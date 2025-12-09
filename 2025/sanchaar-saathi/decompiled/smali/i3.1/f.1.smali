@@ -1,0 +1,31 @@
+.class public abstract Li3/f;
+.super Ljava/util/AbstractSet;
+.source "SourceFile"
+
+# interfaces
+.implements Ljava/util/Set;
+
+
+# direct methods
+.method public constructor <init>()V
+    .locals 0
+
+    invoke-direct {p0}, Ljava/util/AbstractSet;-><init>()V
+
+    return-void
+.end method
+
+
+# virtual methods
+.method public abstract s()I
+.end method
+
+.method public final bridge size()I
+    .locals 1
+
+    invoke-virtual {p0}, Li3/f;->s()I
+
+    move-result v0
+
+    return v0
+.end method
