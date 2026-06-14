@@ -1226,24 +1226,47 @@ def load_sources_sinks(yaml_path: Optional[str]) -> Tuple[Dict, Dict, List[Dict]
     sinks = list(DEFAULT_SINKS)
 
     if isinstance(data, dict):
-        if "sources" in data:
-            for s in data["sources"]:
-                name = s.get("name", "")
-                labels = set(s.get("labels", list(TaintLabel.ALL)))
-                sources[name] = labels
-        if "sanitizers" in data:
-            for s in data["sanitizers"]:
-                name = s.get("name", "")
-                removes = set(s.get("removes", []))
-                sanitizers[name] = removes
-        if "sinks" in data:
-            for s in data["sinks"]:
-                sinks.append({
-                    "func": s.get("func", ""),
-                    "label": s.get("label", TaintLabel.SQL),
-                    "vuln": s.get("vuln", "unknown"),
-                    "severity_base": s.get("severity_base", "high"),
-                })
+        # The YAML has nested categories: sources.superglobals: [list],
+        # sources.wordpress_input_functions: [list], etc.
+        if "sources" in data and isinstance(data["sources"], dict):
+            for category, items in data["sources"].items():
+                if isinstance(items, list):
+                    for item in items:
+                        name = item.split("#")[0].strip() if isinstance(item, str) else str(item)
+                        if name and name not in sources:
+                            sources[name] = TaintLabel.all_set()
+        if "sanitizers" in data and isinstance(data["sanitizers"], dict):
+            label_map = {
+                "sql": {TaintLabel.SQL}, "xss": {TaintLabel.XSS},
+                "command": {TaintLabel.CMD}, "file_path": {TaintLabel.PATH},
+                "auth_checks": set(),
+            }
+            for category, items in data["sanitizers"].items():
+                removes = label_map.get(category, set())
+                if isinstance(items, list):
+                    for item in items:
+                        name = item.split("#")[0].strip() if isinstance(item, str) else str(item)
+                        if name and name not in sanitizers:
+                            sanitizers[name] = removes
+        if "sinks" in data and isinstance(data["sinks"], dict):
+            vuln_map = {
+                "sql_injection": (TaintLabel.SQL, "sql_injection", "critical"),
+                "code_execution": (TaintLabel.CMD, "rce", "critical"),
+                "command_injection": (TaintLabel.CMD, "command_injection", "critical"),
+                "file_operations": (TaintLabel.PATH, "file_inclusion", "high"),
+                "xss_output": (TaintLabel.XSS, "xss", "high"),
+                "deserialization": (TaintLabel.CMD, "object_injection", "critical"),
+                "ssrf": (TaintLabel.URL, "ssrf", "high"),
+                "redirect": (TaintLabel.URL, "open_redirect", "medium"),
+                "variable_injection": (TaintLabel.CMD, "variable_injection", "high"),
+            }
+            for category, items in data["sinks"].items():
+                label, vuln, sev = vuln_map.get(category, (TaintLabel.SQL, "unknown", "high"))
+                if isinstance(items, list):
+                    for item in items:
+                        name = item.split("#")[0].strip() if isinstance(item, str) else str(item)
+                        if name:
+                            sinks.append({"func": name, "label": label, "vuln": vuln, "severity_base": sev})
 
     return sources, sanitizers, sinks
 

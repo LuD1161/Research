@@ -20,7 +20,7 @@ echo ""
 VENV_DIR="${REPO_ROOT}/.venv"
 if [[ ! -d "$VENV_DIR" ]]; then
   info "Creating Python venv at .venv ..."
-  python3 -m venv "$VENV_DIR"
+  uv venv "$VENV_DIR"
   installed "Python venv"
 else
   already "Python venv (.venv)"
@@ -30,8 +30,7 @@ info "Activating venv and installing Python requirements ..."
 # shellcheck source=/dev/null
 source "${VENV_DIR}/bin/activate"
 
-pip install --quiet --upgrade pip
-pip install --quiet -r "${REPO_ROOT}/requirements.txt"
+uv pip install -r "${REPO_ROOT}/requirements.txt"
 installed "Python packages from requirements.txt"
 
 # ── 2. System tools via Homebrew ──────────────────────────────────────────────
@@ -77,8 +76,8 @@ echo "--- Semgrep ---"
 if python3 -c "import semgrep" 2>/dev/null; then
   already "semgrep (python package)"
 else
-  info "Installing semgrep via pip ..."
-  pip install --quiet semgrep
+  info "Installing semgrep via uv pip ..."
+  uv pip install semgrep
   installed "semgrep"
 fi
 
