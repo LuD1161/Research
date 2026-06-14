@@ -1,0 +1,223 @@
+# WordPress PHP Security Analysis: Sources, Sinks, and Sanitizers
+# Used for taint analysis and vulnerability detection in WordPress plugins/themes.
+# Each entry represents a PHP function, method, or superglobal that may introduce,
+# propagate, or neutralize untrusted data.
+
+# ---------------------------------------------------------------------------
+# SOURCES
+# Functions, variables, and constructs that introduce untrusted/external data
+# into the application. Tainted data originates from these points.
+# ---------------------------------------------------------------------------
+sources:
+
+  # PHP superglobals — direct user-controlled input from HTTP requests
+  superglobals:
+    - $_GET
+    - $_POST
+    - $_REQUEST
+    - $_COOKIE
+    - $_SERVER
+    - $_FILES
+    - $_ENV
+
+  # WordPress input helpers — may wrap superglobals; still considered tainted
+  # unless explicitly sanitized before return (e.g. absint, sanitize_text_field)
+  wordpress_input_functions:
+    - get_query_var           # reads from WP query vars (often from $_GET)
+    - get_search_query        # returns the current search query string
+    - wp_unslash              # strips slashes but does NOT sanitize; still tainted
+    - sanitize_text_field     # sanitizes but output is still user-controlled text
+    - sanitize_email          # sanitizes but output is still user-controlled text
+    - sanitize_file_name      # sanitizes but output is still user-controlled text
+    - sanitize_title          # sanitizes but output is still user-controlled text
+    - absint                  # casts to unsigned int; safe for SQL/int contexts only
+    - intval                  # casts to int; safe for SQL/int contexts only
+    - stripslashes_deep       # strips slashes recursively; does NOT sanitize
+    - rest_get_parameters     # returns raw REST API request parameters
+    # WP_REST_Request methods — all return unvalidated request data
+    - WP_REST_Request::get_param
+    - WP_REST_Request::get_params
+    - WP_REST_Request::get_json_params
+    - WP_REST_Request::get_body
+    - WP_REST_Request::get_body_params
+    - WP_REST_Request::get_url_params
+    - WP_REST_Request::get_query_params
+    - WP_REST_Request::get_file_params
+    - WP_REST_Request::get_header
+    - WP_REST_Request::get_headers
+
+  # Raw PHP input mechanisms — bypass WordPress entirely
+  php_input:
+    - file_get_contents('php://input')  # raw HTTP request body
+    - php_sapi_name                     # environment info; can influence flow
+    - getenv                            # environment variables
+    - apache_request_headers            # raw HTTP headers (Apache only)
+    - getallheaders                     # raw HTTP headers (generic)
+
+  # Database reads — values may have been stored from earlier tainted input;
+  # treat as tainted when tracing stored-XSS or second-order injection paths
+  database_reads:
+    - $wpdb->get_var       # single value from DB query
+    - $wpdb->get_row       # single row from DB query
+    - $wpdb->get_col       # single column from DB query
+    - $wpdb->get_results   # multiple rows from DB query
+    - get_option           # reads from wp_options table
+    - get_user_meta        # reads user meta values
+    - get_post_meta        # reads post meta values
+    - get_term_meta        # reads term meta values
+    - get_transient        # reads cached transient values
+    - get_site_transient   # reads network-wide transient values
+    - get_comment_meta     # reads comment meta values
+
+
+# ---------------------------------------------------------------------------
+# SINKS
+# Functions and constructs where tainted data can cause security vulnerabilities.
+# Tainted data reaching these points without proper sanitization is a bug.
+# ---------------------------------------------------------------------------
+sinks:
+
+  # SQL Injection — tainted data interpolated into raw SQL queries
+  sql_injection:
+    - $wpdb->query       # executes arbitrary SQL
+    - $wpdb->get_var     # also a source; sink when query arg is tainted
+    - $wpdb->get_row     # also a source; sink when query arg is tainted
+    - $wpdb->get_col     # also a source; sink when query arg is tainted
+    - $wpdb->get_results # also a source; sink when query arg is tainted
+
+  # Code Execution — tainted data evaluated as PHP code
+  code_execution:
+    - eval                  # executes string as PHP code
+    - assert                # can execute string argument as PHP (PHP < 8)
+    - preg_replace          # dangerous with /e modifier (deprecated in PHP 7)
+    - create_function       # creates anonymous function from string; deprecated
+    - call_user_func        # calls a callback; tainted callback = RCE
+    - call_user_func_array  # calls a callback with array args; tainted = RCE
+    - array_map             # tainted callback argument leads to RCE
+    - array_filter          # tainted callback argument leads to RCE
+    - usort                 # tainted callback argument leads to RCE
+    - uasort                # tainted callback argument leads to RCE
+    - uksort                # tainted callback argument leads to RCE
+
+  # Command Injection — tainted data passed to OS shell commands
+  command_injection:
+    - exec            # executes shell command
+    - system          # executes shell command and outputs result
+    - passthru        # executes shell command and passes raw output
+    - shell_exec      # executes shell command via shell; returns output
+    - popen           # opens a pipe to a shell process
+    - proc_open       # opens a process with fine-grained I/O control
+    - pcntl_exec      # executes a program (replaces current process)
+    - backtick_operator  # `cmd` syntax; equivalent to shell_exec
+
+  # File Operations — tainted data used in file paths or content
+  file_operations:
+    - file_get_contents  # read arbitrary file (also SSRF if URL)
+    - file_put_contents  # write arbitrary file (RCE if .php)
+    - fopen              # open arbitrary file for reading/writing
+    - fwrite             # write to open file handle
+    - readfile           # output file contents directly
+    - file               # read file into array
+    - include            # include and execute a PHP file (LFI/RFI)
+    - include_once       # include and execute a PHP file (LFI/RFI)
+    - require            # require and execute a PHP file (LFI/RFI)
+    - require_once       # require and execute a PHP file (LFI/RFI)
+    - move_uploaded_file # moves uploaded file to target path
+    - copy               # copies file to target path
+    - rename             # renames/moves file or directory
+    - unlink             # deletes a file
+    - mkdir              # creates a directory
+    - rmdir              # removes a directory
+
+  # Cross-Site Scripting (XSS) — tainted data output to HTML/JSON without escaping
+  xss_output:
+    - echo                 # outputs string directly to response
+    - print                # outputs string directly to response
+    - printf               # formatted output to response
+    - vprintf              # formatted output with array args
+    - wp_die               # outputs message and terminates; often rendered as HTML
+    - wp_send_json         # outputs JSON response (check for stored XSS via JSON)
+    - wp_send_json_success # outputs success JSON response
+    - wp_send_json_error   # outputs error JSON response
+
+  # PHP Object Injection / Deserialization
+  deserialization:
+    - unserialize       # deserializes PHP object from string; triggers __wakeup etc.
+    - maybe_unserialize # WP wrapper; calls unserialize if data looks serialized
+
+  # Server-Side Request Forgery (SSRF) — tainted URL in outbound HTTP request
+  ssrf:
+    - wp_remote_get          # WordPress HTTP GET request
+    - wp_remote_post         # WordPress HTTP POST request
+    - wp_remote_request      # WordPress generic HTTP request
+    - wp_safe_remote_get     # "safe" variant; still SSRF if URL bypass possible
+    - wp_safe_remote_post    # "safe" variant; still SSRF if URL bypass possible
+    - wp_safe_remote_request # "safe" variant; still SSRF if URL bypass possible
+    - curl_exec              # executes cURL request
+    - curl_multi_exec        # executes multiple cURL requests
+
+  # Open Redirect — tainted URL in redirect response header
+  redirect:
+    - wp_redirect      # sends Location header; unsafe with tainted URL
+    - wp_safe_redirect # validates host; still check for bypass techniques
+    - header           # raw header output; redirect if Location: is tainted
+
+  # Variable Injection — tainted data used to overwrite arbitrary variables
+  variable_injection:
+    - extract              # imports array keys as variable names; very dangerous
+    - parse_str            # parses query string into variables
+    - mb_parse_str         # multibyte variant of parse_str
+    - import_request_variables  # imports GET/POST/COOKIE into scope (PHP 4/5 only)
+
+
+# ---------------------------------------------------------------------------
+# SANITIZERS
+# Functions that neutralize tainted data for a specific context.
+# A sanitizer only makes data safe for its intended context — not universally.
+# Always verify the sanitizer matches the sink context.
+# ---------------------------------------------------------------------------
+sanitizers:
+
+  # SQL context — makes data safe for use in SQL queries
+  sql:
+    - $wpdb->prepare  # parameterized query builder; gold standard for SQL safety
+    - absint          # converts to non-negative integer; safe for integer SQL params
+    - intval          # converts to integer; safe for integer SQL params
+    - (int)           # PHP cast to integer; safe for integer SQL params
+    - (float)         # PHP cast to float; safe for float SQL params
+
+  # HTML/output context — makes data safe for rendering in a browser
+  xss:
+    - esc_html          # escapes HTML special chars; use inside HTML content
+    - esc_attr          # escapes HTML attribute value; use inside attribute quotes
+    - esc_url           # escapes and validates URL; use in href/src attributes
+    - esc_js            # escapes for inline JavaScript string context
+    - esc_textarea      # escapes for <textarea> content
+    - wp_kses           # strips disallowed HTML tags/attributes with allowlist
+    - wp_kses_post      # wp_kses with the default post allowlist
+    - wp_kses_data      # wp_kses with a minimal data allowlist
+    - htmlspecialchars  # PHP native HTML escaping
+    - htmlentities      # PHP native HTML entity encoding (broader than htmlspecialchars)
+    - strip_tags        # removes HTML/PHP tags; NOT sufficient alone for XSS
+
+  # File path context — prevents path traversal attacks
+  file_path:
+    - realpath         # resolves canonical absolute path; detects traversal
+    - wp_normalize_path  # normalizes path separators for cross-platform safety
+    - validate_file    # WordPress check; returns 0 if path is safe, >0 if not
+
+  # Shell command context — makes data safe for use in OS commands
+  command:
+    - escapeshellarg  # wraps argument in single quotes; escapes embedded quotes
+    - escapeshellcmd  # escapes shell metacharacters; less safe than escapeshellarg
+
+  # Authorization / nonce checks — not sanitizers per se, but guard sinks
+  # by ensuring the request is authenticated and intentional.
+  # A missing auth check before a privileged sink is itself a vulnerability.
+  auth_checks:
+    - current_user_can      # checks if current user has a given capability
+    - wp_verify_nonce       # verifies a nonce value (returns 1 or 2, or false)
+    - check_admin_referer   # verifies nonce + referer for admin actions; dies on fail
+    - check_ajax_referer    # verifies nonce for AJAX actions; dies on fail
+    - is_user_logged_in     # checks if any user is logged in (weak check alone)
+    - wp_check_password     # verifies a plaintext password against a hash

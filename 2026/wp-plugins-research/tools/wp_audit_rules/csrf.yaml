@@ -1,0 +1,99 @@
+rules:
+  - id: wp-csrf-post-handler-no-nonce
+    message: >
+      A POST action handler does not call wp_verify_nonce() or check_admin_referer().
+      Without nonce verification any authenticated user can be tricked into triggering
+      this action via a CSRF attack. Add nonce verification at the top of the handler.
+    severity: ERROR
+    languages: [php]
+    metadata:
+      category: security
+      subcategory: csrf
+      cwe: "CWE-352"
+      confidence: MEDIUM
+    patterns:
+      - pattern: |
+          if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            ...
+          }
+        pattern-not: |
+          if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            ... wp_verify_nonce(...) ...
+          }
+        pattern-not: |
+          if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            ... check_admin_referer(...) ...
+          }
+        pattern-not: |
+          if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            ... check_ajax_referer(...) ...
+          }
+
+  - id: wp-csrf-admin-post-no-referer-check
+    message: >
+      admin-post.php action handler registered without a nonce/referer check.
+      Wrap the callback with check_admin_referer() to prevent CSRF.
+    severity: WARNING
+    languages: [php]
+    metadata:
+      category: security
+      subcategory: csrf
+      cwe: "CWE-352"
+      confidence: LOW
+    patterns:
+      - pattern: add_action("admin_post_...", $FUNC);
+        pattern-not: add_action("admin_post_...", function() { ... check_admin_referer(...) ... });
+
+  - id: wp-csrf-ajax-handler-no-nonce
+    message: >
+      AJAX action handler does not verify nonce via check_ajax_referer() or wp_verify_nonce().
+      This exposes the action to CSRF attacks from authenticated users.
+    severity: ERROR
+    languages: [php]
+    metadata:
+      category: security
+      subcategory: csrf
+      cwe: "CWE-352"
+      confidence: MEDIUM
+    patterns:
+      - pattern: |
+          add_action("wp_ajax_...", function() {
+            ...
+          });
+        pattern-not: |
+          add_action("wp_ajax_...", function() {
+            ... check_ajax_referer(...) ...
+          });
+        pattern-not: |
+          add_action("wp_ajax_...", function() {
+            ... wp_verify_nonce(...) ...
+          });
+
+  - id: wp-csrf-settings-update-no-nonce
+    message: >
+      update_option() or similar settings update called in a request handler without
+      a preceding nonce check. An attacker can forge a request to change plugin settings.
+    severity: WARNING
+    languages: [php]
+    metadata:
+      category: security
+      subcategory: csrf
+      cwe: "CWE-352"
+      confidence: LOW
+    patterns:
+      - pattern: |
+          if (isset($_POST[...])) {
+            ...
+            update_option(...);
+            ...
+          }
+        pattern-not: |
+          if (isset($_POST[...])) {
+            ... wp_verify_nonce(...) ...
+            ... update_option(...) ...
+          }
+        pattern-not: |
+          if (isset($_POST[...])) {
+            ... check_admin_referer(...) ...
+            ... update_option(...) ...
+          }

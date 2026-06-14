@@ -1,0 +1,103 @@
+rules:
+  - id: wp-path-traversal-include-get
+    message: >
+      include() with user-supplied path from $_GET enables Path Traversal and Remote/Local
+      File Inclusion (LFI/RFI). An attacker can load arbitrary files from the server.
+      Never use user input in file include paths; use a whitelist of allowed files.
+    severity: ERROR
+    languages: [php]
+    metadata:
+      category: security
+      subcategory: path-traversal
+      cwe: "CWE-22"
+      confidence: HIGH
+    pattern: include($_GET[...]);
+
+  - id: wp-path-traversal-include-post
+    message: >
+      include() with user-supplied path from $_POST enables Local/Remote File Inclusion.
+      Validate file paths against a strict whitelist.
+    severity: ERROR
+    languages: [php]
+    metadata:
+      category: security
+      subcategory: path-traversal
+      cwe: "CWE-22"
+      confidence: HIGH
+    pattern: include($_POST[...]);
+
+  - id: wp-path-traversal-require-user-input
+    message: >
+      require() with user-supplied path enables Local/Remote File Inclusion.
+      Validate file paths against a strict whitelist before including them.
+    severity: ERROR
+    languages: [php]
+    metadata:
+      category: security
+      subcategory: path-traversal
+      cwe: "CWE-22"
+      confidence: HIGH
+    patterns:
+      - pattern: require($_GET[...]);
+      - pattern: require($_POST[...]);
+      - pattern: require($_REQUEST[...]);
+      - pattern: require_once($_GET[...]);
+      - pattern: require_once($_POST[...]);
+      - pattern: require_once($_REQUEST[...]);
+      - pattern: include_once($_GET[...]);
+      - pattern: include_once($_POST[...]);
+      - pattern: include_once($_REQUEST[...]);
+
+  - id: wp-path-traversal-include-interpolation
+    message: >
+      include/require with string concatenation involving user input enables Path Traversal.
+      Sanitize and validate the path; use realpath() and ensure it falls within allowed dirs.
+    severity: ERROR
+    languages: [php]
+    metadata:
+      category: security
+      subcategory: path-traversal
+      cwe: "CWE-22"
+      confidence: HIGH
+    patterns:
+      - pattern: include("..." . $_GET[...] . "...");
+      - pattern: include("..." . $_POST[...] . "...");
+      - pattern: require("..." . $_GET[...] . "...");
+      - pattern: require("..." . $_POST[...] . "...");
+
+  - id: wp-path-traversal-file-get-contents-user-input
+    message: >
+      file_get_contents() with a user-controlled path from $_GET/$_POST can allow reading
+      arbitrary server files (Path Traversal / LFI). Validate the path against an allowlist
+      and use realpath() to canonicalize before reading.
+    severity: ERROR
+    languages: [php]
+    metadata:
+      category: security
+      subcategory: path-traversal
+      cwe: "CWE-22"
+      confidence: HIGH
+    patterns:
+      - pattern: file_get_contents($_GET[...]);
+      - pattern: file_get_contents($_POST[...]);
+      - pattern: file_get_contents($_REQUEST[...]);
+      - pattern: file_get_contents("..." . $_GET[...] . "...");
+      - pattern: file_get_contents("..." . $_POST[...] . "...");
+
+  - id: wp-path-traversal-file-put-contents-user-input
+    message: >
+      file_put_contents() with a user-controlled path enables arbitrary file write.
+      This can be used for webshell upload or overwriting critical files.
+      Validate and whitelist the destination path.
+    severity: ERROR
+    languages: [php]
+    metadata:
+      category: security
+      subcategory: path-traversal
+      cwe: "CWE-22"
+      confidence: HIGH
+    patterns:
+      - pattern: file_put_contents($_GET[...], ...);
+      - pattern: file_put_contents($_POST[...], ...);
+      - pattern: file_put_contents("..." . $_GET[...] . "...", ...);
+      - pattern: file_put_contents("..." . $_POST[...] . "...", ...);

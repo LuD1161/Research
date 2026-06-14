@@ -1,0 +1,81 @@
+rules:
+  - id: wp-auth-nopriv-ajax-no-nonce
+    message: >
+      wp_ajax_nopriv_ hooks are accessible by unauthenticated users. Without nonce
+      verification this handler may be exploited for CSRF or unauthorized actions.
+      Add wp_verify_nonce() or check_ajax_referer() inside the callback.
+    severity: WARNING
+    languages: [php]
+    metadata:
+      category: security
+      subcategory: auth-bypass
+      cwe: "CWE-306"
+      confidence: MEDIUM
+    pattern: add_action("wp_ajax_nopriv_...", ...);
+
+  - id: wp-auth-rest-return-true-permission
+    message: >
+      Using __return_true as the permission_callback for a REST route grants access
+      to all users including unauthenticated ones. Implement a proper capability check.
+    severity: ERROR
+    languages: [php]
+    metadata:
+      category: security
+      subcategory: auth-bypass
+      cwe: "CWE-862"
+      confidence: HIGH
+    patterns:
+      - pattern: |
+          register_rest_route(..., ..., [..., 'permission_callback' => '__return_true', ...]);
+      - pattern: |
+          register_rest_route(..., ..., ['permission_callback' => '__return_true']);
+
+  - id: wp-auth-rest-no-permission-callback
+    message: >
+      REST route registered without a permission_callback. This defaults to open access
+      in older WordPress versions. Always define a permission_callback that verifies
+      user capabilities.
+    severity: WARNING
+    languages: [php]
+    metadata:
+      category: security
+      subcategory: auth-bypass
+      cwe: "CWE-862"
+      confidence: LOW
+    pattern: register_rest_route($NS, $ROUTE, $ARGS);
+
+  - id: wp-auth-ajax-no-capability-check
+    message: >
+      wp_ajax_ handler does not appear to check user capabilities via current_user_can().
+      Without capability checks, any logged-in user can trigger this action.
+    severity: WARNING
+    languages: [php]
+    metadata:
+      category: security
+      subcategory: auth-bypass
+      cwe: "CWE-862"
+      confidence: LOW
+    patterns:
+      - pattern: |
+          add_action("wp_ajax_...", function() { ... });
+        pattern-not: |
+          add_action("wp_ajax_...", function() { ... current_user_can(...) ... });
+
+  - id: wp-auth-admin-ajax-no-nonce
+    message: >
+      admin-post.php or admin-ajax.php handler does not call check_ajax_referer() or
+      wp_verify_nonce(). This may allow CSRF attacks against admin actions.
+    severity: WARNING
+    languages: [php]
+    metadata:
+      category: security
+      subcategory: auth-bypass
+      cwe: "CWE-352"
+      confidence: LOW
+    patterns:
+      - pattern: |
+          add_action("wp_ajax_...", function() { ... });
+        pattern-not: |
+          add_action("wp_ajax_...", function() { ... check_ajax_referer(...) ... });
+        pattern-not: |
+          add_action("wp_ajax_...", function() { ... wp_verify_nonce(...) ... });
