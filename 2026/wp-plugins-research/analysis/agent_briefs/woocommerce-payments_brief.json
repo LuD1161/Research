@@ -1,0 +1,4439 @@
+{
+  "plugin_slug": "woocommerce-payments",
+  "priority_score": 266,
+  "metadata": {
+    "php_files": 970,
+    "total_lines": 229814
+  },
+  "attack_surface_summary": "# Attack Surface: woocommerce-payments\n\n> Generated: 2026-06-14T21:21:12Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 2535,
+    "total_sinks": 884,
+    "total_sanitizers": 1579,
+    "direct_flows": 851,
+    "functions_with_sources": 906,
+    "functions_with_sinks": 566,
+    "files_analyzed": 970,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "woocommerce-payments-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$currency = sanitize_text_field( wp_unslash( $_POST['currency'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments.php",
+        "line": 1975
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1975,
+          "expression": "$currency = sanitize_text_field( wp_unslash( $_POST['currency'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1983,
+          "expression": "$is_available = WC_Payments_Utils::is_any_bnpl_method_available( $enabled_bnpl_payment_methods, $country, $currency, $price )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1985,
+          "expression": "wp_send_json_success( [ 'is_available' => $is_available ] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( [ 'is_available' => $is_available ] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments.php",
+        "line": 1985
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$order_id = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : false",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payment-gateway-wcpay.php",
+        "line": 3881
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 3881,
+          "expression": "$order_id = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : false",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 3882,
+          "expression": "$order    = wc_get_order( $order_id )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 4020,
+          "expression": "$return_url = method_exists( $order, 'get_view_order_url' ) ? $order->get_view_order_url() : $this->get_return_url( $order )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 4024,
+          "expression": "echo wp_json_encode(\n\t\t\t\t\t[\n\t\t\t\t\t\t'return_url' => $return_url,\n\t\t\t\t\t]\n\t\t\t\t);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo wp_json_encode(\n\t\t\t\t\t[\n\t\t\t\t\t\t'return_url' => $return_url,\n\t\t\t\t\t]\n\t\t\t\t);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payment-gateway-wcpay.php",
+        "line": 4024
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$capabilities = wp_unslash( $_REQUEST['capabilities'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-onboarding-service.php",
+        "line": 240
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 240,
+          "expression": "$capabilities = wp_unslash( $_REQUEST['capabilities'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 242,
+          "expression": "$capabilities = json_decode( $capabilities, true ) ?? []",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 250,
+          "expression": "$capabilities = array_combine(\n\t\t\tarray_map(\n\t\t\t\tfunction ( $key ) {\n\t\t\t\t\t// Keep numeric keys as integers so we can remove them later.\n\t\t\t\t\tif ( is_numeric( $key ) ) {\n\t\t\t\t\t\treturn intval( $key );\n\t\t\t\t\t}\n\n\t\t\t\t\treturn sanitize_text_field( $key );\n\t\t\t\t},\n\t\t\t\tarray_keys( $capabilities )\n\t\t\t),\n\t\t\tarray_map(\n\t\t\t\tfunction ( $value ) {\n\t\t\t\t\treturn filter_var( $value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE );\n\t\t\t\t},\n\t\t\t\t$capabilities\n\t\t\t)\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 271,
+          "expression": "$capabilities = array_filter(\n\t\t\t$capabilities,\n\t\t\tfunction ( $value, $key ) {\n\t\t\t\treturn is_string( $key ) && is_bool( $value );\n\t\t\t},\n\t\t\tARRAY_FILTER_USE_BOTH\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 271,
+          "expression": "$capabilities = array_filter(\n\t\t\t$capabilities,\n\t\t\tfunction ( $value, $key ) {\n\t\t\t\treturn is_string( $key ) && is_bool( $value );\n\t\t\t},\n\t\t\tARRAY_FILTER_USE_BOTH\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$capabilities = array_filter(\n\t\t\t$capabilities,\n\t\t\tfunction ( $value, $key ) {\n\t\t\t\treturn is_string( $key ) && is_bool( $value );\n\t\t\t},\n\t\t\tARRAY_FILTER_USE_BOTH\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-onboarding-service.php",
+        "line": 271
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "function ( $pm, $index ) {\n\t\t\t\tif ( ! isset( $pm['priority'] ) ) {\n\t\t\t\t\t$pm['priority'] = $index;\n\t\t\t\t} else {\n\t\t\t\t\t$pm['priority'] = intval( $pm['priority'] );\n\t\t\t\t}\n\n\t\t\t\treturn $pm;\n\t\t\t}",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-account.php",
+        "line": 740
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 740,
+          "expression": "$recommended_pms = array_map(\n\t\t\tfunction ( $pm, $index ) {\n\t\t\t\tif ( ! isset( $pm['priority'] ) ) {\n\t\t\t\t\t$pm['priority'] = $index;\n\t\t\t\t} else {\n\t\t\t\t\t$pm['priority'] = intval( $pm['priority'] );\n\t\t\t\t}\n\n\t\t\t\treturn $pm;\n\t\t\t},\n\t\t\t$recommended_pms,\n\t\t\tarray_keys( $recommended_pms )\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$recommended_pms = array_map(\n\t\t\tfunction ( $pm, $index ) {\n\t\t\t\tif ( ! isset( $pm['priority'] ) ) {\n\t\t\t\t\t$pm['priority'] = $index;\n\t\t\t\t} else {\n\t\t\t\t\t$pm['priority'] = intval( $pm['priority'] );\n\t\t\t\t}\n\n\t\t\t\treturn $pm;\n\t\t\t},\n\t\t\t$recommended_pms,\n\t\t\tarray_keys( $recommended_pms )\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-account.php",
+        "line": 740
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$wcpay_connect_param         = sanitize_text_field( wp_unslash( $_GET['wcpay-connect'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-account.php",
+        "line": 1377
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1377,
+          "expression": "$wcpay_connect_param         = sanitize_text_field( wp_unslash( $_GET['wcpay-connect'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1797,
+          "expression": "$redirect_to = $this->init_stripe_onboarding(\n\t\t\t\t\t$create_test_drive_account ? 'test_drive' : ( $should_onboard_in_test_mode ? 'test' : 'live' ),\n\t\t\t\t\t$wcpay_connect_param,\n\t\t\t\t\t[\n\t\t\t\t\t\t'promo'                       => ! empty( $incentive_id ) ? $incentive_id : false,\n\t\t\t\t\t\t'collect_payout_requirements' => $collect_payout_requirements ? 'true' : false,\n\t\t\t\t\t\t'source'                      => $onboarding_source,\n\t\t\t\t\t\t'from'                        => WC_Payments_Onboarding_Service::FROM_STRIPE,\n\t\t\t\t\t]\n\t\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1815,
+          "expression": "$redirect_to = wp_sanitize_redirect( $redirect_to )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1816,
+          "expression": "$redirect_to = wp_validate_redirect( $redirect_to )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 1821,
+          "expression": "wp_send_json_success( [ 'redirect_to' => $redirect_to ] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( [ 'redirect_to' => $redirect_to ] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-account.php",
+        "line": 1821
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woocommerce-payments-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$args = [\n\t\t\t'experiment_name'  => $test_name,\n\t\t\t'anon_id'          => $this->anon_id,\n\t\t\t'woo_country_code' => get_option( 'woocommerce_default_country' ),\n\t\t]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-experimental-abtest.php",
+        "line": 154
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 154,
+          "expression": "$args = [\n\t\t\t'experiment_name'  => $test_name,\n\t\t\t'anon_id'          => $this->anon_id,\n\t\t\t'woo_country_code' => get_option( 'woocommerce_default_country' ),\n\t\t]",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 160,
+          "expression": "$url = add_query_arg(\n\t\t\t$args,\n\t\t\tsprintf( // nosemgrep: audit.php.wp.security.xss.query-arg -- constant value is passed in to add_query_arg.\n\t\t\t\t'https://public-api.wordpress.com/wpcom/v2/experiments/0.1.0/assignments/%s',\n\t\t\t\t$this->platform\n\t\t\t)\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 168,
+          "expression": "$get = wp_remote_get( $url )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$get = wp_remote_get( $url )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-experimental-abtest.php",
+        "line": 168
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$adv_fraud_settings = json_decode( wp_json_encode( $this->gateway->get_option( 'advanced_fraud_protection_settings' ) ), true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-status.php",
+        "line": 561
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 561,
+          "expression": "$adv_fraud_settings = json_decode( wp_json_encode( $this->gateway->get_option( 'advanced_fraud_protection_settings' ) ), true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 562,
+          "expression": "$list               = array_filter(\n\t\t\t\t\t\t\t\tarray_map(\n\t\t\t\t\t\t\t\t\tfunction ( $rule ) {\n\t\t\t\t\t\t\t\t\t\tif ( empty( $rule['key'] ) ) {\n\t\t\t\t\t\t\t\t\t\t\treturn null;\n\t\t\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t\t\tswitch ( $rule['key'] ) {\n\t\t\t\t\t\t\t\t\t\t\tcase 'avs_verification':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'AVS Verification';\n\t\t\t\t\t\t\t\t\t\t\tcase 'international_ip_address':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'International IP Address';\n\t\t\t\t\t\t\t\t\t\t\tcase 'ip_address_mismatch':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'IP Address Mismatch';\n\t\t\t\t\t\t\t\t\t\t\tcase 'address_mismatch':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Address Mismatch';\n\t\t\t\t\t\t\t\t\t\t\tcase 'purchase_price_threshold':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Purchase Price Threshold';\n\t\t\t\t\t\t\t\t\t\t\tcase 'order_items_threshold':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Order Items Threshold';\n\t\t\t\t\t\t\t\t\t\t\tdefault:\n\t\t\t\t\t\t\t\t\t\t\t\t// Ignore all others.\n\t\t\t\t\t\t\t\t\t\t\t\treturn null;\n\t\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t\t},\n\t\t\t\t\t\t\t\t\t$adv_fraud_settings\n\t\t\t\t\t\t\t\t)\n\t\t\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$list               = array_filter(\n\t\t\t\t\t\t\t\tarray_map(\n\t\t\t\t\t\t\t\t\tfunction ( $rule ) {\n\t\t\t\t\t\t\t\t\t\tif ( empty( $rule['key'] ) ) {\n\t\t\t\t\t\t\t\t\t\t\treturn null;\n\t\t\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t\t\tswitch ( $rule['key'] ) {\n\t\t\t\t\t\t\t\t\t\t\tcase 'avs_verification':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'AVS Verification';\n\t\t\t\t\t\t\t\t\t\t\tcase 'international_ip_address':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'International IP Address';\n\t\t\t\t\t\t\t\t\t\t\tcase 'ip_address_mismatch':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'IP Address Mismatch';\n\t\t\t\t\t\t\t\t\t\t\tcase 'address_mismatch':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Address Mismatch';\n\t\t\t\t\t\t\t\t\t\t\tcase 'purchase_price_threshold':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Purchase Price Threshold';\n\t\t\t\t\t\t\t\t\t\t\tcase 'order_items_threshold':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Order Items Threshold';\n\t\t\t\t\t\t\t\t\t\t\tdefault:\n\t\t\t\t\t\t\t\t\t\t\t\t// Ignore all others.\n\t\t\t\t\t\t\t\t\t\t\t\treturn null;\n\t\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t\t},\n\t\t\t\t\t\t\t\t\t$adv_fraud_settings\n\t\t\t\t\t\t\t\t)\n\t\t\t\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-status.php",
+        "line": 562
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$adv_fraud_settings = json_decode( wp_json_encode( $this->gateway->get_option( 'advanced_fraud_protection_settings' ) ), true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-status.php",
+        "line": 561
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 561,
+          "expression": "$adv_fraud_settings = json_decode( wp_json_encode( $this->gateway->get_option( 'advanced_fraud_protection_settings' ) ), true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 562,
+          "expression": "$list               = array_filter(\n\t\t\t\t\t\t\t\tarray_map(\n\t\t\t\t\t\t\t\t\tfunction ( $rule ) {\n\t\t\t\t\t\t\t\t\t\tif ( empty( $rule['key'] ) ) {\n\t\t\t\t\t\t\t\t\t\t\treturn null;\n\t\t\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t\t\tswitch ( $rule['key'] ) {\n\t\t\t\t\t\t\t\t\t\t\tcase 'avs_verification':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'AVS Verification';\n\t\t\t\t\t\t\t\t\t\t\tcase 'international_ip_address':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'International IP Address';\n\t\t\t\t\t\t\t\t\t\t\tcase 'ip_address_mismatch':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'IP Address Mismatch';\n\t\t\t\t\t\t\t\t\t\t\tcase 'address_mismatch':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Address Mismatch';\n\t\t\t\t\t\t\t\t\t\t\tcase 'purchase_price_threshold':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Purchase Price Threshold';\n\t\t\t\t\t\t\t\t\t\t\tcase 'order_items_threshold':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Order Items Threshold';\n\t\t\t\t\t\t\t\t\t\t\tdefault:\n\t\t\t\t\t\t\t\t\t\t\t\t// Ignore all others.\n\t\t\t\t\t\t\t\t\t\t\t\treturn null;\n\t\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t\t},\n\t\t\t\t\t\t\t\t\t$adv_fraud_settings\n\t\t\t\t\t\t\t\t)\n\t\t\t\t\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 591,
+          "expression": "echo empty( $list ) ? '-' : esc_html( implode( ',', $list ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo empty( $list ) ? '-' : esc_html( implode( ',', $list ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-status.php",
+        "line": 591
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$manual_capture_enabled = 'yes' === $this->gateway->get_option( 'manual_capture' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-status.php",
+        "line": 607
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 607,
+          "expression": "$manual_capture_enabled = 'yes' === $this->gateway->get_option( 'manual_capture' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 608,
+          "expression": "echo $manual_capture_enabled ? esc_html__( 'Enabled', 'woocommerce-payments' ) : esc_html__( 'Disabled', 'woocommerce-payments' );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $manual_capture_enabled ? esc_html__( 'Enabled', 'woocommerce-payments' ) : esc_html__( 'Disabled', 'woocommerce-payments' );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-status.php",
+        "line": 608
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$enabled_payment_methods   = $this->main_gateway->get_option( 'upe_enabled_payment_method_ids', [] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/migrations/class-manual-capture-payment-method-settings-update.php",
+        "line": 69
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 69,
+          "expression": "$enabled_payment_methods   = $this->main_gateway->get_option( 'upe_enabled_payment_method_ids', [] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 73,
+          "expression": "$filtered_payment_methods = array_filter(\n\t\t\t\t$enabled_payment_methods,\n\t\t\t\tfunction ( $method ) {\n\t\t\t\t\treturn in_array( $method, [ Payment_Method::CARD, Payment_Method::LINK ], true );\n\t\t\t\t}\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$filtered_payment_methods = array_filter(\n\t\t\t\t$enabled_payment_methods,\n\t\t\t\tfunction ( $method ) {\n\t\t\t\t\treturn in_array( $method, [ Payment_Method::CARD, Payment_Method::LINK ], true );\n\t\t\t\t}\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/migrations/class-manual-capture-payment-method-settings-update.php",
+        "line": 73
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$enabled_payment_methods = $this->main_gateway->get_option( 'upe_enabled_payment_method_ids', [] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/migrations/class-payment-method-deprecation-settings-update.php",
+        "line": 77
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 77,
+          "expression": "$enabled_payment_methods = $this->main_gateway->get_option( 'upe_enabled_payment_method_ids', [] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 79,
+          "expression": "$filtered_payment_methods = array_filter(\n\t\t\t$enabled_payment_methods,\n\t\t\tfunction ( $method ) {\n\t\t\t\treturn $this->payment_method_id !== $method;\n\t\t\t}\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$filtered_payment_methods = array_filter(\n\t\t\t$enabled_payment_methods,\n\t\t\tfunction ( $method ) {\n\t\t\t\treturn $this->payment_method_id !== $method;\n\t\t\t}\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/migrations/class-payment-method-deprecation-settings-update.php",
+        "line": 79
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-006",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$user_id    = isset( $_POST['user_id'] ) ? absint( $_POST['user_id'] ) : 0",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/compat/subscriptions/trait-wc-payment-gateway-wcpay-subscriptions.php",
+        "line": 756
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 756,
+          "expression": "$user_id    = isset( $_POST['user_id'] ) ? absint( $_POST['user_id'] ) : 0",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 776,
+          "expression": "$tokens = $this->get_user_formatted_tokens_array( $user_id, $gateway_id )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 777,
+          "expression": "wp_send_json_success( [ 'tokens' => $tokens ] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( [ 'tokens' => $tokens ] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/compat/subscriptions/trait-wc-payment-gateway-wcpay-subscriptions.php",
+        "line": 777
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/compat/subscriptions/emails/plain/failed-renewal-authentication.php",
+        "line": 25
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 25,
+          "expression": "echo apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/compat/subscriptions/emails/plain/failed-renewal-authentication.php",
+        "line": 25
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/compat/subscriptions/emails/plain/failed-renewal-authentication-requested.php",
+        "line": 51
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 51,
+          "expression": "echo apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/compat/subscriptions/emails/plain/failed-renewal-authentication-requested.php",
+        "line": 51
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-006",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$updated_fields_callback = function ( $value, string $key ) {\n\t\t\treturn array_key_exists( $key, WC_Payment_Gateway_WCPay::ACCOUNT_SETTINGS_MAPPING ) &&\n\t\t\t\t$this->wcpay_gateway->get_option( $key ) !== $value;\n\t\t}",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-settings-controller.php",
+        "line": 899
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 899,
+          "expression": "$updated_fields_callback = function ( $value, string $key ) {\n\t\t\treturn array_key_exists( $key, WC_Payment_Gateway_WCPay::ACCOUNT_SETTINGS_MAPPING ) &&\n\t\t\t\t$this->wcpay_gateway->get_option( $key ) !== $value;\n\t\t}",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 904,
+          "expression": "$updated_fields = array_filter( $request->get_params(), $updated_fields_callback, ARRAY_FILTER_USE_BOTH )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$updated_fields = array_filter( $request->get_params(), $updated_fields_callback, ARRAY_FILTER_USE_BOTH )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-settings-controller.php",
+        "line": 904
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-009",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$body['user_session'] = isset( $_REQUEST['user_session'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['user_session'] ) ) : null",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/woopay/class-woopay-session.php",
+        "line": 693
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 693,
+          "expression": "$body['user_session'] = isset( $_REQUEST['user_session'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['user_session'] ) ) : null",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 705,
+          "expression": "$response = \\Automattic\\Jetpack\\Connection\\Client::remote_request( $args, wp_json_encode( $body ) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 716,
+          "expression": "wp_send_json( json_decode( $response_body_json ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json( json_decode( $response_body_json ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/woopay/class-woopay-session.php",
+        "line": 716
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woocommerce-payments-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$order_id  = ( isset( $wp->query_vars['order-pay'] ) ) ? absint( $wp->query_vars['order-pay'] ) : absint( $_GET['order_id'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/subscriptions/class-wc-payments-subscription-change-payment-method-handler.php",
+        "line": 124
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 124,
+          "expression": "$order_id  = ( isset( $wp->query_vars['order-pay'] ) ) ? absint( $wp->query_vars['order-pay'] ) : absint( $_GET['order_id'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 126,
+          "expression": "$order     = wc_get_order( $order_id )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 136,
+          "expression": "$subscriptions = wcs_get_subscriptions_for_order( $order, [ 'order_type' => 'any' ] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 139,
+          "expression": "$subscription = array_pop( $subscriptions )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 142,
+          "expression": "wp_safe_redirect( $this->get_subscription_update_payment_url( $subscription ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( $this->get_subscription_update_payment_url( $subscription ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/subscriptions/class-wc-payments-subscription-change-payment-method-handler.php",
+        "line": 142
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-007",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "wp_unslash( $_GET['currency_is'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/Analytics.php",
+        "line": 561
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 561,
+          "expression": "$args['currency_is'] = array_map( 'sanitize_text_field', wp_unslash( $_GET['currency_is'] ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$args['currency_is'] = array_map( 'sanitize_text_field', wp_unslash( $_GET['currency_is'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/Analytics.php",
+        "line": 561
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-008",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "wp_unslash( $_GET['currency_is_not'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/Analytics.php",
+        "line": 565
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 565,
+          "expression": "$args['currency_is_not'] = array_map( 'sanitize_text_field', wp_unslash( $_GET['currency_is_not'] ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$args['currency_is_not'] = array_map( 'sanitize_text_field', wp_unslash( $_GET['currency_is_not'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/Analytics.php",
+        "line": 565
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-010",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$store_currency      = get_option( 'woocommerce_currency' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/MultiCurrency.php",
+        "line": 1012
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1012,
+          "expression": "$store_currency      = get_option( 'woocommerce_currency' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1030,
+          "expression": "$message = sprintf(\n\t\t/* translators: %1 User's country, %2 Selected currency name, %3 Default store currency name, %4 Link to switch currency */\n\t\t\t__( 'We noticed you\\'re visiting from %1$s. We\\'ve updated our prices to %2$s for your shopping convenience. <a href=\"%4$s\">Use %3$s instead.</a>', 'woocommerce-payments' ),\n\t\t\tapply_filters( self::FILTER_PREFIX . 'override_notice_country', WC()->countries->countries[ $country ] ),\n\t\t\tapply_filters( self::FILTER_PREFIX . 'override_notice_currency_name', $current_currency->get_name() ),\n\t\t\tesc_html( $currencies[ $store_currency ] ),\n\t\t\tesc_url( '?currency=' . $store_currency )\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1044,
+          "expression": "echo $message;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $message;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/MultiCurrency.php",
+        "line": 1044
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-009",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$currencies = get_option( self::CUSTOMER_CURRENCIES_KEY )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/MultiCurrency.php",
+        "line": 1438
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1438,
+          "expression": "$currencies = get_option( self::CUSTOMER_CURRENCIES_KEY )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1441,
+          "expression": "array_map( 'strtoupper', $currencies )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map( 'strtoupper', $currencies )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/MultiCurrency.php",
+        "line": 1441
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-010",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$currencies = $wpdb->get_col( $query )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/MultiCurrency.php",
+        "line": 1469
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1469,
+          "expression": "$currencies = $wpdb->get_col( $query )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1473,
+          "expression": "array_map( 'strtoupper', $currencies )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map( 'strtoupper', $currencies )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/MultiCurrency.php",
+        "line": 1473
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-open-002",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "get_permalink( get_option( 'woocommerce_myaccount_page_id' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/express-checkout/class-wc-payments-express-checkout-button-handler.php",
+        "line": 362
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 362,
+          "expression": "wp_safe_redirect( get_permalink( get_option( 'woocommerce_myaccount_page_id' ) ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( get_permalink( get_option( 'woocommerce_myaccount_page_id' ) ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/express-checkout/class-wc-payments-express-checkout-button-handler.php",
+        "line": 362
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": true
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-accounts-controller.php",
+      "start": {
+        "line": 26,
+        "col": 3,
+        "offset": 450
+      },
+      "end": {
+        "line": 34,
+        "col": 5,
+        "offset": 706
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-accounts-controller.php",
+      "start": {
+        "line": 36,
+        "col": 3,
+        "offset": 710
+      },
+      "end": {
+        "line": 44,
+        "col": 5,
+        "offset": 996
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-authorizations-controller.php",
+      "start": {
+        "line": 29,
+        "col": 3,
+        "offset": 539
+      },
+      "end": {
+        "line": 37,
+        "col": 5,
+        "offset": 799
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-authorizations-controller.php",
+      "start": {
+        "line": 38,
+        "col": 3,
+        "offset": 802
+      },
+      "end": {
+        "line": 46,
+        "col": 5,
+        "offset": 1083
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-authorizations-controller.php",
+      "start": {
+        "line": 47,
+        "col": 3,
+        "offset": 1086
+      },
+      "end": {
+        "line": 55,
+        "col": 5,
+        "offset": 1377
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-capital-controller.php",
+      "start": {
+        "line": 28,
+        "col": 3,
+        "offset": 480
+      },
+      "end": {
+        "line": 36,
+        "col": 5,
+        "offset": 770
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-capital-controller.php",
+      "start": {
+        "line": 37,
+        "col": 3,
+        "offset": 773
+      },
+      "end": {
+        "line": 45,
+        "col": 5,
+        "offset": 1035
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-charges-controller.php",
+      "start": {
+        "line": 29,
+        "col": 3,
+        "offset": 507
+      },
+      "end": {
+        "line": 37,
+        "col": 5,
+        "offset": 783
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-charges-controller.php",
+      "start": {
+        "line": 38,
+        "col": 3,
+        "offset": 786
+      },
+      "end": {
+        "line": 46,
+        "col": 5,
+        "offset": 1083
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-connection-tokens-controller.php",
+      "start": {
+        "line": 26,
+        "col": 3,
+        "offset": 466
+      },
+      "end": {
+        "line": 34,
+        "col": 5,
+        "offset": 728
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-customer-controller.php",
+      "start": {
+        "line": 50,
+        "col": 3,
+        "offset": 1012
+      },
+      "end": {
+        "line": 61,
+        "col": 5,
+        "offset": 1386
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-deposits-controller.php",
+      "start": {
+        "line": 29,
+        "col": 3,
+        "offset": 509
+      },
+      "end": {
+        "line": 37,
+        "col": 5,
+        "offset": 763
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-deposits-controller.php",
+      "start": {
+        "line": 38,
+        "col": 3,
+        "offset": 766
+      },
+      "end": {
+        "line": 46,
+        "col": 5,
+        "offset": 1041
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-deposits-controller.php",
+      "start": {
+        "line": 47,
+        "col": 3,
+        "offset": 1044
+      },
+      "end": {
+        "line": 55,
+        "col": 5,
+        "offset": 1320
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-deposits-controller.php",
+      "start": {
+        "line": 56,
+        "col": 3,
+        "offset": 1323
+      },
+      "end": {
+        "line": 64,
+        "col": 5,
+        "offset": 1611
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-deposits-controller.php",
+      "start": {
+        "line": 65,
+        "col": 3,
+        "offset": 1614
+      },
+      "end": {
+        "line": 73,
+        "col": 5,
+        "offset": 1892
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-deposits-controller.php",
+      "start": {
+        "line": 75,
+        "col": 3,
+        "offset": 1896
+      },
+      "end": {
+        "line": 83,
+        "col": 5,
+        "offset": 2182
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-deposits-controller.php",
+      "start": {
+        "line": 85,
+        "col": 3,
+        "offset": 2186
+      },
+      "end": {
+        "line": 93,
+        "col": 5,
+        "offset": 2443
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-disputes-controller.php",
+      "start": {
+        "line": 28,
+        "col": 3,
+        "offset": 478
+      },
+      "end": {
+        "line": 36,
+        "col": 5,
+        "offset": 732
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-disputes-controller.php",
+      "start": {
+        "line": 37,
+        "col": 3,
+        "offset": 735
+      },
+      "end": {
+        "line": 45,
+        "col": 5,
+        "offset": 1031
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-disputes-controller.php",
+      "start": {
+        "line": 46,
+        "col": 3,
+        "offset": 1034
+      },
+      "end": {
+        "line": 54,
+        "col": 5,
+        "offset": 1309
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-disputes-controller.php",
+      "start": {
+        "line": 55,
+        "col": 3,
+        "offset": 1312
+      },
+      "end": {
+        "line": 63,
+        "col": 5,
+        "offset": 1588
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-disputes-controller.php",
+      "start": {
+        "line": 64,
+        "col": 3,
+        "offset": 1591
+      },
+      "end": {
+        "line": 72,
+        "col": 5,
+        "offset": 1869
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-disputes-controller.php",
+      "start": {
+        "line": 73,
+        "col": 3,
+        "offset": 1872
+      },
+      "end": {
+        "line": 81,
+        "col": 5,
+        "offset": 2154
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-disputes-controller.php",
+      "start": {
+        "line": 82,
+        "col": 3,
+        "offset": 2157
+      },
+      "end": {
+        "line": 90,
+        "col": 5,
+        "offset": 2444
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-documents-controller.php",
+      "start": {
+        "line": 29,
+        "col": 3,
+        "offset": 519
+      },
+      "end": {
+        "line": 37,
+        "col": 5,
+        "offset": 774
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-documents-controller.php",
+      "start": {
+        "line": 38,
+        "col": 3,
+        "offset": 777
+      },
+      "end": {
+        "line": 46,
+        "col": 5,
+        "offset": 1053
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-documents-controller.php",
+      "start": {
+        "line": 47,
+        "col": 3,
+        "offset": 1056
+      },
+      "end": {
+        "line": 55,
+        "col": 5,
+        "offset": 1339
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-files-controller.php",
+      "start": {
+        "line": 26,
+        "col": 3,
+        "offset": 419
+      },
+      "end": {
+        "line": 34,
+        "col": 5,
+        "offset": 673
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-files-controller.php",
+      "start": {
+        "line": 36,
+        "col": 3,
+        "offset": 677
+      },
+      "end": {
+        "line": 44,
+        "col": 5,
+        "offset": 964
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-files-controller.php",
+      "start": {
+        "line": 46,
+        "col": 3,
+        "offset": 968
+      },
+      "end": {
+        "line": 54,
+        "col": 5,
+        "offset": 1256
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-files-controller.php",
+      "start": {
+        "line": 56,
+        "col": 3,
+        "offset": 1260
+      },
+      "end": {
+        "line": 64,
+        "col": 5,
+        "offset": 1505
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-fraud-outcomes-controller.php",
+      "start": {
+        "line": 26,
+        "col": 3,
+        "offset": 450
+      },
+      "end": {
+        "line": 34,
+        "col": 5,
+        "offset": 740
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-onboarding-controller.php",
+      "start": {
+        "line": 51,
+        "col": 3,
+        "offset": 1072
+      },
+      "end": {
+        "line": 101,
+        "col": 5,
+        "offset": 2838
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-onboarding-controller.php",
+      "start": {
+        "line": 103,
+        "col": 3,
+        "offset": 2842
+      },
+      "end": {
+        "line": 123,
+        "col": 5,
+        "offset": 3556
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-onboarding-controller.php",
+      "start": {
+        "line": 125,
+        "col": 3,
+        "offset": 3560
+      },
+      "end": {
+        "line": 145,
+        "col": 5,
+        "offset": 4262
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-onboarding-controller.php",
+      "start": {
+        "line": 147,
+        "col": 3,
+        "offset": 4266
+      },
+      "end": {
+        "line": 155,
+        "col": 5,
+        "offset": 4530
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-onboarding-controller.php",
+      "start": {
+        "line": 157,
+        "col": 3,
+        "offset": 4534
+      },
+      "end": {
+        "line": 165,
+        "col": 5,
+        "offset": 4814
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-onboarding-controller.php",
+      "start": {
+        "line": 167,
+        "col": 3,
+        "offset": 4818
+      },
+      "end": {
+        "line": 203,
+        "col": 5,
+        "offset": 6081
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-onboarding-controller.php",
+      "start": {
+        "line": 205,
+        "col": 3,
+        "offset": 6085
+      },
+      "end": {
+        "line": 225,
+        "col": 5,
+        "offset": 6818
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-orders-controller.php",
+      "start": {
+        "line": 73,
+        "col": 3,
+        "offset": 2048
+      },
+      "end": {
+        "line": 86,
+        "col": 5,
+        "offset": 2459
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-orders-controller.php",
+      "start": {
+        "line": 87,
+        "col": 3,
+        "offset": 2462
+      },
+      "end": {
+        "line": 105,
+        "col": 5,
+        "offset": 2998
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-orders-controller.php",
+      "start": {
+        "line": 106,
+        "col": 3,
+        "offset": 3001
+      },
+      "end": {
+        "line": 119,
+        "col": 5,
+        "offset": 3406
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-orders-controller.php",
+      "start": {
+        "line": 120,
+        "col": 3,
+        "offset": 3409
+      },
+      "end": {
+        "line": 133,
+        "col": 5,
+        "offset": 3812
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-orders-controller.php",
+      "start": {
+        "line": 134,
+        "col": 3,
+        "offset": 3815
+      },
+      "end": {
+        "line": 142,
+        "col": 5,
+        "offset": 4120
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-orders-controller.php",
+      "start": {
+        "line": 143,
+        "col": 3,
+        "offset": 4123
+      },
+      "end": {
+        "line": 151,
+        "col": 5,
+        "offset": 4414
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-payment-intents-controller.php",
+      "start": {
+        "line": 54,
+        "col": 3,
+        "offset": 985
+      },
+      "end": {
+        "line": 62,
+        "col": 5,
+        "offset": 1277
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-payment-intents-controller.php",
+      "start": {
+        "line": 64,
+        "col": 3,
+        "offset": 1281
+      },
+      "end": {
+        "line": 73,
+        "col": 5,
+        "offset": 1604
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-pm-promotions-controller.php",
+      "start": {
+        "line": 47,
+        "col": 3,
+        "offset": 1078
+      },
+      "end": {
+        "line": 55,
+        "col": 5,
+        "offset": 1334
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-pm-promotions-controller.php",
+      "start": {
+        "line": 56,
+        "col": 3,
+        "offset": 1337
+      },
+      "end": {
+        "line": 73,
+        "col": 5,
+        "offset": 1982
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-pm-promotions-controller.php",
+      "start": {
+        "line": 74,
+        "col": 3,
+        "offset": 1985
+      },
+      "end": {
+        "line": 91,
+        "col": 5,
+        "offset": 2628
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-reader-controller.php",
+      "start": {
+        "line": 79,
+        "col": 3,
+        "offset": 2165
+      },
+      "end": {
+        "line": 87,
+        "col": 5,
+        "offset": 2422
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-reader-controller.php",
+      "start": {
+        "line": 89,
+        "col": 3,
+        "offset": 2426
+      },
+      "end": {
+        "line": 113,
+        "col": 5,
+        "offset": 3038
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-reader-controller.php",
+      "start": {
+        "line": 115,
+        "col": 3,
+        "offset": 3042
+      },
+      "end": {
+        "line": 123,
+        "col": 5,
+        "offset": 3332
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-reader-controller.php",
+      "start": {
+        "line": 124,
+        "col": 3,
+        "offset": 3335
+      },
+      "end": {
+        "line": 132,
+        "col": 5,
+        "offset": 3621
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-reader-controller.php",
+      "start": {
+        "line": 133,
+        "col": 3,
+        "offset": 3624
+      },
+      "end": {
+        "line": 141,
+        "col": 5,
+        "offset": 3929
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-refunds-controller.php",
+      "start": {
+        "line": 28,
+        "col": 3,
+        "offset": 565
+      },
+      "end": {
+        "line": 36,
+        "col": 5,
+        "offset": 822
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-settings-controller.php",
+      "start": {
+        "line": 78,
+        "col": 3,
+        "offset": 2121
+      },
+      "end": {
+        "line": 86,
+        "col": 5,
+        "offset": 2375
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-settings-controller.php",
+      "start": {
+        "line": 87,
+        "col": 3,
+        "offset": 2378
+      },
+      "end": {
+        "line": 334,
+        "col": 5,
+        "offset": 14120
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-settings-controller.php",
+      "start": {
+        "line": 335,
+        "col": 3,
+        "offset": 14123
+      },
+      "end": {
+        "line": 343,
+        "col": 5,
+        "offset": 14438
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-settings-option-controller.php",
+      "start": {
+        "line": 46,
+        "col": 3,
+        "offset": 1334
+      },
+      "end": {
+        "line": 64,
+        "col": 5,
+        "offset": 1920
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-terminal-locations-controller.php",
+      "start": {
+        "line": 30,
+        "col": 3,
+        "offset": 621
+      },
+      "end": {
+        "line": 38,
+        "col": 5,
+        "offset": 886
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-terminal-locations-controller.php",
+      "start": {
+        "line": 39,
+        "col": 3,
+        "offset": 889
+      },
+      "end": {
+        "line": 47,
+        "col": 5,
+        "offset": 1173
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-terminal-locations-controller.php",
+      "start": {
+        "line": 48,
+        "col": 3,
+        "offset": 1176
+      },
+      "end": {
+        "line": 66,
+        "col": 5,
+        "offset": 1678
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-terminal-locations-controller.php",
+      "start": {
+        "line": 67,
+        "col": 3,
+        "offset": 1681
+      },
+      "end": {
+        "line": 75,
+        "col": 5,
+        "offset": 1961
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-terminal-locations-controller.php",
+      "start": {
+        "line": 76,
+        "col": 3,
+        "offset": 1964
+      },
+      "end": {
+        "line": 94,
+        "col": 5,
+        "offset": 2438
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-terminal-locations-controller.php",
+      "start": {
+        "line": 95,
+        "col": 3,
+        "offset": 2441
+      },
+      "end": {
+        "line": 103,
+        "col": 5,
+        "offset": 2700
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-timeline-controller.php",
+      "start": {
+        "line": 25,
+        "col": 3,
+        "offset": 486
+      },
+      "end": {
+        "line": 33,
+        "col": 5,
+        "offset": 767
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-tos-controller.php",
+      "start": {
+        "line": 65,
+        "col": 3,
+        "offset": 1607
+      },
+      "end": {
+        "line": 73,
+        "col": 5,
+        "offset": 1860
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-tos-controller.php",
+      "start": {
+        "line": 75,
+        "col": 3,
+        "offset": 1864
+      },
+      "end": {
+        "line": 83,
+        "col": 5,
+        "offset": 2133
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-tos-controller.php",
+      "start": {
+        "line": 85,
+        "col": 3,
+        "offset": 2137
+      },
+      "end": {
+        "line": 93,
+        "col": 5,
+        "offset": 2435
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-transactions-controller.php",
+      "start": {
+        "line": 29,
+        "col": 3,
+        "offset": 561
+      },
+      "end": {
+        "line": 37,
+        "col": 5,
+        "offset": 819
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-transactions-controller.php",
+      "start": {
+        "line": 38,
+        "col": 3,
+        "offset": 822
+      },
+      "end": {
+        "line": 46,
+        "col": 5,
+        "offset": 1102
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-transactions-controller.php",
+      "start": {
+        "line": 47,
+        "col": 3,
+        "offset": 1105
+      },
+      "end": {
+        "line": 55,
+        "col": 5,
+        "offset": 1401
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-transactions-controller.php",
+      "start": {
+        "line": 56,
+        "col": 3,
+        "offset": 1404
+      },
+      "end": {
+        "line": 64,
+        "col": 5,
+        "offset": 1683
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-transactions-controller.php",
+      "start": {
+        "line": 65,
+        "col": 3,
+        "offset": 1686
+      },
+      "end": {
+        "line": 73,
+        "col": 5,
+        "offset": 1976
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-transactions-controller.php",
+      "start": {
+        "line": 74,
+        "col": 3,
+        "offset": 1979
+      },
+      "end": {
+        "line": 82,
+        "col": 5,
+        "offset": 2271
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-transactions-controller.php",
+      "start": {
+        "line": 83,
+        "col": 3,
+        "offset": 2274
+      },
+      "end": {
+        "line": 91,
+        "col": 5,
+        "offset": 2582
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-transactions-controller.php",
+      "start": {
+        "line": 92,
+        "col": 3,
+        "offset": 2585
+      },
+      "end": {
+        "line": 100,
+        "col": 5,
+        "offset": 2904
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-transactions-controller.php",
+      "start": {
+        "line": 101,
+        "col": 3,
+        "offset": 2907
+      },
+      "end": {
+        "line": 109,
+        "col": 5,
+        "offset": 3215
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-vat-controller.php",
+      "start": {
+        "line": 29,
+        "col": 3,
+        "offset": 480
+      },
+      "end": {
+        "line": 37,
+        "col": 5,
+        "offset": 765
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-vat-controller.php",
+      "start": {
+        "line": 38,
+        "col": 3,
+        "offset": 768
+      },
+      "end": {
+        "line": 63,
+        "col": 5,
+        "offset": 1432
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-webhook-controller.php",
+      "start": {
+        "line": 58,
+        "col": 3,
+        "offset": 1509
+      },
+      "end": {
+        "line": 66,
+        "col": 5,
+        "offset": 1766
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-woopay-session-controller.php",
+      "start": {
+        "line": 37,
+        "col": 3,
+        "offset": 643
+      },
+      "end": {
+        "line": 52,
+        "col": 5,
+        "offset": 1050
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-action-scheduler-service.php",
+      "start": {
+        "line": 232,
+        "col": 5,
+        "offset": 8256
+      },
+      "end": {
+        "line": 232,
+        "col": 71,
+        "offset": 8322
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-incentives-service.php",
+      "start": {
+        "line": 491,
+        "col": 3,
+        "offset": 15239
+      },
+      "end": {
+        "line": 501,
+        "col": 4,
+        "offset": 15558
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-payment-request-session-handler.php",
+      "start": {
+        "line": 159,
+        "col": 3,
+        "offset": 4885
+      },
+      "end": {
+        "line": 159,
+        "col": 68,
+        "offset": 4950
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-pm-promotions-service.php",
+      "start": {
+        "line": 671,
+        "col": 3,
+        "offset": 20667
+      },
+      "end": {
+        "line": 678,
+        "col": 4,
+        "offset": 20816
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-styles-cache.php",
+      "start": {
+        "line": 1210,
+        "col": 3,
+        "offset": 40454
+      },
+      "end": {
+        "line": 1210,
+        "col": 23,
+        "offset": 40474
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-token-service.php",
+      "start": {
+        "line": 185,
+        "col": 14,
+        "offset": 8100
+      },
+      "end": {
+        "line": 185,
+        "col": 112,
+        "offset": 8198
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-webhook-reliability-service.php",
+      "start": {
+        "line": 178,
+        "col": 3,
+        "offset": 5795
+      },
+      "end": {
+        "line": 178,
+        "col": 50,
+        "offset": 5842
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/migrations/class-erase-bnpl-announcement-meta.php",
+      "start": {
+        "line": 38,
+        "col": 3,
+        "offset": 826
+      },
+      "end": {
+        "line": 38,
+        "col": 94,
+        "offset": 917
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/Analytics.php",
+      "start": {
+        "line": 514,
+        "col": 14,
+        "offset": 18913
+      },
+      "end": {
+        "line": 521,
+        "col": 5,
+        "offset": 19102
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/Analytics.php",
+      "start": {
+        "line": 523,
+        "col": 14,
+        "offset": 19128
+      },
+      "end": {
+        "line": 530,
+        "col": 5,
+        "offset": 19305
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/FrontendCurrencies.php",
+      "start": {
+        "line": 273,
+        "col": 3,
+        "offset": 7890
+      },
+      "end": {
+        "line": 273,
+        "col": 70,
+        "offset": 7957
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/MultiCurrency.php",
+      "start": {
+        "line": 1039,
+        "col": 3,
+        "offset": 34701
+      },
+      "end": {
+        "line": 1039,
+        "col": 32,
+        "offset": 34730
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/RestController.php",
+      "start": {
+        "line": 61,
+        "col": 4,
+        "offset": 1241
+      },
+      "end": {
+        "line": 69,
+        "col": 6,
+        "offset": 1514
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/RestController.php",
+      "start": {
+        "line": 72,
+        "col": 3,
+        "offset": 1522
+      },
+      "end": {
+        "line": 80,
+        "col": 5,
+        "offset": 1801
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/RestController.php",
+      "start": {
+        "line": 82,
+        "col": 3,
+        "offset": 1805
+      },
+      "end": {
+        "line": 96,
+        "col": 5,
+        "offset": 2226
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/RestController.php",
+      "start": {
+        "line": 98,
+        "col": 3,
+        "offset": 2230
+      },
+      "end": {
+        "line": 113,
+        "col": 5,
+        "offset": 2710
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/RestController.php",
+      "start": {
+        "line": 115,
+        "col": 3,
+        "offset": 2714
+      },
+      "end": {
+        "line": 123,
+        "col": 5,
+        "offset": 2987
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/RestController.php",
+      "start": {
+        "line": 125,
+        "col": 3,
+        "offset": 2991
+      },
+      "end": {
+        "line": 157,
+        "col": 5,
+        "offset": 3895
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/RestController.php",
+      "start": {
+        "line": 159,
+        "col": 3,
+        "offset": 3899
+      },
+      "end": {
+        "line": 184,
+        "col": 5,
+        "offset": 4682
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/Tracking.php",
+      "start": {
+        "line": 171,
+        "col": 26,
+        "offset": 5594
+      },
+      "end": {
+        "line": 171,
+        "col": 64,
+        "offset": 5632
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/Tracking.php",
+      "start": {
+        "line": 173,
+        "col": 26,
+        "offset": 5722
+      },
+      "end": {
+        "line": 173,
+        "col": 63,
+        "offset": 5759
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/notes/class-wc-payments-notes-qualitative-feedback.php",
+      "start": {
+        "line": 42,
+        "col": 14,
+        "offset": 998
+      },
+      "end": {
+        "line": 49,
+        "col": 5,
+        "offset": 1168
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/notes/class-wc-payments-notes-qualitative-feedback.php",
+      "start": {
+        "line": 51,
+        "col": 14,
+        "offset": 1194
+      },
+      "end": {
+        "line": 58,
+        "col": 5,
+        "offset": 1352
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/reports/class-wc-rest-payments-reports-authorizations-controller.php",
+      "start": {
+        "line": 28,
+        "col": 3,
+        "offset": 589
+      },
+      "end": {
+        "line": 40,
+        "col": 5,
+        "offset": 973
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/reports/class-wc-rest-payments-reports-authorizations-controller.php",
+      "start": {
+        "line": 41,
+        "col": 3,
+        "offset": 976
+      },
+      "end": {
+        "line": 52,
+        "col": 5,
+        "offset": 1314
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/reports/class-wc-rest-payments-reports-transactions-controller.php",
+      "start": {
+        "line": 27,
+        "col": 3,
+        "offset": 534
+      },
+      "end": {
+        "line": 39,
+        "col": 5,
+        "offset": 916
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/reports/class-wc-rest-payments-reports-transactions-controller.php",
+      "start": {
+        "line": 40,
+        "col": 3,
+        "offset": 919
+      },
+      "end": {
+        "line": 51,
+        "col": 5,
+        "offset": 1255
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/subscriptions/class-wc-payments-product-service.php",
+      "start": {
+        "line": 726,
+        "col": 3,
+        "offset": 24545
+      },
+      "end": {
+        "line": 726,
+        "col": 63,
+        "offset": 24605
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-openssl-random-pseudo-not-strong",
+      "path": "plugins/src/woocommerce-payments/woocommerce-payments/includes/woopay/class-woopay-utilities.php",
+      "start": {
+        "line": 300,
+        "col": 3,
+        "offset": 9681
+      },
+      "end": {
+        "line": 300,
+        "col": 82,
+        "offset": 9760
+      },
+      "extra": {
+        "message": "openssl_random_pseudo_bytes() without checking the $crypto_strong output parameter may return non-cryptographically-strong bytes on some systems. Always check the second argument or prefer random_bytes() which throws on failure.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-338",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 10,
+    "taint_high": 6,
+    "taint_total": 23,
+    "semgrep_error": 0,
+    "semgrep_warning": 113
+  }
+}

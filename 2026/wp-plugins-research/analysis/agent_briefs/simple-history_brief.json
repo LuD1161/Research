@@ -1,0 +1,3189 @@
+{
+  "plugin_slug": "simple-history",
+  "priority_score": 200,
+  "metadata": {
+    "php_files": 211,
+    "total_lines": 68377
+  },
+  "attack_surface_summary": "# Attack Surface: simple-history\n\n> Generated: 2026-06-14T21:21:11Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 689,
+    "total_sinks": 338,
+    "total_sanitizers": 765,
+    "direct_flows": 347,
+    "functions_with_sources": 234,
+    "functions_with_sinks": 191,
+    "files_analyzed": 211,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "simple-history-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$users = $wpdb->get_results(\n\t\t\t$wpdb->prepare(\n\t\t\t\t'SELECT\n\t\t\t\t\tc.value as user_id,\n\t\t\t\t\tCOUNT(*) as count,\n\t\t\t\t\tu.display_name,\n\t\t\t\t\tu.user_login,\n\t\t\t\t\tu.user_email\n\t\t\t\tFROM\n\t\t\t\t\t%i c\n\t\t\t\tJOIN\n\t\t\t\t\t%i h ON h.id = c.history_id\n\t\t\t\tJOIN\n\t\t\t\t\t%i u ON u.ID = CAST(c.value AS UNSIGNED)\n\t\t\t\tWHERE\n\t\t\t\t\tc.key = \"_user_id\"\n\t\t\t\t\tAND CAST(c.value AS UNSIGNED) > 0\n\t\t\t\t\tAND h.date >= FROM_UNIXTIME(%d)\n\t\t\t\t\tAND h.date <= FROM_UNIXTIME(%d)\n\t\t\t\tGROUP BY\n\t\t\t\t\tc.value\n\t\t\t\tORDER BY\n\t\t\t\t\tcount DESC\n\t\t\t\tLIMIT %d',\n\t\t\t\t$contexts_table,\n\t\t\t\t$events_table,\n\t\t\t\t$wpdb->users,\n\t\t\t\t$date_from,\n\t\t\t\t$date_to,\n\t\t\t\t$limit\n\t\t\t)\n\t\t\t// phpcs:enable WordPressVIPMinimum.Variables.RestrictedVariables.user_meta__wpdb__users\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/class-events-stats.php",
+        "line": 282
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 282,
+          "expression": "$users = $wpdb->get_results(\n\t\t\t$wpdb->prepare(\n\t\t\t\t'SELECT\n\t\t\t\t\tc.value as user_id,\n\t\t\t\t\tCOUNT(*) as count,\n\t\t\t\t\tu.display_name,\n\t\t\t\t\tu.user_login,\n\t\t\t\t\tu.user_email\n\t\t\t\tFROM\n\t\t\t\t\t%i c\n\t\t\t\tJOIN\n\t\t\t\t\t%i h ON h.id = c.history_id\n\t\t\t\tJOIN\n\t\t\t\t\t%i u ON u.ID = CAST(c.value AS UNSIGNED)\n\t\t\t\tWHERE\n\t\t\t\t\tc.key = \"_user_id\"\n\t\t\t\t\tAND CAST(c.value AS UNSIGNED) > 0\n\t\t\t\t\tAND h.date >= FROM_UNIXTIME(%d)\n\t\t\t\t\tAND h.date <= FROM_UNIXTIME(%d)\n\t\t\t\tGROUP BY\n\t\t\t\t\tc.value\n\t\t\t\tORDER BY\n\t\t\t\t\tcount DESC\n\t\t\t\tLIMIT %d',\n\t\t\t\t$contexts_table,\n\t\t\t\t$events_table,\n\t\t\t\t$wpdb->users,\n\t\t\t\t$date_from,\n\t\t\t\t$date_to,\n\t\t\t\t$limit\n\t\t\t)\n\t\t\t// phpcs:enable WordPressVIPMinimum.Variables.RestrictedVariables.user_meta__wpdb__users\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 323,
+          "expression": "array_map(\n\t\t\tfunction ( $user ) {\n\t\t\t\t$display_name = trim( (string) $user->display_name );\n\n\t\t\t\tif ( $display_name === '' ) {\n\t\t\t\t\t$display_name = $user->user_login;\n\t\t\t\t}\n\n\t\t\t\treturn [\n\t\t\t\t\t'id'           => $user->user_id,\n\t\t\t\t\t'display_name' => $display_name,\n\t\t\t\t\t'user_email'   => $user->user_email,\n\t\t\t\t\t'avatar'       => get_avatar_url( $user->user_id ),\n\t\t\t\t\t'count'        => (int) $user->count,\n\t\t\t\t];\n\t\t\t},\n\t\t\t$users\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(\n\t\t\tfunction ( $user ) {\n\t\t\t\t$display_name = trim( (string) $user->display_name );\n\n\t\t\t\tif ( $display_name === '' ) {\n\t\t\t\t\t$display_name = $user->user_login;\n\t\t\t\t}\n\n\t\t\t\treturn [\n\t\t\t\t\t'id'           => $user->user_id,\n\t\t\t\t\t'display_name' => $display_name,\n\t\t\t\t\t'user_email'   => $user->user_email,\n\t\t\t\t\t'avatar'       => get_avatar_url( $user->user_id ),\n\t\t\t\t\t'count'        => (int) $user->count,\n\t\t\t\t];\n\t\t\t},\n\t\t\t$users\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/class-events-stats.php",
+        "line": 323
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$results = $wpdb->get_col(\n\t\t\t$wpdb->prepare(\n\t\t\t\t'SELECT history_id FROM %i WHERE `key` = %s',\n\t\t\t\t$contexts_table,\n\t\t\t\t'_sticky'\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/class-helpers.php",
+        "line": 2427
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2427,
+          "expression": "$results = $wpdb->get_col(\n\t\t\t$wpdb->prepare(\n\t\t\t\t'SELECT history_id FROM %i WHERE `key` = %s',\n\t\t\t\t$contexts_table,\n\t\t\t\t'_sticky'\n\t\t\t)\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2435,
+          "expression": "array_map( 'intval', $results )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map( 'intval', $results )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/class-helpers.php",
+        "line": 2435
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "absint( $sample['rules_count'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-alerts-settings-page-teaser.php",
+        "line": 243
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 243,
+          "expression": "printf(\n\t\t\t\t\t\t\t\t\t\t\t\t\t/* translators: %d: number of alert rules */\n\t\t\t\t\t\t\t\t\t\t\t\t\tesc_html( _n( '%d rule', '%d rules', $sample['rules_count'], 'simple-history' ) ),\n\t\t\t\t\t\t\t\t\t\t\t\t\tabsint( $sample['rules_count'] )\n\t\t\t\t\t\t\t\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf(\n\t\t\t\t\t\t\t\t\t\t\t\t\t/* translators: %d: number of alert rules */\n\t\t\t\t\t\t\t\t\t\t\t\t\tesc_html( _n( '%d rule', '%d rules', $sample['rules_count'], 'simple-history' ) ),\n\t\t\t\t\t\t\t\t\t\t\t\t\tabsint( $sample['rules_count'] )\n\t\t\t\t\t\t\t\t\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-alerts-settings-page-teaser.php",
+        "line": 243
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "absint( $event_count )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-alerts-settings-page-teaser.php",
+        "line": 314
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 314,
+          "expression": "printf(\n\t\t\t\t\t\t\t\t\t\t\t/* translators: %d: number of event types */\n\t\t\t\t\t\t\t\t\t\t\tesc_html( _n( 'Monitors %d event type', 'Monitors %d event types', $event_count, 'simple-history' ) ),\n\t\t\t\t\t\t\t\t\t\t\tabsint( $event_count )\n\t\t\t\t\t\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf(\n\t\t\t\t\t\t\t\t\t\t\t/* translators: %d: number of event types */\n\t\t\t\t\t\t\t\t\t\t\tesc_html( _n( 'Monitors %d event type', 'Monitors %d event types', $event_count, 'simple-history' ) ),\n\t\t\t\t\t\t\t\t\t\t\tabsint( $event_count )\n\t\t\t\t\t\t\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-alerts-settings-page-teaser.php",
+        "line": 314
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-xss-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo absint( $sample['recipient_count'] );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-alerts-settings-page-teaser.php",
+        "line": 359
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 359,
+          "expression": "echo absint( $sample['recipient_count'] );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo absint( $sample['recipient_count'] );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-alerts-settings-page-teaser.php",
+        "line": 359
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "simple-history",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$import_post_types = isset( $_POST['import_post_types'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['import_post_types'] ) ) : []",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-import-handler.php",
+        "line": 88
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 88,
+          "expression": "$import_post_types = isset( $_POST['import_post_types'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['import_post_types'] ) ) : []",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 129,
+          "expression": "$results = $importer->import_all(\n\t\t\t[\n\t\t\t\t'post_types'   => $import_post_types,\n\t\t\t\t'import_users' => $import_users,\n\t\t\t\t'limit'        => $import_limit,\n\t\t\t\t'days_back'    => $days_back,\n\t\t\t]\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 167,
+          "expression": "$redirect_url = add_query_arg(\n\t\t\t[\n\t\t\t\t'page'                   => Tools_Menu_Dropin::MENU_SLUG,\n\t\t\t\t'selected-tab'           => Tools_Menu_Dropin::TOOLS_TAB_SLUG,\n\t\t\t\t'selected-sub-tab'       => Import_Dropin::MENU_SLUG,\n\t\t\t\t'import-completed'       => '1',\n\t\t\t\t'posts-imported'         => isset( $results['posts_imported'] ) ? intval( $results['posts_imported'] ) : 0,\n\t\t\t\t'users-imported'         => isset( $results['users_imported'] ) ? intval( $results['users_imported'] ) : 0,\n\t\t\t\t'post-events-created'    => isset( $results['post_events_created'] ) ? intval( $results['post_events_created'] ) : 0,\n\t\t\t\t'user-events-created'    => isset( $results['user_events_created'] ) ? intval( $results['user_events_created'] ) : 0,\n\t\t\t\t'posts-skipped-imported' => isset( $results['posts_skipped_imported'] ) ? intval( $results['posts_skipped_imported'] ) : 0,\n\t\t\t\t'posts-skipped-logged'   => isset( $results['posts_skipped_logged'] ) ? intval( $results['posts_skipped_logged'] ) : 0,\n\t\t\t\t'users-skipped-imported' => isset( $results['users_skipped_imported'] ) ? intval( $results['users_skipped_imported'] ) : 0,\n\t\t\t\t'users-skipped-logged'   => isset( $results['users_skipped_logged'] ) ? intval( $results['users_skipped_logged'] ) : 0,\n\t\t\t],\n\t\t\tadmin_url( 'admin.php' )\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 185,
+          "expression": "wp_safe_redirect( $redirect_url )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( $redirect_url )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-import-handler.php",
+        "line": 185
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "simple-history-open-002",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "simple-history",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$redirect_url = add_query_arg(\n\t\t\t[\n\t\t\t\t'page'             => Tools_Menu_Dropin::MENU_SLUG,\n\t\t\t\t'selected-tab'     => Tools_Menu_Dropin::TOOLS_TAB_SLUG,\n\t\t\t\t'selected-sub-tab' => Import_Dropin::MENU_SLUG,\n\t\t\t\t'delete-completed' => '1',\n\t\t\t\t'events-deleted'   => isset( $results['events_deleted'] ) ? intval( $results['events_deleted'] ) : 0,\n\t\t\t],\n\t\t\tadmin_url( 'admin.php' )\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-import-handler.php",
+        "line": 229
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 229,
+          "expression": "$redirect_url = add_query_arg(\n\t\t\t[\n\t\t\t\t'page'             => Tools_Menu_Dropin::MENU_SLUG,\n\t\t\t\t'selected-tab'     => Tools_Menu_Dropin::TOOLS_TAB_SLUG,\n\t\t\t\t'selected-sub-tab' => Import_Dropin::MENU_SLUG,\n\t\t\t\t'delete-completed' => '1',\n\t\t\t\t'events-deleted'   => isset( $results['events_deleted'] ) ? intval( $results['events_deleted'] ) : 0,\n\t\t\t],\n\t\t\tadmin_url( 'admin.php' )\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 240,
+          "expression": "wp_safe_redirect( $redirect_url )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( $redirect_url )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-import-handler.php",
+        "line": 240
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "simple-history-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "absint( self::CACHE_DURATION_MINUTES )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-history-insights-sidebar-service.php",
+        "line": 611
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 611,
+          "expression": "printf(\n\t\t\t\t/* translators: %d is the number of minutes between cache refreshes */\n\t\t\t\tesc_html__( 'Insights are based on events you can view. Updates every %d minutes.', 'simple-history' ),\n\t\t\t\tabsint( self::CACHE_DURATION_MINUTES )\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf(\n\t\t\t\t/* translators: %d is the number of minutes between cache refreshes */\n\t\t\t\tesc_html__( 'Insights are based on events you can view. Updates every %d minutes.', 'simple-history' ),\n\t\t\t\tabsint( self::CACHE_DURATION_MINUTES )\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-history-insights-sidebar-service.php",
+        "line": 611
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$ids_to_delete = $wpdb->get_col( $sql )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-setup-purge-db-cron.php",
+        "line": 124
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 124,
+          "expression": "$ids_to_delete = $wpdb->get_col( $sql )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 131,
+          "expression": "$sql_ids_in = implode( ',', $ids_to_delete )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 134,
+          "expression": "$sql_delete_history         = \"DELETE FROM {$table_name} WHERE id IN ($sql_ids_in)\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 138,
+          "expression": "$wpdb->query( $sql_delete_history )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->query( $sql_delete_history )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-setup-purge-db-cron.php",
+        "line": 138
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-sqli-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$ids_to_delete = $wpdb->get_col( $sql )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-setup-purge-db-cron.php",
+        "line": 124
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 124,
+          "expression": "$ids_to_delete = $wpdb->get_col( $sql )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 131,
+          "expression": "$sql_ids_in = implode( ',', $ids_to_delete )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 134,
+          "expression": "$sql_delete_history         = \"DELETE FROM {$table_name} WHERE id IN ($sql_ids_in)\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 141,
+          "expression": "$wpdb->query( $sql_delete_history_context )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->query( $sql_delete_history_context )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-setup-purge-db-cron.php",
+        "line": 141
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "(array) ( $_GET['post'] ?? [] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-post-logger.php",
+        "line": 337
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 337,
+          "expression": "$post_ids = array_map( 'intval', (array) ( $_GET['post'] ?? [] ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$post_ids = array_map( 'intval', (array) ( $_GET['post'] ?? [] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-post-logger.php",
+        "line": 337
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-rce-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$deletedFieldsIDs = explode( '|', (string) sanitize_text_field( wp_unslash( $_POST['_acf_delete_fields'] ) ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-plugin-acf-logger.php",
+        "line": 1015
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1015,
+          "expression": "$deletedFieldsIDs = explode( '|', (string) sanitize_text_field( wp_unslash( $_POST['_acf_delete_fields'] ) ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1016,
+          "expression": "$deletedFieldsIDs = array_map( 'intval', $deletedFieldsIDs )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1016,
+          "expression": "$deletedFieldsIDs = array_map( 'intval', $deletedFieldsIDs )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$deletedFieldsIDs = array_map( 'intval', $deletedFieldsIDs )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-plugin-acf-logger.php",
+        "line": 1016
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-ssrf-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "simple-history",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$repo = isset( $_GET['repo'] ) ? (string) sanitize_text_field( wp_unslash( $_GET['repo'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-plugin-logger.php",
+        "line": 696
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 696,
+          "expression": "$repo = isset( $_GET['repo'] ) ? (string) sanitize_text_field( wp_unslash( $_GET['repo'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 712,
+          "expression": "$api_url = sprintf(\n\t\t\t'https://api.github.com/repos/%1$s/%2$s/readme',\n\t\t\trawurlencode( $repo_username ),\n\t\t\trawurlencode( $repo_repo ) \n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 720,
+          "expression": "$response = wp_remote_get(\n\t\t\t$api_url,\n\t\t\tarray(\n\t\t\t\t'headers' => array(\n\t\t\t\t\t'accept' => 'application/vnd.github.VERSION.html',\n\t\t\t\t),\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_get(\n\t\t\t$api_url,\n\t\t\tarray(\n\t\t\t\t'headers' => array(\n\t\t\t\t\t'accept' => 'application/vnd.github.VERSION.html',\n\t\t\t\t),\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-plugin-logger.php",
+        "line": 720
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "simple-history-xss-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "simple-history",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$repo = isset( $_GET['repo'] ) ? (string) sanitize_text_field( wp_unslash( $_GET['repo'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-plugin-logger.php",
+        "line": 696
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 696,
+          "expression": "$repo = isset( $_GET['repo'] ) ? (string) sanitize_text_field( wp_unslash( $_GET['repo'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 760,
+          "expression": "printf(\n\t\t\t'\n\t\t\t\t<!doctype html>\n\t\t\t\t<style>\n\t\t\t\t\tbody {\n\t\t\t\t\t\tfont-family: sans-serif;\n\t\t\t\t\t\tfont-size: 16px;\n\t\t\t\t\t}\n\t\t\t\t\t.repo-info {\n\t\t\t\t\t\tpadding: 1.25em 1em;\n\t\t\t\t\t\tbackground: #fafafa;\n\t\t\t\t\t\tline-height: 1;\n\t\t\t\t\t}\n\t\t\t\t\t.repo-info p {\n\t\t\t\t\t\tmargin: 0;\n\t\t\t\t\t}\n\t\t\t\t\t    .markdown-body {\n\t\t\t\t        min-width: 200px;\n\t\t\t\t        max-width: 790px;\n\t\t\t\t        margin: 0 auto;\n\t\t\t\t        padding: 30px;\n\t\t\t\t    }\n\n\t\t\t\t\t@import url(\"%3$s\");\n\n\t\t\t\t</style>\n\n\t\t\t\t<base href=\"%4$s/raw/master/\">\n\t\t\t\t<base target=\"_blank\">\n\n\t\t\t\t<header class=\"repo-info\">\n\t\t\t\t\t%1$s\n\t\t\t\t</header>\n\n\t\t\t\t<div class=\"markdown-body readme-contents\">\n\t\t\t\t\t%2$s\n\t\t\t\t</div>\n\t\t\t',\n\t\t\t$repo_info, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\t$escaped_response_body, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\tesc_url( $github_markdown_css_path ), // 3\n\t\t\tesc_url( $repo ) // 4\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf(\n\t\t\t'\n\t\t\t\t<!doctype html>\n\t\t\t\t<style>\n\t\t\t\t\tbody {\n\t\t\t\t\t\tfont-family: sans-serif;\n\t\t\t\t\t\tfont-size: 16px;\n\t\t\t\t\t}\n\t\t\t\t\t.repo-info {\n\t\t\t\t\t\tpadding: 1.25em 1em;\n\t\t\t\t\t\tbackground: #fafafa;\n\t\t\t\t\t\tline-height: 1;\n\t\t\t\t\t}\n\t\t\t\t\t.repo-info p {\n\t\t\t\t\t\tmargin: 0;\n\t\t\t\t\t}\n\t\t\t\t\t    .markdown-body {\n\t\t\t\t        min-width: 200px;\n\t\t\t\t        max-width: 790px;\n\t\t\t\t        margin: 0 auto;\n\t\t\t\t        padding: 30px;\n\t\t\t\t    }\n\n\t\t\t\t\t@import url(\"%3$s\");\n\n\t\t\t\t</style>\n\n\t\t\t\t<base href=\"%4$s/raw/master/\">\n\t\t\t\t<base target=\"_blank\">\n\n\t\t\t\t<header class=\"repo-info\">\n\t\t\t\t\t%1$s\n\t\t\t\t</header>\n\n\t\t\t\t<div class=\"markdown-body readme-contents\">\n\t\t\t\t\t%2$s\n\t\t\t\t</div>\n\t\t\t',\n\t\t\t$repo_info, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\t$escaped_response_body, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\tesc_url( $github_markdown_css_path ), // 3\n\t\t\tesc_url( $repo ) // 4\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-plugin-logger.php",
+        "line": 760
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "simple-history-rce-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$new_ids = array_values( isset( $_POST['menu-item-db-id'] ) ? (array) wp_unslash( $_POST['menu-item-db-id'] ) : array() )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-menu-logger.php",
+        "line": 374
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 374,
+          "expression": "$new_ids = array_values( isset( $_POST['menu-item-db-id'] ) ? (array) wp_unslash( $_POST['menu-item-db-id'] ) : array() )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 499,
+          "expression": "$old_order = array_map( 'intval', array_values( array_intersect( $old_ids, $new_ids ) ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$old_order = array_map( 'intval', array_values( array_intersect( $old_ids, $new_ids ) ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-menu-logger.php",
+        "line": 499
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-rce-006",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$new_ids = array_values( isset( $_POST['menu-item-db-id'] ) ? (array) wp_unslash( $_POST['menu-item-db-id'] ) : array() )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-menu-logger.php",
+        "line": 374
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 374,
+          "expression": "$new_ids = array_values( isset( $_POST['menu-item-db-id'] ) ? (array) wp_unslash( $_POST['menu-item-db-id'] ) : array() )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 500,
+          "expression": "$new_order = array_map( 'intval', array_values( array_intersect( $new_ids, $old_ids ) ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$new_order = array_map( 'intval', array_values( array_intersect( $new_ids, $old_ids ) ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-menu-logger.php",
+        "line": 500
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/simple-history/dropins/class-rss-dropin.php",
+      "start": {
+        "line": 134,
+        "col": 4,
+        "offset": 4356
+      },
+      "end": {
+        "line": 134,
+        "col": 27,
+        "offset": 4379
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/simple-history/inc/class-event.php",
+      "start": {
+        "line": 148,
+        "col": 3,
+        "offset": 3515
+      },
+      "end": {
+        "line": 148,
+        "col": 81,
+        "offset": 3593
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/simple-history/inc/class-event.php",
+      "start": {
+        "line": 547,
+        "col": 3,
+        "offset": 14646
+      },
+      "end": {
+        "line": 547,
+        "col": 79,
+        "offset": 14722
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-existing-data-importer.php",
+      "start": {
+        "line": 695,
+        "col": 28,
+        "offset": 23358
+      },
+      "end": {
+        "line": 695,
+        "col": 83,
+        "offset": 23413
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-helpers.php",
+      "start": {
+        "line": 448,
+        "col": 24,
+        "offset": 14004
+      },
+      "end": {
+        "line": 448,
+        "col": 80,
+        "offset": 14060
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-helpers.php",
+      "start": {
+        "line": 451,
+        "col": 26,
+        "offset": 14245
+      },
+      "end": {
+        "line": 451,
+        "col": 84,
+        "offset": 14303
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-helpers.php",
+      "start": {
+        "line": 550,
+        "col": 60,
+        "offset": 17719
+      },
+      "end": {
+        "line": 550,
+        "col": 143,
+        "offset": 17802
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-helpers.php",
+      "start": {
+        "line": 551,
+        "col": 69,
+        "offset": 17888
+      },
+      "end": {
+        "line": 551,
+        "col": 154,
+        "offset": 17973
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-helpers.php",
+      "start": {
+        "line": 1240,
+        "col": 3,
+        "offset": 40607
+      },
+      "end": {
+        "line": 1240,
+        "col": 23,
+        "offset": 40627
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-helpers.php",
+      "start": {
+        "line": 1244,
+        "col": 3,
+        "offset": 40831
+      },
+      "end": {
+        "line": 1244,
+        "col": 23,
+        "offset": 40851
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-helpers.php",
+      "start": {
+        "line": 1644,
+        "col": 18,
+        "offset": 52623
+      },
+      "end": {
+        "line": 1644,
+        "col": 40,
+        "offset": 52645
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-helpers.php",
+      "start": {
+        "line": 1696,
+        "col": 18,
+        "offset": 54324
+      },
+      "end": {
+        "line": 1696,
+        "col": 40,
+        "offset": 54346
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-helpers.php",
+      "start": {
+        "line": 1780,
+        "col": 14,
+        "offset": 57274
+      },
+      "end": {
+        "line": 1780,
+        "col": 40,
+        "offset": 57300
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/simple-history/inc/class-helpers.php",
+      "start": {
+        "line": 1802,
+        "col": 3,
+        "offset": 57857
+      },
+      "end": {
+        "line": 1802,
+        "col": 51,
+        "offset": 57905
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-helpers.php",
+      "start": {
+        "line": 1818,
+        "col": 17,
+        "offset": 58502
+      },
+      "end": {
+        "line": 1818,
+        "col": 39,
+        "offset": 58524
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/simple-history/inc/class-helpers.php",
+      "start": {
+        "line": 1901,
+        "col": 3,
+        "offset": 61495
+      },
+      "end": {
+        "line": 1901,
+        "col": 87,
+        "offset": 61579
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-helpers.php",
+      "start": {
+        "line": 1917,
+        "col": 21,
+        "offset": 62066
+      },
+      "end": {
+        "line": 1917,
+        "col": 53,
+        "offset": 62098
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-helpers.php",
+      "start": {
+        "line": 2392,
+        "col": 16,
+        "offset": 76933
+      },
+      "end": {
+        "line": 2392,
+        "col": 38,
+        "offset": 76955
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/simple-history/inc/class-log-query.php",
+      "start": {
+        "line": 242,
+        "col": 3,
+        "offset": 10294
+      },
+      "end": {
+        "line": 242,
+        "col": 94,
+        "offset": 10385
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-log-query.php",
+      "start": {
+        "line": 335,
+        "col": 24,
+        "offset": 13421
+      },
+      "end": {
+        "line": 335,
+        "col": 67,
+        "offset": 13464
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/simple-history/inc/class-log-query.php",
+      "start": {
+        "line": 385,
+        "col": 3,
+        "offset": 15190
+      },
+      "end": {
+        "line": 385,
+        "col": 94,
+        "offset": 15281
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-log-query.php",
+      "start": {
+        "line": 402,
+        "col": 3,
+        "offset": 15746
+      },
+      "end": {
+        "line": 402,
+        "col": 78,
+        "offset": 15821
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-log-query.php",
+      "start": {
+        "line": 617,
+        "col": 24,
+        "offset": 22472
+      },
+      "end": {
+        "line": 617,
+        "col": 67,
+        "offset": 22515
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/simple-history/inc/class-log-query.php",
+      "start": {
+        "line": 692,
+        "col": 3,
+        "offset": 24865
+      },
+      "end": {
+        "line": 692,
+        "col": 108,
+        "offset": 24970
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-log-query.php",
+      "start": {
+        "line": 1553,
+        "col": 22,
+        "offset": 57744
+      },
+      "end": {
+        "line": 1553,
+        "col": 62,
+        "offset": 57784
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-log-query.php",
+      "start": {
+        "line": 1636,
+        "col": 15,
+        "offset": 60142
+      },
+      "end": {
+        "line": 1636,
+        "col": 41,
+        "offset": 60168
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-devtools-controller.php",
+      "start": {
+        "line": 37,
+        "col": 3,
+        "offset": 816
+      },
+      "end": {
+        "line": 55,
+        "col": 5,
+        "offset": 1407
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-devtools-controller.php",
+      "start": {
+        "line": 58,
+        "col": 3,
+        "offset": 1488
+      },
+      "end": {
+        "line": 68,
+        "col": 5,
+        "offset": 1825
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-devtools-controller.php",
+      "start": {
+        "line": 71,
+        "col": 3,
+        "offset": 1890
+      },
+      "end": {
+        "line": 88,
+        "col": 5,
+        "offset": 2405
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-devtools-controller.php",
+      "start": {
+        "line": 91,
+        "col": 3,
+        "offset": 2473
+      },
+      "end": {
+        "line": 114,
+        "col": 5,
+        "offset": 3227
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-devtools-controller.php",
+      "start": {
+        "line": 117,
+        "col": 3,
+        "offset": 3313
+      },
+      "end": {
+        "line": 127,
+        "col": 5,
+        "offset": 3660
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-devtools-controller.php",
+      "start": {
+        "line": 130,
+        "col": 3,
+        "offset": 3739
+      },
+      "end": {
+        "line": 140,
+        "col": 5,
+        "offset": 4077
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-events-controller.php",
+      "start": {
+        "line": 40,
+        "col": 3,
+        "offset": 817
+      },
+      "end": {
+        "line": 52,
+        "col": 5,
+        "offset": 1211
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-events-controller.php",
+      "start": {
+        "line": 56,
+        "col": 3,
+        "offset": 1285
+      },
+      "end": {
+        "line": 89,
+        "col": 5,
+        "offset": 2450
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-events-controller.php",
+      "start": {
+        "line": 94,
+        "col": 3,
+        "offset": 2628
+      },
+      "end": {
+        "line": 105,
+        "col": 5,
+        "offset": 3008
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-events-controller.php",
+      "start": {
+        "line": 108,
+        "col": 3,
+        "offset": 3067
+      },
+      "end": {
+        "line": 124,
+        "col": 5,
+        "offset": 3541
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-events-controller.php",
+      "start": {
+        "line": 127,
+        "col": 3,
+        "offset": 3607
+      },
+      "end": {
+        "line": 143,
+        "col": 5,
+        "offset": 4079
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-events-controller.php",
+      "start": {
+        "line": 146,
+        "col": 3,
+        "offset": 4136
+      },
+      "end": {
+        "line": 156,
+        "col": 5,
+        "offset": 4422
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-events-controller.php",
+      "start": {
+        "line": 159,
+        "col": 3,
+        "offset": 4490
+      },
+      "end": {
+        "line": 175,
+        "col": 5,
+        "offset": 4966
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-events-controller.php",
+      "start": {
+        "line": 185,
+        "col": 3,
+        "offset": 5255
+      },
+      "end": {
+        "line": 202,
+        "col": 5,
+        "offset": 5764
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-events-controller.php",
+      "start": {
+        "line": 205,
+        "col": 3,
+        "offset": 5832
+      },
+      "end": {
+        "line": 222,
+        "col": 5,
+        "offset": 6345
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-searchoptions-controller.php",
+      "start": {
+        "line": 38,
+        "col": 3,
+        "offset": 931
+      },
+      "end": {
+        "line": 48,
+        "col": 5,
+        "offset": 1210
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-searchoptions-controller.php",
+      "start": {
+        "line": 51,
+        "col": 3,
+        "offset": 1263
+      },
+      "end": {
+        "line": 61,
+        "col": 5,
+        "offset": 1566
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-stats-controller.php",
+      "start": {
+        "line": 35,
+        "col": 3,
+        "offset": 701
+      },
+      "end": {
+        "line": 47,
+        "col": 5,
+        "offset": 1109
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-stats-controller.php",
+      "start": {
+        "line": 50,
+        "col": 3,
+        "offset": 1162
+      },
+      "end": {
+        "line": 62,
+        "col": 5,
+        "offset": 1572
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-stats-controller.php",
+      "start": {
+        "line": 65,
+        "col": 3,
+        "offset": 1627
+      },
+      "end": {
+        "line": 77,
+        "col": 5,
+        "offset": 2041
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-stats-controller.php",
+      "start": {
+        "line": 80,
+        "col": 3,
+        "offset": 2094
+      },
+      "end": {
+        "line": 92,
+        "col": 5,
+        "offset": 2504
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-stats-controller.php",
+      "start": {
+        "line": 95,
+        "col": 3,
+        "offset": 2559
+      },
+      "end": {
+        "line": 107,
+        "col": 5,
+        "offset": 2973
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-stats-controller.php",
+      "start": {
+        "line": 110,
+        "col": 3,
+        "offset": 3025
+      },
+      "end": {
+        "line": 122,
+        "col": 5,
+        "offset": 3433
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-stats-controller.php",
+      "start": {
+        "line": 125,
+        "col": 3,
+        "offset": 3490
+      },
+      "end": {
+        "line": 137,
+        "col": 5,
+        "offset": 3902
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-stats-controller.php",
+      "start": {
+        "line": 140,
+        "col": 3,
+        "offset": 3960
+      },
+      "end": {
+        "line": 152,
+        "col": 5,
+        "offset": 4374
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-stats-controller.php",
+      "start": {
+        "line": 155,
+        "col": 3,
+        "offset": 4439
+      },
+      "end": {
+        "line": 167,
+        "col": 5,
+        "offset": 4867
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-stats-controller.php",
+      "start": {
+        "line": 170,
+        "col": 3,
+        "offset": 4920
+      },
+      "end": {
+        "line": 182,
+        "col": 5,
+        "offset": 5330
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-support-info-controller.php",
+      "start": {
+        "line": 42,
+        "col": 3,
+        "offset": 1014
+      },
+      "end": {
+        "line": 53,
+        "col": 5,
+        "offset": 1352
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-support-info-controller.php",
+      "start": {
+        "line": 56,
+        "col": 3,
+        "offset": 1419
+      },
+      "end": {
+        "line": 66,
+        "col": 5,
+        "offset": 1722
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-support-info-controller.php",
+      "start": {
+        "line": 228,
+        "col": 15,
+        "offset": 7806
+      },
+      "end": {
+        "line": 228,
+        "col": 58,
+        "offset": 7849
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-support-info-controller.php",
+      "start": {
+        "line": 233,
+        "col": 14,
+        "offset": 8020
+      },
+      "end": {
+        "line": 233,
+        "col": 50,
+        "offset": 8056
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-user-card-controller.php",
+      "start": {
+        "line": 37,
+        "col": 3,
+        "offset": 850
+      },
+      "end": {
+        "line": 55,
+        "col": 5,
+        "offset": 1416
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/class-wp-rest-user-card-controller.php",
+      "start": {
+        "line": 58,
+        "col": 3,
+        "offset": 1480
+      },
+      "end": {
+        "line": 77,
+        "col": 5,
+        "offset": 2130
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/services/class-email-report-service.php",
+      "start": {
+        "line": 40,
+        "col": 3,
+        "offset": 1190
+      },
+      "end": {
+        "line": 48,
+        "col": 5,
+        "offset": 1501
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/simple-history/inc/services/class-email-report-service.php",
+      "start": {
+        "line": 50,
+        "col": 3,
+        "offset": 1505
+      },
+      "end": {
+        "line": 58,
+        "col": 5,
+        "offset": 1782
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/simple-history/inc/services/class-history-insights-sidebar-service.php",
+      "start": {
+        "line": 139,
+        "col": 3,
+        "offset": 4743
+      },
+      "end": {
+        "line": 139,
+        "col": 80,
+        "offset": 4820
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/services/class-setup-database.php",
+      "start": {
+        "line": 274,
+        "col": 3,
+        "offset": 8399
+      },
+      "end": {
+        "line": 274,
+        "col": 23,
+        "offset": 8419
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/services/class-setup-database.php",
+      "start": {
+        "line": 289,
+        "col": 3,
+        "offset": 8774
+      },
+      "end": {
+        "line": 289,
+        "col": 23,
+        "offset": 8794
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/services/class-setup-database.php",
+      "start": {
+        "line": 340,
+        "col": 4,
+        "offset": 10775
+      },
+      "end": {
+        "line": 340,
+        "col": 24,
+        "offset": 10795
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/services/class-setup-purge-db-cron.php",
+      "start": {
+        "line": 138,
+        "col": 4,
+        "offset": 3951
+      },
+      "end": {
+        "line": 138,
+        "col": 39,
+        "offset": 3986
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/services/class-setup-purge-db-cron.php",
+      "start": {
+        "line": 141,
+        "col": 4,
+        "offset": 4138
+      },
+      "end": {
+        "line": 141,
+        "col": 47,
+        "offset": 4181
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/simple-history/inc/services/class-setup-settings-page.php",
+      "start": {
+        "line": 767,
+        "col": 3,
+        "offset": 23486
+      },
+      "end": {
+        "line": 767,
+        "col": 26,
+        "offset": 23509
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/services/wp-cli-commands/class-wp-cli-benchmark-search-command.php",
+      "start": {
+        "line": 79,
+        "col": 18,
+        "offset": 2226
+      },
+      "end": {
+        "line": 79,
+        "col": 74,
+        "offset": 2282
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/services/wp-cli-commands/class-wp-cli-benchmark-search-command.php",
+      "start": {
+        "line": 81,
+        "col": 20,
+        "offset": 2460
+      },
+      "end": {
+        "line": 81,
+        "col": 78,
+        "offset": 2518
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/services/wp-cli-commands/class-wp-cli-benchmark-search-command.php",
+      "start": {
+        "line": 231,
+        "col": 18,
+        "offset": 7149
+      },
+      "end": {
+        "line": 231,
+        "col": 74,
+        "offset": 7205
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/services/wp-cli-commands/class-wp-cli-benchmark-search-command.php",
+      "start": {
+        "line": 233,
+        "col": 20,
+        "offset": 7383
+      },
+      "end": {
+        "line": 233,
+        "col": 78,
+        "offset": 7441
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/services/wp-cli-commands/class-wp-cli-dev-command.php",
+      "start": {
+        "line": 82,
+        "col": 3,
+        "offset": 2210
+      },
+      "end": {
+        "line": 82,
+        "col": 57,
+        "offset": 2264
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/services/wp-cli-commands/class-wp-cli-dev-command.php",
+      "start": {
+        "line": 85,
+        "col": 3,
+        "offset": 2473
+      },
+      "end": {
+        "line": 85,
+        "col": 59,
+        "offset": 2529
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/services/wp-cli-commands/class-wp-cli-dev-command.php",
+      "start": {
+        "line": 238,
+        "col": 20,
+        "offset": 6611
+      },
+      "end": {
+        "line": 238,
+        "col": 74,
+        "offset": 6665
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/services/wp-cli-commands/class-wp-cli-dev-command.php",
+      "start": {
+        "line": 241,
+        "col": 20,
+        "offset": 6888
+      },
+      "end": {
+        "line": 241,
+        "col": 76,
+        "offset": 6944
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/services/wp-cli-commands/class-wp-cli-dev-command.php",
+      "start": {
+        "line": 249,
+        "col": 22,
+        "offset": 7373
+      },
+      "end": {
+        "line": 249,
+        "col": 78,
+        "offset": 7429
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/services/wp-cli-commands/class-wp-cli-dev-command.php",
+      "start": {
+        "line": 252,
+        "col": 22,
+        "offset": 7658
+      },
+      "end": {
+        "line": 252,
+        "col": 80,
+        "offset": 7716
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/services/wp-cli-commands/class-wp-cli-populate-command.php",
+      "start": {
+        "line": 137,
+        "col": 27,
+        "offset": 4038
+      },
+      "end": {
+        "line": 137,
+        "col": 100,
+        "offset": 4111
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/inc/services/wp-cli-commands/class-wp-cli-populate-command.php",
+      "start": {
+        "line": 181,
+        "col": 27,
+        "offset": 5674
+      },
+      "end": {
+        "line": 181,
+        "col": 100,
+        "offset": 5747
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/simple-history/loggers/class-logger.php",
+      "start": {
+        "line": 1928,
+        "col": 4,
+        "offset": 56214
+      },
+      "end": {
+        "line": 1928,
+        "col": 58,
+        "offset": 56268
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/simple-history/loggers/class-logger.php",
+      "start": {
+        "line": 1938,
+        "col": 4,
+        "offset": 56587
+      },
+      "end": {
+        "line": 1938,
+        "col": 58,
+        "offset": 56641
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/uninstall.php",
+      "start": {
+        "line": 52,
+        "col": 2,
+        "offset": 1671
+      },
+      "end": {
+        "line": 52,
+        "col": 52,
+        "offset": 1721
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/simple-history/uninstall.php",
+      "start": {
+        "line": 56,
+        "col": 2,
+        "offset": 1986
+      },
+      "end": {
+        "line": 56,
+        "col": 52,
+        "offset": 2036
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 8,
+    "taint_high": 4,
+    "taint_total": 16,
+    "semgrep_error": 0,
+    "semgrep_warning": 84
+  }
+}

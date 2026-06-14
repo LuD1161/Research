@@ -1,0 +1,659 @@
+{
+  "plugin_slug": "mailchimp-for-wp",
+  "priority_score": 39,
+  "metadata": {
+    "php_files": 132,
+    "total_lines": 17788
+  },
+  "attack_surface_summary": "# Attack Surface: mailchimp-for-wp\n\n> Generated: 2026-06-14T21:21:11Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 138,
+    "total_sinks": 81,
+    "total_sanitizers": 261,
+    "direct_flows": 42,
+    "functions_with_sources": 77,
+    "functions_with_sinks": 53,
+    "files_analyzed": 132,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "mailchimp-for-wp-file-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "mailchimp-for-wp",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$datetime   = gmdate('Y-m-d H:i:s', time() + ( get_option('gmt_offset', 0) * HOUR_IN_SECONDS ))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailchimp-for-wp/includes/class-debug-log.php",
+        "line": 114
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 114,
+          "expression": "$datetime   = gmdate('Y-m-d H:i:s', time() + ( get_option('gmt_offset', 0) * HOUR_IN_SECONDS ))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 115,
+          "expression": "$message    = sprintf('[%s] %s: %s', $datetime, $level_name, $message) . PHP_EOL",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 141,
+          "expression": "fwrite($this->stream, $message)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "fwrite($this->stream, $message)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailchimp-for-wp/includes/class-debug-log.php",
+        "line": 141
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailchimp-for-wp-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "mailchimp-for-wp",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$form_data    = $_POST['mc4wp_form']",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailchimp-for-wp/includes/forms/class-admin.php",
+        "line": 151
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 151,
+          "expression": "$form_data    = $_POST['mc4wp_form']",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 157,
+          "expression": "$form_id = wp_insert_post(\n            [\n                'post_type'    => 'mc4wp-form',\n                'post_status'  => 'publish',\n                'post_title'   => $form_data['name'],\n                'post_content' => $form_content,\n            ]\n        )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 175,
+          "expression": "$edit_form_url = mc4wp_get_edit_form_url($form_id)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 176,
+          "expression": "wp_redirect($edit_form_url)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_redirect($edit_form_url)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailchimp-for-wp/includes/forms/class-admin.php",
+        "line": 176
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailchimp-for-wp-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailchimp-for-wp",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$data  = array_merge($_GET, $_POST)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailchimp-for-wp/includes/forms/class-form-tags.php",
+        "line": 118
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 118,
+          "expression": "$data  = array_merge($_GET, $_POST)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 119,
+          "expression": "$value = isset($data[ $key ]) ? $data[ $key ] : $default",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 123,
+          "expression": "$value = array_filter($value)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 123,
+          "expression": "$value = array_filter($value)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$value = array_filter($value)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailchimp-for-wp/includes/forms/class-form-tags.php",
+        "line": 123
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailchimp-for-wp-rce-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "mailchimp-for-wp",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "(array) explode(',', $_GET['ids'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailchimp-for-wp/includes/admin/class-admin-ajax.php",
+        "line": 46
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 46,
+          "expression": "$list_ids  = array_map(function ($raw) {\n            return preg_replace('/[^a-z0-9]/', '', $raw);\n        }, (array) explode(',', $_GET['ids']))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$list_ids  = array_map(function ($raw) {\n            return preg_replace('/[^a-z0-9]/', '', $raw);\n        }, (array) explode(',', $_GET['ids']))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailchimp-for-wp/includes/admin/class-admin-ajax.php",
+        "line": 46
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "mailchimp-for-wp-file-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "mailchimp-for-wp",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$file = (string) get_option('mc4wp_custom_css_file', '')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailchimp-for-wp/includes/admin/migrations/3.0.0-styles-builder.php",
+        "line": 6
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 6,
+          "expression": "$file = (string) get_option('mc4wp_custom_css_file', '')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 15,
+          "expression": "$relative_path = str_replace($prefix, '', $file)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 19,
+          "expression": "$parts         = explode('?', $relative_path)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 20,
+          "expression": "$relative_path = array_shift($parts)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 24,
+          "expression": "$file = $uploads['basedir'] . $relative_path",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 37,
+          "expression": "$success  = rename($file, $new_file)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$success  = rename($file, $new_file)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailchimp-for-wp/includes/admin/migrations/3.0.0-styles-builder.php",
+        "line": 37
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailchimp-for-wp-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "mailchimp-for-wp",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$token = $_POST[self::FORM_FIELD_NAME] ?? ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailchimp-for-wp/integrations/prosopo-procaptcha/class-procaptcha.php",
+        "line": 185
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 185,
+          "expression": "$token = $_POST[self::FORM_FIELD_NAME] ?? ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 186,
+          "expression": "$token = true === is_string($token) ?\n            $token :\n            ''",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 195,
+          "expression": "$response = wp_remote_post(\n            self::API_URL,\n            [\n                'method' => 'POST',\n                // limit waiting time to 20 seconds.\n                'timeout' => 20,\n                'headers' => [\n                    'Content-Type' => 'application/json',\n                ],\n                'body' => (string) wp_json_encode(\n                    [\n                        'secret' => $this->secret_key,\n                        'token' => $token,\n                    ]\n                ),\n            ]\n        )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(\n            self::API_URL,\n            [\n                'method' => 'POST',\n                // limit waiting time to 20 seconds.\n                'timeout' => 20,\n                'headers' => [\n                    'Content-Type' => 'application/json',\n                ],\n                'body' => (string) wp_json_encode(\n                    [\n                        'secret' => $this->secret_key,\n                        'token' => $token,\n                    ]\n                ),\n            ]\n        )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailchimp-for-wp/integrations/prosopo-procaptcha/class-procaptcha.php",
+        "line": 195
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/mailchimp-for-wp/includes/admin/migrations/4.6.0-remove-lists-from-options.php",
+      "start": {
+        "line": 6,
+        "col": 1,
+        "offset": 50
+      },
+      "end": {
+        "line": 6,
+        "col": 93,
+        "offset": 142
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/mailchimp-for-wp/includes/api/class-api-v3.php",
+      "start": {
+        "line": 53,
+        "col": 9,
+        "offset": 1003
+      },
+      "end": {
+        "line": 53,
+        "col": 53,
+        "offset": 1047
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/mailchimp-for-wp/includes/forms/class-admin.php",
+      "start": {
+        "line": 176,
+        "col": 9,
+        "offset": 7651
+      },
+      "end": {
+        "line": 176,
+        "col": 37,
+        "offset": 7679
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/mailchimp-for-wp/includes/forms/class-admin.php",
+      "start": {
+        "line": 377,
+        "col": 13,
+        "offset": 13954
+      },
+      "end": {
+        "line": 377,
+        "col": 40,
+        "offset": 13981
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/mailchimp-for-wp/includes/forms/class-form-listener.php",
+      "start": {
+        "line": 283,
+        "col": 17,
+        "offset": 10461
+      },
+      "end": {
+        "line": 283,
+        "col": 44,
+        "offset": 10488
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/mailchimp-for-wp/includes/forms/class-form-manager.php",
+      "start": {
+        "line": 134,
+        "col": 9,
+        "offset": 3072
+      },
+      "end": {
+        "line": 142,
+        "col": 11,
+        "offset": 3332
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/mailchimp-for-wp/uninstall.php",
+      "start": {
+        "line": 11,
+        "col": 1,
+        "offset": 176
+      },
+      "end": {
+        "line": 11,
+        "col": 194,
+        "offset": 369
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/mailchimp-for-wp/uninstall.php",
+      "start": {
+        "line": 14,
+        "col": 1,
+        "offset": 409
+      },
+      "end": {
+        "line": 14,
+        "col": 137,
+        "offset": 545
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 1,
+    "taint_high": 3,
+    "taint_total": 6,
+    "semgrep_error": 0,
+    "semgrep_warning": 8
+  }
+}

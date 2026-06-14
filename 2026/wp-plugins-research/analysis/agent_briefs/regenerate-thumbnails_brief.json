@@ -1,0 +1,273 @@
+{
+  "plugin_slug": "regenerate-thumbnails",
+  "priority_score": 27,
+  "metadata": {
+    "php_files": 3,
+    "total_lines": 1604
+  },
+  "attack_surface_summary": "# Attack Surface: regenerate-thumbnails\n\n> Generated: 2026-06-14T21:21:11Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 17,
+    "total_sinks": 11,
+    "total_sanitizers": 23,
+    "direct_flows": 5,
+    "functions_with_sources": 7,
+    "functions_with_sinks": 7,
+    "files_analyzed": 3,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "regenerate-thumbnails-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "regenerate-thumbnails",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "explode( ',', $_GET['ids'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/regenerate-thumbnails/regenerate-thumbnails.php",
+        "line": 291
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 291,
+          "expression": "$script_data['data']['thumbnailIDs'] = array_map( 'intval', explode( ',', $_GET['ids'] ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$script_data['data']['thumbnailIDs'] = array_map( 'intval', explode( ',', $_GET['ids'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/regenerate-thumbnails/regenerate-thumbnails.php",
+        "line": 291
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "regenerate-thumbnails-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "regenerate-thumbnails",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "add_query_arg(\n\t\t\t\tarray(\n\t\t\t\t\t'page' => 'regenerate-thumbnails',\n\t\t\t\t\t'ids'  => rawurlencode( implode( ',', array_map( 'intval', $_REQUEST['media'] ) ) ),\n\t\t\t\t),\n\t\t\t\tadmin_url( 'tools.php' )\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/regenerate-thumbnails/regenerate-thumbnails.php",
+        "line": 518
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 518,
+          "expression": "wp_safe_redirect(\n\t\t\tadd_query_arg(\n\t\t\t\tarray(\n\t\t\t\t\t'page' => 'regenerate-thumbnails',\n\t\t\t\t\t'ids'  => rawurlencode( implode( ',', array_map( 'intval', $_REQUEST['media'] ) ) ),\n\t\t\t\t),\n\t\t\t\tadmin_url( 'tools.php' )\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect(\n\t\t\tadd_query_arg(\n\t\t\t\tarray(\n\t\t\t\t\t'page' => 'regenerate-thumbnails',\n\t\t\t\t\t'ids'  => rawurlencode( implode( ',', array_map( 'intval', $_REQUEST['media'] ) ) ),\n\t\t\t\t),\n\t\t\t\tadmin_url( 'tools.php' )\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/regenerate-thumbnails/regenerate-thumbnails.php",
+        "line": 518
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "regenerate-thumbnails-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "regenerate-thumbnails",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$whitelist = $wpdb->get_col( $wpdb->prepare( \"\n\t\t\t\tSELECT\n\t\t\t\t\tmeta_value\n\t\t\t\tFROM\n\t\t\t\t\t{$wpdb->postmeta}\n\t\t\t\tWHERE\n\t\t\t\t\tmeta_key = '_wp_attached_file'\n\t\t\t\t\tAND meta_value REGEXP %s\n\t\t\t\t/* Regenerate Thumbnails */\n\t\t\t\t\",\n\t\t\t\t'^' . preg_quote( $relative_path ) . '[^' . preg_quote( DIRECTORY_SEPARATOR ) . ']+-[0-9]+x[0-9]+\\.'\n\t\t\t) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/regenerate-thumbnails/includes/class-regeneratethumbnails-regenerator.php",
+        "line": 234
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 234,
+          "expression": "$whitelist = $wpdb->get_col( $wpdb->prepare( \"\n\t\t\t\tSELECT\n\t\t\t\t\tmeta_value\n\t\t\t\tFROM\n\t\t\t\t\t{$wpdb->postmeta}\n\t\t\t\tWHERE\n\t\t\t\t\tmeta_key = '_wp_attached_file'\n\t\t\t\t\tAND meta_value REGEXP %s\n\t\t\t\t/* Regenerate Thumbnails */\n\t\t\t\t\",\n\t\t\t\t'^' . preg_quote( $relative_path ) . '[^' . preg_quote( DIRECTORY_SEPARATOR ) . ']+-[0-9]+x[0-9]+\\.'\n\t\t\t) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 246,
+          "expression": "$whitelist = array_map( 'basename', $whitelist )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 246,
+          "expression": "$whitelist = array_map( 'basename', $whitelist )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$whitelist = array_map( 'basename', $whitelist )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/regenerate-thumbnails/includes/class-regeneratethumbnails-regenerator.php",
+        "line": 246
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/regenerate-thumbnails/includes/class-regeneratethumbnails-rest-controller.php",
+      "start": {
+        "line": 30,
+        "col": 3,
+        "offset": 512
+      },
+      "end": {
+        "line": 71,
+        "col": 7,
+        "offset": 2606
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/regenerate-thumbnails/includes/class-regeneratethumbnails-rest-controller.php",
+      "start": {
+        "line": 73,
+        "col": 3,
+        "offset": 2610
+      },
+      "end": {
+        "line": 79,
+        "col": 7,
+        "offset": 2896
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/regenerate-thumbnails/includes/class-regeneratethumbnails-rest-controller.php",
+      "start": {
+        "line": 81,
+        "col": 3,
+        "offset": 2900
+      },
+      "end": {
+        "line": 88,
+        "col": 7,
+        "offset": 3240
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/regenerate-thumbnails/includes/class-regeneratethumbnails-rest-controller.php",
+      "start": {
+        "line": 258,
+        "col": 16,
+        "offset": 8210
+      },
+      "end": {
+        "line": 258,
+        "col": 55,
+        "offset": 8249
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 2,
+    "taint_high": 0,
+    "taint_total": 3,
+    "semgrep_error": 0,
+    "semgrep_warning": 4
+  }
+}

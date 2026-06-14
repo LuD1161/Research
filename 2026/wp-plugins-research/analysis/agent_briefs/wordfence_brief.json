@@ -1,0 +1,5600 @@
+{
+  "plugin_slug": "wordfence",
+  "priority_score": 405,
+  "metadata": {
+    "php_files": 450,
+    "total_lines": 137623
+  },
+  "attack_surface_summary": "# Attack Surface: wordfence\n\n> Generated: 2026-06-14T21:21:12Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 1103,
+    "total_sinks": 960,
+    "total_sanitizers": 864,
+    "direct_flows": 568,
+    "functions_with_sources": 363,
+    "functions_with_sinks": 508,
+    "files_analyzed": 450,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "wordfence-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "function($b) { return intval($b->id); }",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/models/block/wfBlock.php",
+        "line": 1675
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1675,
+          "expression": "$blockIDs = array_map(function($b) { return intval($b->id); }, $blocks)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$blockIDs = array_map(function($b) { return intval($b->id); }, $blocks)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/models/block/wfBlock.php",
+        "line": 1675
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "array_map(function($b) { return ($b->_type === false ? intval($b->id) : null); }, $blocks)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/models/block/wfBlock.php",
+        "line": 1679
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1679,
+          "expression": "$blockIDsToPopulate = array_filter(array_map(function($b) { return ($b->_type === false ? intval($b->id) : null); }, $blocks))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$blockIDsToPopulate = array_filter(array_map(function($b) { return ($b->_type === false ? intval($b->id) : null); }, $blocks))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/models/block/wfBlock.php",
+        "line": 1679
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$blockIDs = array_map(function($b) { return intval($b->id); }, $blocks)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/models/block/wfBlock.php",
+        "line": 1675
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1675,
+          "expression": "$blockIDs = array_map(function($b) { return intval($b->id); }, $blocks)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1676,
+          "expression": "$inClause = implode(', ', $blockIDs)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1691,
+          "expression": "$query = \"DELETE FROM `{$blocksTable}` WHERE `id` IN (\" . $inClause . \")\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1692,
+          "expression": "$wpdb->query($query)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->query($query)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/models/block/wfBlock.php",
+        "line": 1692
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$timeOffset = 3600 * get_option('gmt_offset')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/viewFullActivityLog.php",
+        "line": 19
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 19,
+          "expression": "$timeOffset = 3600 * get_option('gmt_offset')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 24,
+          "expression": "echo '<div' . ($r['type'] == 'error' ? ' class=\"error\"' : '') . '>[' . date('M d H:i:s', (int) $r['ctime'] + $timeOffset) . ':' . $r['ctime'] . ':' . $r['level'] . ':' . $r['type'] . ']&nbsp;' . esc_html($r['msg']) . \"</div>\\n\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<div' . ($r['type'] == 'error' ? ' class=\"error\"' : '') . '>[' . date('M d H:i:s', (int) $r['ctime'] + $timeOffset) . ':' . $r['ctime'] . ':' . $r['level'] . ':' . $r['type'] . ']&nbsp;' . esc_html($r['msg']) . \"</div>\\n\";",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/viewFullActivityLog.php",
+        "line": 24
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$recentServerAddr = array_filter($recentServerAddr, function($time, $addr) use (&$dirtyServerAddr, &$containsCurrentServerAddr, &$recents) {\n\t\t\tif (!wfUtils::isValidIP($addr)) {\n\t\t\t\t$dirtyServerAddr = true;\n\t\t\t\treturn false;\n\t\t\t}\n\t\t\t\n\t\t\tif ($time < time() - self::SERVER_ADDR_CACHE_TTL) {\n\t\t\t\t$dirtyServerAddr = true;\n\t\t\t\treturn false;\n\t\t\t}\n\t\t\t\n\t\t\tif (isset($_SERVER['SERVER_ADDR']) && $addr == $_SERVER['SERVER_ADDR']) {\n\t\t\t\t$containsCurrentServerAddr = true;\n\t\t\t\tif ($time < time() - self::SERVER_ADDR_REFRESH_TTL) {\n\t\t\t\t\t$dirtyServerAddr = true;\n\t\t\t\t}\n\t\t\t\treturn false; //Filtering out the current one now so it can be re-added later with a current timestamp\n\t\t\t}\n\t\t\t$recents[] = $addr;\n\t\t\treturn true;\n\t\t}, ARRAY_FILTER_USE_BOTH)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wfUtils.php",
+        "line": 1530
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1530,
+          "expression": "$recentServerAddr = array_filter($recentServerAddr, function($time, $addr) use (&$dirtyServerAddr, &$containsCurrentServerAddr, &$recents) {\n\t\t\tif (!wfUtils::isValidIP($addr)) {\n\t\t\t\t$dirtyServerAddr = true;\n\t\t\t\treturn false;\n\t\t\t}\n\t\t\t\n\t\t\tif ($time < time() - self::SERVER_ADDR_CACHE_TTL) {\n\t\t\t\t$dirtyServerAddr = true;\n\t\t\t\treturn false;\n\t\t\t}\n\t\t\t\n\t\t\tif (isset($_SERVER['SERVER_ADDR']) && $addr == $_SERVER['SERVER_ADDR']) {\n\t\t\t\t$containsCurrentServerAddr = true;\n\t\t\t\tif ($time < time() - self::SERVER_ADDR_REFRESH_TTL) {\n\t\t\t\t\t$dirtyServerAddr = true;\n\t\t\t\t}\n\t\t\t\treturn false; //Filtering out the current one now so it can be re-added later with a current timestamp\n\t\t\t}\n\t\t\t$recents[] = $addr;\n\t\t\treturn true;\n\t\t}, ARRAY_FILTER_USE_BOTH)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1530,
+          "expression": "$recentServerAddr = array_filter($recentServerAddr, function($time, $addr) use (&$dirtyServerAddr, &$containsCurrentServerAddr, &$recents) {\n\t\t\tif (!wfUtils::isValidIP($addr)) {\n\t\t\t\t$dirtyServerAddr = true;\n\t\t\t\treturn false;\n\t\t\t}\n\t\t\t\n\t\t\tif ($time < time() - self::SERVER_ADDR_CACHE_TTL) {\n\t\t\t\t$dirtyServerAddr = true;\n\t\t\t\treturn false;\n\t\t\t}\n\t\t\t\n\t\t\tif (isset($_SERVER['SERVER_ADDR']) && $addr == $_SERVER['SERVER_ADDR']) {\n\t\t\t\t$containsCurrentServerAddr = true;\n\t\t\t\tif ($time < time() - self::SERVER_ADDR_REFRESH_TTL) {\n\t\t\t\t\t$dirtyServerAddr = true;\n\t\t\t\t}\n\t\t\t\treturn false; //Filtering out the current one now so it can be re-added later with a current timestamp\n\t\t\t}\n\t\t\t$recents[] = $addr;\n\t\t\treturn true;\n\t\t}, ARRAY_FILTER_USE_BOTH)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$recentServerAddr = array_filter($recentServerAddr, function($time, $addr) use (&$dirtyServerAddr, &$containsCurrentServerAddr, &$recents) {\n\t\t\tif (!wfUtils::isValidIP($addr)) {\n\t\t\t\t$dirtyServerAddr = true;\n\t\t\t\treturn false;\n\t\t\t}\n\t\t\t\n\t\t\tif ($time < time() - self::SERVER_ADDR_CACHE_TTL) {\n\t\t\t\t$dirtyServerAddr = true;\n\t\t\t\treturn false;\n\t\t\t}\n\t\t\t\n\t\t\tif (isset($_SERVER['SERVER_ADDR']) && $addr == $_SERVER['SERVER_ADDR']) {\n\t\t\t\t$containsCurrentServerAddr = true;\n\t\t\t\tif ($time < time() - self::SERVER_ADDR_REFRESH_TTL) {\n\t\t\t\t\t$dirtyServerAddr = true;\n\t\t\t\t}\n\t\t\t\treturn false; //Filtering out the current one now so it can be re-added later with a current timestamp\n\t\t\t}\n\t\t\t$recents[] = $addr;\n\t\t\treturn true;\n\t\t}, ARRAY_FILTER_USE_BOTH)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wfUtils.php",
+        "line": 1530
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-rce-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$ip = isset($_SERVER[$variable]) ? $_SERVER[$variable] : false",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wfUtils.php",
+        "line": 1626
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1626,
+          "expression": "$ip = isset($_SERVER[$variable]) ? $_SERVER[$variable] : false",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1629,
+          "expression": "$ips[$variable] = preg_replace('/[\\s,]/', '', explode(',', $ip))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$ips[$variable] = preg_replace('/[\\s,]/', '', explode(',', $ip))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wfUtils.php",
+        "line": 1629
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-rce-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "explode(',', $_SERVER[$variable])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wfUtils.php",
+        "line": 1687
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1687,
+          "expression": "$items = preg_replace('/[\\s,]/', '', explode(',', $_SERVER[$variable]))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$items = preg_replace('/[\\s,]/', '', explode(',', $_SERVER[$variable]))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wfUtils.php",
+        "line": 1687
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "WFWAF_API_URL_SEC . \"?\" . http_build_query(array(\n\t\t\t\t\t'action' => 'detect_proxy',\n\t\t\t\t\t'k'      => wfConfig::get('apiKey'),\n\t\t\t\t\t's'      => $siteurl,\n\t\t\t\t\t'h'\t\t => $homeurl,\n\t\t\t\t\t't'\t\t => microtime(true),\n\t\t\t\t\t'lang'   => get_site_option('WPLANG'),\n\t\t\t\t), '', '&')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wfUtils.php",
+        "line": 2924
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2924,
+          "expression": "$response = wp_remote_post(WFWAF_API_URL_SEC . \"?\" . http_build_query(array(\n\t\t\t\t\t'action' => 'detect_proxy',\n\t\t\t\t\t'k'      => wfConfig::get('apiKey'),\n\t\t\t\t\t's'      => $siteurl,\n\t\t\t\t\t'h'\t\t => $homeurl,\n\t\t\t\t\t't'\t\t => microtime(true),\n\t\t\t\t\t'lang'   => get_site_option('WPLANG'),\n\t\t\t\t), '', '&'),\n\t\t\t\tarray(\n\t\t\t\t\t'body'    => json_encode($payload),\n\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t\t\t'Referer' => false,\n\t\t\t\t\t),\n\t\t\t\t\t'timeout' => $timeout,\n\t\t\t\t\t'blocking' => $blocking,\n\t\t\t\t))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(WFWAF_API_URL_SEC . \"?\" . http_build_query(array(\n\t\t\t\t\t'action' => 'detect_proxy',\n\t\t\t\t\t'k'      => wfConfig::get('apiKey'),\n\t\t\t\t\t's'      => $siteurl,\n\t\t\t\t\t'h'\t\t => $homeurl,\n\t\t\t\t\t't'\t\t => microtime(true),\n\t\t\t\t\t'lang'   => get_site_option('WPLANG'),\n\t\t\t\t), '', '&'),\n\t\t\t\tarray(\n\t\t\t\t\t'body'    => json_encode($payload),\n\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t\t\t'Referer' => false,\n\t\t\t\t\t),\n\t\t\t\t\t'timeout' => $timeout,\n\t\t\t\t\t'blocking' => $blocking,\n\t\t\t\t))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wfUtils.php",
+        "line": 2924
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-vari-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "variable_injection",
+      "source": {
+        "expression": "$raw = $_POST",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wfAuditLog.php",
+        "line": 1113
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1113,
+          "expression": "$raw = $_POST",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1117,
+          "expression": "parse_str($input, $raw)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "parse_str($input, $raw)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wfAuditLog.php",
+        "line": 1117
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-rce-006",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wordfence",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$func = (isset($_POST['action']) && $_POST['action']) ? $_POST['action'] : $_GET['action']",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 1728
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1728,
+          "expression": "$func = (isset($_POST['action']) && $_POST['action']) ? $_POST['action'] : $_GET['action']",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1729,
+          "expression": "$func = str_replace('wordfence_', '', $func)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1750,
+          "expression": "$returnArr = call_user_func('wordfence::ajax_' . $func . '_callback')",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$returnArr = call_user_func('wordfence::ajax_' . $func . '_callback')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 1750
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wordfence-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "wordfence",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$redirectUrl = !empty($_REQUEST['redirect_to']) ? $_REQUEST['redirect_to'] : 'wp-login.php?checkemail=confirm'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 1878
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1878,
+          "expression": "$redirectUrl = !empty($_REQUEST['redirect_to']) ? $_REQUEST['redirect_to'] : 'wp-login.php?checkemail=confirm'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1880,
+          "expression": "wp_safe_redirect($redirectUrl)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect($redirectUrl)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 1880
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$userID = intval($matches[1])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 2758
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2758,
+          "expression": "$userID = intval($matches[1])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2776,
+          "expression": "echo \"<p>\n        <label for=\\\"wfAuthenticationCode\\\">Authentication Code<br>\n        <input type=\\\"text\\\" size=\\\"6\\\" class=\\\"input\\\" id=\\\"wordfence_authFactor\\\" name=\\\"wordfence_authFactor\\\" autofocus></label>\n        <input type=\\\"hidden\\\" id=\\\"wordfence_twoFactorUser\\\" name=\\\"wordfence_twoFactorUser\\\" value=\\\"\" . $userID . \"\\\">\n        <input type=\\\"hidden\\\" id=\\\"wordfence_twoFactorNonce\\\" name=\\\"wordfence_twoFactorNonce\\\" value=\\\"\" . $twoFactorNonce . \"\\\">\n    </p>\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo \"<p>\n        <label for=\\\"wfAuthenticationCode\\\">Authentication Code<br>\n        <input type=\\\"text\\\" size=\\\"6\\\" class=\\\"input\\\" id=\\\"wordfence_authFactor\\\" name=\\\"wordfence_authFactor\\\" autofocus></label>\n        <input type=\\\"hidden\\\" id=\\\"wordfence_twoFactorUser\\\" name=\\\"wordfence_twoFactorUser\\\" value=\\\"\" . $userID . \"\\\">\n        <input type=\\\"hidden\\\" id=\\\"wordfence_twoFactorNonce\\\" name=\\\"wordfence_twoFactorNonce\\\" value=\\\"\" . $twoFactorNonce . \"\\\">\n    </p>\";",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 2776
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-rce-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$_POST['wordfence_twoFactorNonce']",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 2866
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2866,
+          "expression": "$twoFactorNonce = preg_replace('/[^a-f0-9]/i', '', $_POST['wordfence_twoFactorNonce'])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$twoFactorNonce = preg_replace('/[^a-f0-9]/i', '', $_POST['wordfence_twoFactorNonce'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 2866
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-rce-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$_POST['wordfence_authFactor']",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 2903
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2903,
+          "expression": "$code = preg_replace('/[^a-f0-9]/i', '', $_POST['wordfence_authFactor'])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$code = preg_replace('/[^a-f0-9]/i', '', $_POST['wordfence_authFactor'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 2903
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-ssrf-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$record['IP'] = base64_encode(filter_var($record['IP'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? wfUtils::inet_aton($record['IP']) : wfUtils::inet_pton($record['IP']))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 3434
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 3434,
+          "expression": "$record['IP'] = base64_encode(filter_var($record['IP'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? wfUtils::inet_aton($record['IP']) : wfUtils::inet_pton($record['IP']))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 3438,
+          "expression": "$toSend[$key] = $record",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 3445,
+          "expression": "$toSend = array_values($toSend)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 3448,
+          "expression": "$response = wp_remote_post(WORDFENCE_HACKATTEMPT_URL_SEC . 'multipleHackAttempts/?k=' . rawurlencode(wfConfig::get('apiKey')) . '&t=brute', array(\n\t\t\t\t\t'timeout' => 2,\n\t\t\t\t\t'user-agent' => \"Wordfence.com UA \" . (defined('WORDFENCE_VERSION') ? WORDFENCE_VERSION : '[Unknown version]'),\n\t\t\t\t\t'body' => 'IPs=' . rawurlencode(json_encode($toSend)),\n\t\t\t\t\t'headers' => array('Referer' => false),\n\t\t\t\t))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(WORDFENCE_HACKATTEMPT_URL_SEC . 'multipleHackAttempts/?k=' . rawurlencode(wfConfig::get('apiKey')) . '&t=brute', array(\n\t\t\t\t\t'timeout' => 2,\n\t\t\t\t\t'user-agent' => \"Wordfence.com UA \" . (defined('WORDFENCE_VERSION') ? WORDFENCE_VERSION : '[Unknown version]'),\n\t\t\t\t\t'body' => 'IPs=' . rawurlencode(json_encode($toSend)),\n\t\t\t\t\t'headers' => array('Referer' => false),\n\t\t\t\t))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 3448
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-ssrf-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "WORDFENCE_HACKATTEMPT_URL_SEC . 'hackAttempt/?k=' . rawurlencode(wfConfig::get('apiKey')) . \n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'&IP=' . rawurlencode(filter_var($IP, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? wfUtils::inet_aton($IP) : wfUtils::inet_pton($IP)) . \n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'&t=' . rawurlencode($hitType) .\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'&type=' . $endpointType",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 3509
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 3509,
+          "expression": "$result = wp_remote_get(WORDFENCE_HACKATTEMPT_URL_SEC . 'hackAttempt/?k=' . rawurlencode(wfConfig::get('apiKey')) . \n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'&IP=' . rawurlencode(filter_var($IP, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? wfUtils::inet_aton($IP) : wfUtils::inet_pton($IP)) . \n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'&t=' . rawurlencode($hitType) .\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'&type=' . $endpointType, \n\t\t\t\tarray(\n\t\t\t\t\t'timeout' => 3,\n\t\t\t\t\t'user-agent' => \"Wordfence.com UA \" . (defined('WORDFENCE_VERSION') ? WORDFENCE_VERSION : '[Unknown version]'),\n\t\t\t\t\t'headers' => array('Referer' => false),\n\t\t\t\t))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$result = wp_remote_get(WORDFENCE_HACKATTEMPT_URL_SEC . 'hackAttempt/?k=' . rawurlencode(wfConfig::get('apiKey')) . \n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'&IP=' . rawurlencode(filter_var($IP, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? wfUtils::inet_aton($IP) : wfUtils::inet_pton($IP)) . \n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'&t=' . rawurlencode($hitType) .\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'&type=' . $endpointType, \n\t\t\t\tarray(\n\t\t\t\t\t'timeout' => 3,\n\t\t\t\t\t'user-agent' => \"Wordfence.com UA \" . (defined('WORDFENCE_VERSION') ? WORDFENCE_VERSION : '[Unknown version]'),\n\t\t\t\t\t'headers' => array('Referer' => false),\n\t\t\t\t))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 3509
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-rce-009",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$_POST['wordfence_twoFactorNonce']",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 3580
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 3580,
+          "expression": "$twoFactorNonce = preg_replace('/[^a-f0-9]/i', '', $_POST['wordfence_twoFactorNonce'])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$twoFactorNonce = preg_replace('/[^a-f0-9]/i', '', $_POST['wordfence_twoFactorNonce'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 3580
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-rce-010",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$twoFactorNonce = preg_replace('/[^a-f0-9]/i', '', $_POST['wordfence_twoFactorNonce'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 3580
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 3580,
+          "expression": "$twoFactorNonce = preg_replace('/[^a-f0-9]/i', '', $_POST['wordfence_twoFactorNonce'])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 3584,
+          "expression": "$passwd = $twoFactorNonce",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 3602,
+          "expression": "$passwd = preg_replace('/^(.+)\\s+wf([a-z0-9 ]+)$/i', '$1', $passwd)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 3602,
+          "expression": "$passwd = preg_replace('/^(.+)\\s+wf([a-z0-9 ]+)$/i', '$1', $passwd)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$passwd = preg_replace('/^(.+)\\s+wf([a-z0-9 ]+)$/i', '$1', $passwd)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 3602
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-rce-011",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$val = trim($_POST['val'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 4595
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 4595,
+          "expression": "$val = trim($_POST['val'])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 4596,
+          "expression": "$val = preg_replace('/[^a-zA-Z0-9\\.\\-:]+/', '', $val)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 4596,
+          "expression": "$val = preg_replace('/[^a-zA-Z0-9\\.\\-:]+/', '', $val)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$val = preg_replace('/[^a-zA-Z0-9\\.\\-:]+/', '', $val)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 4596
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-open-002",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "wordfence",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "remove_query_arg('wfcentral_admin_redirect', network_admin_url('admin.php?page=Wordfence' . rawurlencode(ucwords(preg_replace('/\\W/', '', $_GET['wfcentral_admin_redirect']))) . '&' . $_SERVER['QUERY_STRING']))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 5232
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 5232,
+          "expression": "wp_safe_redirect(remove_query_arg('wfcentral_admin_redirect', network_admin_url('admin.php?page=Wordfence' . rawurlencode(ucwords(preg_replace('/\\W/', '', $_GET['wfcentral_admin_redirect']))) . '&' . $_SERVER['QUERY_STRING'])))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect(remove_query_arg('wfcentral_admin_redirect', network_admin_url('admin.php?page=Wordfence' . rawurlencode(ucwords(preg_replace('/\\W/', '', $_GET['wfcentral_admin_redirect']))) . '&' . $_SERVER['QUERY_STRING'])))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 5232
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wordfence-open-003",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "wordfence",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$localFile = ABSPATH . preg_replace('/^(?:\\.\\.|[\\/]+)/', '', sanitize_text_field($_GET['file']))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 5596
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 5596,
+          "expression": "$localFile = ABSPATH . preg_replace('/^(?:\\.\\.|[\\/]+)/', '', sanitize_text_field($_GET['file']))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 5610,
+          "expression": "$filename = basename($localFile)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 5612,
+          "expression": "header('Content-Disposition: attachment; filename=\"' . $filename . '\"')",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "header('Content-Disposition: attachment; filename=\"' . $filename . '\"')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 5612
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-open-004",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "wordfence",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$localFile = ABSPATH . preg_replace('/^(?:\\.\\.|[\\/]+)/', '', sanitize_text_field($_GET['file']))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 5596
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 5596,
+          "expression": "$localFile = ABSPATH . preg_replace('/^(?:\\.\\.|[\\/]+)/', '', sanitize_text_field($_GET['file']))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 5613,
+          "expression": "header('Content-Length: ' . filesize($localFile))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "header('Content-Length: ' . filesize($localFile))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 5613
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-file-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$localFile = ABSPATH . preg_replace('/^(?:\\.\\.|[\\/]+)/', '', sanitize_text_field($_GET['file']))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 5596
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 5596,
+          "expression": "$localFile = ABSPATH . preg_replace('/^(?:\\.\\.|[\\/]+)/', '', sanitize_text_field($_GET['file']))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 5614,
+          "expression": "readfile($localFile)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "readfile($localFile)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 5614
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-xss-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$data['hit'] = new wfRequestModel($_GET['hitid'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 5642
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 5642,
+          "expression": "$data['hit'] = new wfRequestModel($_GET['hitid'])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 5644,
+          "expression": "$data['hitData'] = (object) wfRequestModel::unserializeActionData($data['hit']->actionData)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 5646,
+          "expression": "echo wfView::create('waf/debug', $data);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo wfView::create('waf/debug', $data);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 5646
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-sqli-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$issueID = absint(!empty($_POST['issueID']) ? $_POST['issueID'] : 0)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 7205
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 7205,
+          "expression": "$issueID = absint(!empty($_POST['issueID']) ? $_POST['issueID'] : 0)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 7207,
+          "expression": "$issue = $wfIssues->getIssueByID($issueID)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 7211,
+          "expression": "$data = $issue['data']",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 7228,
+          "expression": "$wpdb->delete($wpdb->users, array('ID' => $data['userID']))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->delete($wpdb->users, array('ID' => $data['userID']))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 7228
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-rce-012",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$_POST['name']",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 7381
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 7381,
+          "expression": "$name = preg_replace('/[^a-zA-Z0-9_\\-]/', '', $_POST['name'])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$name = preg_replace('/[^a-zA-Z0-9_\\-]/', '', $_POST['name'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 7381
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-rce-013",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$name = preg_replace('/[^a-zA-Z0-9_\\-]/', '', $_POST['name'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 7381
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 7381,
+          "expression": "$name = preg_replace('/[^a-zA-Z0-9_\\-]/', '', $_POST['name'])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 7395,
+          "expression": "$name = preg_replace('/[^a-zA-Z0-9_\\-]/', '', $name)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 7395,
+          "expression": "$name = preg_replace('/[^a-zA-Z0-9_\\-]/', '', $name)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$name = preg_replace('/[^a-zA-Z0-9_\\-]/', '', $name)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 7395
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-ssrf-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "WFWAF_API_URL_SEC . \"?\" . http_build_query(array(\n\t\t\t\t\t\t\t\t\t'action' => 'send_waf_attack_data',\n\t\t\t\t\t\t\t\t\t'k'      => $waf->getStorageEngine()->getConfig('apiKey', null, 'synced'),\n\t\t\t\t\t\t\t\t\t's'      => $siteurl,\n\t\t\t\t\t\t\t\t\t'h'\t\t => $homeurl,\n\t\t\t\t\t\t\t\t\t't'\t\t => microtime(true),\n\t\t\t\t\t\t\t\t\t'c'\t\t => $installType,\n\t\t\t\t\t\t\t\t\t'lang'   => get_site_option('WPLANG'),\n\t\t\t\t\t\t\t\t), '', '&')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 8290
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 8290,
+          "expression": "$response = wp_remote_post(WFWAF_API_URL_SEC . \"?\" . http_build_query(array(\n\t\t\t\t\t\t\t\t\t'action' => 'send_waf_attack_data',\n\t\t\t\t\t\t\t\t\t'k'      => $waf->getStorageEngine()->getConfig('apiKey', null, 'synced'),\n\t\t\t\t\t\t\t\t\t's'      => $siteurl,\n\t\t\t\t\t\t\t\t\t'h'\t\t => $homeurl,\n\t\t\t\t\t\t\t\t\t't'\t\t => microtime(true),\n\t\t\t\t\t\t\t\t\t'c'\t\t => $installType,\n\t\t\t\t\t\t\t\t\t'lang'   => get_site_option('WPLANG'),\n\t\t\t\t\t\t\t\t), '', '&'),\n\t\t\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t\t\t'body'    => $bodyData,\n\t\t\t\t\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t\t\t\t\t\t\t'Referer' => false,\n\t\t\t\t\t\t\t\t\t),\n\t\t\t\t\t\t\t\t\t'timeout' => 30,\n\t\t\t\t\t\t\t\t))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(WFWAF_API_URL_SEC . \"?\" . http_build_query(array(\n\t\t\t\t\t\t\t\t\t'action' => 'send_waf_attack_data',\n\t\t\t\t\t\t\t\t\t'k'      => $waf->getStorageEngine()->getConfig('apiKey', null, 'synced'),\n\t\t\t\t\t\t\t\t\t's'      => $siteurl,\n\t\t\t\t\t\t\t\t\t'h'\t\t => $homeurl,\n\t\t\t\t\t\t\t\t\t't'\t\t => microtime(true),\n\t\t\t\t\t\t\t\t\t'c'\t\t => $installType,\n\t\t\t\t\t\t\t\t\t'lang'   => get_site_option('WPLANG'),\n\t\t\t\t\t\t\t\t), '', '&'),\n\t\t\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t\t\t'body'    => $bodyData,\n\t\t\t\t\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t\t\t\t\t\t\t'Referer' => false,\n\t\t\t\t\t\t\t\t\t),\n\t\t\t\t\t\t\t\t\t'timeout' => 30,\n\t\t\t\t\t\t\t\t))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 8290
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-ssrf-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "WFWAF_API_URL_SEC . \"?\" . http_build_query(array(\n\t\t\t\t\t\t\t\t\t'action' => 'send_waf_false_positives',\n\t\t\t\t\t\t\t\t\t'k'      => $waf->getStorageEngine()->getConfig('apiKey', null, 'synced'),\n\t\t\t\t\t\t\t\t\t's'      => $siteurl,\n\t\t\t\t\t\t\t\t\t'h'\t\t => $homeurl,\n\t\t\t\t\t\t\t\t\t't'\t\t => microtime(true),\n\t\t\t\t\t\t\t\t\t'c'\t\t => $installType,\n\t\t\t\t\t\t\t\t\t'lang'   => get_site_option('WPLANG'),\n\t\t\t\t\t\t\t\t), '', '&')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 8433
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 8433,
+          "expression": "$response = wp_remote_post(WFWAF_API_URL_SEC . \"?\" . http_build_query(array(\n\t\t\t\t\t\t\t\t\t'action' => 'send_waf_false_positives',\n\t\t\t\t\t\t\t\t\t'k'      => $waf->getStorageEngine()->getConfig('apiKey', null, 'synced'),\n\t\t\t\t\t\t\t\t\t's'      => $siteurl,\n\t\t\t\t\t\t\t\t\t'h'\t\t => $homeurl,\n\t\t\t\t\t\t\t\t\t't'\t\t => microtime(true),\n\t\t\t\t\t\t\t\t\t'c'\t\t => $installType,\n\t\t\t\t\t\t\t\t\t'lang'   => get_site_option('WPLANG'),\n\t\t\t\t\t\t\t\t), '', '&'),\n\t\t\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t\t\t'body'    => json_encode($data),\n\t\t\t\t\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t\t\t\t\t\t\t'Referer' => false,\n\t\t\t\t\t\t\t\t\t),\n\t\t\t\t\t\t\t\t\t'timeout' => 30,\n\t\t\t\t\t\t\t\t))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(WFWAF_API_URL_SEC . \"?\" . http_build_query(array(\n\t\t\t\t\t\t\t\t\t'action' => 'send_waf_false_positives',\n\t\t\t\t\t\t\t\t\t'k'      => $waf->getStorageEngine()->getConfig('apiKey', null, 'synced'),\n\t\t\t\t\t\t\t\t\t's'      => $siteurl,\n\t\t\t\t\t\t\t\t\t'h'\t\t => $homeurl,\n\t\t\t\t\t\t\t\t\t't'\t\t => microtime(true),\n\t\t\t\t\t\t\t\t\t'c'\t\t => $installType,\n\t\t\t\t\t\t\t\t\t'lang'   => get_site_option('WPLANG'),\n\t\t\t\t\t\t\t\t), '', '&'),\n\t\t\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t\t\t'body'    => json_encode($data),\n\t\t\t\t\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t\t\t\t\t\t\t'Referer' => false,\n\t\t\t\t\t\t\t\t\t),\n\t\t\t\t\t\t\t\t\t'timeout' => 30,\n\t\t\t\t\t\t\t\t))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 8433
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-file-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$afterWAFBlock = substr($htaccessContent, intval($matches[0][1]) + strlen($wafBlock))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 9390
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 9390,
+          "expression": "$afterWAFBlock = substr($htaccessContent, intval($matches[0][1]) + strlen($wafBlock))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 9393,
+          "expression": "$updatedHtaccessContent = $beforeWAFBlock . $beforeMod_php . $php5Matches[0][0] . \"\\n\" . sprintf(\"<IfModule mod_php7.c>\\n\\tphp_value auto_prepend_file '%1\\$s'\\n</IfModule>\\n<IfModule mod_php.c>\\n\\tphp_value auto_prepend_file '%1\\$s'\\n</IfModule>\", $php5Matches[1][0] /* already escaped */) . $afterMod_php . $afterWAFBlock",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 9394,
+          "expression": "file_put_contents($htaccessPath, $updatedHtaccessContent)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "file_put_contents($htaccessPath, $updatedHtaccessContent)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 9394
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-file-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$afterWAFBlock = substr($htaccessContent, intval($matches[0][1]) + strlen($wafBlock))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 9398
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 9398,
+          "expression": "$afterWAFBlock = substr($htaccessContent, intval($matches[0][1]) + strlen($wafBlock))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 9401,
+          "expression": "$updatedHtaccessContent = $beforeWAFBlock . $beforeMod_php . $php5Matches[0][0] . \"\\n\" . $php7Matches[0][0] . \"\\n\" . sprintf(\"<IfModule mod_php.c>\\n\\tphp_value auto_prepend_file '%s'\\n</IfModule>\", $php5Matches[1][0] /* already escaped */) . $afterMod_php . $afterWAFBlock",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 9402,
+          "expression": "file_put_contents($htaccessPath, $updatedHtaccessContent)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "file_put_contents($htaccessPath, $updatedHtaccessContent)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+        "line": 9402
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-vari-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "variable_injection",
+      "source": {
+        "expression": "$meta = get_user_meta($user->ID)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/modules/login-security/classes/controller/permissions.php",
+        "line": 390
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 390,
+          "expression": "$meta = get_user_meta($user->ID)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 393,
+          "expression": "$extractor->extract($meta)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$extractor->extract($meta)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/modules/login-security/classes/controller/permissions.php",
+        "line": 393
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-rce-014",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$notices = get_user_meta($user->ID, self::USER_META_KEY, true)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/modules/login-security/classes/controller/notices.php",
+        "line": 154
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 154,
+          "expression": "$notices = get_user_meta($user->ID, self::USER_META_KEY, true)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 155,
+          "expression": "array_filter((array) $notices)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_filter((array) $notices)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/modules/login-security/classes/controller/notices.php",
+        "line": 155
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-rce-015",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "explode(',', $_SERVER[$variable])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/modules/login-security/classes/model/request.php",
+        "line": 26
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 26,
+          "expression": "$items = preg_replace('/[\\s,]/', '', explode(',', $_SERVER[$variable]))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$items = preg_replace('/[\\s,]/', '', explode(',', $_SERVER[$variable]))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/modules/login-security/classes/model/request.php",
+        "line": 26
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$offset = get_option('gmt_offset')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/modules/login-security/views/page/manage.php",
+        "line": 103
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 103,
+          "expression": "$offset = get_option('gmt_offset')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 104,
+          "expression": "$tz = 'UTC' . ($offset >= 0 ? '+' . $offset : $offset)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 108,
+          "expression": "echo \\WordfenceLS\\Controller_Time::format_local_time('Y-m-d H:i:s', $time) . ' ' . $tz;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo \\WordfenceLS\\Controller_Time::format_local_time('Y-m-d H:i:s', $time) . ' ' . $tz;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/modules/login-security/views/page/manage.php",
+        "line": 108
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-xss-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$offset = get_option('gmt_offset')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/modules/login-security/views/page/manage.php",
+        "line": 103
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 103,
+          "expression": "$offset = get_option('gmt_offset')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 104,
+          "expression": "$tz = 'UTC' . ($offset >= 0 ? '+' . $offset : $offset)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 112,
+          "expression": "echo esc_html__('Corrected Time (NTP):', 'wordfence') . ' ' . date('Y-m-d H:i:s', $correctedTime) . ' UTC (' . \\WordfenceLS\\Controller_Time::format_local_time('Y-m-d H:i:s', $correctedTime) . ' ' . $tz . ')<br>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_html__('Corrected Time (NTP):', 'wordfence') . ' ' . date('Y-m-d H:i:s', $correctedTime) . ' UTC (' . \\WordfenceLS\\Controller_Time::format_local_time('Y-m-d H:i:s', $correctedTime) . ' ' . $tz . ')<br>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/modules/login-security/views/page/manage.php",
+        "line": 112
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-xss-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$offset = get_option('gmt_offset')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/modules/login-security/views/page/manage.php",
+        "line": 103
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 103,
+          "expression": "$offset = get_option('gmt_offset')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 104,
+          "expression": "$tz = 'UTC' . ($offset >= 0 ? '+' . $offset : $offset)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 115,
+          "expression": "echo esc_html__('Corrected Time (WF):', 'wordfence') . ' ' . date('Y-m-d H:i:s', $correctedTime) . ' UTC (' . \\WordfenceLS\\Controller_Time::format_local_time('Y-m-d H:i:s', $correctedTime) . ' ' . $tz . ')<br>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_html__('Corrected Time (WF):', 'wordfence') . ' ' . date('Y-m-d H:i:s', $correctedTime) . ' UTC (' . \\WordfenceLS\\Controller_Time::format_local_time('Y-m-d H:i:s', $correctedTime) . ' ' . $tz . ')<br>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/modules/login-security/views/page/manage.php",
+        "line": 115
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordfence-xss-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wordfence",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo get_option('blog_charset')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/views/reports/activity-report-email-inline.php",
+        "line": 22
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 22,
+          "expression": "echo get_option('blog_charset')",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo get_option('blog_charset')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordfence/wordfence/views/reports/activity-report-email-inline.php",
+        "line": 22
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/wordfence/wordfence/lib/rest-api/wfRESTAuthenticationController.php",
+      "start": {
+        "line": 28,
+        "col": 3,
+        "offset": 652
+      },
+      "end": {
+        "line": 32,
+        "col": 6,
+        "offset": 845
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/wordfence/wordfence/lib/rest-api/wfRESTAuthenticationController.php",
+      "start": {
+        "line": 33,
+        "col": 3,
+        "offset": 848
+      },
+      "end": {
+        "line": 37,
+        "col": 6,
+        "offset": 1049
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/rest-api/wfRESTConfigController.php",
+      "start": {
+        "line": 26,
+        "col": 13,
+        "offset": 914
+      },
+      "end": {
+        "line": 26,
+        "col": 115,
+        "offset": 1016
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/wordfence/wordfence/lib/rest-api/wfRESTConfigController.php",
+      "start": {
+        "line": 37,
+        "col": 3,
+        "offset": 1323
+      },
+      "end": {
+        "line": 46,
+        "col": 6,
+        "offset": 1723
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/wordfence/wordfence/lib/rest-api/wfRESTConfigController.php",
+      "start": {
+        "line": 47,
+        "col": 3,
+        "offset": 1726
+      },
+      "end": {
+        "line": 56,
+        "col": 6,
+        "offset": 2122
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/wordfence/wordfence/lib/rest-api/wfRESTConfigController.php",
+      "start": {
+        "line": 57,
+        "col": 3,
+        "offset": 2125
+      },
+      "end": {
+        "line": 61,
+        "col": 6,
+        "offset": 2355
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/wordfence/wordfence/lib/rest-api/wfRESTScanController.php",
+      "start": {
+        "line": 11,
+        "col": 3,
+        "offset": 225
+      },
+      "end": {
+        "line": 30,
+        "col": 6,
+        "offset": 978
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/wordfence/wordfence/lib/rest-api/wfRESTScanController.php",
+      "start": {
+        "line": 31,
+        "col": 3,
+        "offset": 981
+      },
+      "end": {
+        "line": 35,
+        "col": 6,
+        "offset": 1205
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/wordfence/wordfence/lib/rest-api/wfRESTScanController.php",
+      "start": {
+        "line": 36,
+        "col": 3,
+        "offset": 1208
+      },
+      "end": {
+        "line": 40,
+        "col": 6,
+        "offset": 1431
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/wordfence/wordfence/lib/rest-api/wfRESTScanController.php",
+      "start": {
+        "line": 41,
+        "col": 3,
+        "offset": 1434
+      },
+      "end": {
+        "line": 45,
+        "col": 6,
+        "offset": 1665
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfBrowscap.php",
+      "start": {
+        "line": 36,
+        "col": 37,
+        "offset": 1167
+      },
+      "end": {
+        "line": 36,
+        "col": 63,
+        "offset": 1193
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfBrowscap.php",
+      "start": {
+        "line": 58,
+        "col": 48,
+        "offset": 1921
+      },
+      "end": {
+        "line": 58,
+        "col": 83,
+        "offset": 1956
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfBrowscap.php",
+      "start": {
+        "line": 61,
+        "col": 30,
+        "offset": 2042
+      },
+      "end": {
+        "line": 61,
+        "col": 70,
+        "offset": 2082
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wfConfig.php",
+      "start": {
+        "line": 303,
+        "col": 24,
+        "offset": 25740
+      },
+      "end": {
+        "line": 303,
+        "col": 99,
+        "offset": 25815
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wfConfig.php",
+      "start": {
+        "line": 304,
+        "col": 19,
+        "offset": 25838
+      },
+      "end": {
+        "line": 304,
+        "col": 71,
+        "offset": 25890
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfConfig.php",
+      "start": {
+        "line": 728,
+        "col": 14,
+        "offset": 38442
+      },
+      "end": {
+        "line": 728,
+        "col": 34,
+        "offset": 38462
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfConfig.php",
+      "start": {
+        "line": 755,
+        "col": 38,
+        "offset": 39492
+      },
+      "end": {
+        "line": 755,
+        "col": 60,
+        "offset": 39514
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfConfig.php",
+      "start": {
+        "line": 758,
+        "col": 13,
+        "offset": 39578
+      },
+      "end": {
+        "line": 758,
+        "col": 35,
+        "offset": 39600
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfConfig.php",
+      "start": {
+        "line": 762,
+        "col": 36,
+        "offset": 39665
+      },
+      "end": {
+        "line": 762,
+        "col": 60,
+        "offset": 39689
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfConfig.php",
+      "start": {
+        "line": 765,
+        "col": 11,
+        "offset": 39747
+      },
+      "end": {
+        "line": 765,
+        "col": 35,
+        "offset": 39771
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfConfig.php",
+      "start": {
+        "line": 775,
+        "col": 14,
+        "offset": 40143
+      },
+      "end": {
+        "line": 775,
+        "col": 36,
+        "offset": 40165
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfConfig.php",
+      "start": {
+        "line": 779,
+        "col": 37,
+        "offset": 40234
+      },
+      "end": {
+        "line": 779,
+        "col": 61,
+        "offset": 40258
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfConfig.php",
+      "start": {
+        "line": 782,
+        "col": 12,
+        "offset": 40319
+      },
+      "end": {
+        "line": 782,
+        "col": 36,
+        "offset": 40343
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfConfig.php",
+      "start": {
+        "line": 953,
+        "col": 13,
+        "offset": 47208
+      },
+      "end": {
+        "line": 953,
+        "col": 33,
+        "offset": 47228
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wfCredentialsController.php",
+      "start": {
+        "line": 41,
+        "col": 20,
+        "offset": 1140
+      },
+      "end": {
+        "line": 41,
+        "col": 69,
+        "offset": 1189
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wfDB.php",
+      "start": {
+        "line": 77,
+        "col": 11,
+        "offset": 2247
+      },
+      "end": {
+        "line": 77,
+        "col": 79,
+        "offset": 2315
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wfDB.php",
+      "start": {
+        "line": 79,
+        "col": 11,
+        "offset": 2338
+      },
+      "end": {
+        "line": 79,
+        "col": 42,
+        "offset": 2369
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wfDB.php",
+      "start": {
+        "line": 95,
+        "col": 11,
+        "offset": 2853
+      },
+      "end": {
+        "line": 95,
+        "col": 77,
+        "offset": 2919
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wfDB.php",
+      "start": {
+        "line": 97,
+        "col": 11,
+        "offset": 2942
+      },
+      "end": {
+        "line": 97,
+        "col": 40,
+        "offset": 2971
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wfDB.php",
+      "start": {
+        "line": 202,
+        "col": 13,
+        "offset": 6195
+      },
+      "end": {
+        "line": 202,
+        "col": 33,
+        "offset": 6215
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wfDB.php",
+      "start": {
+        "line": 251,
+        "col": 13,
+        "offset": 7831
+      },
+      "end": {
+        "line": 251,
+        "col": 33,
+        "offset": 7851
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wfDiagnostic.php",
+      "start": {
+        "line": 294,
+        "col": 14,
+        "offset": 12416
+      },
+      "end": {
+        "line": 294,
+        "col": 48,
+        "offset": 12450
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wordfence/wordfence/lib/wfDiagnostic.php",
+      "start": {
+        "line": 342,
+        "col": 3,
+        "offset": 13448
+      },
+      "end": {
+        "line": 342,
+        "col": 22,
+        "offset": 13467
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wordfence/wordfence/lib/wfDiagnostic.php",
+      "start": {
+        "line": 354,
+        "col": 3,
+        "offset": 13821
+      },
+      "end": {
+        "line": 354,
+        "col": 22,
+        "offset": 13840
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wordfence/wordfence/lib/wfIssues.php",
+      "start": {
+        "line": 273,
+        "col": 4,
+        "offset": 9881
+      },
+      "end": {
+        "line": 273,
+        "col": 46,
+        "offset": 9923
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wordfence/wordfence/lib/wfIssues.php",
+      "start": {
+        "line": 274,
+        "col": 4,
+        "offset": 9927
+      },
+      "end": {
+        "line": 274,
+        "col": 46,
+        "offset": 9969
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfIssues.php",
+      "start": {
+        "line": 578,
+        "col": 18,
+        "offset": 20456
+      },
+      "end": {
+        "line": 578,
+        "col": 43,
+        "offset": 20481
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfIssues.php",
+      "start": {
+        "line": 586,
+        "col": 48,
+        "offset": 20826
+      },
+      "end": {
+        "line": 586,
+        "col": 71,
+        "offset": 20849
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfIssues.php",
+      "start": {
+        "line": 636,
+        "col": 17,
+        "offset": 23055
+      },
+      "end": {
+        "line": 636,
+        "col": 40,
+        "offset": 23078
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfIssues.php",
+      "start": {
+        "line": 645,
+        "col": 17,
+        "offset": 23340
+      },
+      "end": {
+        "line": 645,
+        "col": 40,
+        "offset": 23363
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfIssues.php",
+      "start": {
+        "line": 657,
+        "col": 17,
+        "offset": 23711
+      },
+      "end": {
+        "line": 657,
+        "col": 40,
+        "offset": 23734
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfIssues.php",
+      "start": {
+        "line": 693,
+        "col": 14,
+        "offset": 25039
+      },
+      "end": {
+        "line": 693,
+        "col": 41,
+        "offset": 25066
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfIssues.php",
+      "start": {
+        "line": 712,
+        "col": 14,
+        "offset": 25699
+      },
+      "end": {
+        "line": 712,
+        "col": 41,
+        "offset": 25726
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/lib/wfIssues.php",
+      "start": {
+        "line": 778,
+        "col": 20,
+        "offset": 27504
+      },
+      "end": {
+        "line": 778,
+        "col": 47,
+        "offset": 27531
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-openssl-random-pseudo-not-strong",
+      "path": "plugins/src/wordfence/wordfence/lib/wfLicense.php",
+      "start": {
+        "line": 384,
+        "col": 4,
+        "offset": 10021
+      },
+      "end": {
+        "line": 384,
+        "col": 74,
+        "offset": 10091
+      },
+      "extra": {
+        "message": "openssl_random_pseudo_bytes() without checking the $crypto_strong output parameter may return non-cryptographically-strong bytes on some systems. Always check the second argument or prefer random_bytes() which throws on failure.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-338",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wfLog.php",
+      "start": {
+        "line": 87,
+        "col": 3,
+        "offset": 2523
+      },
+      "end": {
+        "line": 87,
+        "col": 77,
+        "offset": 2597
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wordfence/wordfence/lib/wfLog.php",
+      "start": {
+        "line": 749,
+        "col": 3,
+        "offset": 24739
+      },
+      "end": {
+        "line": 749,
+        "col": 118,
+        "offset": 24854
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wordfence/wordfence/lib/wfMD5BloomFilter.php",
+      "start": {
+        "line": 111,
+        "col": 3,
+        "offset": 4585
+      },
+      "end": {
+        "line": 111,
+        "col": 26,
+        "offset": 4608
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wordfence/wordfence/lib/wfMD5BloomFilter.php",
+      "start": {
+        "line": 120,
+        "col": 3,
+        "offset": 4905
+      },
+      "end": {
+        "line": 120,
+        "col": 26,
+        "offset": 4928
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wordfence/wordfence/lib/wfScanEngine.php",
+      "start": {
+        "line": 310,
+        "col": 4,
+        "offset": 11364
+      },
+      "end": {
+        "line": 310,
+        "col": 166,
+        "offset": 11526
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wordfence/wordfence/lib/wfScanEngine.php",
+      "start": {
+        "line": 1241,
+        "col": 5,
+        "offset": 53647
+      },
+      "end": {
+        "line": 1260,
+        "col": 7,
+        "offset": 54544
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wordfence/wordfence/lib/wfScanEngine.php",
+      "start": {
+        "line": 1302,
+        "col": 6,
+        "offset": 55923
+      },
+      "end": {
+        "line": 1302,
+        "col": 64,
+        "offset": 55981
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wordfence/wordfence/lib/wfScanEngine.php",
+      "start": {
+        "line": 1426,
+        "col": 6,
+        "offset": 61177
+      },
+      "end": {
+        "line": 1426,
+        "col": 132,
+        "offset": 61303
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wordfence/wordfence/lib/wfScanEngine.php",
+      "start": {
+        "line": 2383,
+        "col": 5,
+        "offset": 107521
+      },
+      "end": {
+        "line": 2383,
+        "col": 71,
+        "offset": 107587
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wordfence/wordfence/lib/wfScanFileProperties.php",
+      "start": {
+        "line": 18,
+        "col": 3,
+        "offset": 335
+      },
+      "end": {
+        "line": 18,
+        "col": 49,
+        "offset": 381
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wfUtils.php",
+      "start": {
+        "line": 3113,
+        "col": 11,
+        "offset": 102931
+      },
+      "end": {
+        "line": 3113,
+        "col": 105,
+        "offset": 103025
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wfUtils.php",
+      "start": {
+        "line": 3115,
+        "col": 12,
+        "offset": 103111
+      },
+      "end": {
+        "line": 3115,
+        "col": 109,
+        "offset": 103208
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wfUtils.php",
+      "start": {
+        "line": 3201,
+        "col": 11,
+        "offset": 105620
+      },
+      "end": {
+        "line": 3201,
+        "col": 108,
+        "offset": 105717
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 324,
+        "col": 14,
+        "offset": 13914
+      },
+      "end": {
+        "line": 324,
+        "col": 48,
+        "offset": 13948
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 502,
+        "col": 4,
+        "offset": 20883
+      },
+      "end": {
+        "line": 502,
+        "col": 107,
+        "offset": 20986
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 503,
+        "col": 4,
+        "offset": 20991
+      },
+      "end": {
+        "line": 503,
+        "col": 123,
+        "offset": 21110
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 506,
+        "col": 3,
+        "offset": 21119
+      },
+      "end": {
+        "line": 506,
+        "col": 114,
+        "offset": 21230
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 551,
+        "col": 14,
+        "offset": 22276
+      },
+      "end": {
+        "line": 551,
+        "col": 77,
+        "offset": 22339
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 559,
+        "col": 14,
+        "offset": 22584
+      },
+      "end": {
+        "line": 559,
+        "col": 77,
+        "offset": 22647
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 599,
+        "col": 5,
+        "offset": 23879
+      },
+      "end": {
+        "line": 599,
+        "col": 67,
+        "offset": 23941
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 611,
+        "col": 4,
+        "offset": 24157
+      },
+      "end": {
+        "line": 618,
+        "col": 5,
+        "offset": 24258
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 620,
+        "col": 4,
+        "offset": 24264
+      },
+      "end": {
+        "line": 620,
+        "col": 61,
+        "offset": 24321
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 632,
+        "col": 4,
+        "offset": 24589
+      },
+      "end": {
+        "line": 632,
+        "col": 111,
+        "offset": 24696
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 651,
+        "col": 4,
+        "offset": 25202
+      },
+      "end": {
+        "line": 651,
+        "col": 86,
+        "offset": 25284
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 692,
+        "col": 4,
+        "offset": 26409
+      },
+      "end": {
+        "line": 692,
+        "col": 99,
+        "offset": 26504
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 693,
+        "col": 4,
+        "offset": 26509
+      },
+      "end": {
+        "line": 693,
+        "col": 70,
+        "offset": 26575
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 706,
+        "col": 4,
+        "offset": 26882
+      },
+      "end": {
+        "line": 706,
+        "col": 111,
+        "offset": 26989
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 707,
+        "col": 4,
+        "offset": 26994
+      },
+      "end": {
+        "line": 707,
+        "col": 111,
+        "offset": 27101
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 719,
+        "col": 4,
+        "offset": 27391
+      },
+      "end": {
+        "line": 719,
+        "col": 105,
+        "offset": 27492
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 720,
+        "col": 4,
+        "offset": 27497
+      },
+      "end": {
+        "line": 720,
+        "col": 69,
+        "offset": 27562
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 721,
+        "col": 4,
+        "offset": 27567
+      },
+      "end": {
+        "line": 721,
+        "col": 93,
+        "offset": 27656
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 742,
+        "col": 4,
+        "offset": 28598
+      },
+      "end": {
+        "line": 742,
+        "col": 112,
+        "offset": 28706
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 743,
+        "col": 4,
+        "offset": 28711
+      },
+      "end": {
+        "line": 743,
+        "col": 131,
+        "offset": 28838
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 756,
+        "col": 4,
+        "offset": 29154
+      },
+      "end": {
+        "line": 756,
+        "col": 106,
+        "offset": 29256
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 826,
+        "col": 4,
+        "offset": 32195
+      },
+      "end": {
+        "line": 826,
+        "col": 24,
+        "offset": 32215
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 891,
+        "col": 4,
+        "offset": 34774
+      },
+      "end": {
+        "line": 891,
+        "col": 101,
+        "offset": 34871
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 892,
+        "col": 4,
+        "offset": 34876
+      },
+      "end": {
+        "line": 892,
+        "col": 74,
+        "offset": 34946
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 893,
+        "col": 4,
+        "offset": 34951
+      },
+      "end": {
+        "line": 893,
+        "col": 69,
+        "offset": 35016
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 894,
+        "col": 4,
+        "offset": 35021
+      },
+      "end": {
+        "line": 894,
+        "col": 70,
+        "offset": 35087
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 895,
+        "col": 4,
+        "offset": 35092
+      },
+      "end": {
+        "line": 895,
+        "col": 70,
+        "offset": 35158
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 896,
+        "col": 4,
+        "offset": 35163
+      },
+      "end": {
+        "line": 896,
+        "col": 94,
+        "offset": 35253
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 898,
+        "col": 4,
+        "offset": 35262
+      },
+      "end": {
+        "line": 898,
+        "col": 108,
+        "offset": 35366
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 899,
+        "col": 4,
+        "offset": 35371
+      },
+      "end": {
+        "line": 899,
+        "col": 81,
+        "offset": 35448
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 900,
+        "col": 4,
+        "offset": 35453
+      },
+      "end": {
+        "line": 900,
+        "col": 76,
+        "offset": 35525
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 901,
+        "col": 4,
+        "offset": 35530
+      },
+      "end": {
+        "line": 901,
+        "col": 77,
+        "offset": 35603
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 902,
+        "col": 4,
+        "offset": 35608
+      },
+      "end": {
+        "line": 902,
+        "col": 77,
+        "offset": 35681
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 1104,
+        "col": 4,
+        "offset": 43508
+      },
+      "end": {
+        "line": 1104,
+        "col": 52,
+        "offset": 43556
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 1105,
+        "col": 4,
+        "offset": 43561
+      },
+      "end": {
+        "line": 1105,
+        "col": 92,
+        "offset": 43649
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 1110,
+        "col": 4,
+        "offset": 43887
+      },
+      "end": {
+        "line": 1110,
+        "col": 50,
+        "offset": 43933
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 1111,
+        "col": 4,
+        "offset": 43938
+      },
+      "end": {
+        "line": 1111,
+        "col": 100,
+        "offset": 44034
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 1115,
+        "col": 3,
+        "offset": 44066
+      },
+      "end": {
+        "line": 1115,
+        "col": 82,
+        "offset": 44145
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 2452,
+        "col": 33,
+        "offset": 100184
+      },
+      "end": {
+        "line": 2452,
+        "col": 97,
+        "offset": 100248
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 5657,
+        "col": 3,
+        "offset": 239771
+      },
+      "end": {
+        "line": 5657,
+        "col": 91,
+        "offset": 239859
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 5663,
+        "col": 25,
+        "offset": 239997
+      },
+      "end": {
+        "line": 5663,
+        "col": 101,
+        "offset": 240073
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 5805,
+        "col": 6,
+        "offset": 244624
+      },
+      "end": {
+        "line": 5805,
+        "col": 81,
+        "offset": 244699
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 5809,
+        "col": 6,
+        "offset": 244746
+      },
+      "end": {
+        "line": 5809,
+        "col": 87,
+        "offset": 244827
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 5813,
+        "col": 6,
+        "offset": 244882
+      },
+      "end": {
+        "line": 5813,
+        "col": 90,
+        "offset": 244966
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 5818,
+        "col": 7,
+        "offset": 245107
+      },
+      "end": {
+        "line": 5818,
+        "col": 60,
+        "offset": 245160
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 6421,
+        "col": 4,
+        "offset": 275384
+      },
+      "end": {
+        "line": 6421,
+        "col": 29,
+        "offset": 275409
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 6434,
+        "col": 4,
+        "offset": 275888
+      },
+      "end": {
+        "line": 6434,
+        "col": 29,
+        "offset": 275913
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 7077,
+        "col": 3,
+        "offset": 300705
+      },
+      "end": {
+        "line": 7077,
+        "col": 85,
+        "offset": 300787
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 8042,
+        "col": 14,
+        "offset": 334781
+      },
+      "end": {
+        "line": 8042,
+        "col": 40,
+        "offset": 334807
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 8118,
+        "col": 18,
+        "offset": 337168
+      },
+      "end": {
+        "line": 8118,
+        "col": 54,
+        "offset": 337204
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 8119,
+        "col": 19,
+        "offset": 337224
+      },
+      "end": {
+        "line": 8119,
+        "col": 56,
+        "offset": 337261
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 8247,
+        "col": 20,
+        "offset": 343296
+      },
+      "end": {
+        "line": 8247,
+        "col": 46,
+        "offset": 343322
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 8248,
+        "col": 19,
+        "offset": 343342
+      },
+      "end": {
+        "line": 8248,
+        "col": 47,
+        "offset": 343370
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceClass.php",
+      "start": {
+        "line": 8487,
+        "col": 30,
+        "offset": 353003
+      },
+      "end": {
+        "line": 8487,
+        "col": 94,
+        "offset": 353067
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wordfence/wordfence/lib/wordfenceURLHoover.php",
+      "start": {
+        "line": 151,
+        "col": 3,
+        "offset": 4314
+      },
+      "end": {
+        "line": 151,
+        "col": 47,
+        "offset": 4358
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/models/block/wfBlock.php",
+      "start": {
+        "line": 560,
+        "col": 3,
+        "offset": 25045
+      },
+      "end": {
+        "line": 560,
+        "col": 132,
+        "offset": 25174
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/models/block/wfBlock.php",
+      "start": {
+        "line": 1167,
+        "col": 3,
+        "offset": 47194
+      },
+      "end": {
+        "line": 1167,
+        "col": 23,
+        "offset": 47214
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/models/block/wfBlock.php",
+      "start": {
+        "line": 1175,
+        "col": 3,
+        "offset": 47604
+      },
+      "end": {
+        "line": 1175,
+        "col": 23,
+        "offset": 47624
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/models/block/wfBlock.php",
+      "start": {
+        "line": 1692,
+        "col": 7,
+        "offset": 65163
+      },
+      "end": {
+        "line": 1692,
+        "col": 27,
+        "offset": 65183
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/modules/login-security/classes/controller/db.php",
+      "start": {
+        "line": 75,
+        "col": 4,
+        "offset": 1873
+      },
+      "end": {
+        "line": 75,
+        "col": 78,
+        "offset": 1947
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/modules/login-security/classes/controller/db.php",
+      "start": {
+        "line": 89,
+        "col": 11,
+        "offset": 2237
+      },
+      "end": {
+        "line": 89,
+        "col": 145,
+        "offset": 2371
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/modules/login-security/classes/controller/db.php",
+      "start": {
+        "line": 160,
+        "col": 7,
+        "offset": 4610
+      },
+      "end": {
+        "line": 160,
+        "col": 27,
+        "offset": 4630
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/modules/login-security/classes/controller/totp.php",
+      "start": {
+        "line": 79,
+        "col": 5,
+        "offset": 2598
+      },
+      "end": {
+        "line": 79,
+        "col": 27,
+        "offset": 2620
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/modules/login-security/classes/controller/totp.php",
+      "start": {
+        "line": 92,
+        "col": 5,
+        "offset": 3082
+      },
+      "end": {
+        "line": 92,
+        "col": 27,
+        "offset": 3104
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/modules/login-security/classes/controller/totp.php",
+      "start": {
+        "line": 97,
+        "col": 3,
+        "offset": 3137
+      },
+      "end": {
+        "line": 97,
+        "col": 27,
+        "offset": 3161
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/modules/login-security/classes/controller/users.php",
+      "start": {
+        "line": 208,
+        "col": 19,
+        "offset": 6753
+      },
+      "end": {
+        "line": 208,
+        "col": 68,
+        "offset": 6802
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/modules/login-security/classes/controller/users.php",
+      "start": {
+        "line": 356,
+        "col": 25,
+        "offset": 11348
+      },
+      "end": {
+        "line": 356,
+        "col": 84,
+        "offset": 11407
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/modules/login-security/classes/controller/users.php",
+      "start": {
+        "line": 496,
+        "col": 17,
+        "offset": 15722
+      },
+      "end": {
+        "line": 496,
+        "col": 66,
+        "offset": 15771
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/modules/login-security/classes/controller/users.php",
+      "start": {
+        "line": 900,
+        "col": 15,
+        "offset": 31474
+      },
+      "end": {
+        "line": 900,
+        "col": 41,
+        "offset": 31500
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/modules/login-security/classes/controller/users.php",
+      "start": {
+        "line": 1095,
+        "col": 10,
+        "offset": 37530
+      },
+      "end": {
+        "line": 1095,
+        "col": 63,
+        "offset": 37583
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/modules/login-security/classes/model/settings/db.php",
+      "start": {
+        "line": 98,
+        "col": 11,
+        "offset": 2691
+      },
+      "end": {
+        "line": 98,
+        "col": 96,
+        "offset": 2776
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/modules/login-security/classes/utility/multisite.php",
+      "start": {
+        "line": 35,
+        "col": 11,
+        "offset": 948
+      },
+      "end": {
+        "line": 35,
+        "col": 142,
+        "offset": 1079
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wordfence/wordfence/modules/login-security/classes/utility/multisite.php",
+      "start": {
+        "line": 38,
+        "col": 10,
+        "offset": 1097
+      },
+      "end": {
+        "line": 38,
+        "col": 108,
+        "offset": 1195
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/wordfence/wordfence/modules/login-security/classes/utility/serialization.php",
+      "start": {
+        "line": 18,
+        "col": 21,
+        "offset": 483
+      },
+      "end": {
+        "line": 18,
+        "col": 39,
+        "offset": 501
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 14,
+    "taint_high": 19,
+    "taint_total": 38,
+    "semgrep_error": 0,
+    "semgrep_warning": 132
+  }
+}

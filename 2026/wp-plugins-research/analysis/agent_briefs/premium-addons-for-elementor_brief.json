@@ -1,0 +1,2318 @@
+{
+  "plugin_slug": "premium-addons-for-elementor",
+  "priority_score": 60,
+  "metadata": {
+    "php_files": 224,
+    "total_lines": 157281
+  },
+  "attack_surface_summary": "# Attack Surface: premium-addons-for-elementor\n\n> Generated: 2026-06-14T21:21:11Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 614,
+    "total_sinks": 238,
+    "total_sanitizers": 1273,
+    "direct_flows": 647,
+    "functions_with_sources": 164,
+    "functions_with_sinks": 117,
+    "files_analyzed": 224,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "premium-addons-for-elementor-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$shape = sanitize_text_field( wp_unslash( $_POST['shape'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/addons/shape-divider.php",
+        "line": 1057
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1057,
+          "expression": "$shape = sanitize_text_field( wp_unslash( $_POST['shape'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1059,
+          "expression": "$svg_shape = Helper_Functions::get_svg_shapes( $shape )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1065,
+          "expression": "wp_send_json_success( array( 'shape' => $svg_shape ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( array( 'shape' => $svg_shape ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/addons/shape-divider.php",
+        "line": 1065
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "'https://vimeo.com/api/oembed.json?url=' . rawurlencode( 'https://vimeo.com/' . intval( $video_id ) ) . '&width=1280'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/helper-functions.php",
+        "line": 552
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 552,
+          "expression": "$response = wp_remote_get(\n\t\t\t\t'https://vimeo.com/api/oembed.json?url=' . rawurlencode( 'https://vimeo.com/' . intval( $video_id ) ) . '&width=1280',\n\t\t\t\tarray(\n\t\t\t\t\t'timeout'   => 5,\n\t\t\t\t\t'sslverify' => true,\n\t\t\t\t)\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_get(\n\t\t\t\t'https://vimeo.com/api/oembed.json?url=' . rawurlencode( 'https://vimeo.com/' . intval( $video_id ) ) . '&width=1280',\n\t\t\t\tarray(\n\t\t\t\t\t'timeout'   => 5,\n\t\t\t\t\t'sslverify' => true,\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/helper-functions.php",
+        "line": 552
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$enabled_elements = array_filter(\n\t\t\t$enabled_elements,\n\t\t\tfunction ( $value, $key ) {\n\t\t\t\treturn ( strpos( $key, 'premium-' ) === 0 || strpos( $key, 'mini-' ) === 0 || strpos( $key, 'woo-' ) === 0 ) && filter_var( $value, FILTER_VALIDATE_BOOLEAN );\n\t\t\t},\n\t\t\tARRAY_FILTER_USE_BOTH\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/helper-functions.php",
+        "line": 2082
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2082,
+          "expression": "$enabled_elements = array_filter(\n\t\t\t$enabled_elements,\n\t\t\tfunction ( $value, $key ) {\n\t\t\t\treturn ( strpos( $key, 'premium-' ) === 0 || strpos( $key, 'mini-' ) === 0 || strpos( $key, 'woo-' ) === 0 ) && filter_var( $value, FILTER_VALIDATE_BOOLEAN );\n\t\t\t},\n\t\t\tARRAY_FILTER_USE_BOTH\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2082,
+          "expression": "$enabled_elements = array_filter(\n\t\t\t$enabled_elements,\n\t\t\tfunction ( $value, $key ) {\n\t\t\t\treturn ( strpos( $key, 'premium-' ) === 0 || strpos( $key, 'mini-' ) === 0 || strpos( $key, 'woo-' ) === 0 ) && filter_var( $value, FILTER_VALIDATE_BOOLEAN );\n\t\t\t},\n\t\t\tARRAY_FILTER_USE_BOTH\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$enabled_elements = array_filter(\n\t\t\t$enabled_elements,\n\t\t\tfunction ( $value, $key ) {\n\t\t\t\treturn ( strpos( $key, 'premium-' ) === 0 || strpos( $key, 'mini-' ) === 0 || strpos( $key, 'woo-' ) === 0 ) && filter_var( $value, FILTER_VALIDATE_BOOLEAN );\n\t\t\t},\n\t\t\tARRAY_FILTER_USE_BOTH\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/helper-functions.php",
+        "line": 2082
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$active_cat = isset( $_POST['category'] ) ? wp_unslash( $_POST['category'] ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/premium-template-tags.php",
+        "line": 975
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 975,
+          "expression": "$active_cat = isset( $_POST['category'] ) ? wp_unslash( $_POST['category'] ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 994,
+          "expression": "$posts = $this->inner_render( $widget, $active_cat, $page_num, $req_type )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1001,
+          "expression": "$data['posts'] = $posts",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1004,
+          "expression": "wp_send_json_success( $data )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $data )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/premium-template-tags.php",
+        "line": 1004
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$key = isset( $_GET['element'] ) ? sanitize_text_field( wp_unslash( $_GET['element'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/templates/classes/manager.php",
+        "line": 208
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 208,
+          "expression": "$key = isset( $_GET['element'] ) ? sanitize_text_field( wp_unslash( $_GET['element'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 210,
+          "expression": "$info = Admin_Helper::get_info_by_key( $key )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 229,
+          "expression": "$data = array(\n\t\t\t\t'name'      => $info['title'],\n\t\t\t\t'widgetURL' => $demo_link,\n\t\t\t\t'url'       => $url,\n\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 235,
+          "expression": "wp_send_json_success( $data )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $data )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/templates/classes/manager.php",
+        "line": 235
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-rce-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$post_type = isset( $_POST['post_type'] ) ? wp_unslash( $_POST['post_type'] ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/helpers/ajax-helper.php",
+        "line": 65
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 65,
+          "expression": "$post_type = isset( $_POST['post_type'] ) ? wp_unslash( $_POST['post_type'] ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 67,
+          "expression": "$post_type = array_map( 'sanitize_text_field', $post_type )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 67,
+          "expression": "$post_type = array_map( 'sanitize_text_field', $post_type )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$post_type = array_map( 'sanitize_text_field', $post_type )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/helpers/ajax-helper.php",
+        "line": 67
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$query_options = isset( $_POST['query_options'] ) && is_array( $_POST['query_options'] )\n\t\t\t? array_map( 'sanitize_text_field', wp_unslash( $_POST['query_options'] ) )\n\t\t\t: array()",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/helpers/ajax-helper.php",
+        "line": 154
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 154,
+          "expression": "$query_options = isset( $_POST['query_options'] ) && is_array( $_POST['query_options'] )\n\t\t\t? array_map( 'sanitize_text_field', wp_unslash( $_POST['query_options'] ) )\n\t\t\t: array()",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 165,
+          "expression": "$results = ACF_Helper::format_acf_query_result( $query->posts, $query_options )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 167,
+          "expression": "wp_send_json_success( wp_json_encode( $results ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( wp_json_encode( $results ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/helpers/ajax-helper.php",
+        "line": 167
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$template = isset( $_GET['templateID'] ) ? sanitize_text_field( wp_unslash( $_GET['templateID'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/helpers/ajax-helper.php",
+        "line": 180
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 180,
+          "expression": "$template = isset( $_GET['templateID'] ) ? sanitize_text_field( wp_unslash( $_GET['templateID'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 211,
+          "expression": "$data = array(\n\t\t\t'template_content' => $template_content,\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 215,
+          "expression": "wp_send_json_success( $data )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $data )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/helpers/ajax-helper.php",
+        "line": 215
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-ssrf-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$token = sanitize_text_field( wp_unslash( $_GET['token'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/helpers/ajax-helper.php",
+        "line": 262
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 262,
+          "expression": "$token = sanitize_text_field( wp_unslash( $_GET['token'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 272,
+          "expression": "$response = wp_remote_get(\n\t\t\t\t$api_url,\n\t\t\t\tarray(\n\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t'Authorization' => 'Bearer ' . $token,\n\t\t\t\t\t),\n\t\t\t\t)\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_get(\n\t\t\t\t$api_url,\n\t\t\t\tarray(\n\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t'Authorization' => 'Bearer ' . $token,\n\t\t\t\t\t),\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/helpers/ajax-helper.php",
+        "line": 272
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-ssrf-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$user_msg = isset( $_POST['user_message'] ) ? sanitize_text_field( wp_unslash( $_POST['user_message'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/helpers/ajax-helper.php",
+        "line": 339
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 339,
+          "expression": "$user_msg = isset( $_POST['user_message'] ) ? sanitize_text_field( wp_unslash( $_POST['user_message'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 355,
+          "expression": "$body = array(\n\t\t\t'email'   => $email,\n\t\t\t'element' => $element,\n\t\t\t'message' => $user_msg,\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 363,
+          "expression": "$response = wp_safe_remote_request(\n\t\t\t$api_url,\n\t\t\tarray(\n\t\t\t\t'headers'     => array(\n\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t),\n\t\t\t\t'body'        => wp_json_encode( $body ),\n\t\t\t\t'timeout'     => 20,\n\t\t\t\t'method'      => 'POST',\n\t\t\t\t'httpversion' => '1.1',\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_safe_remote_request(\n\t\t\t$api_url,\n\t\t\tarray(\n\t\t\t\t'headers'     => array(\n\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t),\n\t\t\t\t'body'        => wp_json_encode( $body ),\n\t\t\t\t'timeout'     => 20,\n\t\t\t\t'method'      => 'POST',\n\t\t\t\t'httpversion' => '1.1',\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/helpers/ajax-helper.php",
+        "line": 363
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-006",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$user_msg = isset( $_POST['user_message'] ) ? sanitize_text_field( wp_unslash( $_POST['user_message'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/helpers/ajax-helper.php",
+        "line": 339
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 339,
+          "expression": "$user_msg = isset( $_POST['user_message'] ) ? sanitize_text_field( wp_unslash( $_POST['user_message'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 355,
+          "expression": "$body = array(\n\t\t\t'email'   => $email,\n\t\t\t'element' => $element,\n\t\t\t'message' => $user_msg,\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 363,
+          "expression": "$response = wp_safe_remote_request(\n\t\t\t$api_url,\n\t\t\tarray(\n\t\t\t\t'headers'     => array(\n\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t),\n\t\t\t\t'body'        => wp_json_encode( $body ),\n\t\t\t\t'timeout'     => 20,\n\t\t\t\t'method'      => 'POST',\n\t\t\t\t'httpversion' => '1.1',\n\t\t\t)\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 391,
+          "expression": "wp_send_json_success( ( $response['body'] ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( ( $response['body'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/helpers/ajax-helper.php",
+        "line": 391
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-007",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$res = wp_update_post(\n\t\t\t\tarray(\n\t\t\t\t\t'ID'         => sanitize_text_field( wp_unslash( $_POST['id'] ) ),\n\t\t\t\t\t'post_title' => sanitize_text_field( wp_unslash( $_POST['title'] ) ),\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/extras/live-editor.php",
+        "line": 99
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 99,
+          "expression": "$res = wp_update_post(\n\t\t\t\tarray(\n\t\t\t\t\t'ID'         => sanitize_text_field( wp_unslash( $_POST['id'] ) ),\n\t\t\t\t\t'post_title' => sanitize_text_field( wp_unslash( $_POST['title'] ) ),\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 106,
+          "expression": "wp_send_json_success( $res )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $res )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/extras/live-editor.php",
+        "line": 106
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-008",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$res = wp_update_post(\n\t\t\t\tarray(\n\t\t\t\t\t'ID'         => sanitize_text_field( wp_unslash( $_POST['id'] ) ),\n\t\t\t\t\t'post_title' => sanitize_text_field( wp_unslash( $_POST['title'] ) ),\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/extras/live-editor.php",
+        "line": 99
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 99,
+          "expression": "$res = wp_update_post(\n\t\t\t\tarray(\n\t\t\t\t\t'ID'         => sanitize_text_field( wp_unslash( $_POST['id'] ) ),\n\t\t\t\t\t'post_title' => sanitize_text_field( wp_unslash( $_POST['title'] ) ),\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 184,
+          "expression": "wp_send_json_success( $result )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $result )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/extras/live-editor.php",
+        "line": 184
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-009",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$res = wp_update_post(\n\t\t\t\tarray(\n\t\t\t\t\t'ID'         => sanitize_text_field( wp_unslash( $_POST['id'] ) ),\n\t\t\t\t\t'post_title' => sanitize_text_field( wp_unslash( $_POST['title'] ) ),\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/extras/live-editor.php",
+        "line": 99
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 99,
+          "expression": "$res = wp_update_post(\n\t\t\t\tarray(\n\t\t\t\t\t'ID'         => sanitize_text_field( wp_unslash( $_POST['id'] ) ),\n\t\t\t\t\t'post_title' => sanitize_text_field( wp_unslash( $_POST['title'] ) ),\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 236,
+          "expression": "wp_send_json_success( $result )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $result )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/extras/live-editor.php",
+        "line": 236
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-010",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$temp_title = sanitize_text_field( wp_unslash( $_POST['tempTitle'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/extras/live-editor.php",
+        "line": 205
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 205,
+          "expression": "$temp_title = sanitize_text_field( wp_unslash( $_POST['tempTitle'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 208,
+          "expression": "$decoded_title = html_entity_decode( $temp_title )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 239,
+          "expression": "wp_send_json_error( 'Template not found.....' . $decoded_title, 404 )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_error( 'Template not found.....' . $decoded_title, 404 )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/extras/live-editor.php",
+        "line": 239
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-011",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$post_name  = 'pa-dynamic-temp-' . sanitize_text_field( wp_unslash( $_POST['key'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/extras/live-editor.php",
+        "line": 123
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 123,
+          "expression": "$post_name  = 'pa-dynamic-temp-' . sanitize_text_field( wp_unslash( $_POST['key'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 144,
+          "expression": "$args       = array(\n\t\t\t\t'post_type'              => 'elementor_library',\n\t\t\t\t'name'                   => $post_name,\n\t\t\t\t'post_status'            => 'publish',\n\t\t\t\t'update_post_term_cache' => false,\n\t\t\t\t'update_post_meta_cache' => false,\n\t\t\t\t'posts_per_page'         => 1,\n\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 153,
+          "expression": "$post = get_posts( $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 178,
+          "expression": "$result = array(\n\t\t\t\t'url'   => $edit_url,\n\t\t\t\t'id'    => $post_id,\n\t\t\t\t'title' => $post_title,\n\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 184,
+          "expression": "wp_send_json_success( $result )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $result )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/extras/live-editor.php",
+        "line": 184
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-012",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$temp_title = sanitize_text_field( wp_unslash( $_POST['tempTitle'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/extras/live-editor.php",
+        "line": 205
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 205,
+          "expression": "$temp_title = sanitize_text_field( wp_unslash( $_POST['tempTitle'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 227,
+          "expression": "$result = array(\n\t\t\t\t\t'url'         => $edit_url,\n\t\t\t\t\t'id'          => $post_id,\n\t\t\t\t\t'title'       => $temp_title,\n\t\t\t\t\t'newFunction' => 'hello',\n\t\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 236,
+          "expression": "wp_send_json_success( $result )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $result )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/extras/live-editor.php",
+        "line": 236
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-013",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$media_import = isset( $_POST['copy_content'] ) ? wp_unslash( $_POST['copy_content'] ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/extras/cross-copy-paste.php",
+        "line": 98
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 98,
+          "expression": "$media_import = isset( $_POST['copy_content'] ) ? wp_unslash( $_POST['copy_content'] ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 104,
+          "expression": "$media_import = array( json_decode( $media_import, true ) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 105,
+          "expression": "$media_import = self::cross_cp_import_elements_ids( $media_import )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 106,
+          "expression": "$media_import = self::cross_cp_import_copy_content( $media_import )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 108,
+          "expression": "wp_send_json_success( $media_import )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $media_import )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/extras/cross-copy-paste.php",
+        "line": 108
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-014",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$preset = sanitize_text_field( wp_unslash( $_GET['preset'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/extras/cf7-inserter.php",
+        "line": 52
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 52,
+          "expression": "$preset = sanitize_text_field( wp_unslash( $_GET['preset'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 56,
+          "expression": "$props = array(\n\t\t\t\t'form'                => self::get_cf_form_body( $preset ),\n\t\t\t\t'mail'                => array(\n\t\t\t\t\t'active'             => 1,\n\t\t\t\t\t'subject'            => '[_site_title] \"[your-subject]\"',\n\t\t\t\t\t'sender'             => '[_site_title]',\n\t\t\t\t\t'recipient'          => '[_site_admin_email]',\n\t\t\t\t\t'body'               => 'From: [your-name] [your-email]' . PHP_EOL .\n\t\t\t\t\t\t\t'Subject: [your-subject]' . PHP_EOL . PHP_EOL .\n\t\t\t\t\t\t\t'Message Body:' . PHP_EOL . '[your-message]' . PHP_EOL . PHP_EOL .\n\t\t\t\t\t\t\t'--' . PHP_EOL .\n\t\t\t\t\t\t\t'This e-mail was sent from a contact form on [_site_title] ([_site_url])',\n\t\t\t\t\t'additional_headers' => 'Reply-To: [your-email]',\n\t\t\t\t\t'attachments'        => '',\n\t\t\t\t\t'use_html'           => '',\n\t\t\t\t\t'exclude_blank'      => '',\n\t\t\t\t),\n\t\t\t\t'mail_2'              => array(\n\t\t\t\t\t'active'             => '',\n\t\t\t\t\t'subject'            => '[_site_title] \"[your-subject]\"',\n\t\t\t\t\t'sender'             => '[_site_title]',\n\t\t\t\t\t'recipient'          => '[your-email]',\n\t\t\t\t\t'body'               => 'Message Body:' . PHP_EOL . '[your-message]' . PHP_EOL . PHP_EOL .\n\t\t\t\t\t\t\t'--' . PHP_EOL .\n\t\t\t\t\t\t\t'This e-mail was sent from a contact form on [_site_title] ([_site_url])',\n\t\t\t\t\t'additional_headers' => 'Reply-To: [_site_admin_email]',\n\t\t\t\t\t'attachments'        => '',\n\t\t\t\t\t'use_html'           => '',\n\t\t\t\t\t'exclude_blank'      => '',\n\t\t\t\t),\n\t\t\t\t'messages'            => array(\n\t\t\t\t\t'mail_sent_ok'             => 'Thank you for your message. It has been sent.',\n\t\t\t\t\t'mail_sent_ng'             => 'There was an error trying to send your message. Please try again later.',\n\t\t\t\t\t'validation_error'         => 'One or more fields have an error. Please check and try again.',\n\t\t\t\t\t'spam'                     => 'There was an error trying to send your message. Please try again later.',\n\t\t\t\t\t'accept_terms'             => 'You must accept the terms and conditions before sending your message.',\n\t\t\t\t\t'invalid_required'         => 'Please fill out this field.',\n\t\t\t\t\t'invalid_too_long'         => 'This field has a too long input.',\n\t\t\t\t\t'invalid_too_short'        => 'This field has a too short input.',\n\t\t\t\t\t'upload_failed'            => 'There was an unknown error uploading the file.',\n\t\t\t\t\t'upload_file_type_invalid' => 'You are not allowed to upload files of this type.',\n\t\t\t\t\t'upload_file_too_large'    => 'The uploaded file is too large.',\n\t\t\t\t\t'upload_failed_php_error'  => 'There was an error uploading the file.',\n\t\t\t\t\t'invalid_date'             => 'Please enter a date in YYYY-MM-DD format.',\n\t\t\t\t\t'date_too_early'           => 'This field has a too early date.',\n\t\t\t\t\t'date_too_late'            => 'This field has a too late date.',\n\t\t\t\t\t'invalid_number'           => 'Please enter a number.',\n\t\t\t\t\t'number_too_small'         => 'This field has a too small number.',\n\t\t\t\t\t'number_too_large'         => 'This field has a too large number.',\n\t\t\t\t\t'quiz_answer_not_correct'  => 'The answer to the quiz is incorrect.',\n\t\t\t\t\t'invalid_email'            => 'Please enter an email address.',\n\t\t\t\t\t'invalid_url'              => 'Please enter a URL.',\n\t\t\t\t\t'invalid_tel'              => 'Please enter a telephone number.',\n\t\t\t\t),\n\t\t\t\t'additional_settings' => '',\n\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 113,
+          "expression": "$post_content = implode( \"\\n\", wpcf7_array_flatten( $props ) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 115,
+          "expression": "$args = array(\n\t\t\t\t'post_status'  => 'publish',\n\t\t\t\t'post_type'    => 'wpcf7_contact_form',\n\t\t\t\t'post_content' => $post_content,\n\t\t\t\t'post_author'  => $current_user->ID,\n\t\t\t\t'post_title'   => sprintf(\n\t\t\t\t\t__( 'Form | %s', 'premium-addons-for-elementor' ),\n\t\t\t\t\tgmdate( 'Y-m-d H:i' )\n\t\t\t\t),\n\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 126,
+          "expression": "$post_id = wp_insert_post( $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 136,
+          "expression": "$form_id = wpcf7_generate_contact_form_hash( $post_id )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 7,
+          "line": 140,
+          "expression": "wp_send_json_success( substr( $form_id, 0, 7 ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( substr( $form_id, 0, 7 ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/includes/extras/cf7-inserter.php",
+        "line": 140
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-015",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$item_id       = sanitize_text_field( wp_unslash( $_POST['item_id'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/admin-helper.php",
+        "line": 472
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 472,
+          "expression": "$item_id       = sanitize_text_field( wp_unslash( $_POST['item_id'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 473,
+          "expression": "$item_settings = json_decode( get_post_meta( $item_id, 'pa_megamenu_item_meta', true ) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 475,
+          "expression": "wp_send_json_success( $item_settings )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $item_settings )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/admin-helper.php",
+        "line": 475
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-rce-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "wp_unslash( $_POST['settings'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/admin-helper.php",
+        "line": 497
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 497,
+          "expression": "$settings = array_map(\n\t\t\tfunction ( $setting ) {\n\t\t\t\treturn htmlspecialchars( $setting, ENT_QUOTES );\n\t\t\t},\n\t\t\twp_unslash( $_POST['settings'] ) // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$settings = array_map(\n\t\t\tfunction ( $setting ) {\n\t\t\t\treturn htmlspecialchars( $setting, ENT_QUOTES );\n\t\t\t},\n\t\t\twp_unslash( $_POST['settings'] ) // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/admin-helper.php",
+        "line": 497
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-016",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$settings = array_map(\n\t\t\tfunction ( $setting ) {\n\t\t\t\treturn htmlspecialchars( $setting, ENT_QUOTES );\n\t\t\t},\n\t\t\twp_unslash( $_POST['settings'] ) // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/admin-helper.php",
+        "line": 497
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 497,
+          "expression": "$settings = array_map(\n\t\t\tfunction ( $setting ) {\n\t\t\t\treturn htmlspecialchars( $setting, ENT_QUOTES );\n\t\t\t},\n\t\t\twp_unslash( $_POST['settings'] ) // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 506,
+          "expression": "wp_send_json_success( $settings )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $settings )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/admin-helper.php",
+        "line": 506
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-vari-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "variable_injection",
+      "source": {
+        "expression": "sanitize_text_field( wp_unslash( $_POST['fields'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/admin-helper.php",
+        "line": 944
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 944,
+          "expression": "parse_str( sanitize_text_field( wp_unslash( $_POST['fields'] ) ), $settings )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "parse_str( sanitize_text_field( wp_unslash( $_POST['fields'] ) ), $settings )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/admin-helper.php",
+        "line": 944
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-vari-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "variable_injection",
+      "source": {
+        "expression": "sanitize_text_field( wp_unslash( $_POST['fields'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/admin-helper.php",
+        "line": 1017
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1017,
+          "expression": "parse_str( sanitize_text_field( wp_unslash( $_POST['fields'] ) ), $settings )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "parse_str( sanitize_text_field( wp_unslash( $_POST['fields'] ) ), $settings )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/admin-helper.php",
+        "line": 1017
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-ssrf-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$email = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/admin-helper.php",
+        "line": 1675
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1675,
+          "expression": "$email = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1679,
+          "expression": "$request = add_query_arg(\n\t\t\tarray(\n\t\t\t\t'email' => $email,\n\t\t\t),\n\t\t\t$api_url\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1686,
+          "expression": "$response = wp_remote_get(\n\t\t\t$request,\n\t\t\tarray(\n\t\t\t\t'timeout'   => 15,\n\t\t\t\t'sslverify' => true,\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_get(\n\t\t\t$request,\n\t\t\tarray(\n\t\t\t\t'timeout'   => 15,\n\t\t\t\t'sslverify' => true,\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/admin-helper.php",
+        "line": 1686
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-017",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$email = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/admin-helper.php",
+        "line": 1675
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1675,
+          "expression": "$email = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1679,
+          "expression": "$request = add_query_arg(\n\t\t\tarray(\n\t\t\t\t'email' => $email,\n\t\t\t),\n\t\t\t$api_url\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1686,
+          "expression": "$response = wp_remote_get(\n\t\t\t$request,\n\t\t\tarray(\n\t\t\t\t'timeout'   => 15,\n\t\t\t\t'sslverify' => true,\n\t\t\t)\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1694,
+          "expression": "$body = wp_remote_retrieve_body( $response )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 1695,
+          "expression": "$body = json_decode( $body, true )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 1697,
+          "expression": "wp_send_json_success( $body )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $body )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/admin-helper.php",
+        "line": 1697
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$paged   = isset( $_GET['paged'] ) ? absint( $_GET['paged'] ) : 1",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/duplicator.php",
+        "line": 110
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 110,
+          "expression": "$paged   = isset( $_GET['paged'] ) ? absint( $_GET['paged'] ) : 1",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 129,
+          "expression": "$redirect = add_query_arg(\n\t\t\tarray(\n\t\t\t\t'post_type' => $post->post_type,\n\t\t\t\t'paged'     => $paged,\n\t\t\t),\n\t\t\tadmin_url( 'edit.php' )\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 147,
+          "expression": "wp_safe_redirect( $redirect )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( $redirect )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/duplicator.php",
+        "line": 147
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-rce-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "wp_unslash( $_POST['data'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/feedback.php",
+        "line": 46
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 46,
+          "expression": "$data = array_map( 'sanitize_text_field', wp_unslash( $_POST['data'] ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$data = array_map( 'sanitize_text_field', wp_unslash( $_POST['data'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/feedback.php",
+        "line": 46
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-ssrf-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$data = array_map( 'sanitize_text_field', wp_unslash( $_POST['data'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/feedback.php",
+        "line": 46
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 46,
+          "expression": "$data = array_map( 'sanitize_text_field', wp_unslash( $_POST['data'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 55,
+          "expression": "$anonymous   = isset( $data['anonymous'] ) ? (bool) $data['anonymous'] : false",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 79,
+          "expression": "$body = array(\n\t\t\t'user'      => self::collect_user_data( $anonymous ),\n\t\t\t'wordpress' => $wordpress,\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 86,
+          "expression": "$response = wp_safe_remote_request(\n\t\t\t$api_url,\n\t\t\tarray(\n\t\t\t\t'headers'     => array(\n\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t),\n\t\t\t\t'body'        => wp_json_encode( $body ),\n\t\t\t\t'timeout'     => 20,\n\t\t\t\t'method'      => 'POST',\n\t\t\t\t'httpversion' => '1.1',\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_safe_remote_request(\n\t\t\t$api_url,\n\t\t\tarray(\n\t\t\t\t'headers'     => array(\n\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t),\n\t\t\t\t'body'        => wp_json_encode( $body ),\n\t\t\t\t'timeout'     => 20,\n\t\t\t\t'method'      => 'POST',\n\t\t\t\t'httpversion' => '1.1',\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/feedback.php",
+        "line": 86
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-018",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$data = array_map( 'sanitize_text_field', wp_unslash( $_POST['data'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/feedback.php",
+        "line": 46
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 46,
+          "expression": "$data = array_map( 'sanitize_text_field', wp_unslash( $_POST['data'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 55,
+          "expression": "$anonymous   = isset( $data['anonymous'] ) ? (bool) $data['anonymous'] : false",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 79,
+          "expression": "$body = array(\n\t\t\t'user'      => self::collect_user_data( $anonymous ),\n\t\t\t'wordpress' => $wordpress,\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 86,
+          "expression": "$response = wp_safe_remote_request(\n\t\t\t$api_url,\n\t\t\tarray(\n\t\t\t\t'headers'     => array(\n\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t),\n\t\t\t\t'body'        => wp_json_encode( $body ),\n\t\t\t\t'timeout'     => 20,\n\t\t\t\t'method'      => 'POST',\n\t\t\t\t'httpversion' => '1.1',\n\t\t\t)\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 114,
+          "expression": "wp_send_json_success( ( $response['body'] ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( ( $response['body'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/admin/includes/feedback.php",
+        "line": 114
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-019",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$style_id  = sanitize_text_field( wp_unslash( $_POST['skin'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/modules/woocommerce/modules/products-module.php",
+        "line": 99
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 99,
+          "expression": "$style_id  = sanitize_text_field( wp_unslash( $_POST['skin'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 126,
+          "expression": "$pagination = $skin->page_render( $style_id, $widget )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 131,
+          "expression": "$data['pagination'] = $pagination",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 134,
+          "expression": "wp_send_json_success( $data )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $data )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/modules/woocommerce/modules/products-module.php",
+        "line": 134
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-020",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$child_id = intval( $child_id )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/modules/woocommerce/modules/cta-module.php",
+        "line": 158
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 158,
+          "expression": "$child_id = intval( $child_id )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 171,
+          "expression": "$product_url = $child_product ? get_permalink( $child_id ) : ''",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 172,
+          "expression": "wp_send_json_error(\n\t\t\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t\t\t'message'     => 'Failed to add product to cart.',\n\t\t\t\t\t\t\t\t\t'product_url' => $product_url,\n\t\t\t\t\t\t\t\t)\n\t\t\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_error(\n\t\t\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t\t\t'message'     => 'Failed to add product to cart.',\n\t\t\t\t\t\t\t\t\t'product_url' => $product_url,\n\t\t\t\t\t\t\t\t)\n\t\t\t\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/modules/woocommerce/modules/cta-module.php",
+        "line": 172
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-xss-021",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$message     = apply_filters( 'yith_wcwl_wishlist_message', get_option( 'yith_wcwl_product_added_text', 'Product added to wishlist.' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/modules/woocommerce/modules/cta-module.php",
+        "line": 338
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 338,
+          "expression": "$message     = apply_filters( 'yith_wcwl_wishlist_message', get_option( 'yith_wcwl_product_added_text', 'Product added to wishlist.' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 340,
+          "expression": "wp_send_json_success(\n\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t'message'     => $message,\n\t\t\t\t\t\t\t'in_wishlist' => $in_wishlist,\n\t\t\t\t\t\t)\n\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success(\n\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t'message'     => $message,\n\t\t\t\t\t\t\t'in_wishlist' => $in_wishlist,\n\t\t\t\t\t\t)\n\t\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/modules/woocommerce/modules/cta-module.php",
+        "line": 340
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-rce-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$products = isset( $_COOKIE[ $cookie_name ] ) ? json_decode( sanitize_text_field( wp_unslash( $_COOKIE[ $cookie_name ] ) ) ) : array()",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/modules/woocommerce/modules/cta-module.php",
+        "line": 458
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 458,
+          "expression": "$products = isset( $_COOKIE[ $cookie_name ] ) ? json_decode( sanitize_text_field( wp_unslash( $_COOKIE[ $cookie_name ] ) ) ) : array()",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 466,
+          "expression": "$products = array_filter(\n\t\t\t\t\t$products,\n\t\t\t\t\tfunction ( $id ) use ( $product_id ) {\n\t\t\t\t\t\treturn strval( $product_id ) !== $id;\n\t\t\t\t\t}\n\t\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 466,
+          "expression": "$products = array_filter(\n\t\t\t\t\t$products,\n\t\t\t\t\tfunction ( $id ) use ( $product_id ) {\n\t\t\t\t\t\treturn strval( $product_id ) !== $id;\n\t\t\t\t\t}\n\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$products = array_filter(\n\t\t\t\t\t$products,\n\t\t\t\t\tfunction ( $id ) use ( $product_id ) {\n\t\t\t\t\t\treturn strval( $product_id ) !== $id;\n\t\t\t\t\t}\n\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/modules/woocommerce/modules/cta-module.php",
+        "line": 466
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "premium-addons-for-elementor-ssrf-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "premium-addons-for-elementor",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$token = get_option( 'pinterest_token', false )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/widgets/dep/pa-pins-handler.php",
+        "line": 64
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 64,
+          "expression": "$token = get_option( 'pinterest_token', false )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 65,
+          "expression": "$token = $token ?: $settings['access_token']",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 94,
+          "expression": "$response = wp_remote_get(\n\t\t\t$url,\n\t\t\tarray(\n\t\t\t\t'headers' => array(\n\t\t\t\t\t'Authorization' => 'Bearer ' . $token,\n\t\t\t\t),\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_get(\n\t\t\t$url,\n\t\t\tarray(\n\t\t\t\t'headers' => array(\n\t\t\t\t\t'Authorization' => 'Bearer ' . $token,\n\t\t\t\t),\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/premium-addons-for-elementor/widgets/dep/pa-pins-handler.php",
+        "line": 94
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/premium-addons-for-elementor/admin/includes/beta-testers.php",
+      "start": {
+        "line": 44,
+        "col": 3,
+        "offset": 599
+      },
+      "end": {
+        "line": 44,
+        "col": 68,
+        "offset": 664
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/premium-addons-for-elementor/includes/extras/live-editor.php",
+      "start": {
+        "line": 158,
+        "col": 5,
+        "offset": 4138
+      },
+      "end": {
+        "line": 158,
+        "col": 67,
+        "offset": 4200
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/premium-addons-for-elementor/includes/helper-functions.php",
+      "start": {
+        "line": 997,
+        "col": 3,
+        "offset": 22376
+      },
+      "end": {
+        "line": 997,
+        "col": 50,
+        "offset": 22423
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/premium-addons-for-elementor/includes/helper-functions.php",
+      "start": {
+        "line": 1216,
+        "col": 3,
+        "offset": 27308
+      },
+      "end": {
+        "line": 1216,
+        "col": 36,
+        "offset": 27341
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/premium-addons-for-elementor/includes/helper-functions.php",
+      "start": {
+        "line": 1911,
+        "col": 3,
+        "offset": 48144
+      },
+      "end": {
+        "line": 1911,
+        "col": 45,
+        "offset": 48186
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 1,
+    "taint_high": 2,
+    "taint_total": 35,
+    "semgrep_error": 0,
+    "semgrep_warning": 5
+  }
+}

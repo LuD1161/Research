@@ -1,0 +1,5526 @@
+{
+  "plugin_slug": "w3-total-cache",
+  "priority_score": 355,
+  "metadata": {
+    "php_files": 3869,
+    "total_lines": 357527
+  },
+  "attack_surface_summary": "# Attack Surface: w3-total-cache\n\n> Generated: 2026-06-14T21:21:12Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 1032,
+    "total_sinks": 958,
+    "total_sanitizers": 2508,
+    "direct_flows": 545,
+    "functions_with_sources": 401,
+    "functions_with_sinks": 598,
+    "files_analyzed": 3870,
+    "parse_errors": 1
+  },
+  "taint_flows": [
+    {
+      "flow_id": "w3-total-cache-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$permalink_structure     = get_option( 'permalink_structure' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/BrowserCache_Environment_Apache.php",
+        "line": 78
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 78,
+          "expression": "$permalink_structure     = get_option( 'permalink_structure' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 84,
+          "expression": "$extensions[ $index ] = preg_replace( '~\\|?' . Util_Environment::preg_quote( $permalink_structure_ext ) . '\\|?~', '', $extension )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$extensions[ $index ] = preg_replace( '~\\|?' . Util_Environment::preg_quote( $permalink_structure_ext ) . '\\|?~', '', $extension )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/BrowserCache_Environment_Apache.php",
+        "line": 84
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-file-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$data = sprintf(\n\t\t\t\"[%s] [%s] [%s] %s\\n\",\n\t\t\tgmdate( 'r' ),\n\t\t\tisset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '',\n\t\t\t! empty( $_SERVER['HTTP_REFERER'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_REFERER'] ) ) : '-',\n\t\t\t$msg\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/Minify_Core.php",
+        "line": 204
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 204,
+          "expression": "$data = sprintf(\n\t\t\t\"[%s] [%s] [%s] %s\\n\",\n\t\t\tgmdate( 'r' ),\n\t\t\tisset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '',\n\t\t\t! empty( $_SERVER['HTTP_REFERER'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_REFERER'] ) ) : '-',\n\t\t\t$msg\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 212,
+          "expression": "$data = strtr( $data, '<>', '..' )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 216,
+          "expression": "file_put_contents( $filename, $data, FILE_APPEND )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "file_put_contents( $filename, $data, FILE_APPEND )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/Minify_Core.php",
+        "line": 216
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-rce-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$imageservice_data = get_post_meta( $post_id, 'w3tc_imageservice', true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/Extension_ImageService_Plugin_Admin.php",
+        "line": 699
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 699,
+          "expression": "$imageservice_data = get_post_meta( $post_id, 'w3tc_imageservice', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 766,
+          "expression": "$sorted_downloads = $imageservice_data['downloads']",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 767,
+          "expression": "uksort(\n\t\t\t\t\t\t\t$sorted_downloads,\n\t\t\t\t\t\t\tfunction( $a, $b ) {\n\t\t\t\t\t\t\t\t// Define order: webp first, then avif, then others.\n\t\t\t\t\t\t\t\t$order = array( 'webp' => 1, 'avif' => 2 );\n\t\t\t\t\t\t\t\t$a_order = isset( $order[ $a ] ) ? $order[ $a ] : 99;\n\t\t\t\t\t\t\t\t$b_order = isset( $order[ $b ] ) ? $order[ $b ] : 99;\n\t\t\t\t\t\t\t\treturn $a_order - $b_order;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "uksort(\n\t\t\t\t\t\t\t$sorted_downloads,\n\t\t\t\t\t\t\tfunction( $a, $b ) {\n\t\t\t\t\t\t\t\t// Define order: webp first, then avif, then others.\n\t\t\t\t\t\t\t\t$order = array( 'webp' => 1, 'avif' => 2 );\n\t\t\t\t\t\t\t\t$a_order = isset( $order[ $a ] ) ? $order[ $a ] : 99;\n\t\t\t\t\t\t\t\t$b_order = isset( $order[ $b ] ) ? $order[ $b ] : 99;\n\t\t\t\t\t\t\t\treturn $a_order - $b_order;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/Extension_ImageService_Plugin_Admin.php",
+        "line": 767
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-rce-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$imageservice_data = get_post_meta( $post_id, 'w3tc_imageservice', true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/Extension_ImageService_Plugin_Admin.php",
+        "line": 699
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 699,
+          "expression": "$imageservice_data = get_post_meta( $post_id, 'w3tc_imageservice', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1070,
+          "expression": "$child_post = get_post( $imageservice_data['post_child'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1072,
+          "expression": "$format_label = strtoupper( str_replace( 'image/', '', $child_post->post_mime_type ) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1073,
+          "expression": "$converted_formats[] = $format_label",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 1079,
+          "expression": "usort(\n\t\t\t\t\t\t\t\t$converted_formats,\n\t\t\t\t\t\t\t\tfunction( $a, $b ) {\n\t\t\t\t\t\t\t\t\t$order = array( 'WEBP' => 1, 'AVIF' => 2 );\n\t\t\t\t\t\t\t\t\t$a_order = isset( $order[ $a ] ) ? $order[ $a ] : 99;\n\t\t\t\t\t\t\t\t\t$b_order = isset( $order[ $b ] ) ? $order[ $b ] : 99;\n\t\t\t\t\t\t\t\t\treturn $a_order - $b_order;\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "usort(\n\t\t\t\t\t\t\t\t$converted_formats,\n\t\t\t\t\t\t\t\tfunction( $a, $b ) {\n\t\t\t\t\t\t\t\t\t$order = array( 'WEBP' => 1, 'AVIF' => 2 );\n\t\t\t\t\t\t\t\t\t$a_order = isset( $order[ $a ] ) ? $order[ $a ] : 99;\n\t\t\t\t\t\t\t\t\t$b_order = isset( $order[ $b ] ) ? $order[ $b ] : 99;\n\t\t\t\t\t\t\t\t\treturn $a_order - $b_order;\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/Extension_ImageService_Plugin_Admin.php",
+        "line": 1079
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "(array) get_post_meta( $post_id, 'w3tc_imageservice', true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/Extension_ImageService_Plugin_Admin.php",
+        "line": 2026
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2026,
+          "expression": "wp_send_json_success( (array) get_post_meta( $post_id, 'w3tc_imageservice', true ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( (array) get_post_meta( $post_id, 'w3tc_imageservice', true ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/Extension_ImageService_Plugin_Admin.php",
+        "line": 2026
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "w3-total-cache-rce-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "filter_var( $single_config['url_pattern'], FILTER_SANITIZE_URL )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/UserExperience_Remove_CssJs_Extension.php",
+        "line": 219
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 219,
+          "expression": "$new_cssjs_singles[ $single_id ]['url_pattern']      = preg_replace( '/\\?.*$/', '', filter_var( $single_config['url_pattern'], FILTER_SANITIZE_URL ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$new_cssjs_singles[ $single_id ]['url_pattern']      = preg_replace( '/\\?.*$/', '', filter_var( $single_config['url_pattern'], FILTER_SANITIZE_URL ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/UserExperience_Remove_CssJs_Extension.php",
+        "line": 219
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$new_query_string['sort'] = sanitize_text_field( $sort_column )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/UsageStatistics_Page.php",
+        "line": 214
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 214,
+          "expression": "$new_query_string['sort'] = sanitize_text_field( $sort_column )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 216,
+          "expression": "echo '<a href=\"' . esc_url( 'admin.php?' . http_build_query( $new_query_string ) ) . '\">' . esc_html( $name ) . '</a>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<a href=\"' . esc_url( 'admin.php?' . http_build_query( $new_query_string ) ) . '\">' . esc_html( $name ) . '</a>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/UsageStatistics_Page.php",
+        "line": 216
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-xss-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$response = get_transient( 'w3tc_nr_widgetdata_basic' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/Extension_NewRelic_Widget.php",
+        "line": 128
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 128,
+          "expression": "$response = get_transient( 'w3tc_nr_widgetdata_basic' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 129,
+          "expression": "$response = @json_decode( $response, true )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 132,
+          "expression": "echo wp_json_encode( $response );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo wp_json_encode( $response );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/Extension_NewRelic_Widget.php",
+        "line": 132
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$email = filter_input( INPUT_POST, 'email', FILTER_SANITIZE_EMAIL )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/Generic_AdminActions_Config.php",
+        "line": 231
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 231,
+          "expression": "$email = filter_input( INPUT_POST, 'email', FILTER_SANITIZE_EMAIL )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 233,
+          "expression": "wp_remote_post(\n\t\t\t\tW3TC_MAILLINGLIST_SIGNUP_URL,\n\t\t\t\tarray(\n\t\t\t\t\t'body' => array(\n\t\t\t\t\t\t'email'   => $email,\n\t\t\t\t\t\t'license' => $license,\n\t\t\t\t\t),\n\t\t\t\t)\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_remote_post(\n\t\t\t\tW3TC_MAILLINGLIST_SIGNUP_URL,\n\t\t\t\tarray(\n\t\t\t\t\t'body' => array(\n\t\t\t\t\t\t'email'   => $email,\n\t\t\t\t\t\t'license' => $license,\n\t\t\t\t\t),\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/Generic_AdminActions_Config.php",
+        "line": 233
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-file-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$data = sprintf(\n\t\t\t\"\\n[%s] [%s] [%s]\\n\",\n\t\t\tgmdate( 'r' ),\n\t\t\tisset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '',\n\t\t\tround( $request_time_total, 4 )\n\t\t) . implode( \"\\n\", $strings ) . \"\\n\"",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/DbCache_WpdbNew.php",
+        "line": 128
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 128,
+          "expression": "$data = sprintf(\n\t\t\t\"\\n[%s] [%s] [%s]\\n\",\n\t\t\tgmdate( 'r' ),\n\t\t\tisset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '',\n\t\t\tround( $request_time_total, 4 )\n\t\t) . implode( \"\\n\", $strings ) . \"\\n\"",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 134,
+          "expression": "$data = strtr( $data, '<>', '..' )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 137,
+          "expression": "file_put_contents( $filename, $data, FILE_APPEND )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "file_put_contents( $filename, $data, FILE_APPEND )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/DbCache_WpdbNew.php",
+        "line": 137
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-rce-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$pext = strtolower( pathinfo( get_option( 'permalink_structure' ), PATHINFO_EXTENSION ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/BrowserCache_Environment.php",
+        "line": 734
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 734,
+          "expression": "$pext = strtolower( pathinfo( get_option( 'permalink_structure' ), PATHINFO_EXTENSION ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 736,
+          "expression": "$extensions = Util_Rule::remove_extension_from_list( $extensions, $pext )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 739,
+          "expression": "$extensions_lowercase = array_map( 'strtolower', $extensions )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$extensions_lowercase = array_map( 'strtolower', $extensions )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/BrowserCache_Environment.php",
+        "line": 739
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-rce-006",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$pext = strtolower( pathinfo( get_option( 'permalink_structure' ), PATHINFO_EXTENSION ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/BrowserCache_Environment.php",
+        "line": 734
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 734,
+          "expression": "$pext = strtolower( pathinfo( get_option( 'permalink_structure' ), PATHINFO_EXTENSION ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 736,
+          "expression": "$extensions = Util_Rule::remove_extension_from_list( $extensions, $pext )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 740,
+          "expression": "$extensions_uppercase = array_map( 'strtoupper', $extensions )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$extensions_uppercase = array_map( 'strtoupper', $extensions )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/BrowserCache_Environment.php",
+        "line": 740
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-file-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$data = sprintf(\n\t\t\t\"\\n[%s] [%s] [%s]\\n\",\n\t\t\tgmdate( 'r' ),\n\t\t\tisset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '',\n\t\t\tround( $request_time_total, 4 )\n\t\t) . implode( \"\\n\", $strings ) . \"\\n\"",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/DbCache_WpdbLegacy.php",
+        "line": 128
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 128,
+          "expression": "$data = sprintf(\n\t\t\t\"\\n[%s] [%s] [%s]\\n\",\n\t\t\tgmdate( 'r' ),\n\t\t\tisset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '',\n\t\t\tround( $request_time_total, 4 )\n\t\t) . implode( \"\\n\", $strings ) . \"\\n\"",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 134,
+          "expression": "$data = strtr( $data, '<>', '..' )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 137,
+          "expression": "file_put_contents( $filename, $data, FILE_APPEND )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "file_put_contents( $filename, $data, FILE_APPEND )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/DbCache_WpdbLegacy.php",
+        "line": 137
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-rce-007",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$pext = strtolower( pathinfo( get_option( 'permalink_structure' ), PATHINFO_EXTENSION ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/BrowserCache_Environment_Nginx.php",
+        "line": 405
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 405,
+          "expression": "$pext = strtolower( pathinfo( get_option( 'permalink_structure' ), PATHINFO_EXTENSION ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 408,
+          "expression": "$extensions = Util_Rule::remove_extension_from_list( $extensions, $pext )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 416,
+          "expression": "$extensions       = array_filter(\n\t\t\t\t\t$extensions,\n\t\t\t\t\tfunction ( $ext ) use ( $image_extensions ) {\n\t\t\t\t\t\t// Check if extension is a single value or pipe-delimited.\n\t\t\t\t\t\t$ext_parts = explode( '|', $ext );\n\t\t\t\t\t\t// Return false if any part matches an image extension (exclude it).\n\t\t\t\t\t\tforeach ( $ext_parts as $part ) {\n\t\t\t\t\t\t\tif ( in_array( $part, $image_extensions, true ) ) {\n\t\t\t\t\t\t\t\treturn false;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\treturn true;\n\t\t\t\t\t}\n\t\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 416,
+          "expression": "$extensions       = array_filter(\n\t\t\t\t\t$extensions,\n\t\t\t\t\tfunction ( $ext ) use ( $image_extensions ) {\n\t\t\t\t\t\t// Check if extension is a single value or pipe-delimited.\n\t\t\t\t\t\t$ext_parts = explode( '|', $ext );\n\t\t\t\t\t\t// Return false if any part matches an image extension (exclude it).\n\t\t\t\t\t\tforeach ( $ext_parts as $part ) {\n\t\t\t\t\t\t\tif ( in_array( $part, $image_extensions, true ) ) {\n\t\t\t\t\t\t\t\treturn false;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\treturn true;\n\t\t\t\t\t}\n\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$extensions       = array_filter(\n\t\t\t\t\t$extensions,\n\t\t\t\t\tfunction ( $ext ) use ( $image_extensions ) {\n\t\t\t\t\t\t// Check if extension is a single value or pipe-delimited.\n\t\t\t\t\t\t$ext_parts = explode( '|', $ext );\n\t\t\t\t\t\t// Return false if any part matches an image extension (exclude it).\n\t\t\t\t\t\tforeach ( $ext_parts as $part ) {\n\t\t\t\t\t\t\tif ( in_array( $part, $image_extensions, true ) ) {\n\t\t\t\t\t\t\t\treturn false;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\treturn true;\n\t\t\t\t\t}\n\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/BrowserCache_Environment_Nginx.php",
+        "line": 416
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-file-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$data = sprintf(\n\t\t\t'[%1$s] [%2$s] [%3$s] %4$s ' . \"\\n\",\n\t\t\tgmdate( 'r' ),\n\t\t\tisset( $_SERVER['REQUEST_URI'] ) ? filter_var( stripslashes( $_SERVER['REQUEST_URI'] ), FILTER_SANITIZE_URL ) : '',\n\t\t\t! empty( $_SERVER['HTTP_REFERER'] ) ? htmlspecialchars( $_SERVER['HTTP_REFERER'] ) : '-',\n\t\t\t$msg\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/PgCache_ContentGrabber.php",
+        "line": 2528
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2528,
+          "expression": "$data = sprintf(\n\t\t\t'[%1$s] [%2$s] [%3$s] %4$s ' . \"\\n\",\n\t\t\tgmdate( 'r' ),\n\t\t\tisset( $_SERVER['REQUEST_URI'] ) ? filter_var( stripslashes( $_SERVER['REQUEST_URI'] ), FILTER_SANITIZE_URL ) : '',\n\t\t\t! empty( $_SERVER['HTTP_REFERER'] ) ? htmlspecialchars( $_SERVER['HTTP_REFERER'] ) : '-',\n\t\t\t$msg\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2535,
+          "expression": "$data = strtr( $data, '<>', '..' )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 2540,
+          "expression": "file_put_contents( $filename, $data, FILE_APPEND )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "file_put_contents( $filename, $data, FILE_APPEND )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/PgCache_ContentGrabber.php",
+        "line": 2540
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-rce-008",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$url = isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/Util_WpFile.php",
+        "line": 419
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 419,
+          "expression": "$url = isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 422,
+          "expression": "$url = preg_replace( '/&w3tc_note=([^&]+)/', '', $url )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 422,
+          "expression": "$url = preg_replace( '/&w3tc_note=([^&]+)/', '', $url )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$url = preg_replace( '/&w3tc_note=([^&]+)/', '', $url )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/Util_WpFile.php",
+        "line": 422
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_tab = ( ! empty( $_GET['tab'] ) ? Util_Request::get( 'tab' ) : 'mobile' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/PageSpeed_Page_View_FromAPI.php",
+        "line": 25
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 25,
+          "expression": "$current_tab = ( ! empty( $_GET['tab'] ) ? Util_Request::get( 'tab' ) : 'mobile' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 55,
+          "expression": "echo ( 'mobile' === $current_tab ? 'nav-tab-active' : '' );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ( 'mobile' === $current_tab ? 'nav-tab-active' : '' );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/PageSpeed_Page_View_FromAPI.php",
+        "line": 55
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-xss-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_tab = ( ! empty( $_GET['tab'] ) ? Util_Request::get( 'tab' ) : 'mobile' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/PageSpeed_Page_View_FromAPI.php",
+        "line": 25
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 25,
+          "expression": "$current_tab = ( ! empty( $_GET['tab'] ) ? Util_Request::get( 'tab' ) : 'mobile' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 56,
+          "expression": "echo ( 'desktop' === $current_tab ? 'nav-tab-active' : '' );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ( 'desktop' === $current_tab ? 'nav-tab-active' : '' );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/PageSpeed_Page_View_FromAPI.php",
+        "line": 56
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$protocol = isset( $_SERVER['SERVER_PROTOCOL'] ) ?\n\t\t\thtmlspecialchars( stripslashes( $_SERVER['SERVER_PROTOCOL'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/Util_Environment.php",
+        "line": 1292
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1292,
+          "expression": "$protocol = isset( $_SERVER['SERVER_PROTOCOL'] ) ?\n\t\t\thtmlspecialchars( stripslashes( $_SERVER['SERVER_PROTOCOL'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1301,
+          "expression": "$status_header = \"$protocol $status_code $text\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1302,
+          "expression": "header( $status_header, true, $status_code )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "header( $status_header, true, $status_code )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/Util_Environment.php",
+        "line": 1302
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-rce-009",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "array(\n\t\t'user'      => (string) getenv( 'STORAGE_ACCOUNT_NAME' ),\n\t\t'client_id' => (string) getenv( 'ENTRA_CLIENT_ID' ),\n\t\t'container' => (string) getenv( 'BLOB_CONTAINER_NAME' ),\n\t\t'cname'     => empty( getenv( 'BLOB_STORAGE_URL' ) ) ? array() : array( (string) getenv( 'BLOB_STORAGE_URL' ) ),\n\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/inc/options/cdn/azuremi.php",
+        "line": 14
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 14,
+          "expression": "$cdn_azuremi_config = array_map(\n\t/**\n\t * Anonymous function to populate unset config keys using defaults.\n\t *\n\t * @since 2.7.7\n\t *\n\t * @param string|array $default Default configuration .\n\t * @param string|array $config  Stored configuration values.\n\t * @return string|array\n\t */\n\tfunction ( $default, $config ) {\n\t\treturn empty( $config ) ? $default : $config;\n\t},\n\t// Default configuration values.\n\tarray(\n\t\t'user'      => (string) getenv( 'STORAGE_ACCOUNT_NAME' ),\n\t\t'client_id' => (string) getenv( 'ENTRA_CLIENT_ID' ),\n\t\t'container' => (string) getenv( 'BLOB_CONTAINER_NAME' ),\n\t\t'cname'     => empty( getenv( 'BLOB_STORAGE_URL' ) ) ? array() : array( (string) getenv( 'BLOB_STORAGE_URL' ) ),\n\t),\n\t// Stored configuration values.\n\tarray(\n\t\t'user'      => $this->_config->get_string( 'cdn.azuremi.user' ),\n\t\t'client_id' => $this->_config->get_string( 'cdn.azuremi.clientid' ),\n\t\t'container' => $this->_config->get_string( 'cdn.azuremi.container' ),\n\t\t'cname'     => $this->_config->get_array( 'cdn.azuremi.cname' ),\n\t)\n)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$cdn_azuremi_config = array_map(\n\t/**\n\t * Anonymous function to populate unset config keys using defaults.\n\t *\n\t * @since 2.7.7\n\t *\n\t * @param string|array $default Default configuration .\n\t * @param string|array $config  Stored configuration values.\n\t * @return string|array\n\t */\n\tfunction ( $default, $config ) {\n\t\treturn empty( $config ) ? $default : $config;\n\t},\n\t// Default configuration values.\n\tarray(\n\t\t'user'      => (string) getenv( 'STORAGE_ACCOUNT_NAME' ),\n\t\t'client_id' => (string) getenv( 'ENTRA_CLIENT_ID' ),\n\t\t'container' => (string) getenv( 'BLOB_CONTAINER_NAME' ),\n\t\t'cname'     => empty( getenv( 'BLOB_STORAGE_URL' ) ) ? array() : array( (string) getenv( 'BLOB_STORAGE_URL' ) ),\n\t),\n\t// Stored configuration values.\n\tarray(\n\t\t'user'      => $this->_config->get_string( 'cdn.azuremi.user' ),\n\t\t'client_id' => $this->_config->get_string( 'cdn.azuremi.clientid' ),\n\t\t'container' => $this->_config->get_string( 'cdn.azuremi.container' ),\n\t\t'cname'     => $this->_config->get_array( 'cdn.azuremi.cname' ),\n\t)\n)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/inc/options/cdn/azuremi.php",
+        "line": 14
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-xss-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo esc_html__( 'E-mail sent from IP: ', 'w3-total-cache' ) .\n\t\t\t\t( isset( $_SERVER['REMOTE_ADDR'] ) ?\n\t\t\t\tesc_html( sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) ) : esc_html__( 'Unknown', 'w3-total-cache' ) ) . '<br />';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/inc/email/support_request.php",
+        "line": 52
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 52,
+          "expression": "echo esc_html__( 'E-mail sent from IP: ', 'w3-total-cache' ) .\n\t\t\t\t( isset( $_SERVER['REMOTE_ADDR'] ) ?\n\t\t\t\tesc_html( sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) ) : esc_html__( 'Unknown', 'w3-total-cache' ) ) . '<br />';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_html__( 'E-mail sent from IP: ', 'w3-total-cache' ) .\n\t\t\t\t( isset( $_SERVER['REMOTE_ADDR'] ) ?\n\t\t\t\tesc_html( sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) ) : esc_html__( 'Unknown', 'w3-total-cache' ) ) . '<br />';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/inc/email/support_request.php",
+        "line": 52
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-xss-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo esc_html__( 'User Agent: ', 'w3-total-cache' ) .\n\t\t\t\t( isset( $_SERVER['HTTP_USER_AGENT'] ) ?\n\t\t\t\tesc_html( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) ) : esc_html__( 'Unknown', 'w3-total-cache' ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/inc/email/support_request.php",
+        "line": 55
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 55,
+          "expression": "echo esc_html__( 'User Agent: ', 'w3-total-cache' ) .\n\t\t\t\t( isset( $_SERVER['HTTP_USER_AGENT'] ) ?\n\t\t\t\tesc_html( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) ) : esc_html__( 'Unknown', 'w3-total-cache' ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_html__( 'User Agent: ', 'w3-total-cache' ) .\n\t\t\t\t( isset( $_SERVER['HTTP_USER_AGENT'] ) ?\n\t\t\t\tesc_html( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) ) : esc_html__( 'Unknown', 'w3-total-cache' ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/inc/email/support_request.php",
+        "line": 55
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-lfi-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "local_file_inclusion",
+      "source": {
+        "expression": "getenv('HOME') . DIRECTORY_SEPARATOR . '.aws' . DIRECTORY_SEPARATOR . 'sdk' . DIRECTORY_SEPARATOR . 'config.inc.php'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/lib/SNS/sdk.class.php",
+        "line": 29
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 29,
+          "expression": "include_once getenv('HOME') . DIRECTORY_SEPARATOR . '.aws' . DIRECTORY_SEPARATOR . 'sdk' . DIRECTORY_SEPARATOR . 'config.inc.php'",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "include_once getenv('HOME') . DIRECTORY_SEPARATOR . '.aws' . DIRECTORY_SEPARATOR . 'sdk' . DIRECTORY_SEPARATOR . 'config.inc.php'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/lib/SNS/sdk.class.php",
+        "line": 29
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "w3-total-cache-ssrf-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "w3-total-cache",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$request['headers']['Content-Type'] =\n\t\t\t\t'application/x-www-form-urlencoded; charset=' . get_option('blog_charset')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/lib/NetDNA/NetDNA.php",
+        "line": 97
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 97,
+          "expression": "$request['headers']['Content-Type'] =\n\t\t\t\t'application/x-www-form-urlencoded; charset=' . get_option('blog_charset')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 106,
+          "expression": "$response = wp_remote_request($url, $request)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_request($url, $request)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/w3-total-cache/lib/NetDNA/NetDNA.php",
+        "line": 106
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Cache.php",
+      "start": {
+        "line": 32,
+        "col": 3,
+        "offset": 578
+      },
+      "end": {
+        "line": 32,
+        "col": 76,
+        "offset": 651
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/Cache_Apc.php",
+      "start": {
+        "line": 77,
+        "col": 9,
+        "offset": 1850
+      },
+      "end": {
+        "line": 77,
+        "col": 49,
+        "offset": 1890
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/Cache_Apc.php",
+      "start": {
+        "line": 144,
+        "col": 10,
+        "offset": 3643
+      },
+      "end": {
+        "line": 144,
+        "col": 50,
+        "offset": 3683
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/Cache_Apcu.php",
+      "start": {
+        "line": 77,
+        "col": 9,
+        "offset": 1854
+      },
+      "end": {
+        "line": 77,
+        "col": 50,
+        "offset": 1895
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/Cache_Apcu.php",
+      "start": {
+        "line": 144,
+        "col": 10,
+        "offset": 3649
+      },
+      "end": {
+        "line": 144,
+        "col": 51,
+        "offset": 3690
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/Cache_Eaccelerator.php",
+      "start": {
+        "line": 77,
+        "col": 9,
+        "offset": 1884
+      },
+      "end": {
+        "line": 77,
+        "col": 56,
+        "offset": 1931
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/Cache_Eaccelerator.php",
+      "start": {
+        "line": 143,
+        "col": 10,
+        "offset": 3690
+      },
+      "end": {
+        "line": 143,
+        "col": 57,
+        "offset": 3737
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/Cache_File.php",
+      "start": {
+        "line": 187,
+        "col": 26,
+        "offset": 6244
+      },
+      "end": {
+        "line": 187,
+        "col": 46,
+        "offset": 6264
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Cache_File.php",
+      "start": {
+        "line": 434,
+        "col": 4,
+        "offset": 13861
+      },
+      "end": {
+        "line": 434,
+        "col": 24,
+        "offset": 13881
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Cache_Memcache.php",
+      "start": {
+        "line": 496,
+        "col": 3,
+        "offset": 14900
+      },
+      "end": {
+        "line": 496,
+        "col": 125,
+        "offset": 15022
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Cache_Memcached.php",
+      "start": {
+        "line": 680,
+        "col": 3,
+        "offset": 20869
+      },
+      "end": {
+        "line": 680,
+        "col": 125,
+        "offset": 20991
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Cache_Nginx_Memcached.php",
+      "start": {
+        "line": 424,
+        "col": 3,
+        "offset": 13733
+      },
+      "end": {
+        "line": 424,
+        "col": 125,
+        "offset": 13855
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/Cache_Redis.php",
+      "start": {
+        "line": 171,
+        "col": 9,
+        "offset": 3612
+      },
+      "end": {
+        "line": 171,
+        "col": 26,
+        "offset": 3629
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/Cache_Redis.php",
+      "start": {
+        "line": 409,
+        "col": 13,
+        "offset": 9556
+      },
+      "end": {
+        "line": 409,
+        "col": 34,
+        "offset": 9577
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/Cache_Redis.php",
+      "start": {
+        "line": 469,
+        "col": 31,
+        "offset": 11155
+      },
+      "end": {
+        "line": 469,
+        "col": 59,
+        "offset": 11183
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/Cache_Wincache.php",
+      "start": {
+        "line": 84,
+        "col": 9,
+        "offset": 3019
+      },
+      "end": {
+        "line": 84,
+        "col": 59,
+        "offset": 3069
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/Cache_Wincache.php",
+      "start": {
+        "line": 156,
+        "col": 10,
+        "offset": 5585
+      },
+      "end": {
+        "line": 156,
+        "col": 60,
+        "offset": 5635
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/Cache_Xcache.php",
+      "start": {
+        "line": 87,
+        "col": 9,
+        "offset": 3136
+      },
+      "end": {
+        "line": 87,
+        "col": 50,
+        "offset": 3177
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/Cache_Xcache.php",
+      "start": {
+        "line": 158,
+        "col": 10,
+        "offset": 5651
+      },
+      "end": {
+        "line": 158,
+        "col": 51,
+        "offset": 5692
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/CdnEngine.php",
+      "start": {
+        "line": 26,
+        "col": 3,
+        "offset": 464
+      },
+      "end": {
+        "line": 26,
+        "col": 80,
+        "offset": 541
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/CdnEngine_Azure.php",
+      "start": {
+        "line": 147,
+        "col": 3,
+        "offset": 3963
+      },
+      "end": {
+        "line": 147,
+        "col": 35,
+        "offset": 3995
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/CdnEngine_Azure.php",
+      "start": {
+        "line": 242,
+        "col": 3,
+        "offset": 6945
+      },
+      "end": {
+        "line": 242,
+        "col": 43,
+        "offset": 6985
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/CdnEngine_Azure_MI.php",
+      "start": {
+        "line": 133,
+        "col": 3,
+        "offset": 3413
+      },
+      "end": {
+        "line": 133,
+        "col": 35,
+        "offset": 3445
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/CdnEngine_Azure_MI.php",
+      "start": {
+        "line": 243,
+        "col": 3,
+        "offset": 6281
+      },
+      "end": {
+        "line": 243,
+        "col": 43,
+        "offset": 6321
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/CdnEngine_Ftp.php",
+      "start": {
+        "line": 571,
+        "col": 3,
+        "offset": 15923
+      },
+      "end": {
+        "line": 571,
+        "col": 29,
+        "offset": 15949
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/CdnEngine_Ftp.php",
+      "start": {
+        "line": 679,
+        "col": 3,
+        "offset": 18841
+      },
+      "end": {
+        "line": 679,
+        "col": 32,
+        "offset": 18870
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/CdnEngine_GoogleDrive.php",
+      "start": {
+        "line": 640,
+        "col": 18,
+        "offset": 18640
+      },
+      "end": {
+        "line": 640,
+        "col": 44,
+        "offset": 18666
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/CdnEngine_GoogleDrive.php",
+      "start": {
+        "line": 768,
+        "col": 3,
+        "offset": 22069
+      },
+      "end": {
+        "line": 768,
+        "col": 23,
+        "offset": 22089
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/CdnEngine_GoogleDrive.php",
+      "start": {
+        "line": 798,
+        "col": 3,
+        "offset": 23156
+      },
+      "end": {
+        "line": 798,
+        "col": 27,
+        "offset": 23180
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/CdnEngine_GoogleDrive.php",
+      "start": {
+        "line": 801,
+        "col": 14,
+        "offset": 23322
+      },
+      "end": {
+        "line": 801,
+        "col": 42,
+        "offset": 23350
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/CdnEngine_RackSpaceCloudFiles.php",
+      "start": {
+        "line": 282,
+        "col": 6,
+        "offset": 7805
+      },
+      "end": {
+        "line": 282,
+        "col": 41,
+        "offset": 7840
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/CdnEngine_RackSpaceCloudFiles.php",
+      "start": {
+        "line": 373,
+        "col": 3,
+        "offset": 9962
+      },
+      "end": {
+        "line": 373,
+        "col": 44,
+        "offset": 10003
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/CdnEngine_S3.php",
+      "start": {
+        "line": 342,
+        "col": 6,
+        "offset": 9646
+      },
+      "end": {
+        "line": 342,
+        "col": 42,
+        "offset": 9682
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/CdnEngine_S3.php",
+      "start": {
+        "line": 511,
+        "col": 3,
+        "offset": 13658
+      },
+      "end": {
+        "line": 511,
+        "col": 37,
+        "offset": 13692
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/CdnEngine_S3_Compatible.php",
+      "start": {
+        "line": 239,
+        "col": 5,
+        "offset": 5846
+      },
+      "end": {
+        "line": 239,
+        "col": 29,
+        "offset": 5870
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/CdnEngine_S3_Compatible.php",
+      "start": {
+        "line": 372,
+        "col": 3,
+        "offset": 8883
+      },
+      "end": {
+        "line": 372,
+        "col": 40,
+        "offset": 8920
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Cdn_AdminNotes.php",
+      "start": {
+        "line": 315,
+        "col": 13,
+        "offset": 13011
+      },
+      "end": {
+        "line": 315,
+        "col": 115,
+        "offset": 13113
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Cdn_Core_Admin.php",
+      "start": {
+        "line": 73,
+        "col": 10,
+        "offset": 2069
+      },
+      "end": {
+        "line": 73,
+        "col": 30,
+        "offset": 2089
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Cdn_Core_Admin.php",
+      "start": {
+        "line": 90,
+        "col": 10,
+        "offset": 2541
+      },
+      "end": {
+        "line": 90,
+        "col": 30,
+        "offset": 2561
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Cdn_Core_Admin.php",
+      "start": {
+        "line": 107,
+        "col": 10,
+        "offset": 3035
+      },
+      "end": {
+        "line": 107,
+        "col": 30,
+        "offset": 3055
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Cdn_Core_Admin.php",
+      "start": {
+        "line": 128,
+        "col": 14,
+        "offset": 3643
+      },
+      "end": {
+        "line": 128,
+        "col": 40,
+        "offset": 3669
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Cdn_Core_Admin.php",
+      "start": {
+        "line": 267,
+        "col": 13,
+        "offset": 7924
+      },
+      "end": {
+        "line": 267,
+        "col": 39,
+        "offset": 7950
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/Cdn_Core_Admin.php",
+      "start": {
+        "line": 289,
+        "col": 20,
+        "offset": 8550
+      },
+      "end": {
+        "line": 289,
+        "col": 50,
+        "offset": 8580
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Cdn_Core_Admin.php",
+      "start": {
+        "line": 362,
+        "col": 13,
+        "offset": 10807
+      },
+      "end": {
+        "line": 362,
+        "col": 39,
+        "offset": 10833
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Cdn_Core_Admin.php",
+      "start": {
+        "line": 636,
+        "col": 13,
+        "offset": 19019
+      },
+      "end": {
+        "line": 636,
+        "col": 39,
+        "offset": 19045
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Cdn_Core_Admin.php",
+      "start": {
+        "line": 706,
+        "col": 10,
+        "offset": 21170
+      },
+      "end": {
+        "line": 706,
+        "col": 32,
+        "offset": 21192
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Cdn_Core_Admin.php",
+      "start": {
+        "line": 738,
+        "col": 10,
+        "offset": 21968
+      },
+      "end": {
+        "line": 738,
+        "col": 32,
+        "offset": 21990
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Cdn_Environment.php",
+      "start": {
+        "line": 241,
+        "col": 4,
+        "offset": 7674
+      },
+      "end": {
+        "line": 241,
+        "col": 24,
+        "offset": 7694
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Cdn_Environment.php",
+      "start": {
+        "line": 243,
+        "col": 4,
+        "offset": 7751
+      },
+      "end": {
+        "line": 243,
+        "col": 24,
+        "offset": 7771
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Cdn_Environment.php",
+      "start": {
+        "line": 270,
+        "col": 3,
+        "offset": 8527
+      },
+      "end": {
+        "line": 270,
+        "col": 23,
+        "offset": 8547
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Cdn_Environment.php",
+      "start": {
+        "line": 296,
+        "col": 3,
+        "offset": 9285
+      },
+      "end": {
+        "line": 296,
+        "col": 23,
+        "offset": 9305
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Cdn_RackSpace_Api_CloudFiles.php",
+      "start": {
+        "line": 92,
+        "col": 3,
+        "offset": 2479
+      },
+      "end": {
+        "line": 94,
+        "col": 5,
+        "offset": 2539
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Config.php",
+      "start": {
+        "line": 591,
+        "col": 4,
+        "offset": 16087
+      },
+      "end": {
+        "line": 591,
+        "col": 65,
+        "offset": 16148
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/DbCache_WpdbInjection_QueryCaching.php",
+      "start": {
+        "line": 195,
+        "col": 4,
+        "offset": 4196
+      },
+      "end": {
+        "line": 195,
+        "col": 55,
+        "offset": 4247
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/DbCache_WpdbInjection_QueryCaching.php",
+      "start": {
+        "line": 249,
+        "col": 5,
+        "offset": 5827
+      },
+      "end": {
+        "line": 254,
+        "col": 7,
+        "offset": 5971
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/Extension_AlwaysCached_Plugin.php",
+      "start": {
+        "line": 173,
+        "col": 43,
+        "offset": 4937
+      },
+      "end": {
+        "line": 173,
+        "col": 82,
+        "offset": 4976
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Extension_AlwaysCached_Queue.php",
+      "start": {
+        "line": 282,
+        "col": 10,
+        "offset": 6893
+      },
+      "end": {
+        "line": 282,
+        "col": 48,
+        "offset": 6931
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Extension_AlwaysCached_Queue.php",
+      "start": {
+        "line": 326,
+        "col": 3,
+        "offset": 7802
+      },
+      "end": {
+        "line": 326,
+        "col": 50,
+        "offset": 7849
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Extension_AlwaysCached_Queue.php",
+      "start": {
+        "line": 355,
+        "col": 3,
+        "offset": 8419
+      },
+      "end": {
+        "line": 355,
+        "col": 41,
+        "offset": 8457
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Extension_AlwaysCached_Queue.php",
+      "start": {
+        "line": 383,
+        "col": 3,
+        "offset": 9050
+      },
+      "end": {
+        "line": 383,
+        "col": 43,
+        "offset": 9090
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Extension_FragmentCache_WpObjectCache.php",
+      "start": {
+        "line": 515,
+        "col": 3,
+        "offset": 10385
+      },
+      "end": {
+        "line": 515,
+        "col": 20,
+        "offset": 10402
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Extension_ImageService_Api.php",
+      "start": {
+        "line": 88,
+        "col": 4,
+        "offset": 1400
+      },
+      "end": {
+        "line": 88,
+        "col": 48,
+        "offset": 1444
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Extension_NewRelic_Service.php",
+      "start": {
+        "line": 491,
+        "col": 3,
+        "offset": 14541
+      },
+      "end": {
+        "line": 504,
+        "col": 5,
+        "offset": 14768
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Extension_NewRelic_Service.php",
+      "start": {
+        "line": 775,
+        "col": 3,
+        "offset": 23254
+      },
+      "end": {
+        "line": 775,
+        "col": 44,
+        "offset": 23295
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Generic_AdminActions_Test.php",
+      "start": {
+        "line": 89,
+        "col": 5,
+        "offset": 2166
+      },
+      "end": {
+        "line": 89,
+        "col": 55,
+        "offset": 2216
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Generic_AdminActions_Test.php",
+      "start": {
+        "line": 225,
+        "col": 4,
+        "offset": 5649
+      },
+      "end": {
+        "line": 225,
+        "col": 54,
+        "offset": 5699
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Generic_Plugin.php",
+      "start": {
+        "line": 1051,
+        "col": 5,
+        "offset": 30138
+      },
+      "end": {
+        "line": 1051,
+        "col": 43,
+        "offset": 30176
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Generic_Plugin.php",
+      "start": {
+        "line": 1070,
+        "col": 5,
+        "offset": 30469
+      },
+      "end": {
+        "line": 1070,
+        "col": 43,
+        "offset": 30507
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Licensing_Plugin_Admin.php",
+      "start": {
+        "line": 180,
+        "col": 4,
+        "offset": 4902
+      },
+      "end": {
+        "line": 180,
+        "col": 63,
+        "offset": 4961
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Licensing_Plugin_Admin.php",
+      "start": {
+        "line": 232,
+        "col": 5,
+        "offset": 6831
+      },
+      "end": {
+        "line": 232,
+        "col": 64,
+        "offset": 6890
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Licensing_Plugin_Admin.php",
+      "start": {
+        "line": 762,
+        "col": 3,
+        "offset": 24680
+      },
+      "end": {
+        "line": 762,
+        "col": 62,
+        "offset": 24739
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Licensing_Plugin_Admin.php",
+      "start": {
+        "line": 1055,
+        "col": 3,
+        "offset": 34050
+      },
+      "end": {
+        "line": 1055,
+        "col": 62,
+        "offset": 34109
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Minify_Core.php",
+      "start": {
+        "line": 30,
+        "col": 3,
+        "offset": 707
+      },
+      "end": {
+        "line": 30,
+        "col": 107,
+        "offset": 811
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Minify_Core.php",
+      "start": {
+        "line": 33,
+        "col": 4,
+        "offset": 889
+      },
+      "end": {
+        "line": 33,
+        "col": 92,
+        "offset": 977
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Minify_Environment.php",
+      "start": {
+        "line": 295,
+        "col": 3,
+        "offset": 9748
+      },
+      "end": {
+        "line": 295,
+        "col": 77,
+        "offset": 9822
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Minify_MinifiedFileRequestHandler.php",
+      "start": {
+        "line": 339,
+        "col": 4,
+        "offset": 11335
+      },
+      "end": {
+        "line": 339,
+        "col": 122,
+        "offset": 11453
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Minify_MinifiedFileRequestHandler.php",
+      "start": {
+        "line": 661,
+        "col": 3,
+        "offset": 20512
+      },
+      "end": {
+        "line": 661,
+        "col": 112,
+        "offset": 20621
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Minify_MinifiedFileRequestHandler.php",
+      "start": {
+        "line": 958,
+        "col": 6,
+        "offset": 30113
+      },
+      "end": {
+        "line": 958,
+        "col": 31,
+        "offset": 30138
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Minify_MinifiedFileRequestHandler.php",
+      "start": {
+        "line": 971,
+        "col": 7,
+        "offset": 30651
+      },
+      "end": {
+        "line": 971,
+        "col": 32,
+        "offset": 30676
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Minify_MinifiedFileRequestHandler.php",
+      "start": {
+        "line": 1093,
+        "col": 3,
+        "offset": 33410
+      },
+      "end": {
+        "line": 1093,
+        "col": 80,
+        "offset": 33487
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/Minify_MinifiedFileRequestHandler.php",
+      "start": {
+        "line": 1131,
+        "col": 14,
+        "offset": 34303
+      },
+      "end": {
+        "line": 1131,
+        "col": 45,
+        "offset": 34334
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/PgCache_ContentGrabber.php",
+      "start": {
+        "line": 480,
+        "col": 3,
+        "offset": 11695
+      },
+      "end": {
+        "line": 480,
+        "col": 34,
+        "offset": 11726
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/PgCache_ContentGrabber.php",
+      "start": {
+        "line": 1780,
+        "col": 3,
+        "offset": 50808
+      },
+      "end": {
+        "line": 1780,
+        "col": 21,
+        "offset": 50826
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-rce-eval-usage",
+      "path": "plugins/src/w3-total-cache/PgCache_ContentGrabber.php",
+      "start": {
+        "line": 2139,
+        "col": 5,
+        "offset": 61270
+      },
+      "end": {
+        "line": 2139,
+        "col": 29,
+        "offset": 61294
+      },
+      "extra": {
+        "message": "Use of eval() is dangerous and can lead to Remote Code Execution (RCE). Avoid eval() entirely; find an alternative implementation.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "rce",
+          "cwe": "CWE-94",
+          "confidence": "HIGH"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/PgCache_ContentGrabber.php",
+      "start": {
+        "line": 2483,
+        "col": 3,
+        "offset": 71539
+      },
+      "end": {
+        "line": 2483,
+        "col": 26,
+        "offset": 71562
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/PgCache_Environment.php",
+      "start": {
+        "line": 247,
+        "col": 4,
+        "offset": 7264
+      },
+      "end": {
+        "line": 247,
+        "col": 85,
+        "offset": 7345
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/PgCache_Environment.php",
+      "start": {
+        "line": 295,
+        "col": 3,
+        "offset": 9152
+      },
+      "end": {
+        "line": 295,
+        "col": 77,
+        "offset": 9226
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/PgCache_Environment.php",
+      "start": {
+        "line": 311,
+        "col": 5,
+        "offset": 9549
+      },
+      "end": {
+        "line": 311,
+        "col": 90,
+        "offset": 9634
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/PgCache_Environment.php",
+      "start": {
+        "line": 560,
+        "col": 5,
+        "offset": 16366
+      },
+      "end": {
+        "line": 560,
+        "col": 64,
+        "offset": 16425
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/PgCache_Environment.php",
+      "start": {
+        "line": 889,
+        "col": 5,
+        "offset": 28651
+      },
+      "end": {
+        "line": 889,
+        "col": 64,
+        "offset": 28710
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Support_AdminActions.php",
+      "start": {
+        "line": 160,
+        "col": 29,
+        "offset": 4175
+      },
+      "end": {
+        "line": 160,
+        "col": 65,
+        "offset": 4211
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/UsageStatistics_StorageWriter.php",
+      "start": {
+        "line": 419,
+        "col": 16,
+        "offset": 12107
+      },
+      "end": {
+        "line": 419,
+        "col": 34,
+        "offset": 12125
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/UserExperience_LazyLoad_Mutator_Unmutable.php",
+      "start": {
+        "line": 36,
+        "col": 3,
+        "offset": 724
+      },
+      "end": {
+        "line": 38,
+        "col": 11,
+        "offset": 890
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Util_Http.php",
+      "start": {
+        "line": 214,
+        "col": 3,
+        "offset": 6745
+      },
+      "end": {
+        "line": 214,
+        "col": 35,
+        "offset": 6777
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Util_Installed.php",
+      "start": {
+        "line": 202,
+        "col": 3,
+        "offset": 3586
+      },
+      "end": {
+        "line": 202,
+        "col": 41,
+        "offset": 3624
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Util_Installed.php",
+      "start": {
+        "line": 220,
+        "col": 4,
+        "offset": 3987
+      },
+      "end": {
+        "line": 220,
+        "col": 54,
+        "offset": 4037
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Util_PageUrls.php",
+      "start": {
+        "line": 215,
+        "col": 3,
+        "offset": 6490
+      },
+      "end": {
+        "line": 215,
+        "col": 56,
+        "offset": 6543
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Util_PageUrls.php",
+      "start": {
+        "line": 251,
+        "col": 3,
+        "offset": 7689
+      },
+      "end": {
+        "line": 251,
+        "col": 70,
+        "offset": 7756
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Util_PageUrls.php",
+      "start": {
+        "line": 290,
+        "col": 3,
+        "offset": 9004
+      },
+      "end": {
+        "line": 290,
+        "col": 53,
+        "offset": 9054
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Util_PageUrls.php",
+      "start": {
+        "line": 332,
+        "col": 3,
+        "offset": 10597
+      },
+      "end": {
+        "line": 332,
+        "col": 53,
+        "offset": 10647
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Util_PageUrls.php",
+      "start": {
+        "line": 374,
+        "col": 3,
+        "offset": 12109
+      },
+      "end": {
+        "line": 374,
+        "col": 53,
+        "offset": 12159
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Util_PageUrls.php",
+      "start": {
+        "line": 412,
+        "col": 3,
+        "offset": 13382
+      },
+      "end": {
+        "line": 412,
+        "col": 53,
+        "offset": 13432
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Util_PageUrls.php",
+      "start": {
+        "line": 438,
+        "col": 3,
+        "offset": 13984
+      },
+      "end": {
+        "line": 438,
+        "col": 51,
+        "offset": 14032
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Util_PageUrls.php",
+      "start": {
+        "line": 463,
+        "col": 3,
+        "offset": 14679
+      },
+      "end": {
+        "line": 463,
+        "col": 55,
+        "offset": 14731
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Util_PageUrls.php",
+      "start": {
+        "line": 488,
+        "col": 3,
+        "offset": 15316
+      },
+      "end": {
+        "line": 488,
+        "col": 69,
+        "offset": 15382
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Util_PageUrls.php",
+      "start": {
+        "line": 514,
+        "col": 3,
+        "offset": 15982
+      },
+      "end": {
+        "line": 514,
+        "col": 40,
+        "offset": 16019
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Util_PageUrls.php",
+      "start": {
+        "line": 671,
+        "col": 18,
+        "offset": 20200
+      },
+      "end": {
+        "line": 671,
+        "col": 40,
+        "offset": 20222
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Util_PageUrls.php",
+      "start": {
+        "line": 950,
+        "col": 3,
+        "offset": 27024
+      },
+      "end": {
+        "line": 950,
+        "col": 52,
+        "offset": 27073
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Util_Theme.php",
+      "start": {
+        "line": 88,
+        "col": 3,
+        "offset": 1652
+      },
+      "end": {
+        "line": 88,
+        "col": 70,
+        "offset": 1719
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/Util_WpmuBlogmap.php",
+      "start": {
+        "line": 42,
+        "col": 4,
+        "offset": 1241
+      },
+      "end": {
+        "line": 42,
+        "col": 31,
+        "offset": 1268
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Varnish_Flush.php",
+      "start": {
+        "line": 293,
+        "col": 14,
+        "offset": 9454
+      },
+      "end": {
+        "line": 302,
+        "col": 6,
+        "offset": 9795
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/w3-total-cache/Varnish_Flush.php",
+      "start": {
+        "line": 314,
+        "col": 14,
+        "offset": 10235
+      },
+      "end": {
+        "line": 322,
+        "col": 6,
+        "offset": 10420
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Google/Auth/AssertionCredentials.php",
+      "start": {
+        "line": 84,
+        "col": 5,
+        "offset": 2464
+      },
+      "end": {
+        "line": 84,
+        "col": 19,
+        "offset": 2478
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/lib/Google/Cache/File.php",
+      "start": {
+        "line": 56,
+        "col": 16,
+        "offset": 1641
+      },
+      "end": {
+        "line": 56,
+        "col": 34,
+        "offset": 1659
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Google/Cache/File.php",
+      "start": {
+        "line": 90,
+        "col": 5,
+        "offset": 2525
+      },
+      "end": {
+        "line": 90,
+        "col": 67,
+        "offset": 2587
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Google/Cache/File.php",
+      "start": {
+        "line": 98,
+        "col": 5,
+        "offset": 2843
+      },
+      "end": {
+        "line": 98,
+        "col": 64,
+        "offset": 2902
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-mt-rand-security-token",
+      "path": "plugins/src/w3-total-cache/lib/Google/Http/Batch.php",
+      "start": {
+        "line": 48,
+        "col": 7,
+        "offset": 1383
+      },
+      "end": {
+        "line": 48,
+        "col": 24,
+        "offset": 1400
+      },
+      "extra": {
+        "message": "mt_rand() is not cryptographically secure and must not be used to generate security tokens, nonces, passwords, or salts. Use wp_generate_password() or random_bytes().\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-338",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Google/Http/Request.php",
+      "start": {
+        "line": 366,
+        "col": 5,
+        "offset": 8716
+      },
+      "end": {
+        "line": 366,
+        "col": 21,
+        "offset": 8732
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Minify/Minify.php",
+      "start": {
+        "line": 666,
+        "col": 3,
+        "offset": 21621
+      },
+      "end": {
+        "line": 673,
+        "col": 6,
+        "offset": 21938
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Minify/Minify/CSS/Compressor.php",
+      "start": {
+        "line": 73,
+        "col": 9,
+        "offset": 1633
+      },
+      "end": {
+        "line": 73,
+        "col": 159,
+        "offset": 1783
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/lib/Minify/Minify/Cache/File.php",
+      "start": {
+        "line": 148,
+        "col": 13,
+        "offset": 3088
+      },
+      "end": {
+        "line": 148,
+        "col": 31,
+        "offset": 3106
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/lib/Minify/Minify/Cache/File.php",
+      "start": {
+        "line": 295,
+        "col": 13,
+        "offset": 6143
+      },
+      "end": {
+        "line": 295,
+        "col": 31,
+        "offset": 6161
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Minify/Minify/HTML.php",
+      "start": {
+        "line": 105,
+        "col": 3,
+        "offset": 2597
+      },
+      "end": {
+        "line": 105,
+        "col": 154,
+        "offset": 2748
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Minify/Minify/IgnoredCommentPreserver.php",
+      "start": {
+        "line": 10,
+        "col": 9,
+        "offset": 236
+      },
+      "end": {
+        "line": 10,
+        "col": 76,
+        "offset": 303
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Minify/Minify/Source.php",
+      "start": {
+        "line": 177,
+        "col": 9,
+        "offset": 5173
+      },
+      "end": {
+        "line": 177,
+        "col": 37,
+        "offset": 5201
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/class.soap_transport_http.php",
+      "start": {
+        "line": 485,
+        "col": 5,
+        "offset": 16805
+      },
+      "end": {
+        "line": 485,
+        "col": 21,
+        "offset": 16821
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/class.soap_transport_http.php",
+      "start": {
+        "line": 491,
+        "col": 5,
+        "offset": 16940
+      },
+      "end": {
+        "line": 491,
+        "col": 22,
+        "offset": 16957
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/class.soap_transport_http.php",
+      "start": {
+        "line": 513,
+        "col": 5,
+        "offset": 17847
+      },
+      "end": {
+        "line": 513,
+        "col": 42,
+        "offset": 17884
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-rand-security-token",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/class.soapclient.php",
+      "start": {
+        "line": 703,
+        "col": 3,
+        "offset": 24483
+      },
+      "end": {
+        "line": 703,
+        "col": 15,
+        "offset": 24495
+      },
+      "extra": {
+        "message": "rand() is not cryptographically secure and must not be used to generate security tokens, nonces, or passwords. Use wp_generate_password() or random_bytes() instead.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-338",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-rce-eval-usage",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/class.soapclient.php",
+      "start": {
+        "line": 711,
+        "col": 3,
+        "offset": 24718
+      },
+      "end": {
+        "line": 711,
+        "col": 18,
+        "offset": 24733
+      },
+      "extra": {
+        "message": "Use of eval() is dangerous and can lead to Remote Code Execution (RCE). Avoid eval() entirely; find an alternative implementation.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "rce",
+          "cwe": "CWE-94",
+          "confidence": "HIGH"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-rce-eval-usage",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/class.soapclient.php",
+      "start": {
+        "line": 713,
+        "col": 3,
+        "offset": 24766
+      },
+      "end": {
+        "line": 713,
+        "col": 46,
+        "offset": 24809
+      },
+      "extra": {
+        "message": "Use of eval() is dangerous and can lead to Remote Code Execution (RCE). Avoid eval() entirely; find an alternative implementation.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "rce",
+          "cwe": "CWE-94",
+          "confidence": "HIGH"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-rand-security-token",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/class.soapclient.php",
+      "start": {
+        "line": 810,
+        "col": 3,
+        "offset": 28191
+      },
+      "end": {
+        "line": 810,
+        "col": 15,
+        "offset": 28203
+      },
+      "extra": {
+        "message": "rand() is not cryptographically secure and must not be used to generate security tokens, nonces, or passwords. Use wp_generate_password() or random_bytes() instead.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-338",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/class.wsdlcache.php",
+      "start": {
+        "line": 64,
+        "col": 3,
+        "offset": 1345
+      },
+      "end": {
+        "line": 64,
+        "col": 53,
+        "offset": 1395
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/class.wsdlcache.php",
+      "start": {
+        "line": 112,
+        "col": 28,
+        "offset": 2766
+      },
+      "end": {
+        "line": 112,
+        "col": 43,
+        "offset": 2781
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/class.wsdlcache.php",
+      "start": {
+        "line": 134,
+        "col": 4,
+        "offset": 3391
+      },
+      "end": {
+        "line": 134,
+        "col": 56,
+        "offset": 3443
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/class.wsdlcache.php",
+      "start": {
+        "line": 136,
+        "col": 4,
+        "offset": 3459
+      },
+      "end": {
+        "line": 136,
+        "col": 56,
+        "offset": 3511
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/nusoap.php",
+      "start": {
+        "line": 2638,
+        "col": 5,
+        "offset": 85721
+      },
+      "end": {
+        "line": 2638,
+        "col": 21,
+        "offset": 85737
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/nusoap.php",
+      "start": {
+        "line": 2644,
+        "col": 5,
+        "offset": 85858
+      },
+      "end": {
+        "line": 2644,
+        "col": 22,
+        "offset": 85875
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/nusoap.php",
+      "start": {
+        "line": 2666,
+        "col": 5,
+        "offset": 86768
+      },
+      "end": {
+        "line": 2666,
+        "col": 42,
+        "offset": 86805
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-rce-eval-usage",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/nusoap.php",
+      "start": {
+        "line": 4032,
+        "col": 4,
+        "offset": 131545
+      },
+      "end": {
+        "line": 4032,
+        "col": 21,
+        "offset": 131562
+      },
+      "extra": {
+        "message": "Use of eval() is dangerous and can lead to Remote Code Execution (RCE). Avoid eval() entirely; find an alternative implementation.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "rce",
+          "cwe": "CWE-94",
+          "confidence": "HIGH"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-rand-security-token",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/nusoap.php",
+      "start": {
+        "line": 7825,
+        "col": 3,
+        "offset": 280047
+      },
+      "end": {
+        "line": 7825,
+        "col": 15,
+        "offset": 280059
+      },
+      "extra": {
+        "message": "rand() is not cryptographically secure and must not be used to generate security tokens, nonces, or passwords. Use wp_generate_password() or random_bytes() instead.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-338",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-rce-eval-usage",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/nusoap.php",
+      "start": {
+        "line": 7833,
+        "col": 3,
+        "offset": 280282
+      },
+      "end": {
+        "line": 7833,
+        "col": 18,
+        "offset": 280297
+      },
+      "extra": {
+        "message": "Use of eval() is dangerous and can lead to Remote Code Execution (RCE). Avoid eval() entirely; find an alternative implementation.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "rce",
+          "cwe": "CWE-94",
+          "confidence": "HIGH"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-rce-eval-usage",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/nusoap.php",
+      "start": {
+        "line": 7835,
+        "col": 3,
+        "offset": 280330
+      },
+      "end": {
+        "line": 7835,
+        "col": 46,
+        "offset": 280373
+      },
+      "extra": {
+        "message": "Use of eval() is dangerous and can lead to Remote Code Execution (RCE). Avoid eval() entirely; find an alternative implementation.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "rce",
+          "cwe": "CWE-94",
+          "confidence": "HIGH"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-rand-security-token",
+      "path": "plugins/src/w3-total-cache/lib/Nusoap/nusoap.php",
+      "start": {
+        "line": 7932,
+        "col": 3,
+        "offset": 283755
+      },
+      "end": {
+        "line": 7932,
+        "col": 15,
+        "offset": 283767
+      },
+      "extra": {
+        "message": "rand() is not cryptographically secure and must not be used to generate security tokens, nonces, or passwords. Use wp_generate_password() or random_bytes() instead.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-338",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-mt-rand-security-token",
+      "path": "plugins/src/w3-total-cache/lib/OAuth/W3tcOAuth.php",
+      "start": {
+        "line": 482,
+        "col": 5,
+        "offset": 15286
+      },
+      "end": {
+        "line": 482,
+        "col": 23,
+        "offset": 15304
+      },
+      "extra": {
+        "message": "mt_rand() is not cryptographically secure and must not be used to generate security tokens, nonces, passwords, or salts. Use wp_generate_password() or random_bytes().\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-338",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/OAuth/W3tcOAuth.php",
+      "start": {
+        "line": 484,
+        "col": 5,
+        "offset": 15310
+      },
+      "end": {
+        "line": 484,
+        "col": 28,
+        "offset": 15333
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/S3Compatible.php",
+      "start": {
+        "line": 402,
+        "col": 26,
+        "offset": 9328
+      },
+      "end": {
+        "line": 406,
+        "col": 5,
+        "offset": 9485
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-sha1-password",
+      "path": "plugins/src/w3-total-cache/lib/S3Compatible.php",
+      "start": {
+        "line": 635,
+        "col": 3,
+        "offset": 16661
+      },
+      "end": {
+        "line": 639,
+        "col": 46,
+        "offset": 16971
+      },
+      "extra": {
+        "message": "sha1() is a cryptographically weak hash function not suitable for password storage. Use wp_hash_password() or password_hash() with a modern algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-916",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-sha1-password",
+      "path": "plugins/src/w3-total-cache/lib/SNS/sdk.class.php",
+      "start": {
+        "line": 889,
+        "col": 4,
+        "offset": 29443
+      },
+      "end": {
+        "line": 889,
+        "col": 111,
+        "offset": 29550
+      },
+      "extra": {
+        "message": "sha1() is a cryptographically weak hash function not suitable for password storage. Use wp_hash_password() or password_hash() with a modern algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-916",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/w3-total-cache/lib/SNS/sdk.class.php",
+      "start": {
+        "line": 1072,
+        "col": 4,
+        "offset": 34831
+      },
+      "end": {
+        "line": 1072,
+        "col": 76,
+        "offset": 34903
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-sha1-password",
+      "path": "plugins/src/w3-total-cache/lib/SNS/sdk.class.php",
+      "start": {
+        "line": 1271,
+        "col": 4,
+        "offset": 40678
+      },
+      "end": {
+        "line": 1271,
+        "col": 97,
+        "offset": 40771
+      },
+      "extra": {
+        "message": "sha1() is a cryptographically weak hash function not suitable for password storage. Use wp_hash_password() or password_hash() with a modern algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-916",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 8,
+    "taint_high": 14,
+    "taint_total": 24,
+    "semgrep_error": 15,
+    "semgrep_warning": 136
+  }
+}

@@ -1,0 +1,898 @@
+{
+  "plugin_slug": "elementskit-lite",
+  "priority_score": 96,
+  "metadata": {
+    "php_files": 273,
+    "total_lines": 76069
+  },
+  "attack_surface_summary": "# Attack Surface: elementskit-lite\n\n> Generated: 2026-06-14T21:21:09Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 272,
+    "total_sinks": 90,
+    "total_sanitizers": 1139,
+    "direct_flows": 137,
+    "functions_with_sources": 89,
+    "functions_with_sinks": 69,
+    "files_analyzed": 273,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "elementskit-lite-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "elementskit-lite",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$disabled_elements = (array) get_option( 'elementor_disabled_elements', [] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/compatibility/element-manager/init.php",
+        "line": 15
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 15,
+          "expression": "$disabled_elements = (array) get_option( 'elementor_disabled_elements', [] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 18,
+          "expression": "$widgets_to_disable = array_filter(\n\t\t\t\t$disabled_elements,\n\t\t\t\tfunction( $element ) {\n\t\t\t\t\treturn preg_match( '/^(elementskit-|ekit-)/', $element );\n\t\t\t\t}\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$widgets_to_disable = array_filter(\n\t\t\t\t$disabled_elements,\n\t\t\t\tfunction( $element ) {\n\t\t\t\t\treturn preg_match( '/^(elementskit-|ekit-)/', $element );\n\t\t\t\t}\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/compatibility/element-manager/init.php",
+        "line": 18
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "elementskit-lite-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "elementskit-lite",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$elementskit_options = get_option('elementskit_options')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/compatibility/element-manager/init.php",
+        "line": 147
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 147,
+          "expression": "$elementskit_options = get_option('elementskit_options')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 153,
+          "expression": "$widgets_list = $elementskit_options['widget_list'] ?? []",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 154,
+          "expression": "$widgets_to_disable = array_filter($widgets_list, function ($widget) {\n\t\t\treturn isset($widget['status']) && $widget['status'] === 'inactive';\n\t\t})",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$widgets_to_disable = array_filter($widgets_list, function ($widget) {\n\t\t\treturn isset($widget['status']) && $widget['status'] === 'inactive';\n\t\t})",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/compatibility/element-manager/init.php",
+        "line": 154
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "elementskit-lite-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "elementskit-lite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$plugins = !empty($_POST['our_plugins']) && is_array($_POST['our_plugins']) ? $_POST['our_plugins'] : []",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/libs/framework/classes/ajax.php",
+        "line": 82
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 82,
+          "expression": "$plugins = !empty($_POST['our_plugins']) && is_array($_POST['our_plugins']) ? $_POST['our_plugins'] : []",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 90,
+          "expression": "$response['plugins'] = $plugins",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 93,
+          "expression": "wp_send_json($response)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json($response)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/libs/framework/classes/ajax.php",
+        "line": 93
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "elementskit-lite-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "elementskit-lite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$plugin_slug = isset( $_POST['plugin_slug'] ) ? sanitize_text_field( wp_unslash( $_POST['plugin_slug'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/libs/framework/classes/ajax.php",
+        "line": 104
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 104,
+          "expression": "$plugin_slug = isset( $_POST['plugin_slug'] ) ? sanitize_text_field( wp_unslash( $_POST['plugin_slug'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 110,
+          "expression": "wp_send_json_success(\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'message' => self::plugin_activate_message( $plugin_slug )\n\t\t\t\t\t)\n\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success(\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'message' => self::plugin_activate_message( $plugin_slug )\n\t\t\t\t\t)\n\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/libs/framework/classes/ajax.php",
+        "line": 110
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "elementskit-lite-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "elementskit-lite",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "array( 'meta_id' => intval( $meta_id ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/libs/xs-migration/migration.php",
+        "line": 482
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 482,
+          "expression": "$wpdb->update( $tbl, array( 'meta_value' => $value ), array( 'meta_id' => intval( $meta_id ) ), array( '%s' ), array( '%d' ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->update( $tbl, array( 'meta_value' => $value ), array( 'meta_id' => intval( $meta_id ) ), array( '%s' ), array( '%d' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/libs/xs-migration/migration.php",
+        "line": 482
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "elementskit-lite-ssrf-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "elementskit-lite",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$param = array_merge( \\ElementsKit_Lite::license_data(), $_GET, array( 'action' => 'get_layout_list' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/modules/layout-manager/layout-list-api.php",
+        "line": 17
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 17,
+          "expression": "$param = array_merge( \\ElementsKit_Lite::license_data(), $_GET, array( 'action' => 'get_layout_list' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 19,
+          "expression": "$response = wp_remote_get( \n\t\t\t\\ElementsKit_Lite::api_url() . 'layout-manager-api/?' . http_build_query( $param ),\n\t\t\tarray(\n\t\t\t\t'timeout' => 30,\n\t\t\t\t'headers' => array(\n\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t),\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_get( \n\t\t\t\\ElementsKit_Lite::api_url() . 'layout-manager-api/?' . http_build_query( $param ),\n\t\t\tarray(\n\t\t\t\t'timeout' => 30,\n\t\t\t\t'headers' => array(\n\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t),\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/modules/layout-manager/layout-list-api.php",
+        "line": 19
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "elementskit-lite-xss-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "elementskit-lite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$post_id = isset($_POST['post_id']) ? intval( $_POST['post_id'] ) : 0",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/modules/controls/widget-area-utils.php",
+        "line": 21
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 21,
+          "expression": "$post_id = isset($_POST['post_id']) ? intval( $_POST['post_id'] ) : 0",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 29,
+          "expression": "echo str_replace( '#elementor', '', \\ElementsKit_Lite\\Utils::render_tab_content( \\ElementsKit_Lite\\Utils::render_elementor_content( $post_id ), $post_id ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo str_replace( '#elementor', '', \\ElementsKit_Lite\\Utils::render_tab_content( \\ElementsKit_Lite\\Utils::render_elementor_content( $post_id ), $post_id ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/modules/controls/widget-area-utils.php",
+        "line": 29
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "elementskit-lite-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "elementskit-lite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$id = ( isset( $_GET['post'] ) ? intval( wp_unslash( $_GET['post'] ) ) : 0 )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/modules/widget-builder/views/builder.php",
+        "line": 4
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 4,
+          "expression": "$id = ( isset( $_GET['post'] ) ? intval( wp_unslash( $_GET['post'] ) ) : 0 )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 9,
+          "expression": "echo intval( $id );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo intval( $id );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/modules/widget-builder/views/builder.php",
+        "line": 9
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "elementskit-lite-xss-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "elementskit-lite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$id = ( isset( $_GET['post'] ) ? intval( wp_unslash( $_GET['post'] ) ) : 0 )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/modules/widget-builder/views/builder.php",
+        "line": 4
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 4,
+          "expression": "$id = ( isset( $_GET['post'] ) ? intval( wp_unslash( $_GET['post'] ) ) : 0 )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 11,
+          "expression": "echo esc_url( str_replace( array( '&amp;', 'action=edit' ), array( '&', 'action=elementor' ), get_edit_post_link( $id ) ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( str_replace( array( '&amp;', 'action=edit' ), array( '&', 'action=elementor' ), get_edit_post_link( $id ) ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/modules/widget-builder/views/builder.php",
+        "line": 11
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "elementskit-lite-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "elementskit-lite",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$url = admin_url(\n\t\t\t'post.php?post=' . absint( $builder_post_id ) . '&action=elementor'\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/modules/dynamic-content/cpt-api.php",
+        "line": 83
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 83,
+          "expression": "$url = admin_url(\n\t\t\t'post.php?post=' . absint( $builder_post_id ) . '&action=elementor'\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 87,
+          "expression": "wp_safe_redirect( $url )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( $url )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/modules/dynamic-content/cpt-api.php",
+        "line": 87
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "elementskit-lite-xss-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "elementskit-lite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$form_list_id_sanitize = isset($form_list) ? intval($form_list) : 0",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/widgets/fluent-forms/fluent-forms.php",
+        "line": 2633
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2633,
+          "expression": "$form_list_id_sanitize = isset($form_list) ? intval($form_list) : 0",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2684,
+          "expression": "echo do_shortcode('[fluentform id=\"' . $form_list_id_sanitize . '\"]');",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo do_shortcode('[fluentform id=\"' . $form_list_id_sanitize . '\"]');",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/widgets/fluent-forms/fluent-forms.php",
+        "line": 2684
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "elementskit-lite-xss-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "elementskit-lite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo do_shortcode('[weforms id=\"'.intval($settings['ekit_weform_form_id']).'\"]' );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/widgets/we-forms/we-forms.php",
+        "line": 587
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 587,
+          "expression": "echo do_shortcode('[weforms id=\"'.intval($settings['ekit_weform_form_id']).'\"]' );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo do_shortcode('[weforms id=\"'.intval($settings['ekit_weform_form_id']).'\"]' );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/widgets/we-forms/we-forms.php",
+        "line": 587
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "elementskit-lite-xss-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "elementskit-lite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo do_shortcode('[wpforms id=\"'.intval($settings['ekit_wpform_form_id']).'\"]' );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/widgets/wp-forms/wp-forms.php",
+        "line": 678
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 678,
+          "expression": "echo do_shortcode('[wpforms id=\"'.intval($settings['ekit_wpform_form_id']).'\"]' );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo do_shortcode('[wpforms id=\"'.intval($settings['ekit_wpform_form_id']).'\"]' );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/widgets/wp-forms/wp-forms.php",
+        "line": 678
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "elementskit-lite-xss-009",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "elementskit-lite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo do_shortcode('[contact-form-7 id=\"'.intval($settings['ekit_contact_form7']).'\"]' );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/widgets/contact-form7/contact-form7.php",
+        "line": 885
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 885,
+          "expression": "echo do_shortcode('[contact-form-7 id=\"'.intval($settings['ekit_contact_form7']).'\"]' );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo do_shortcode('[contact-form-7 id=\"'.intval($settings['ekit_contact_form7']).'\"]' );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/widgets/contact-form7/contact-form7.php",
+        "line": 885
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "elementskit-lite-xss-010",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "elementskit-lite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo do_shortcode( '[ninja_form id=\"' . intval($settings['ekit_ninja_form_id']) . '\" ]' );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/widgets/ninja-forms/ninja-forms.php",
+        "line": 925
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 925,
+          "expression": "echo do_shortcode( '[ninja_form id=\"' . intval($settings['ekit_ninja_form_id']) . '\" ]' );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo do_shortcode( '[ninja_form id=\"' . intval($settings['ekit_ninja_form_id']) . '\" ]' );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/widgets/ninja-forms/ninja-forms.php",
+        "line": 925
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "elementskit-lite-lfi-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "elementskit-lite",
+      "vulnerability_class": "local_file_inclusion",
+      "source": {
+        "expression": "$style = isset($ekit_testimonial_style) ? sanitize_text_field($ekit_testimonial_style) : 'default'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/widgets/testimonial/testimonial.php",
+        "line": 2548
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2548,
+          "expression": "$style = isset($ekit_testimonial_style) ? sanitize_text_field($ekit_testimonial_style) : 'default'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2559,
+          "expression": "require Handler::get_dir() . 'style/' . $style . '.php'",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "require Handler::get_dir() . 'style/' . $style . '.php'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/elementskit-lite/widgets/testimonial/testimonial.php",
+        "line": 2559
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/elementskit-lite/core/handler-api.php",
+      "start": {
+        "line": 22,
+        "col": 5,
+        "offset": 319
+      },
+      "end": {
+        "line": 31,
+        "col": 6,
+        "offset": 714
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/elementskit-lite/core/handler-api.php",
+      "start": {
+        "line": 22,
+        "col": 5,
+        "offset": 319
+      },
+      "end": {
+        "line": 31,
+        "col": 7,
+        "offset": 715
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/elementskit-lite/libs/xs-migration/migration.php",
+      "start": {
+        "line": 350,
+        "col": 4,
+        "offset": 9443
+      },
+      "end": {
+        "line": 350,
+        "col": 85,
+        "offset": 9524
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/elementskit-lite/widgets/mail-chimp/classes/mail-chimp-rest.php",
+      "start": {
+        "line": 63,
+        "col": 2,
+        "offset": 1533
+      },
+      "end": {
+        "line": 69,
+        "col": 3,
+        "offset": 1713
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/elementskit-lite/widgets/mail-chimp/classes/mail-chimp-rest.php",
+      "start": {
+        "line": 63,
+        "col": 2,
+        "offset": 1533
+      },
+      "end": {
+        "line": 69,
+        "col": 4,
+        "offset": 1714
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 4,
+    "taint_high": 7,
+    "taint_total": 16,
+    "semgrep_error": 0,
+    "semgrep_warning": 5
+  }
+}

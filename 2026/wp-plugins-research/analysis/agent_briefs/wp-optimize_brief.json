@@ -1,0 +1,3479 @@
+{
+  "plugin_slug": "wp-optimize",
+  "priority_score": 315,
+  "metadata": {
+    "php_files": 596,
+    "total_lines": 145524
+  },
+  "attack_surface_summary": "# Attack Surface: wp-optimize\n\n> Generated: 2026-06-14T21:21:12Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 789,
+    "total_sinks": 1064,
+    "total_sanitizers": 892,
+    "direct_flows": 717,
+    "functions_with_sources": 349,
+    "functions_with_sinks": 564,
+    "files_analyzed": 596,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "wp-optimize-file-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$host = isset($_SERVER['HTTP_HOST']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_HOST'])) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/minify/class-wp-optimize-minify-front-end.php",
+        "line": 2393
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2393,
+          "expression": "$host = isset($_SERVER['HTTP_HOST']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_HOST'])) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2409,
+          "expression": "$a = $cache_file_base . md5(\"$host-$request_uri$request_query\").'.header'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 2416,
+          "expression": "file_get_contents($a)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "file_get_contents($a)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/minify/class-wp-optimize-minify-front-end.php",
+        "line": 2416
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-file-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$host = isset($_SERVER['HTTP_HOST']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_HOST'])) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/minify/class-wp-optimize-minify-front-end.php",
+        "line": 2393
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2393,
+          "expression": "$host = isset($_SERVER['HTTP_HOST']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_HOST'])) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2408,
+          "expression": "$b = $cache_file_base . md5(\"$host-$request_uri\").'.header'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 2419,
+          "expression": "file_get_contents($b)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "file_get_contents($b)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/minify/class-wp-optimize-minify-front-end.php",
+        "line": 2419
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "array_map('trim', explode(\"\\n\", get_option('wpo_min_disable_on_url', '')))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/minify/class-wp-optimize-minify-functions.php",
+        "line": 822
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 822,
+          "expression": "$disable_on_url = array_filter(array_map('trim', explode(\"\\n\", get_option('wpo_min_disable_on_url', ''))))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$disable_on_url = array_filter(array_map('trim', explode(\"\\n\", get_option('wpo_min_disable_on_url', ''))))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/minify/class-wp-optimize-minify-functions.php",
+        "line": 822
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$cookie_value = $_COOKIE[$key][$cookie_key]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 446
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 446,
+          "expression": "$cookie_value = $_COOKIE[$key][$cookie_key]",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 447,
+          "expression": "$_cache_key = $cookie_key.'='.$cookie_value",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 448,
+          "expression": "$_cache_key = preg_replace('/[^a-z0-9_\\-\\=]/i', '-', $_cache_key)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 448,
+          "expression": "$_cache_key = preg_replace('/[^a-z0-9_\\-\\=]/i', '-', $_cache_key)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$_cache_key = preg_replace('/[^a-z0-9_\\-\\=]/i', '-', $_cache_key)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 448
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$_cache_key = $cookie_name.'='. $_COOKIE[$cookie_name]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 457
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 457,
+          "expression": "$_cache_key = $cookie_name.'='. $_COOKIE[$cookie_name]",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 458,
+          "expression": "$_cache_key = preg_replace('/[^a-z0-9_\\-\\=]/i', '-', $_cache_key)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 458,
+          "expression": "$_cache_key = preg_replace('/[^a-z0-9_\\-\\=]/i', '-', $_cache_key)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$_cache_key = preg_replace('/[^a-z0-9_\\-\\=]/i', '-', $_cache_key)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 458
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$query_variable_value = $_GET[$variable]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 473
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 473,
+          "expression": "$query_variable_value = $_GET[$variable]",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 474,
+          "expression": "$_cache_key = $variable.'='.$query_variable_value",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 475,
+          "expression": "$_cache_key = preg_replace('/[^a-z0-9_\\-\\=]/i', '-', $_cache_key)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 475,
+          "expression": "$_cache_key = preg_replace('/[^a-z0-9_\\-\\=]/i', '-', $_cache_key)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$_cache_key = preg_replace('/[^a-z0-9_\\-\\=]/i', '-', $_cache_key)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 475
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$file_name_rest_json = wpo_rest_cache_filename($_GET)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 795
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 795,
+          "expression": "$file_name_rest_json = wpo_rest_cache_filename($_GET)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 798,
+          "expression": "$path = $path_dir . $file_name_rest_json",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 812,
+          "expression": "$modified_time = file_exists($path) ? (int) filemtime($path) : time()",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 846,
+          "expression": "header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $modified_time) . ' GMT')",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $modified_time) . ' GMT')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 846
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-open-002",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$file_name_rest_json = wpo_rest_cache_filename($_GET)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 795
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 795,
+          "expression": "$file_name_rest_json = wpo_rest_cache_filename($_GET)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 798,
+          "expression": "$path = $path_dir . $file_name_rest_json",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 812,
+          "expression": "$modified_time = file_exists($path) ? (int) filemtime($path) : time()",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 879,
+          "expression": "header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $modified_time) . ' GMT')",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $modified_time) . ' GMT')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 879
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-file-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$file_name_rest_json = wpo_rest_cache_filename($_GET)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 795
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 795,
+          "expression": "$file_name_rest_json = wpo_rest_cache_filename($_GET)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 798,
+          "expression": "$path = $path_dir . $file_name_rest_json",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 882,
+          "expression": "readfile($path)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "readfile($path)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 882
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-file-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$file_name_rest_json = wpo_rest_cache_filename($_GET)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 795
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 795,
+          "expression": "$file_name_rest_json = wpo_rest_cache_filename($_GET)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 798,
+          "expression": "$path = $path_dir . $file_name_rest_json",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 801,
+          "expression": "$headers_file = $path . '.headers'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 929,
+          "expression": "$headers_json = file_get_contents($headers_file)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$headers_json = file_get_contents($headers_file)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 929
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$request_uri = isset($_SERVER['REQUEST_URI']) ? strval(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 1106
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1106,
+          "expression": "$request_uri = isset($_SERVER['REQUEST_URI']) ? strval(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1113,
+          "expression": "$request_uri = rtrim($request_uri, '?')",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1115,
+          "expression": "$url = preg_replace('/(.+?)([\\/]*)(\\[\\?\\#][^\\/]+|$)/', '$1/$3', $request_uri)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$url = preg_replace('/(.+?)([\\/]*)(\\[\\?\\#][^\\/]+|$)/', '$1/$3', $request_uri)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 1115
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-006",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$request_uri = isset($_SERVER['REQUEST_URI']) ? strval(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 1106
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1106,
+          "expression": "$request_uri = isset($_SERVER['REQUEST_URI']) ? strval(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1107,
+          "expression": "$url_part = \"://\" . $_SERVER['HTTP_HOST'] . $request_uri",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1154,
+          "expression": "$url_parts['path'] = preg_replace('/(.*?)index\\.(php|html)(\\/.+)/i', '$1index-$2$3', $url_parts['path'])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$url_parts['path'] = preg_replace('/(.*?)index\\.(php|html)(\\/.+)/i', '$1index-$2$3', $url_parts['path'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 1154
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-007",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$request_uri = isset($_SERVER['REQUEST_URI']) ? strval(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 1106
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1106,
+          "expression": "$request_uri = isset($_SERVER['REQUEST_URI']) ? strval(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1107,
+          "expression": "$url_part = \"://\" . $_SERVER['HTTP_HOST'] . $request_uri",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1155,
+          "expression": "$url_parts['path'] = preg_replace('/index\\.(php|html)/i', 'index-$1', $url_parts['path'])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$url_parts['path'] = preg_replace('/index\\.(php|html)/i', 'index-$1', $url_parts['path'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 1155
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-008",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 1187
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1187,
+          "expression": "$request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1188,
+          "expression": "$url = rtrim('http' . ((isset($_SERVER['HTTPS']) && ('on' === $_SERVER['HTTPS'] || 1 === (int) $_SERVER['HTTPS']) ||\n\t\t\t\tisset($_SERVER['HTTP_X_FORWARDED_PROTO']) && 'https' === $_SERVER['HTTP_X_FORWARDED_PROTO']) ? 's' : '' )\n\t\t\t. '://' . $http_host.$request_uri, '/')",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1192,
+          "expression": "preg_replace('/[^a-z0-9\\-._~:\\/?#\\[\\]@!$&\\'()*+,;=%]/i', '', $url)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "preg_replace('/[^a-z0-9\\-._~:\\/?#\\[\\]@!$&\\'()*+,;=%]/i', '', $url)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 1192
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-009",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 1187
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1187,
+          "expression": "$request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1188,
+          "expression": "$url = rtrim('http' . ((isset($_SERVER['HTTPS']) && ('on' === $_SERVER['HTTPS'] || 1 === (int) $_SERVER['HTTPS']) ||\n\t\t\t\tisset($_SERVER['HTTP_X_FORWARDED_PROTO']) && 'https' === $_SERVER['HTTP_X_FORWARDED_PROTO']) ? 's' : '' )\n\t\t\t. '://' . $http_host.$request_uri, '/')",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1392,
+          "expression": "$url = preg_replace('/\\?.*/', '', $url)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1392,
+          "expression": "$url = preg_replace('/\\?.*/', '', $url)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$url = preg_replace('/\\?.*/', '', $url)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 1392
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-010",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 1187
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1187,
+          "expression": "$request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1188,
+          "expression": "$url = rtrim('http' . ((isset($_SERVER['HTTPS']) && ('on' === $_SERVER['HTTPS'] || 1 === (int) $_SERVER['HTTPS']) ||\n\t\t\t\tisset($_SERVER['HTTP_X_FORWARDED_PROTO']) && 'https' === $_SERVER['HTTP_X_FORWARDED_PROTO']) ? 's' : '' )\n\t\t\t. '://' . $http_host.$request_uri, '/')",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1392,
+          "expression": "$url = preg_replace('/\\?.*/', '', $url)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1393,
+          "expression": "$url = rtrim($url, '/')",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 1451,
+          "expression": "$url = preg_replace('#^(http|https):\\/\\/.*\\/#Ui', '/', $url)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 1451,
+          "expression": "$url = preg_replace('#^(http|https):\\/\\/.*\\/#Ui', '/', $url)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$url = preg_replace('#^(http|https):\\/\\/.*\\/#Ui', '/', $url)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 1451
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-011",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 1187
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1187,
+          "expression": "$request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1188,
+          "expression": "$url = rtrim('http' . ((isset($_SERVER['HTTPS']) && ('on' === $_SERVER['HTTPS'] || 1 === (int) $_SERVER['HTTPS']) ||\n\t\t\t\tisset($_SERVER['HTTP_X_FORWARDED_PROTO']) && 'https' === $_SERVER['HTTP_X_FORWARDED_PROTO']) ? 's' : '' )\n\t\t\t. '://' . $http_host.$request_uri, '/')",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1392,
+          "expression": "$url = preg_replace('/\\?.*/', '', $url)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1393,
+          "expression": "$url = rtrim($url, '/')",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 1396,
+          "expression": "$path = parse_url($url, PHP_URL_PATH)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 1397,
+          "expression": "$path = $path ?? '/'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 7,
+          "line": 1398,
+          "expression": "$path = rtrim($path, '/')",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 8,
+          "line": 2032,
+          "expression": "$path = str_replace('\\\\', '/', $path)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 9,
+          "line": 2035,
+          "expression": "$path = preg_replace('|(?<=.)/+|', '/', $path)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 10,
+          "line": 2035,
+          "expression": "$path = preg_replace('|(?<=.)/+|', '/', $path)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$path = preg_replace('|(?<=.)/+|', '/', $path)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 2035
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-012",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$str = $_SERVER[$key] ?? ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 2080
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2080,
+          "expression": "$str = $_SERVER[$key] ?? ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2089,
+          "expression": "$str = stripslashes((string) $str)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 2092,
+          "expression": "$str = preg_replace('/[\\x00-\\x1F\\x7F]/u', '', $str)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 2092,
+          "expression": "$str = preg_replace('/[\\x00-\\x1F\\x7F]/u', '', $str)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$str = preg_replace('/[\\x00-\\x1F\\x7F]/u', '', $str)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 2092
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-013",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$http_host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 1186
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1186,
+          "expression": "$http_host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1188,
+          "expression": "$url = rtrim('http' . ((isset($_SERVER['HTTPS']) && ('on' === $_SERVER['HTTPS'] || 1 === (int) $_SERVER['HTTPS']) ||\n\t\t\t\tisset($_SERVER['HTTP_X_FORWARDED_PROTO']) && 'https' === $_SERVER['HTTP_X_FORWARDED_PROTO']) ? 's' : '' )\n\t\t\t. '://' . $http_host.$request_uri, '/')",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1192,
+          "expression": "preg_replace('/[^a-z0-9\\-._~:\\/?#\\[\\]@!$&\\'()*+,;=%]/i', '', $url)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "preg_replace('/[^a-z0-9\\-._~:\\/?#\\[\\]@!$&\\'()*+,;=%]/i', '', $url)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+        "line": 1192
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-014",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$config = get_option('wpo_cache_config', $this->defaults)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/class-wpo-cache-config.php",
+        "line": 50
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 50,
+          "expression": "$config = get_option('wpo_cache_config', $this->defaults)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 77,
+          "expression": "$config = wp_parse_args($config, $this->defaults)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 79,
+          "expression": "$config['page_cache_length_value'] = intval($config['page_cache_length_value'])",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 80,
+          "expression": "$config['page_cache_length'] = $this->calculate_page_cache_length($config['page_cache_length_value'], $config['page_cache_length_unit'])",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 85,
+          "expression": "$config[$field] = array_map('trim', $config[$field])",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 85,
+          "expression": "$config[$field] = array_map('trim', $config[$field])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$config[$field] = array_map('trim', $config[$field])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/class-wpo-cache-config.php",
+        "line": 85
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-015",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$config['page_cache_length_value'] = intval($config['page_cache_length_value'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/class-wpo-cache-config.php",
+        "line": 79
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 79,
+          "expression": "$config['page_cache_length_value'] = intval($config['page_cache_length_value'])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 80,
+          "expression": "$config['page_cache_length'] = $this->calculate_page_cache_length($config['page_cache_length_value'], $config['page_cache_length_unit'])",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 85,
+          "expression": "$config[$field] = array_map('trim', $config[$field])",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 85,
+          "expression": "$config[$field] = array_map('trim', $config[$field])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$config[$field] = array_map('trim', $config[$field])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/cache/class-wpo-cache-config.php",
+        "line": 85
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-016",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$server = $this->options->get_option('compression_server', $this->webservice)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-manager.php",
+        "line": 289
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 289,
+          "expression": "$server = $this->options->get_option('compression_server', $this->webservice)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 290,
+          "expression": "$task_name = $this->get_associated_task($server)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 295,
+          "expression": "$task = call_user_func(array($task_name, 'create_task'), 'smush', $description, $task_options, $task_name)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$task = call_user_func(array($task_name, 'create_task'), 'smush', $description, $task_options, $task_name)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-manager.php",
+        "line": 295
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-017",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$server = $this->options->get_option('compression_server', $this->webservice)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-manager.php",
+        "line": 289
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 289,
+          "expression": "$server = $this->options->get_option('compression_server', $this->webservice)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 347,
+          "expression": "$task_name = $this->get_associated_task($server)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 351,
+          "expression": "$task = call_user_func(array($task_name, 'create_task'), 'smush', $description, $options, $task_name)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$task = call_user_func(array($task_name, 'create_task'), 'smush', $description, $options, $task_name)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-manager.php",
+        "line": 351
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-file-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$backup_path = get_post_meta($image_id, 'original-file', true)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-manager.php",
+        "line": 383
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 383,
+          "expression": "$backup_path = get_post_meta($image_id, 'original-file', true)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 399,
+          "expression": "$backup_path = $uploads_basedir . $backup_path",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 409,
+          "expression": "$temp_relative_backup_path = substr($backup_path, strpos($backup_path, $current_uploads_dir_folder) + strlen($current_uploads_dir_folder))",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 411,
+          "expression": "$backup_path = $uploads_basedir . $temp_relative_backup_path",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 423,
+          "expression": "$backup_path = substr($backup_path, strpos($backup_path, 'wp-content/uploads/') + strlen('wp-content/uploads/'))",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 424,
+          "expression": "$backup_path = $uploads_basedir . $backup_path",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 7,
+          "line": 428,
+          "expression": "$backup_path = realpath($backup_path)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 8,
+          "line": 443,
+          "expression": "copy($backup_path, $image_path)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "copy($backup_path, $image_path)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-manager.php",
+        "line": 443
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-018",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$server = $this->options->get_option('compression_server', $this->webservice)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-manager.php",
+        "line": 622
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 622,
+          "expression": "$server = $this->options->get_option('compression_server', $this->webservice)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 623,
+          "expression": "$task_name = $this->get_associated_task($server)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 627,
+          "expression": "$task = call_user_func(array($task_name, 'create_task'), 'smush', $description, $task_options, $task_name)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$task = call_user_func(array($task_name, 'create_task'), 'smush', $description, $task_options, $task_name)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-manager.php",
+        "line": 627
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-019",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$server = $this->options->get_option('compression_server', $this->webservice)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-manager.php",
+        "line": 622
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 622,
+          "expression": "$server = $this->options->get_option('compression_server', $this->webservice)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 648,
+          "expression": "$task = $this->get_associated_task($server)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 649,
+          "expression": "$online = call_user_func(array($task, 'is_server_online'))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$online = call_user_func(array($task, 'is_server_online'))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-manager.php",
+        "line": 649
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$api_endpoint = $this->get_option('api_endpoint')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-task.php",
+        "line": 62
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 62,
+          "expression": "$api_endpoint = $this->get_option('api_endpoint')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 180,
+          "expression": "$response = wp_remote_post($api_endpoint, $post_data)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post($api_endpoint, $post_data)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-task.php",
+        "line": 180
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-020",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$attachment_id\t= $this->get_option('attachment_id')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-task.php",
+        "line": 50
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 50,
+          "expression": "$attachment_id\t= $this->get_option('attachment_id')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 57,
+          "expression": "$file_path = get_attached_file($attachment_id)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 243,
+          "expression": "$file = pathinfo($file_path)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 244,
+          "expression": "$back_up = wp_normalize_path($file['dirname'].'/'.basename($file['filename'].$this->get_option('backup_prefix').$file['extension']))",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 248,
+          "expression": "$back_up_relative_path = preg_replace('#^'.wp_normalize_path($uploads_dir['basedir'].'/').'#', '', $back_up)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$back_up_relative_path = preg_replace('#^'.wp_normalize_path($uploads_dir['basedir'].'/').'#', '', $back_up)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-task.php",
+        "line": 248
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-file-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$attachment_id\t= $this->get_option('attachment_id')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-task.php",
+        "line": 50
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 50,
+          "expression": "$attachment_id\t= $this->get_option('attachment_id')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 57,
+          "expression": "$file_path = get_attached_file($attachment_id)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 258,
+          "expression": "copy($file_path, $back_up)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "copy($file_path, $back_up)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-task.php",
+        "line": 258
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-file-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$attachment_id\t= $this->get_option('attachment_id')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-task.php",
+        "line": 50
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 50,
+          "expression": "$attachment_id\t= $this->get_option('attachment_id')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 57,
+          "expression": "$file_path = get_attached_file($attachment_id)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 277,
+          "expression": "file_put_contents($file_path, $optimised_image)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "file_put_contents($file_path, $optimised_image)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-task.php",
+        "line": 277
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-021",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$back_up = wp_normalize_path($file['dirname'].'/'.basename($file['filename'].$this->get_option('backup_prefix').$file['extension']))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-task.php",
+        "line": 244
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 244,
+          "expression": "$back_up = wp_normalize_path($file['dirname'].'/'.basename($file['filename'].$this->get_option('backup_prefix').$file['extension']))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 248,
+          "expression": "$back_up_relative_path = preg_replace('#^'.wp_normalize_path($uploads_dir['basedir'].'/').'#', '', $back_up)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$back_up_relative_path = preg_replace('#^'.wp_normalize_path($uploads_dir['basedir'].'/').'#', '', $back_up)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-task.php",
+        "line": 248
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-rce-022",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$putative_return = stripslashes_deep($GLOBALS[$superglobal][$key])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/fragments/input-processing.php",
+        "line": 37
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 37,
+          "expression": "$putative_return = stripslashes_deep($GLOBALS[$superglobal][$key])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 40,
+          "expression": "$putative_return = call_user_func($sanitisation, $putative_return)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 40,
+          "expression": "$putative_return = call_user_func($sanitisation, $putative_return)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$putative_return = call_user_func($sanitisation, $putative_return)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/includes/fragments/input-processing.php",
+        "line": 40
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$active_page = !empty($_REQUEST['page']) ? sanitize_text_field(wp_unslash($_REQUEST['page'])) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/templates/pages-menu.php",
+        "line": 9
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 9,
+          "expression": "$active_page = !empty($_REQUEST['page']) ? sanitize_text_field(wp_unslash($_REQUEST['page'])) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 16,
+          "expression": "echo ($active_page === $menu['menu_slug']) ? 'active' : '';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ($active_page === $menu['menu_slug']) ? 'active' : '';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/templates/pages-menu.php",
+        "line": 16
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo intval($smush_options['image_quality']);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/templates/admin-metabox-smush-settings.php",
+        "line": 29
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 29,
+          "expression": "echo intval($smush_options['image_quality']);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo intval($smush_options['image_quality']);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/templates/admin-metabox-smush-settings.php",
+        "line": 29
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-xss-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo intval($wpo_minify_options['cache_lifespan']);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/templates/minify/advanced-tab.php",
+        "line": 91
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 91,
+          "expression": "echo intval($wpo_minify_options['cache_lifespan']);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo intval($wpo_minify_options['cache_lifespan']);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/templates/minify/advanced-tab.php",
+        "line": 91
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-optimize-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-optimize",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo ($options->get_option('enable-admin-menu', 'false') === 'true') ? 'checked=\"checked\"' : '';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/templates/settings/settings-general.php",
+        "line": 7
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 7,
+          "expression": "echo ($options->get_option('enable-admin-menu', 'false') === 'true') ? 'checked=\"checked\"' : '';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ($options->get_option('enable-admin-menu', 'false') === 'true') ? 'checked=\"checked\"' : '';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-optimize/wp-optimize/templates/settings/settings-general.php",
+        "line": 7
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/cache/class-wp-optimize-page-cache-preloader.php",
+      "start": {
+        "line": 499,
+        "col": 7,
+        "offset": 14984
+      },
+      "end": {
+        "line": 499,
+        "col": 89,
+        "offset": 15066
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/wp-optimize/wp-optimize/cache/class-wpo-page-cache.php",
+      "start": {
+        "line": 409,
+        "col": 4,
+        "offset": 12006
+      },
+      "end": {
+        "line": 409,
+        "col": 105,
+        "offset": 12107
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/wp-optimize/wp-optimize/cache/class-wpo-page-cache.php",
+      "start": {
+        "line": 418,
+        "col": 4,
+        "offset": 12412
+      },
+      "end": {
+        "line": 418,
+        "col": 103,
+        "offset": 12511
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-sha1-password",
+      "path": "plugins/src/wp-optimize/wp-optimize/cache/file-based-page-cache-functions.php",
+      "start": {
+        "line": 512,
+        "col": 3,
+        "offset": 21462
+      },
+      "end": {
+        "line": 512,
+        "col": 65,
+        "offset": 21524
+      },
+      "extra": {
+        "message": "sha1() is a cryptographically weak hash function not suitable for password storage. Use wp_hash_password() or password_hash() with a modern algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-916",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-manager.php",
+      "start": {
+        "line": 547,
+        "col": 28,
+        "offset": 19625
+      },
+      "end": {
+        "line": 547,
+        "col": 135,
+        "offset": 19732
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/includes/class-updraft-smush-manager.php",
+      "start": {
+        "line": 583,
+        "col": 5,
+        "offset": 21839
+      },
+      "end": {
+        "line": 583,
+        "col": 136,
+        "offset": 21970
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-optimize/wp-optimize/includes/class-wp-optimize-404-detector.php",
+      "start": {
+        "line": 196,
+        "col": 5,
+        "offset": 6211
+      },
+      "end": {
+        "line": 196,
+        "col": 70,
+        "offset": 6276
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/includes/class-wp-optimize-commands.php",
+      "start": {
+        "line": 1269,
+        "col": 22,
+        "offset": 40007
+      },
+      "end": {
+        "line": 1269,
+        "col": 94,
+        "offset": 40079
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/includes/class-wp-optimize-commands.php",
+      "start": {
+        "line": 1271,
+        "col": 8,
+        "offset": 40112
+      },
+      "end": {
+        "line": 1271,
+        "col": 72,
+        "offset": 40176
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/includes/class-wp-optimize-database-information.php",
+      "start": {
+        "line": 50,
+        "col": 16,
+        "offset": 1236
+      },
+      "end": {
+        "line": 50,
+        "col": 76,
+        "offset": 1296
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/includes/class-wp-optimize-database-information.php",
+      "start": {
+        "line": 139,
+        "col": 20,
+        "offset": 3654
+      },
+      "end": {
+        "line": 139,
+        "col": 59,
+        "offset": 3693
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/includes/class-wp-optimize-database-information.php",
+      "start": {
+        "line": 360,
+        "col": 19,
+        "offset": 9225
+      },
+      "end": {
+        "line": 360,
+        "col": 76,
+        "offset": 9282
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/includes/class-wp-optimize-database-information.php",
+      "start": {
+        "line": 709,
+        "col": 18,
+        "offset": 18727
+      },
+      "end": {
+        "line": 709,
+        "col": 57,
+        "offset": 18766
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/includes/class-wp-optimize-database-information.php",
+      "start": {
+        "line": 711,
+        "col": 18,
+        "offset": 18822
+      },
+      "end": {
+        "line": 711,
+        "col": 88,
+        "offset": 18892
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/includes/class-wp-optimize-options.php",
+      "start": {
+        "line": 347,
+        "col": 14,
+        "offset": 10777
+      },
+      "end": {
+        "line": 347,
+        "col": 126,
+        "offset": 10889
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/includes/class-wp-optimize-options.php",
+      "start": {
+        "line": 349,
+        "col": 14,
+        "offset": 10915
+      },
+      "end": {
+        "line": 349,
+        "col": 128,
+        "offset": 11029
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/includes/class-wp-optimize-preloader.php",
+      "start": {
+        "line": 570,
+        "col": 7,
+        "offset": 16824
+      },
+      "end": {
+        "line": 570,
+        "col": 89,
+        "offset": 16906
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/includes/class-wp-optimize-table-management.php",
+      "start": {
+        "line": 81,
+        "col": 4,
+        "offset": 1827
+      },
+      "end": {
+        "line": 81,
+        "col": 86,
+        "offset": 1909
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/includes/class-wp-optimize-updates.php",
+      "start": {
+        "line": 88,
+        "col": 3,
+        "offset": 2874
+      },
+      "end": {
+        "line": 88,
+        "col": 23,
+        "offset": 2894
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-optimize/wp-optimize/includes/class-wp-optimize-updates.php",
+      "start": {
+        "line": 288,
+        "col": 3,
+        "offset": 9656
+      },
+      "end": {
+        "line": 288,
+        "col": 80,
+        "offset": 9733
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-optimize/wp-optimize/includes/class-wp-optimize-utils.php",
+      "start": {
+        "line": 34,
+        "col": 3,
+        "offset": 972
+      },
+      "end": {
+        "line": 34,
+        "col": 62,
+        "offset": 1031
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-optimize/wp-optimize/minify/class-wp-optimize-minify-front-end.php",
+      "start": {
+        "line": 793,
+        "col": 6,
+        "offset": 28950
+      },
+      "end": {
+        "line": 793,
+        "col": 61,
+        "offset": 29005
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-optimize/wp-optimize/minify/class-wp-optimize-minify-front-end.php",
+      "start": {
+        "line": 1889,
+        "col": 6,
+        "offset": 72876
+      },
+      "end": {
+        "line": 1889,
+        "col": 61,
+        "offset": 72931
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-optimize/wp-optimize/minify/class-wp-optimize-minify-front-end.php",
+      "start": {
+        "line": 2316,
+        "col": 3,
+        "offset": 87217
+      },
+      "end": {
+        "line": 2316,
+        "col": 68,
+        "offset": 87282
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-optimize/wp-optimize/minify/class-wp-optimize-minify-front-end.php",
+      "start": {
+        "line": 2317,
+        "col": 3,
+        "offset": 87285
+      },
+      "end": {
+        "line": 2317,
+        "col": 83,
+        "offset": 87365
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-optimize/wp-optimize/minify/class-wp-optimize-minify-front-end.php",
+      "start": {
+        "line": 2408,
+        "col": 3,
+        "offset": 89893
+      },
+      "end": {
+        "line": 2408,
+        "col": 63,
+        "offset": 89953
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-optimize/wp-optimize/minify/class-wp-optimize-minify-front-end.php",
+      "start": {
+        "line": 2409,
+        "col": 3,
+        "offset": 89956
+      },
+      "end": {
+        "line": 2409,
+        "col": 77,
+        "offset": 90030
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/wp-optimize/wp-optimize/minify/class-wp-optimize-minify.php",
+      "start": {
+        "line": 155,
+        "col": 4,
+        "offset": 4730
+      },
+      "end": {
+        "line": 155,
+        "col": 113,
+        "offset": 4839
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/optimizations/orphanedtables.php",
+      "start": {
+        "line": 103,
+        "col": 19,
+        "offset": 2959
+      },
+      "end": {
+        "line": 103,
+        "col": 53,
+        "offset": 2993
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/optimizations/orphanedtables.php",
+      "start": {
+        "line": 117,
+        "col": 14,
+        "offset": 3419
+      },
+      "end": {
+        "line": 117,
+        "col": 38,
+        "offset": 3443
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/optimizations/orphanedtables.php",
+      "start": {
+        "line": 146,
+        "col": 13,
+        "offset": 4199
+      },
+      "end": {
+        "line": 146,
+        "col": 37,
+        "offset": 4223
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/optimizations/repairtables.php",
+      "start": {
+        "line": 98,
+        "col": 14,
+        "offset": 2749
+      },
+      "end": {
+        "line": 98,
+        "col": 83,
+        "offset": 2818
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-optimize/wp-optimize/templates/performance/404-detector.php",
+      "start": {
+        "line": 75,
+        "col": 4,
+        "offset": 2382
+      },
+      "end": {
+        "line": 75,
+        "col": 28,
+        "offset": 2406
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-optimize/wp-optimize/templates/performance/404-detector.php",
+      "start": {
+        "line": 97,
+        "col": 3,
+        "offset": 3392
+      },
+      "end": {
+        "line": 97,
+        "col": 27,
+        "offset": 3416
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/wp-optimize.php",
+      "start": {
+        "line": 1861,
+        "col": 15,
+        "offset": 64544
+      },
+      "end": {
+        "line": 1861,
+        "col": 68,
+        "offset": 64597
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/wp-optimize.php",
+      "start": {
+        "line": 1867,
+        "col": 5,
+        "offset": 64749
+      },
+      "end": {
+        "line": 1867,
+        "col": 59,
+        "offset": 64803
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-optimize/wp-optimize/wp-optimize.php",
+      "start": {
+        "line": 1870,
+        "col": 16,
+        "offset": 64942
+      },
+      "end": {
+        "line": 1870,
+        "col": 69,
+        "offset": 64995
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 17,
+    "taint_high": 14,
+    "taint_total": 36,
+    "semgrep_error": 1,
+    "semgrep_warning": 36
+  }
+}

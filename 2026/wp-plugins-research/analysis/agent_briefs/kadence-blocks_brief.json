@@ -1,0 +1,2399 @@
+{
+  "plugin_slug": "kadence-blocks",
+  "priority_score": 134,
+  "metadata": {
+    "php_files": 1379,
+    "total_lines": 226653
+  },
+  "attack_surface_summary": "# Attack Surface: kadence-blocks\n\n> Generated: 2026-06-14T21:21:11Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 616,
+    "total_sinks": 567,
+    "total_sanitizers": 846,
+    "direct_flows": 693,
+    "functions_with_sources": 229,
+    "functions_with_sinks": 386,
+    "files_analyzed": 1379,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "kadence-blocks-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "kadence-blocks",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$post_id = isset( $_REQUEST['post'] ) ? absint( $_REQUEST['post'] ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/class-kadence-blocks-duplicate-post.php",
+        "line": 69
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 69,
+          "expression": "$post_id = isset( $_REQUEST['post'] ) ? absint( $_REQUEST['post'] ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 72,
+          "expression": "$clone_post = get_post( $post_id )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 79,
+          "expression": "$duplicate_id = $this->duplicate( $clone_post )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 82,
+          "expression": "wp_redirect( admin_url( 'post.php?action=edit&post=' . $duplicate_id ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_redirect( admin_url( 'post.php?action=edit&post=' . $duplicate_id ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/class-kadence-blocks-duplicate-post.php",
+        "line": 82
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "kadence-blocks-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "kadence-blocks",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$final_data['pages']     = ! empty( $temp_data['pages'] ) ? sanitize_text_field( $temp_data['pages'] ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library.php",
+        "line": 571
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 571,
+          "expression": "$final_data['pages']     = ! empty( $temp_data['pages'] ) ? sanitize_text_field( $temp_data['pages'] ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 574,
+          "expression": "wp_send_json( $final_data )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json( $final_data )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library.php",
+        "line": 574
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "kadence-blocks-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "kadence-blocks",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$email = empty( $_POST['email'] ) ? '' : sanitize_text_field( $_POST['email'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library.php",
+        "line": 768
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 768,
+          "expression": "$email = empty( $_POST['email'] ) ? '' : sanitize_text_field( $_POST['email'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 781,
+          "expression": "$args = [\n\t\t\t\t'email' => $email,\n\t\t\t\t'tag'   => 'wire',\n\t\t\t]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 786,
+          "expression": "$api_url  = add_query_arg( $args, 'https://www.kadencewp.com/kadence-blocks/wp-json/kadence-subscribe/v1/subscribe/' )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 787,
+          "expression": "$response = wp_safe_remote_get(\n\t\t\t\t$api_url,\n\t\t\t\t[\n\t\t\t\t\t'timeout' => 20,\n\t\t\t\t]\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_safe_remote_get(\n\t\t\t\t$api_url,\n\t\t\t\t[\n\t\t\t\t\t'timeout' => 20,\n\t\t\t\t]\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library.php",
+        "line": 787
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "kadence-blocks-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "kadence-blocks",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$email = empty( $_POST['email'] ) ? '' : sanitize_text_field( $_POST['email'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library.php",
+        "line": 768
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 768,
+          "expression": "$email = empty( $_POST['email'] ) ? '' : sanitize_text_field( $_POST['email'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 781,
+          "expression": "$args = [\n\t\t\t\t'email' => $email,\n\t\t\t\t'tag'   => 'wire',\n\t\t\t]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 786,
+          "expression": "$api_url  = add_query_arg( $args, 'https://www.kadencewp.com/kadence-blocks/wp-json/kadence-subscribe/v1/subscribe/' )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 787,
+          "expression": "$response = wp_safe_remote_get(\n\t\t\t\t$api_url,\n\t\t\t\t[\n\t\t\t\t\t'timeout' => 20,\n\t\t\t\t]\n\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 798,
+          "expression": "$contents = wp_remote_retrieve_body( $response )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 807,
+          "expression": "wp_send_json( $contents )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json( $contents )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library.php",
+        "line": 807
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "kadence-blocks-xss-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "kadence-blocks",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$data = empty( $_POST['import_content'] ) ? '' : stripslashes( $_POST['import_content'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library.php",
+        "line": 820
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 820,
+          "expression": "$data = empty( $_POST['import_content'] ) ? '' : stripslashes( $_POST['import_content'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 821,
+          "expression": "$data = $this->process_pattern_content( $data )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 826,
+          "expression": "wp_send_json( $data )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json( $data )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library.php",
+        "line": 826
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "kadence-blocks-xss-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "kadence-blocks",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$content       = empty( $_POST['import_content'] ) ? '' : stripslashes( $_POST['import_content'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library.php",
+        "line": 839
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 839,
+          "expression": "$content       = empty( $_POST['import_content'] ) ? '' : stripslashes( $_POST['import_content'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 841,
+          "expression": "$data          = $this->process_image_content( $content, $image_library )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 846,
+          "expression": "wp_send_json( $data )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json( $data )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library.php",
+        "line": 846
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "kadence-blocks-xss-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "kadence-blocks",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$data           = empty( $_POST['import_content'] ) ? '' : stripslashes( $_POST['import_content'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library.php",
+        "line": 919
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 919,
+          "expression": "$data           = empty( $_POST['import_content'] ) ? '' : stripslashes( $_POST['import_content'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 928,
+          "expression": "$data           = $this->process_content( $data, $import_library, $import_type, $import_id, $import_style )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 933,
+          "expression": "wp_send_json( $data )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json( $data )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library.php",
+        "line": 933
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "kadence-blocks-ssrf-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "kadence-blocks",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$url = empty( $library_url ) ? '' : rtrim( sanitize_text_field( $library_url ), '/' ) . '/wp-json/kadence-cloud/v1/info/'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+        "line": 1496
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1496,
+          "expression": "$url = empty( $library_url ) ? '' : rtrim( sanitize_text_field( $library_url ), '/' ) . '/wp-json/kadence-cloud/v1/info/'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1504,
+          "expression": "$api_url  = add_query_arg( $args, $url )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1505,
+          "expression": "$response = wp_safe_remote_get(\n\t\t\t$api_url,\n\t\t\t[\n\t\t\t\t'timeout' => 20,\n\t\t\t]\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_safe_remote_get(\n\t\t\t$api_url,\n\t\t\t[\n\t\t\t\t'timeout' => 20,\n\t\t\t]\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+        "line": 1505
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "kadence-blocks-ssrf-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "kadence-blocks",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$api_key = get_option( 'kadence_blocks_mailerlite_api' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/form-ajax.php",
+        "line": 301
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 301,
+          "expression": "$api_key = get_option( 'kadence_blocks_mailerlite_api' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 351,
+          "expression": "$api_key = 'Bearer ' . $api_key",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 360,
+          "expression": "$response = wp_remote_post(\n\t\t\t\t\t\t\t\t\t$api_url,\n\t\t\t\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t\t\t\t'method'  => 'POST',\n\t\t\t\t\t\t\t\t\t\t'timeout' => 15,\n\t\t\t\t\t\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t\t\t\t\t\t'accept'       => 'application/json',\n\t\t\t\t\t\t\t\t\t\t\t'content-type' => 'application/json',\n\t\t\t\t\t\t\t\t\t\t\t$auth          => $api_key,\n\t\t\t\t\t\t\t\t\t\t),\n\t\t\t\t\t\t\t\t\t\t'body'    => json_encode( $body ),\n\t\t\t\t\t\t\t\t\t)\n\t\t\t\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(\n\t\t\t\t\t\t\t\t\t$api_url,\n\t\t\t\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t\t\t\t'method'  => 'POST',\n\t\t\t\t\t\t\t\t\t\t'timeout' => 15,\n\t\t\t\t\t\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t\t\t\t\t\t'accept'       => 'application/json',\n\t\t\t\t\t\t\t\t\t\t\t'content-type' => 'application/json',\n\t\t\t\t\t\t\t\t\t\t\t$auth          => $api_key,\n\t\t\t\t\t\t\t\t\t\t),\n\t\t\t\t\t\t\t\t\t\t'body'    => json_encode( $body ),\n\t\t\t\t\t\t\t\t\t)\n\t\t\t\t\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/form-ajax.php",
+        "line": 360
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "kadence-blocks-ssrf-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "kadence-blocks",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$secret = get_option( 'kadence_blocks_recaptcha_secret_key' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/form-ajax.php",
+        "line": 538
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 538,
+          "expression": "$secret = get_option( 'kadence_blocks_recaptcha_secret_key' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 542,
+          "expression": "$args = array(\n\t\t\t'body' => array(\n\t\t\t\t'secret'   => $secret,\n\t\t\t\t'response' => $token,\n\t\t\t),\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 548,
+          "expression": "$verify_request = wp_remote_post( $recaptcha_url, $args )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$verify_request = wp_remote_post( $recaptcha_url, $args )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/form-ajax.php",
+        "line": 548
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "kadence-blocks-ssrf-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "kadence-blocks",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$secret        = get_option( 'kadence_blocks_recaptcha_secret_key' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/form-ajax.php",
+        "line": 575
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 575,
+          "expression": "$secret        = get_option( 'kadence_blocks_recaptcha_secret_key' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 579,
+          "expression": "$args = array(\n\t\t\t'body' => array(\n\t\t\t\t'secret'   => $secret,\n\t\t\t\t'response' => $token,\n\t\t\t\t'remoteip' => $_SERVER['REMOTE_ADDR'],\n\t\t\t),\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 586,
+          "expression": "$verify_request = wp_remote_post( $recaptcha_url, $args )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$verify_request = wp_remote_post( $recaptcha_url, $args )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/form-ajax.php",
+        "line": 586
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "kadence-blocks-ssrf-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "kadence-blocks",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$api_key = get_option( 'kadence_blocks_mailerlite_api' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/advanced-form/advanced-form-submit-actions.php",
+        "line": 199
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 199,
+          "expression": "$api_key = get_option( 'kadence_blocks_mailerlite_api' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 205,
+          "expression": "$response = wp_remote_post(\n\t\t\t$api_url,\n\t\t\tarray(\n\t\t\t\t'method'  => $method,\n\t\t\t\t'timeout' => 10,\n\t\t\t\t'headers' => array(\n\t\t\t\t\t'accept'              => 'application/json',\n\t\t\t\t\t'content-type'        => 'application/json',\n\t\t\t\t\t'X-MailerLite-ApiKey' => $api_key,\n\t\t\t\t),\n\t\t\t\t'body'    => json_encode( $body ),\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(\n\t\t\t$api_url,\n\t\t\tarray(\n\t\t\t\t'method'  => $method,\n\t\t\t\t'timeout' => 10,\n\t\t\t\t'headers' => array(\n\t\t\t\t\t'accept'              => 'application/json',\n\t\t\t\t\t'content-type'        => 'application/json',\n\t\t\t\t\t'X-MailerLite-ApiKey' => $api_key,\n\t\t\t\t),\n\t\t\t\t'body'    => json_encode( $body ),\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/advanced-form/advanced-form-submit-actions.php",
+        "line": 205
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "kadence-blocks-ssrf-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "kadence-blocks",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$api_base  = get_option( 'kadence_blocks_getresponse_api_endpoint' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/advanced-form/getresponse-rest-api.php",
+        "line": 85
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 85,
+          "expression": "$api_base  = get_option( 'kadence_blocks_getresponse_api_endpoint' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 101,
+          "expression": "$request_url = rtrim( $api_base, '/' ) . '/' . $end_point",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 109,
+          "expression": "$response = wp_safe_remote_get( $request_url, $request_args )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_safe_remote_get( $request_url, $request_args )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/advanced-form/getresponse-rest-api.php",
+        "line": 109
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "kadence-blocks-ssrf-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "kadence-blocks",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$args           = array(\n\t\t\t'body' => array(\n\t\t\t\t'secret'   => $secret,\n\t\t\t\t'response' => $token,\n\t\t\t\t'remoteip' => $_SERVER['REMOTE_ADDR']\n\t\t\t),\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/advanced-form/advanced-form-captcha-verify.php",
+        "line": 40
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 40,
+          "expression": "$args           = array(\n\t\t\t'body' => array(\n\t\t\t\t'secret'   => $secret,\n\t\t\t\t'response' => $token,\n\t\t\t\t'remoteip' => $_SERVER['REMOTE_ADDR']\n\t\t\t),\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 47,
+          "expression": "$verify_request = wp_remote_post( $url, $args )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$verify_request = wp_remote_post( $url, $args )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/advanced-form/advanced-form-captcha-verify.php",
+        "line": 47
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "kadence-blocks-ssrf-009",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "kadence-blocks",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$api_key   = get_option( 'kadence_blocks_activecampaign_api_key' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/advanced-form/activecampaign-rest-api.php",
+        "line": 69
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 69,
+          "expression": "$api_key   = get_option( 'kadence_blocks_activecampaign_api_key' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 79,
+          "expression": "$request_url = add_query_arg( array(\n\t\t\t'api_secret' => $api_key,\n\t\t), $base_url )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 89,
+          "expression": "$response = wp_safe_remote_get( $request_url, $request_args )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_safe_remote_get( $request_url, $request_args )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/kadence-blocks/includes/advanced-form/activecampaign-rest-api.php",
+        "line": 89
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/advanced-form/activecampaign-rest-api.php",
+      "start": {
+        "line": 35,
+        "col": 3,
+        "offset": 594
+      },
+      "end": {
+        "line": 46,
+        "col": 5,
+        "offset": 953
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/advanced-form/advanced-form-rest-api.php",
+      "start": {
+        "line": 12,
+        "col": 3,
+        "offset": 262
+      },
+      "end": {
+        "line": 22,
+        "col": 5,
+        "offset": 587
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/advanced-form/getresponse-rest-api.php",
+      "start": {
+        "line": 43,
+        "col": 3,
+        "offset": 800
+      },
+      "end": {
+        "line": 54,
+        "col": 5,
+        "offset": 1159
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-fluentcrm-form-rest-api.php",
+      "start": {
+        "line": 36,
+        "col": 3,
+        "offset": 617
+      },
+      "end": {
+        "line": 47,
+        "col": 5,
+        "offset": 976
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-ai-events.php",
+      "start": {
+        "line": 57,
+        "col": 3,
+        "offset": 1189
+      },
+      "end": {
+        "line": 78,
+        "col": 5,
+        "offset": 1864
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-cpt-import-export.php",
+      "start": {
+        "line": 424,
+        "col": 5,
+        "offset": 12024
+      },
+      "end": {
+        "line": 430,
+        "col": 8,
+        "offset": 12174
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-duplicate-post.php",
+      "start": {
+        "line": 82,
+        "col": 3,
+        "offset": 2195
+      },
+      "end": {
+        "line": 82,
+        "col": 76,
+        "offset": 2268
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-image-picker-rest.php",
+      "start": {
+        "line": 43,
+        "col": 3,
+        "offset": 853
+      },
+      "end": {
+        "line": 54,
+        "col": 5,
+        "offset": 1213
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-posts-rest-api.php",
+      "start": {
+        "line": 128,
+        "col": 3,
+        "offset": 1952
+      },
+      "end": {
+        "line": 139,
+        "col": 5,
+        "offset": 2313
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-posts-rest-api.php",
+      "start": {
+        "line": 140,
+        "col": 3,
+        "offset": 2316
+      },
+      "end": {
+        "line": 151,
+        "col": 5,
+        "offset": 2696
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-posts-rest-api.php",
+      "start": {
+        "line": 152,
+        "col": 3,
+        "offset": 2699
+      },
+      "end": {
+        "line": 163,
+        "col": 5,
+        "offset": 3067
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 374,
+        "col": 3,
+        "offset": 6628
+      },
+      "end": {
+        "line": 385,
+        "col": 5,
+        "offset": 6967
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 386,
+        "col": 3,
+        "offset": 6970
+      },
+      "end": {
+        "line": 397,
+        "col": 5,
+        "offset": 7307
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 398,
+        "col": 3,
+        "offset": 7310
+      },
+      "end": {
+        "line": 409,
+        "col": 5,
+        "offset": 7647
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 410,
+        "col": 3,
+        "offset": 7650
+      },
+      "end": {
+        "line": 421,
+        "col": 5,
+        "offset": 7997
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 422,
+        "col": 3,
+        "offset": 8000
+      },
+      "end": {
+        "line": 433,
+        "col": 5,
+        "offset": 8333
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 434,
+        "col": 3,
+        "offset": 8336
+      },
+      "end": {
+        "line": 445,
+        "col": 5,
+        "offset": 8691
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 446,
+        "col": 3,
+        "offset": 8694
+      },
+      "end": {
+        "line": 457,
+        "col": 5,
+        "offset": 9033
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 458,
+        "col": 3,
+        "offset": 9036
+      },
+      "end": {
+        "line": 469,
+        "col": 5,
+        "offset": 9383
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 470,
+        "col": 3,
+        "offset": 9386
+      },
+      "end": {
+        "line": 481,
+        "col": 5,
+        "offset": 9732
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 482,
+        "col": 3,
+        "offset": 9735
+      },
+      "end": {
+        "line": 493,
+        "col": 5,
+        "offset": 10082
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 494,
+        "col": 3,
+        "offset": 10085
+      },
+      "end": {
+        "line": 505,
+        "col": 5,
+        "offset": 10428
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 506,
+        "col": 3,
+        "offset": 10431
+      },
+      "end": {
+        "line": 517,
+        "col": 5,
+        "offset": 10781
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 518,
+        "col": 3,
+        "offset": 10784
+      },
+      "end": {
+        "line": 529,
+        "col": 5,
+        "offset": 11127
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 530,
+        "col": 3,
+        "offset": 11130
+      },
+      "end": {
+        "line": 541,
+        "col": 5,
+        "offset": 11483
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 542,
+        "col": 3,
+        "offset": 11486
+      },
+      "end": {
+        "line": 553,
+        "col": 5,
+        "offset": 11835
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 554,
+        "col": 3,
+        "offset": 11838
+      },
+      "end": {
+        "line": 565,
+        "col": 5,
+        "offset": 12180
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 566,
+        "col": 3,
+        "offset": 12183
+      },
+      "end": {
+        "line": 577,
+        "col": 5,
+        "offset": 12523
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 578,
+        "col": 3,
+        "offset": 12526
+      },
+      "end": {
+        "line": 589,
+        "col": 5,
+        "offset": 12879
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 590,
+        "col": 3,
+        "offset": 12882
+      },
+      "end": {
+        "line": 601,
+        "col": 5,
+        "offset": 13232
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 602,
+        "col": 3,
+        "offset": 13235
+      },
+      "end": {
+        "line": 613,
+        "col": 5,
+        "offset": 13589
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 614,
+        "col": 3,
+        "offset": 13592
+      },
+      "end": {
+        "line": 625,
+        "col": 5,
+        "offset": 13944
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 626,
+        "col": 3,
+        "offset": 13947
+      },
+      "end": {
+        "line": 637,
+        "col": 5,
+        "offset": 14284
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-sha1-password",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 2948,
+        "col": 3,
+        "offset": 94266
+      },
+      "end": {
+        "line": 2948,
+        "col": 90,
+        "offset": 94353
+      },
+      "extra": {
+        "message": "sha1() is a cryptographically weak hash function not suitable for password storage. Use wp_hash_password() or password_hash() with a modern algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-916",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-sha1-password",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library-rest-api.php",
+      "start": {
+        "line": 3026,
+        "col": 4,
+        "offset": 97065
+      },
+      "end": {
+        "line": 3034,
+        "col": 6,
+        "offset": 97304
+      },
+      "extra": {
+        "message": "sha1() is a cryptographically weak hash function not suitable for password storage. Use wp_hash_password() or password_hash() with a modern algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-916",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library.php",
+      "start": {
+        "line": 535,
+        "col": 3,
+        "offset": 15116
+      },
+      "end": {
+        "line": 535,
+        "col": 115,
+        "offset": 15228
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-sha1-password",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library.php",
+      "start": {
+        "line": 1102,
+        "col": 3,
+        "offset": 37285
+      },
+      "end": {
+        "line": 1102,
+        "col": 90,
+        "offset": 37372
+      },
+      "extra": {
+        "message": "sha1() is a cryptographically weak hash function not suitable for password storage. Use wp_hash_password() or password_hash() with a modern algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-916",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-sha1-password",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-prebuilt-library.php",
+      "start": {
+        "line": 1120,
+        "col": 3,
+        "offset": 37748
+      },
+      "end": {
+        "line": 1128,
+        "col": 5,
+        "offset": 37979
+      },
+      "extra": {
+        "message": "sha1() is a cryptographically weak hash function not suitable for password storage. Use wp_hash_password() or password_hash() with a modern algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-916",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/kadence-blocks/includes/class-kadence-blocks-svg.php",
+      "start": {
+        "line": 142,
+        "col": 3,
+        "offset": 3977
+      },
+      "end": {
+        "line": 142,
+        "col": 76,
+        "offset": 4050
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/kadence-blocks/includes/class-local-gfonts.php",
+      "start": {
+        "line": 580,
+        "col": 4,
+        "offset": 15271
+      },
+      "end": {
+        "line": 580,
+        "col": 105,
+        "offset": 15372
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-lottieanimation-get-rest-api.php",
+      "start": {
+        "line": 33,
+        "col": 3,
+        "offset": 602
+      },
+      "end": {
+        "line": 43,
+        "col": 5,
+        "offset": 874
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-lottieanimation-post-rest-api.php",
+      "start": {
+        "line": 28,
+        "col": 3,
+        "offset": 513
+      },
+      "end": {
+        "line": 38,
+        "col": 5,
+        "offset": 825
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-mailerlite-form-rest-api.php",
+      "start": {
+        "line": 46,
+        "col": 3,
+        "offset": 765
+      },
+      "end": {
+        "line": 57,
+        "col": 5,
+        "offset": 1124
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/class-vector-post-rest-api.php",
+      "start": {
+        "line": 31,
+        "col": 3,
+        "offset": 621
+      },
+      "end": {
+        "line": 41,
+        "col": 5,
+        "offset": 927
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/header/class-kadence-header-rest.php",
+      "start": {
+        "line": 13,
+        "col": 3,
+        "offset": 265
+      },
+      "end": {
+        "line": 23,
+        "col": 5,
+        "offset": 590
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/kadence-blocks/includes/helper-functions.php",
+      "start": {
+        "line": 283,
+        "col": 2,
+        "offset": 9626
+      },
+      "end": {
+        "line": 283,
+        "col": 80,
+        "offset": 9704
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/navigation/class-kadence-navigation-rest.php",
+      "start": {
+        "line": 13,
+        "col": 3,
+        "offset": 269
+      },
+      "end": {
+        "line": 23,
+        "col": 5,
+        "offset": 594
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/kadence-blocks/includes/resources/Optimizer/Image/Traits/Image_Key_Generator_Trait.php",
+      "start": {
+        "line": 26,
+        "col": 3,
+        "offset": 664
+      },
+      "end": {
+        "line": 26,
+        "col": 36,
+        "offset": 697
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/resources/Optimizer/Rest/Optimize_Rest_Controller.php",
+      "start": {
+        "line": 61,
+        "col": 3,
+        "offset": 2030
+      },
+      "end": {
+        "line": 85,
+        "col": 5,
+        "offset": 2940
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/resources/Optimizer/Rest/Optimize_Rest_Controller.php",
+      "start": {
+        "line": 87,
+        "col": 3,
+        "offset": 2944
+      },
+      "end": {
+        "line": 98,
+        "col": 5,
+        "offset": 3319
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/kadence-blocks/includes/resources/Optimizer/Rest/Optimize_Rest_Controller.php",
+      "start": {
+        "line": 100,
+        "col": 3,
+        "offset": 3323
+      },
+      "end": {
+        "line": 111,
+        "col": 5,
+        "offset": 3690
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 0,
+    "taint_high": 12,
+    "taint_total": 15,
+    "semgrep_error": 4,
+    "semgrep_warning": 47
+  }
+}

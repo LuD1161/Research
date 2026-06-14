@@ -1,0 +1,551 @@
+{
+  "plugin_slug": "fluent-smtp",
+  "priority_score": 46,
+  "metadata": {
+    "php_files": 886,
+    "total_lines": 121671
+  },
+  "attack_surface_summary": "# Attack Surface: fluent-smtp\n\n> Generated: 2026-06-14T21:21:10Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 165,
+    "total_sinks": 162,
+    "total_sanitizers": 80,
+    "direct_flows": 58,
+    "functions_with_sources": 74,
+    "functions_with_sinks": 129,
+    "files_analyzed": 886,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "fluent-smtp-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "fluent-smtp",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$settings = get_option('_fluent_smtp_notify_settings', [])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/fluent-smtp/app/Models/Settings.php",
+        "line": 252
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 252,
+          "expression": "$settings = get_option('_fluent_smtp_notify_settings', [])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 254,
+          "expression": "$settings = wp_parse_args($settings, $defaults)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 257,
+          "expression": "$settings['active_channel'] = array_filter([$settings['active_channel']])",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 257,
+          "expression": "$settings['active_channel'] = array_filter([$settings['active_channel']])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$settings['active_channel'] = array_filter([$settings['active_channel']])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/fluent-smtp/app/Models/Settings.php",
+        "line": 257
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "fluent-smtp-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "fluent-smtp",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$sendTo = str_replace(['{site_admin}', '{admin_email}'], get_option('admin_email'), $sendTo)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/fluent-smtp/app/Hooks/Handlers/SchedulerHandler.php",
+        "line": 54
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 54,
+          "expression": "$sendTo = str_replace(['{site_admin}', '{admin_email}'], get_option('admin_email'), $sendTo)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 58,
+          "expression": "$sendToArray = array_filter($sendToArray, function ($email) {\n            return is_email($email);\n        })",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$sendToArray = array_filter($sendToArray, function ($email) {\n            return is_email($email);\n        })",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/fluent-smtp/app/Hooks/Handlers/SchedulerHandler.php",
+        "line": 58
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "fluent-smtp-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "fluent-smtp",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "function ($recipient) {\n            $email = Arr::get($recipient, 'email');\n            // validate the email\n            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {\n                return null;\n            }\n\n            return [\n                'name'  => Arr::get($recipient, 'name', ''),\n                'email' => Arr::get($recipient, 'email', '')\n            ];\n        }",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/fluent-smtp/app/Services/Mailer/Providers/ToSend/Handler.php",
+        "line": 177
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 177,
+          "expression": "$emails = array_map(function ($recipient) {\n            $email = Arr::get($recipient, 'email');\n            // validate the email\n            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {\n                return null;\n            }\n\n            return [\n                'name'  => Arr::get($recipient, 'name', ''),\n                'email' => Arr::get($recipient, 'email', '')\n            ];\n        }, $recipients)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$emails = array_map(function ($recipient) {\n            $email = Arr::get($recipient, 'email');\n            // validate the email\n            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {\n                return null;\n            }\n\n            return [\n                'name'  => Arr::get($recipient, 'name', ''),\n                'email' => Arr::get($recipient, 'email', '')\n            ];\n        }, $recipients)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/fluent-smtp/app/Services/Mailer/Providers/ToSend/Handler.php",
+        "line": 177
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-openssl-random-pseudo-not-strong",
+      "path": "plugins/src/fluent-smtp/app/Functions/helpers.php",
+      "start": {
+        "line": 829,
+        "col": 13,
+        "offset": 30616
+      },
+      "end": {
+        "line": 829,
+        "col": 55,
+        "offset": 30658
+      },
+      "extra": {
+        "message": "openssl_random_pseudo_bytes() without checking the $crypto_strong output parameter may return non-cryptographically-strong bytes on some systems. Always check the second argument or prefer random_bytes() which throws on failure.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-338",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/fluent-smtp/app/Hooks/Handlers/ActionsRegistrar.php",
+      "start": {
+        "line": 110,
+        "col": 13,
+        "offset": 2352
+      },
+      "end": {
+        "line": 114,
+        "col": 15,
+        "offset": 2628
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/fluent-smtp/app/Hooks/Handlers/ActionsRegistrar.php",
+      "start": {
+        "line": 110,
+        "col": 13,
+        "offset": 2352
+      },
+      "end": {
+        "line": 114,
+        "col": 16,
+        "offset": 2629
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/fluent-smtp/app/Hooks/Handlers/AdminMenuHandler.php",
+      "start": {
+        "line": 34,
+        "col": 25,
+        "offset": 1130
+      },
+      "end": {
+        "line": 34,
+        "col": 135,
+        "offset": 1240
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/fluent-smtp/app/Hooks/Handlers/AdminMenuHandler.php",
+      "start": {
+        "line": 50,
+        "col": 21,
+        "offset": 1987
+      },
+      "end": {
+        "line": 50,
+        "col": 107,
+        "offset": 2073
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/fluent-smtp/app/Http/Controllers/DashboardController.php",
+      "start": {
+        "line": 41,
+        "col": 24,
+        "offset": 1189
+      },
+      "end": {
+        "line": 54,
+        "col": 21,
+        "offset": 1590
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/fluent-smtp/app/Http/Controllers/DashboardController.php",
+      "start": {
+        "line": 56,
+        "col": 24,
+        "offset": 1632
+      },
+      "end": {
+        "line": 67,
+        "col": 21,
+        "offset": 1979
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/fluent-smtp/app/Models/Settings.php",
+      "start": {
+        "line": 106,
+        "col": 9,
+        "offset": 3020
+      },
+      "end": {
+        "line": 106,
+        "col": 27,
+        "offset": 3038
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/fluent-smtp/app/Services/Mailer/Providers/AmazonSes/Handler.php",
+      "start": {
+        "line": 254,
+        "col": 9,
+        "offset": 7232
+      },
+      "end": {
+        "line": 254,
+        "col": 74,
+        "offset": 7297
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/fluent-smtp/app/Services/Mailer/Providers/AmazonSes/Handler.php",
+      "start": {
+        "line": 331,
+        "col": 13,
+        "offset": 9833
+      },
+      "end": {
+        "line": 331,
+        "col": 56,
+        "offset": 9876
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/fluent-smtp/app/Services/Mailer/Providers/ToSend/Handler.php",
+      "start": {
+        "line": 323,
+        "col": 9,
+        "offset": 10085
+      },
+      "end": {
+        "line": 323,
+        "col": 74,
+        "offset": 10150
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/fluent-smtp/app/Services/Mailer/Providers/ToSend/Handler.php",
+      "start": {
+        "line": 370,
+        "col": 13,
+        "offset": 11623
+      },
+      "end": {
+        "line": 370,
+        "col": 56,
+        "offset": 11666
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/fluent-smtp/database/migrations/EmailLogs.php",
+      "start": {
+        "line": 20,
+        "col": 13,
+        "offset": 332
+      },
+      "end": {
+        "line": 20,
+        "col": 56,
+        "offset": 375
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 3,
+    "taint_high": 0,
+    "taint_total": 3,
+    "semgrep_error": 0,
+    "semgrep_warning": 13
+  }
+}
