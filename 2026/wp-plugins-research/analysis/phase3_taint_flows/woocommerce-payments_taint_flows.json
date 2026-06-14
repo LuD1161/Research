@@ -1,0 +1,1265 @@
+{
+  "plugin": "woocommerce-payments",
+  "php_files_analyzed": 430,
+  "parse_errors": 0,
+  "total_flows": 23,
+  "by_severity": {
+    "medium": 5,
+    "critical": 10,
+    "high": 6,
+    "low": 2
+  },
+  "by_vulnerability_class": {
+    "xss": 10,
+    "rce": 10,
+    "ssrf": 1,
+    "open_redirect": 2
+  },
+  "flows": [
+    {
+      "flow_id": "woocommerce-payments-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$currency = sanitize_text_field( wp_unslash( $_POST['currency'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments.php",
+        "line": 1975
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1975,
+          "expression": "$currency = sanitize_text_field( wp_unslash( $_POST['currency'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1983,
+          "expression": "$is_available = WC_Payments_Utils::is_any_bnpl_method_available( $enabled_bnpl_payment_methods, $country, $currency, $price )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1985,
+          "expression": "wp_send_json_success( [ 'is_available' => $is_available ] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( [ 'is_available' => $is_available ] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments.php",
+        "line": 1985
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$order_id = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : false",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payment-gateway-wcpay.php",
+        "line": 3881
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 3881,
+          "expression": "$order_id = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : false",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 3882,
+          "expression": "$order    = wc_get_order( $order_id )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 4020,
+          "expression": "$return_url = method_exists( $order, 'get_view_order_url' ) ? $order->get_view_order_url() : $this->get_return_url( $order )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 4024,
+          "expression": "echo wp_json_encode(\n\t\t\t\t\t[\n\t\t\t\t\t\t'return_url' => $return_url,\n\t\t\t\t\t]\n\t\t\t\t);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo wp_json_encode(\n\t\t\t\t\t[\n\t\t\t\t\t\t'return_url' => $return_url,\n\t\t\t\t\t]\n\t\t\t\t);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payment-gateway-wcpay.php",
+        "line": 4024
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$capabilities = wp_unslash( $_REQUEST['capabilities'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-onboarding-service.php",
+        "line": 240
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 240,
+          "expression": "$capabilities = wp_unslash( $_REQUEST['capabilities'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 242,
+          "expression": "$capabilities = json_decode( $capabilities, true ) ?? []",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 250,
+          "expression": "$capabilities = array_combine(\n\t\t\tarray_map(\n\t\t\t\tfunction ( $key ) {\n\t\t\t\t\t// Keep numeric keys as integers so we can remove them later.\n\t\t\t\t\tif ( is_numeric( $key ) ) {\n\t\t\t\t\t\treturn intval( $key );\n\t\t\t\t\t}\n\n\t\t\t\t\treturn sanitize_text_field( $key );\n\t\t\t\t},\n\t\t\t\tarray_keys( $capabilities )\n\t\t\t),\n\t\t\tarray_map(\n\t\t\t\tfunction ( $value ) {\n\t\t\t\t\treturn filter_var( $value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE );\n\t\t\t\t},\n\t\t\t\t$capabilities\n\t\t\t)\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 271,
+          "expression": "$capabilities = array_filter(\n\t\t\t$capabilities,\n\t\t\tfunction ( $value, $key ) {\n\t\t\t\treturn is_string( $key ) && is_bool( $value );\n\t\t\t},\n\t\t\tARRAY_FILTER_USE_BOTH\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 271,
+          "expression": "$capabilities = array_filter(\n\t\t\t$capabilities,\n\t\t\tfunction ( $value, $key ) {\n\t\t\t\treturn is_string( $key ) && is_bool( $value );\n\t\t\t},\n\t\t\tARRAY_FILTER_USE_BOTH\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$capabilities = array_filter(\n\t\t\t$capabilities,\n\t\t\tfunction ( $value, $key ) {\n\t\t\t\treturn is_string( $key ) && is_bool( $value );\n\t\t\t},\n\t\t\tARRAY_FILTER_USE_BOTH\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-onboarding-service.php",
+        "line": 271
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "function ( $pm, $index ) {\n\t\t\t\tif ( ! isset( $pm['priority'] ) ) {\n\t\t\t\t\t$pm['priority'] = $index;\n\t\t\t\t} else {\n\t\t\t\t\t$pm['priority'] = intval( $pm['priority'] );\n\t\t\t\t}\n\n\t\t\t\treturn $pm;\n\t\t\t}",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-account.php",
+        "line": 740
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 740,
+          "expression": "$recommended_pms = array_map(\n\t\t\tfunction ( $pm, $index ) {\n\t\t\t\tif ( ! isset( $pm['priority'] ) ) {\n\t\t\t\t\t$pm['priority'] = $index;\n\t\t\t\t} else {\n\t\t\t\t\t$pm['priority'] = intval( $pm['priority'] );\n\t\t\t\t}\n\n\t\t\t\treturn $pm;\n\t\t\t},\n\t\t\t$recommended_pms,\n\t\t\tarray_keys( $recommended_pms )\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$recommended_pms = array_map(\n\t\t\tfunction ( $pm, $index ) {\n\t\t\t\tif ( ! isset( $pm['priority'] ) ) {\n\t\t\t\t\t$pm['priority'] = $index;\n\t\t\t\t} else {\n\t\t\t\t\t$pm['priority'] = intval( $pm['priority'] );\n\t\t\t\t}\n\n\t\t\t\treturn $pm;\n\t\t\t},\n\t\t\t$recommended_pms,\n\t\t\tarray_keys( $recommended_pms )\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-account.php",
+        "line": 740
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$wcpay_connect_param         = sanitize_text_field( wp_unslash( $_GET['wcpay-connect'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-account.php",
+        "line": 1377
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1377,
+          "expression": "$wcpay_connect_param         = sanitize_text_field( wp_unslash( $_GET['wcpay-connect'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1797,
+          "expression": "$redirect_to = $this->init_stripe_onboarding(\n\t\t\t\t\t$create_test_drive_account ? 'test_drive' : ( $should_onboard_in_test_mode ? 'test' : 'live' ),\n\t\t\t\t\t$wcpay_connect_param,\n\t\t\t\t\t[\n\t\t\t\t\t\t'promo'                       => ! empty( $incentive_id ) ? $incentive_id : false,\n\t\t\t\t\t\t'collect_payout_requirements' => $collect_payout_requirements ? 'true' : false,\n\t\t\t\t\t\t'source'                      => $onboarding_source,\n\t\t\t\t\t\t'from'                        => WC_Payments_Onboarding_Service::FROM_STRIPE,\n\t\t\t\t\t]\n\t\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1815,
+          "expression": "$redirect_to = wp_sanitize_redirect( $redirect_to )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1816,
+          "expression": "$redirect_to = wp_validate_redirect( $redirect_to )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 1821,
+          "expression": "wp_send_json_success( [ 'redirect_to' => $redirect_to ] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( [ 'redirect_to' => $redirect_to ] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-account.php",
+        "line": 1821
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woocommerce-payments-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$args = [\n\t\t\t'experiment_name'  => $test_name,\n\t\t\t'anon_id'          => $this->anon_id,\n\t\t\t'woo_country_code' => get_option( 'woocommerce_default_country' ),\n\t\t]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-experimental-abtest.php",
+        "line": 154
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 154,
+          "expression": "$args = [\n\t\t\t'experiment_name'  => $test_name,\n\t\t\t'anon_id'          => $this->anon_id,\n\t\t\t'woo_country_code' => get_option( 'woocommerce_default_country' ),\n\t\t]",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 160,
+          "expression": "$url = add_query_arg(\n\t\t\t$args,\n\t\t\tsprintf( // nosemgrep: audit.php.wp.security.xss.query-arg -- constant value is passed in to add_query_arg.\n\t\t\t\t'https://public-api.wordpress.com/wpcom/v2/experiments/0.1.0/assignments/%s',\n\t\t\t\t$this->platform\n\t\t\t)\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 168,
+          "expression": "$get = wp_remote_get( $url )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$get = wp_remote_get( $url )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-experimental-abtest.php",
+        "line": 168
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$adv_fraud_settings = json_decode( wp_json_encode( $this->gateway->get_option( 'advanced_fraud_protection_settings' ) ), true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-status.php",
+        "line": 561
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 561,
+          "expression": "$adv_fraud_settings = json_decode( wp_json_encode( $this->gateway->get_option( 'advanced_fraud_protection_settings' ) ), true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 562,
+          "expression": "$list               = array_filter(\n\t\t\t\t\t\t\t\tarray_map(\n\t\t\t\t\t\t\t\t\tfunction ( $rule ) {\n\t\t\t\t\t\t\t\t\t\tif ( empty( $rule['key'] ) ) {\n\t\t\t\t\t\t\t\t\t\t\treturn null;\n\t\t\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t\t\tswitch ( $rule['key'] ) {\n\t\t\t\t\t\t\t\t\t\t\tcase 'avs_verification':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'AVS Verification';\n\t\t\t\t\t\t\t\t\t\t\tcase 'international_ip_address':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'International IP Address';\n\t\t\t\t\t\t\t\t\t\t\tcase 'ip_address_mismatch':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'IP Address Mismatch';\n\t\t\t\t\t\t\t\t\t\t\tcase 'address_mismatch':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Address Mismatch';\n\t\t\t\t\t\t\t\t\t\t\tcase 'purchase_price_threshold':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Purchase Price Threshold';\n\t\t\t\t\t\t\t\t\t\t\tcase 'order_items_threshold':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Order Items Threshold';\n\t\t\t\t\t\t\t\t\t\t\tdefault:\n\t\t\t\t\t\t\t\t\t\t\t\t// Ignore all others.\n\t\t\t\t\t\t\t\t\t\t\t\treturn null;\n\t\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t\t},\n\t\t\t\t\t\t\t\t\t$adv_fraud_settings\n\t\t\t\t\t\t\t\t)\n\t\t\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$list               = array_filter(\n\t\t\t\t\t\t\t\tarray_map(\n\t\t\t\t\t\t\t\t\tfunction ( $rule ) {\n\t\t\t\t\t\t\t\t\t\tif ( empty( $rule['key'] ) ) {\n\t\t\t\t\t\t\t\t\t\t\treturn null;\n\t\t\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t\t\tswitch ( $rule['key'] ) {\n\t\t\t\t\t\t\t\t\t\t\tcase 'avs_verification':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'AVS Verification';\n\t\t\t\t\t\t\t\t\t\t\tcase 'international_ip_address':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'International IP Address';\n\t\t\t\t\t\t\t\t\t\t\tcase 'ip_address_mismatch':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'IP Address Mismatch';\n\t\t\t\t\t\t\t\t\t\t\tcase 'address_mismatch':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Address Mismatch';\n\t\t\t\t\t\t\t\t\t\t\tcase 'purchase_price_threshold':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Purchase Price Threshold';\n\t\t\t\t\t\t\t\t\t\t\tcase 'order_items_threshold':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Order Items Threshold';\n\t\t\t\t\t\t\t\t\t\t\tdefault:\n\t\t\t\t\t\t\t\t\t\t\t\t// Ignore all others.\n\t\t\t\t\t\t\t\t\t\t\t\treturn null;\n\t\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t\t},\n\t\t\t\t\t\t\t\t\t$adv_fraud_settings\n\t\t\t\t\t\t\t\t)\n\t\t\t\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-status.php",
+        "line": 562
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$adv_fraud_settings = json_decode( wp_json_encode( $this->gateway->get_option( 'advanced_fraud_protection_settings' ) ), true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-status.php",
+        "line": 561
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 561,
+          "expression": "$adv_fraud_settings = json_decode( wp_json_encode( $this->gateway->get_option( 'advanced_fraud_protection_settings' ) ), true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 562,
+          "expression": "$list               = array_filter(\n\t\t\t\t\t\t\t\tarray_map(\n\t\t\t\t\t\t\t\t\tfunction ( $rule ) {\n\t\t\t\t\t\t\t\t\t\tif ( empty( $rule['key'] ) ) {\n\t\t\t\t\t\t\t\t\t\t\treturn null;\n\t\t\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t\t\tswitch ( $rule['key'] ) {\n\t\t\t\t\t\t\t\t\t\t\tcase 'avs_verification':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'AVS Verification';\n\t\t\t\t\t\t\t\t\t\t\tcase 'international_ip_address':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'International IP Address';\n\t\t\t\t\t\t\t\t\t\t\tcase 'ip_address_mismatch':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'IP Address Mismatch';\n\t\t\t\t\t\t\t\t\t\t\tcase 'address_mismatch':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Address Mismatch';\n\t\t\t\t\t\t\t\t\t\t\tcase 'purchase_price_threshold':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Purchase Price Threshold';\n\t\t\t\t\t\t\t\t\t\t\tcase 'order_items_threshold':\n\t\t\t\t\t\t\t\t\t\t\t\treturn 'Order Items Threshold';\n\t\t\t\t\t\t\t\t\t\t\tdefault:\n\t\t\t\t\t\t\t\t\t\t\t\t// Ignore all others.\n\t\t\t\t\t\t\t\t\t\t\t\treturn null;\n\t\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t\t},\n\t\t\t\t\t\t\t\t\t$adv_fraud_settings\n\t\t\t\t\t\t\t\t)\n\t\t\t\t\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 591,
+          "expression": "echo empty( $list ) ? '-' : esc_html( implode( ',', $list ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo empty( $list ) ? '-' : esc_html( implode( ',', $list ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-status.php",
+        "line": 591
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$manual_capture_enabled = 'yes' === $this->gateway->get_option( 'manual_capture' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-status.php",
+        "line": 607
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 607,
+          "expression": "$manual_capture_enabled = 'yes' === $this->gateway->get_option( 'manual_capture' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 608,
+          "expression": "echo $manual_capture_enabled ? esc_html__( 'Enabled', 'woocommerce-payments' ) : esc_html__( 'Disabled', 'woocommerce-payments' );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $manual_capture_enabled ? esc_html__( 'Enabled', 'woocommerce-payments' ) : esc_html__( 'Disabled', 'woocommerce-payments' );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/class-wc-payments-status.php",
+        "line": 608
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$enabled_payment_methods   = $this->main_gateway->get_option( 'upe_enabled_payment_method_ids', [] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/migrations/class-manual-capture-payment-method-settings-update.php",
+        "line": 69
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 69,
+          "expression": "$enabled_payment_methods   = $this->main_gateway->get_option( 'upe_enabled_payment_method_ids', [] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 73,
+          "expression": "$filtered_payment_methods = array_filter(\n\t\t\t\t$enabled_payment_methods,\n\t\t\t\tfunction ( $method ) {\n\t\t\t\t\treturn in_array( $method, [ Payment_Method::CARD, Payment_Method::LINK ], true );\n\t\t\t\t}\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$filtered_payment_methods = array_filter(\n\t\t\t\t$enabled_payment_methods,\n\t\t\t\tfunction ( $method ) {\n\t\t\t\t\treturn in_array( $method, [ Payment_Method::CARD, Payment_Method::LINK ], true );\n\t\t\t\t}\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/migrations/class-manual-capture-payment-method-settings-update.php",
+        "line": 73
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$enabled_payment_methods = $this->main_gateway->get_option( 'upe_enabled_payment_method_ids', [] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/migrations/class-payment-method-deprecation-settings-update.php",
+        "line": 77
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 77,
+          "expression": "$enabled_payment_methods = $this->main_gateway->get_option( 'upe_enabled_payment_method_ids', [] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 79,
+          "expression": "$filtered_payment_methods = array_filter(\n\t\t\t$enabled_payment_methods,\n\t\t\tfunction ( $method ) {\n\t\t\t\treturn $this->payment_method_id !== $method;\n\t\t\t}\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$filtered_payment_methods = array_filter(\n\t\t\t$enabled_payment_methods,\n\t\t\tfunction ( $method ) {\n\t\t\t\treturn $this->payment_method_id !== $method;\n\t\t\t}\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/migrations/class-payment-method-deprecation-settings-update.php",
+        "line": 79
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-006",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$user_id    = isset( $_POST['user_id'] ) ? absint( $_POST['user_id'] ) : 0",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/compat/subscriptions/trait-wc-payment-gateway-wcpay-subscriptions.php",
+        "line": 756
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 756,
+          "expression": "$user_id    = isset( $_POST['user_id'] ) ? absint( $_POST['user_id'] ) : 0",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 776,
+          "expression": "$tokens = $this->get_user_formatted_tokens_array( $user_id, $gateway_id )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 777,
+          "expression": "wp_send_json_success( [ 'tokens' => $tokens ] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( [ 'tokens' => $tokens ] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/compat/subscriptions/trait-wc-payment-gateway-wcpay-subscriptions.php",
+        "line": 777
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/compat/subscriptions/emails/plain/failed-renewal-authentication.php",
+        "line": 25
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 25,
+          "expression": "echo apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/compat/subscriptions/emails/plain/failed-renewal-authentication.php",
+        "line": 25
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/compat/subscriptions/emails/plain/failed-renewal-authentication-requested.php",
+        "line": 51
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 51,
+          "expression": "echo apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/compat/subscriptions/emails/plain/failed-renewal-authentication-requested.php",
+        "line": 51
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-006",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$updated_fields_callback = function ( $value, string $key ) {\n\t\t\treturn array_key_exists( $key, WC_Payment_Gateway_WCPay::ACCOUNT_SETTINGS_MAPPING ) &&\n\t\t\t\t$this->wcpay_gateway->get_option( $key ) !== $value;\n\t\t}",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-settings-controller.php",
+        "line": 899
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 899,
+          "expression": "$updated_fields_callback = function ( $value, string $key ) {\n\t\t\treturn array_key_exists( $key, WC_Payment_Gateway_WCPay::ACCOUNT_SETTINGS_MAPPING ) &&\n\t\t\t\t$this->wcpay_gateway->get_option( $key ) !== $value;\n\t\t}",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 904,
+          "expression": "$updated_fields = array_filter( $request->get_params(), $updated_fields_callback, ARRAY_FILTER_USE_BOTH )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$updated_fields = array_filter( $request->get_params(), $updated_fields_callback, ARRAY_FILTER_USE_BOTH )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/admin/class-wc-rest-payments-settings-controller.php",
+        "line": 904
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-009",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$body['user_session'] = isset( $_REQUEST['user_session'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['user_session'] ) ) : null",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/woopay/class-woopay-session.php",
+        "line": 693
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 693,
+          "expression": "$body['user_session'] = isset( $_REQUEST['user_session'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['user_session'] ) ) : null",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 705,
+          "expression": "$response = \\Automattic\\Jetpack\\Connection\\Client::remote_request( $args, wp_json_encode( $body ) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 716,
+          "expression": "wp_send_json( json_decode( $response_body_json ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json( json_decode( $response_body_json ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/woopay/class-woopay-session.php",
+        "line": 716
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woocommerce-payments-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$order_id  = ( isset( $wp->query_vars['order-pay'] ) ) ? absint( $wp->query_vars['order-pay'] ) : absint( $_GET['order_id'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/subscriptions/class-wc-payments-subscription-change-payment-method-handler.php",
+        "line": 124
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 124,
+          "expression": "$order_id  = ( isset( $wp->query_vars['order-pay'] ) ) ? absint( $wp->query_vars['order-pay'] ) : absint( $_GET['order_id'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 126,
+          "expression": "$order     = wc_get_order( $order_id )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 136,
+          "expression": "$subscriptions = wcs_get_subscriptions_for_order( $order, [ 'order_type' => 'any' ] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 139,
+          "expression": "$subscription = array_pop( $subscriptions )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 142,
+          "expression": "wp_safe_redirect( $this->get_subscription_update_payment_url( $subscription ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( $this->get_subscription_update_payment_url( $subscription ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/subscriptions/class-wc-payments-subscription-change-payment-method-handler.php",
+        "line": 142
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-007",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "wp_unslash( $_GET['currency_is'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/Analytics.php",
+        "line": 561
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 561,
+          "expression": "$args['currency_is'] = array_map( 'sanitize_text_field', wp_unslash( $_GET['currency_is'] ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$args['currency_is'] = array_map( 'sanitize_text_field', wp_unslash( $_GET['currency_is'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/Analytics.php",
+        "line": 561
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-008",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "wp_unslash( $_GET['currency_is_not'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/Analytics.php",
+        "line": 565
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 565,
+          "expression": "$args['currency_is_not'] = array_map( 'sanitize_text_field', wp_unslash( $_GET['currency_is_not'] ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$args['currency_is_not'] = array_map( 'sanitize_text_field', wp_unslash( $_GET['currency_is_not'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/Analytics.php",
+        "line": 565
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-xss-010",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$store_currency      = get_option( 'woocommerce_currency' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/MultiCurrency.php",
+        "line": 1012
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1012,
+          "expression": "$store_currency      = get_option( 'woocommerce_currency' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1030,
+          "expression": "$message = sprintf(\n\t\t/* translators: %1 User's country, %2 Selected currency name, %3 Default store currency name, %4 Link to switch currency */\n\t\t\t__( 'We noticed you\\'re visiting from %1$s. We\\'ve updated our prices to %2$s for your shopping convenience. <a href=\"%4$s\">Use %3$s instead.</a>', 'woocommerce-payments' ),\n\t\t\tapply_filters( self::FILTER_PREFIX . 'override_notice_country', WC()->countries->countries[ $country ] ),\n\t\t\tapply_filters( self::FILTER_PREFIX . 'override_notice_currency_name', $current_currency->get_name() ),\n\t\t\tesc_html( $currencies[ $store_currency ] ),\n\t\t\tesc_url( '?currency=' . $store_currency )\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1044,
+          "expression": "echo $message;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $message;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/MultiCurrency.php",
+        "line": 1044
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-009",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$currencies = get_option( self::CUSTOMER_CURRENCIES_KEY )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/MultiCurrency.php",
+        "line": 1438
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1438,
+          "expression": "$currencies = get_option( self::CUSTOMER_CURRENCIES_KEY )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1441,
+          "expression": "array_map( 'strtoupper', $currencies )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map( 'strtoupper', $currencies )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/MultiCurrency.php",
+        "line": 1441
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-rce-010",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$currencies = $wpdb->get_col( $query )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/MultiCurrency.php",
+        "line": 1469
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1469,
+          "expression": "$currencies = $wpdb->get_col( $query )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1473,
+          "expression": "array_map( 'strtoupper', $currencies )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map( 'strtoupper', $currencies )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/multi-currency/MultiCurrency.php",
+        "line": 1473
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "woocommerce-payments-open-002",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "woocommerce-payments",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "get_permalink( get_option( 'woocommerce_myaccount_page_id' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/express-checkout/class-wc-payments-express-checkout-button-handler.php",
+        "line": 362
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 362,
+          "expression": "wp_safe_redirect( get_permalink( get_option( 'woocommerce_myaccount_page_id' ) ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( get_permalink( get_option( 'woocommerce_myaccount_page_id' ) ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woocommerce-payments/woocommerce-payments/includes/express-checkout/class-wc-payments-express-checkout-button-handler.php",
+        "line": 362
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": true
+    }
+  ]
+}

@@ -1,0 +1,900 @@
+{
+  "plugin": "cookie-law-info",
+  "php_files_analyzed": 136,
+  "parse_errors": 0,
+  "total_flows": 19,
+  "by_severity": {
+    "critical": 5,
+    "high": 13,
+    "medium": 1
+  },
+  "by_vulnerability_class": {
+    "rce": 4,
+    "ssrf": 3,
+    "sql_injection": 2,
+    "xss": 10
+  },
+  "flows": [
+    {
+      "flow_id": "cookie-law-info-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$keys   = $wpdb->get_results( $wpdb->prepare( \"SELECT option_name FROM $wpdb->options WHERE option_name LIKE %s\", $prefix ), ARRAY_A )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/uninstall.php",
+        "line": 42
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 42,
+          "expression": "$keys   = $wpdb->get_results( $wpdb->prepare( \"SELECT option_name FROM $wpdb->options WHERE option_name LIKE %s\", $prefix ), ARRAY_A )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 44,
+          "expression": "$transients = array_map(\n\t\t\t\tfunction( $key ) {\n\t\t\t\t\treturn ltrim( $key['option_name'], '_transient_' );\n\t\t\t\t},\n\t\t\t\t$keys\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$transients = array_map(\n\t\t\t\tfunction( $key ) {\n\t\t\t\t\treturn ltrim( $key['option_name'], '_transient_' );\n\t\t\t\t},\n\t\t\t\t$keys\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/uninstall.php",
+        "line": 44
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$keys   = $wpdb->get_results( $wpdb->prepare( \"SELECT option_name FROM $wpdb->options WHERE option_name LIKE %s\", $prefix ), ARRAY_A )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/lite/includes/class-cache.php",
+        "line": 180
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 180,
+          "expression": "$keys   = $wpdb->get_results( $wpdb->prepare( \"SELECT option_name FROM $wpdb->options WHERE option_name LIKE %s\", $prefix ), ARRAY_A )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 186,
+          "expression": "array_map(\n\t\t\tfunction( $key ) {\n\t\t\t\t// Remove '_transient_' from the option name.\n\t\t\t\treturn ltrim( $key['option_name'], '_transient_' );\n\t\t\t},\n\t\t\t$keys\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(\n\t\t\tfunction( $key ) {\n\t\t\t\t// Remove '_transient_' from the option name.\n\t\t\t\treturn ltrim( $key['option_name'], '_transient_' );\n\t\t\t},\n\t\t\t$keys\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/lite/includes/class-cache.php",
+        "line": 186
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$data = array(\n\t\t\t'reason_slug'    => sanitize_text_field( wp_unslash( $request['reason_id'] ) ),\n\t\t\t'reason_detail'  => ! empty( $request['reason_text'] ) ? sanitize_text_field( wp_unslash( $request['reason_text'] ) ) : null,\n\t\t\t'date'           => gmdate( 'M d, Y h:i:s A' ),\n\t\t\t'comments'       => ! empty( $request['reason_info'] ) ? sanitize_text_field( wp_unslash( $request['reason_info'] ) ) : null,\n\t\t\t'server'         => ! empty( $_SERVER['SERVER_SOFTWARE'] ) ? sanitize_text_field( wp_unslash( $_SERVER['SERVER_SOFTWARE'] ) ) : null,\n\t\t\t'php_version'    => phpversion(),\n\t\t\t'mysql_version'  => $wpdb->db_version(),\n\t\t\t'wp_version'     => get_bloginfo( 'version' ),\n\t\t\t'wc_version'     => defined( 'WC_VERSION' ) ? WC_VERSION : null,\n\t\t\t'locale'         => get_locale(),\n\t\t\t'plugin_version' => $this->current_version,\n\t\t\t'is_multisite'   => is_multisite(),\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/lite/admin/modules/uninstall-feedback/class-uninstall-feedback.php",
+        "line": 509
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 509,
+          "expression": "$data = array(\n\t\t\t'reason_slug'    => sanitize_text_field( wp_unslash( $request['reason_id'] ) ),\n\t\t\t'reason_detail'  => ! empty( $request['reason_text'] ) ? sanitize_text_field( wp_unslash( $request['reason_text'] ) ) : null,\n\t\t\t'date'           => gmdate( 'M d, Y h:i:s A' ),\n\t\t\t'comments'       => ! empty( $request['reason_info'] ) ? sanitize_text_field( wp_unslash( $request['reason_info'] ) ) : null,\n\t\t\t'server'         => ! empty( $_SERVER['SERVER_SOFTWARE'] ) ? sanitize_text_field( wp_unslash( $_SERVER['SERVER_SOFTWARE'] ) ) : null,\n\t\t\t'php_version'    => phpversion(),\n\t\t\t'mysql_version'  => $wpdb->db_version(),\n\t\t\t'wp_version'     => get_bloginfo( 'version' ),\n\t\t\t'wc_version'     => defined( 'WC_VERSION' ) ? WC_VERSION : null,\n\t\t\t'locale'         => get_locale(),\n\t\t\t'plugin_version' => $this->current_version,\n\t\t\t'is_multisite'   => is_multisite(),\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 524,
+          "expression": "$response = wp_remote_post(\n\t\t\t$this->api_url,\n\t\t\tarray(\n\t\t\t\t'headers'     => array( 'Content-Type' => 'application/json; charset=utf-8' ),\n\t\t\t\t'method'      => 'POST',\n\t\t\t\t'timeout'     => 45,\n\t\t\t\t'redirection' => 5,\n\t\t\t\t'httpversion' => '1.0',\n\t\t\t\t'blocking'    => false,\n\t\t\t\t'body'        => wp_json_encode( $data ),\n\t\t\t\t'cookies'     => array(),\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(\n\t\t\t$this->api_url,\n\t\t\tarray(\n\t\t\t\t'headers'     => array( 'Content-Type' => 'application/json; charset=utf-8' ),\n\t\t\t\t'method'      => 'POST',\n\t\t\t\t'timeout'     => 45,\n\t\t\t\t'redirection' => 5,\n\t\t\t\t'httpversion' => '1.0',\n\t\t\t\t'blocking'    => false,\n\t\t\t\t'body'        => wp_json_encode( $data ),\n\t\t\t\t'cookies'     => array(),\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/lite/admin/modules/uninstall-feedback/class-uninstall-feedback.php",
+        "line": 524
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$args['category'] = sanitize_text_field( $request['category'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/lite/admin/modules/cookies/api/class-api-controller.php",
+        "line": 82
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 82,
+          "expression": "$args['category'] = sanitize_text_field( $request['category'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 84,
+          "expression": "$item_data = $this->get_item_objects( $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 86,
+          "expression": "$item_objects = array_filter( array_map( array( $this, 'get_item_object' ), $item_data ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$item_objects = array_filter( array_map( array( $this, 'get_item_object' ), $item_data ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/lite/admin/modules/cookies/api/class-api-controller.php",
+        "line": 86
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-ssrf-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$data = array(\n\t\t\t'reason_slug'                 => sanitize_text_field( wp_unslash( $post_data['reason_id'] ) ),\n\t\t\t'reason_detail'               => ! empty( $post_data['reason_text'] ) ? sanitize_text_field( wp_unslash( $post_data['reason_text'] ) ) : null,\n\t\t\t'date'                        => gmdate( 'M d, Y h:i:s A' ),\n\t\t\t'comments'                    => ! empty( $post_data['reason_info'] ) ? sanitize_text_field( wp_unslash( $post_data['reason_info'] ) ) : '',\n\t\t\t'server'                      => ! empty( $_SERVER['SERVER_SOFTWARE'] ) ? sanitize_text_field( wp_unslash( $_SERVER['SERVER_SOFTWARE'] ) ) : '',\n\t\t\t'php_version'                 => phpversion(),\n\t\t\t'mysql_version'               => $wpdb->db_version(),\n\t\t\t'wp_version'                  => get_bloginfo( 'version' ),\n\t\t\t'wc_version'                  => defined( 'WC_VERSION' ) ? WC_VERSION : null,\n\t\t\t'locale'                      => get_locale(),\n\t\t\t'plugin_version'              => $this->current_version,\n\t\t\t'is_multisite'                => is_multisite(),\n\t\t\t'is_legacy'                   => true,\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/uninstall-feedback/uninstall-feedback.php",
+        "line": 330
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 330,
+          "expression": "$data = array(\n\t\t\t'reason_slug'                 => sanitize_text_field( wp_unslash( $post_data['reason_id'] ) ),\n\t\t\t'reason_detail'               => ! empty( $post_data['reason_text'] ) ? sanitize_text_field( wp_unslash( $post_data['reason_text'] ) ) : null,\n\t\t\t'date'                        => gmdate( 'M d, Y h:i:s A' ),\n\t\t\t'comments'                    => ! empty( $post_data['reason_info'] ) ? sanitize_text_field( wp_unslash( $post_data['reason_info'] ) ) : '',\n\t\t\t'server'                      => ! empty( $_SERVER['SERVER_SOFTWARE'] ) ? sanitize_text_field( wp_unslash( $_SERVER['SERVER_SOFTWARE'] ) ) : '',\n\t\t\t'php_version'                 => phpversion(),\n\t\t\t'mysql_version'               => $wpdb->db_version(),\n\t\t\t'wp_version'                  => get_bloginfo( 'version' ),\n\t\t\t'wc_version'                  => defined( 'WC_VERSION' ) ? WC_VERSION : null,\n\t\t\t'locale'                      => get_locale(),\n\t\t\t'plugin_version'              => $this->current_version,\n\t\t\t'is_multisite'                => is_multisite(),\n\t\t\t'is_legacy'                   => true,\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 346,
+          "expression": "$response = wp_remote_post(\n\t\t\t$this->api_url,\n\t\t\tarray(\n\t\t\t\t'headers'     => array( 'Content-Type' => 'application/json; charset=utf-8' ),\n\t\t\t\t'method'      => 'POST',\n\t\t\t\t'timeout'     => 45,\n\t\t\t\t'redirection' => 5,\n\t\t\t\t'httpversion' => '1.0',\n\t\t\t\t'blocking'    => false,\n\t\t\t\t'body'        => wp_json_encode( $data ),\n\t\t\t\t'cookies'     => array(),\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(\n\t\t\t$this->api_url,\n\t\t\tarray(\n\t\t\t\t'headers'     => array( 'Content-Type' => 'application/json; charset=utf-8' ),\n\t\t\t\t'method'      => 'POST',\n\t\t\t\t'timeout'     => 45,\n\t\t\t\t'redirection' => 5,\n\t\t\t\t'httpversion' => '1.0',\n\t\t\t\t'blocking'    => false,\n\t\t\t\t'body'        => wp_json_encode( $data ),\n\t\t\t\t'cookies'     => array(),\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/uninstall-feedback/uninstall-feedback.php",
+        "line": 346
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$data_arr   = array(\n\t\t\t'created_at'     => time(),\n\t\t\t'total_url'      => absint( $total_url ),\n\t\t\t'total_cookies'  => 0,\n\t\t\t'current_action' => 'get_pages',\n\t\t\t'status'         => 1,\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookie-scaner/cookie-scaner.php",
+        "line": 959
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 959,
+          "expression": "$data_arr   = array(\n\t\t\t'created_at'     => time(),\n\t\t\t'total_url'      => absint( $total_url ),\n\t\t\t'total_cookies'  => 0,\n\t\t\t'current_action' => 'get_pages',\n\t\t\t'status'         => 1,\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 967,
+          "expression": "$wpdb->insert( $scan_table, $data_arr )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->insert( $scan_table, $data_arr )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookie-scaner/cookie-scaner.php",
+        "line": 967
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-sqli-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$category    = esc_sql( sanitize_text_field( $category ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookie-scaner/cookie-scaner.php",
+        "line": 1122
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1122,
+          "expression": "$category    = esc_sql( sanitize_text_field( $category ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1126,
+          "expression": "$category_id = esc_sql( absint( $category_id ) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1137,
+          "expression": "$wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery\n\t\t\t\t\t\t$cookies_table,\n\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t'id_cli_cookie_scan'     => $scan_id,\n\t\t\t\t\t\t\t'id_cli_cookie_scan_url' => $url_id,\n\t\t\t\t\t\t\t'cookie_id'              => $cookie_id,\n\t\t\t\t\t\t\t'expiry'                 => $expiry,\n\t\t\t\t\t\t\t'type'                   => $type,\n\t\t\t\t\t\t\t'category'               => $category,\n\t\t\t\t\t\t\t'category_id'            => $category_id,\n\t\t\t\t\t\t\t'description'            => $description,\n\n\t\t\t\t\t\t),\n\t\t\t\t\t\tarray( '%d', '%d', '%s', '%s', '%s', '%s', '%d', '%s' )\n\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery\n\t\t\t\t\t\t$cookies_table,\n\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t'id_cli_cookie_scan'     => $scan_id,\n\t\t\t\t\t\t\t'id_cli_cookie_scan_url' => $url_id,\n\t\t\t\t\t\t\t'cookie_id'              => $cookie_id,\n\t\t\t\t\t\t\t'expiry'                 => $expiry,\n\t\t\t\t\t\t\t'type'                   => $type,\n\t\t\t\t\t\t\t'category'               => $category,\n\t\t\t\t\t\t\t'category_id'            => $category_id,\n\t\t\t\t\t\t\t'description'            => $description,\n\n\t\t\t\t\t\t),\n\t\t\t\t\t\tarray( '%d', '%d', '%s', '%s', '%s', '%s', '%d', '%s' )\n\t\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookie-scaner/cookie-scaner.php",
+        "line": 1137
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-ssrf-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$request_body = array(\n\t\t\t'domain' => home_url(),\n\t\t\t'urls'   => $urls,\n\t\t\t'scanId' => intval( $scan_id ),\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookie-scaner/classes/class-cookie-law-info-cookie-scanner-api.php",
+        "line": 98
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 98,
+          "expression": "$request_body = array(\n\t\t\t'domain' => home_url(),\n\t\t\t'urls'   => $urls,\n\t\t\t'scanId' => intval( $scan_id ),\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 104,
+          "expression": "$raw_response  = wp_remote_post(\n\t\t\t$endpoint,\n\t\t\tarray(\n\t\t\t\t'body'    => wp_json_encode( $request_body ),\n\t\t\t\t'headers' => array(\n\t\t\t\t\t'Content-Type'  => 'application/json',\n\t\t\t\t\t'Authorization' => 'Bearer ' . $token,\n\t\t\t\t),\n\t\t\t\t'timeout' => 60,\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$raw_response  = wp_remote_post(\n\t\t\t$endpoint,\n\t\t\tarray(\n\t\t\t\t'body'    => wp_json_encode( $request_body ),\n\t\t\t\t'headers' => array(\n\t\t\t\t\t'Content-Type'  => 'application/json',\n\t\t\t\t\t'Authorization' => 'Bearer ' . $token,\n\t\t\t\t),\n\t\t\t\t'timeout' => 60,\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookie-scaner/classes/class-cookie-law-info-cookie-scanner-api.php",
+        "line": 104
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$head_scripts = $this->get_term_meta( $term_id, '_cli_cookie_head_scripts', true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookies/cookies.php",
+        "line": 674
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 674,
+          "expression": "$head_scripts = $this->get_term_meta( $term_id, '_cli_cookie_head_scripts', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 684,
+          "expression": "echo wp_unslash( $head_scripts );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo wp_unslash( $head_scripts );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookies/cookies.php",
+        "line": 684
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$body_scripts = $this->get_term_meta( $term_id, '_cli_cookie_body_scripts', true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookies/cookies.php",
+        "line": 675
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 675,
+          "expression": "$body_scripts = $this->get_term_meta( $term_id, '_cli_cookie_body_scripts', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 696,
+          "expression": "echo wp_unslash( $body_scripts );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo wp_unslash( $body_scripts );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookies/cookies.php",
+        "line": 696
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-xss-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$form_action = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookies/views/necessary-settings.php",
+        "line": 29
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 29,
+          "expression": "$form_action = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 31,
+          "expression": "echo esc_url( $form_action );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $form_action );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookies/views/necessary-settings.php",
+        "line": 31
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$form_action = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookies/views/non-necessary-settings.php",
+        "line": 26
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 26,
+          "expression": "$form_action = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 27,
+          "expression": "echo esc_url( $form_action );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $form_action );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookies/views/non-necessary-settings.php",
+        "line": 27
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-xss-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo ( filter_var( $settings['status'], FILTER_VALIDATE_BOOLEAN ) == true ) ? ' checked=\"checked\" ' : ' ';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookies/views/non-necessary-settings.php",
+        "line": 34
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 34,
+          "expression": "echo ( filter_var( $settings['status'], FILTER_VALIDATE_BOOLEAN ) == true ) ? ' checked=\"checked\" ' : ' ';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ( filter_var( $settings['status'], FILTER_VALIDATE_BOOLEAN ) == true ) ? ' checked=\"checked\" ' : ' ';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookies/views/non-necessary-settings.php",
+        "line": 34
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-xss-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo ( filter_var( $settings['status'], FILTER_VALIDATE_BOOLEAN ) == false ) ? ' checked=\"checked\" ' : '';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookies/views/non-necessary-settings.php",
+        "line": 35
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 35,
+          "expression": "echo ( filter_var( $settings['status'], FILTER_VALIDATE_BOOLEAN ) == false ) ? ' checked=\"checked\" ' : '';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ( filter_var( $settings['status'], FILTER_VALIDATE_BOOLEAN ) == false ) ? ' checked=\"checked\" ' : '';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookies/views/non-necessary-settings.php",
+        "line": 35
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-xss-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo ( filter_var( $settings['default_state'], FILTER_VALIDATE_BOOLEAN ) == true ) ? ' checked=\"checked\" ' : ' ';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookies/views/non-necessary-settings.php",
+        "line": 41
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 41,
+          "expression": "echo ( filter_var( $settings['default_state'], FILTER_VALIDATE_BOOLEAN ) == true ) ? ' checked=\"checked\" ' : ' ';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ( filter_var( $settings['default_state'], FILTER_VALIDATE_BOOLEAN ) == true ) ? ' checked=\"checked\" ' : ' ';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookies/views/non-necessary-settings.php",
+        "line": 41
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-xss-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo ( filter_var( $settings['default_state'], FILTER_VALIDATE_BOOLEAN ) == false ) ? ' checked=\"checked\" ' : '';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookies/views/non-necessary-settings.php",
+        "line": 42
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 42,
+          "expression": "echo ( filter_var( $settings['default_state'], FILTER_VALIDATE_BOOLEAN ) == false ) ? ' checked=\"checked\" ' : '';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ( filter_var( $settings['default_state'], FILTER_VALIDATE_BOOLEAN ) == false ) ? ' checked=\"checked\" ' : '';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/modules/cookies/views/non-necessary-settings.php",
+        "line": 42
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-xss-009",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$form_action = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/partials/cookie-law-info-privacy_overview.php",
+        "line": 28
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 28,
+          "expression": "$form_action = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 29,
+          "expression": "echo esc_url( $form_action );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $form_action );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/partials/cookie-law-info-privacy_overview.php",
+        "line": 29
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-xss-010",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$form_action = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/partials/cookie-law-info-admin_settings.php",
+        "line": 93
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 93,
+          "expression": "$form_action = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 94,
+          "expression": "echo esc_url( $form_action );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $form_action );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/admin/partials/cookie-law-info-admin_settings.php",
+        "line": 94
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cookie-law-info-rce-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "cookie-law-info",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$replace     = 'data-cli-class=\"cli-blocker-script\"  data-cli-script-type=\"' . sanitize_text_field( $category ) . '\" data-cli-block=\"true\"  data-cli-element-position=\"head\"'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/public/modules/script-blocker/script-blocker.php",
+        "line": 634
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 634,
+          "expression": "$replace     = 'data-cli-class=\"cli-blocker-script\"  data-cli-script-type=\"' . sanitize_text_field( $category ) . '\" data-cli-block=\"true\"  data-cli-element-position=\"head\"'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 644,
+          "expression": "$script = preg_replace( '/' . $re . '/', 'type=\"' . $script_type . '\"' . ' ' . $replace, $script, 1 )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$script = preg_replace( '/' . $re . '/', 'type=\"' . $script_type . '\"' . ' ' . $replace, $script, 1 )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cookie-law-info/legacy/public/modules/script-blocker/script-blocker.php",
+        "line": 644
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    }
+  ]
+}

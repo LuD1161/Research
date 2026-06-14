@@ -1,0 +1,1552 @@
+{
+  "plugin": "wordpress-seo",
+  "php_files_analyzed": 1576,
+  "parse_errors": 0,
+  "total_flows": 27,
+  "by_severity": {
+    "low": 3,
+    "critical": 10,
+    "medium": 14
+  },
+  "by_vulnerability_class": {
+    "open_redirect": 3,
+    "sql_injection": 4,
+    "object_injection": 4,
+    "rce": 4,
+    "xss": 3,
+    "file_inclusion": 8,
+    "local_file_inclusion": 1
+  },
+  "flows": [
+    {
+      "flow_id": "wordpress-seo-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$catlink = trailingslashit( get_option( 'home' ) ) . user_trailingslashit( $category_redirect, 'category' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/inc/class-rewrite.php",
+        "line": 251
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 251,
+          "expression": "$catlink = trailingslashit( get_option( 'home' ) ) . user_trailingslashit( $category_redirect, 'category' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 253,
+          "expression": "wp_safe_redirect( $catlink, 301, 'Yoast SEO' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( $catlink, 301, 'Yoast SEO' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/inc/class-rewrite.php",
+        "line": 253
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordpress-seo-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$meta_ids = $wpdb->get_col( $query )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/inc/class-wpseo-meta.php",
+        "line": 891
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 891,
+          "expression": "$meta_ids = $wpdb->get_col( $query )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 897,
+          "expression": "$query = \"DELETE FROM {$wpdb->postmeta} WHERE meta_id IN( \" . implode( ',', $meta_ids ) . ' )'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 898,
+          "expression": "$count = $wpdb->query( $query )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$count = $wpdb->query( $query )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/inc/class-wpseo-meta.php",
+        "line": 898
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordpress-seo-obje-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "object_injection",
+      "source": {
+        "expression": "$results = $wpdb->get_results(\n\t\t\t$wpdb->prepare(\n\t\t\t\t'SELECT %i FROM %i WHERE %i = %s',\n\t\t\t\t[ 'option_value', $wpdb->options, 'option_name', $option_name ],\n\t\t\t),\n\t\t\tARRAY_A,\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/inc/class-upgrade.php",
+        "line": 1357
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1357,
+          "expression": "$results = $wpdb->get_results(\n\t\t\t$wpdb->prepare(\n\t\t\t\t'SELECT %i FROM %i WHERE %i = %s',\n\t\t\t\t[ 'option_value', $wpdb->options, 'option_name', $option_name ],\n\t\t\t),\n\t\t\tARRAY_A,\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1366,
+          "expression": "maybe_unserialize( $results[0]['option_value'] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "maybe_unserialize( $results[0]['option_value'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/inc/class-upgrade.php",
+        "line": 1366
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordpress-seo-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$fields = $wpdb->get_col( $wpdb->prepare( $sql, $limit ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/inc/class-wpseo-custom-fields.php",
+        "line": 62
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 62,
+          "expression": "$fields = $wpdb->get_col( $wpdb->prepare( $sql, $limit ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 71,
+          "expression": "$fields = apply_filters( 'wpseo_replacement_variables_custom_fields', $fields )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 74,
+          "expression": "self::$custom_fields = array_map( [ 'WPSEO_Custom_Fields', 'add_custom_field_prefix' ], $fields )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "self::$custom_fields = array_map( [ 'WPSEO_Custom_Fields', 'add_custom_field_prefix' ], $fields )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/inc/class-wpseo-custom-fields.php",
+        "line": 74
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordpress-seo-open-002",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$type = get_query_var( 'sitemap' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/inc/sitemaps/class-sitemaps.php",
+        "line": 265
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 265,
+          "expression": "$type = get_query_var( 'sitemap' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 272,
+          "expression": "wp_safe_redirect( home_url( \"/$type-sitemap.xml\" ), 301, 'Yoast SEO' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( home_url( \"/$type-sitemap.xml\" ), 301, 'Yoast SEO' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/inc/sitemaps/class-sitemaps.php",
+        "line": 272
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordpress-seo-rce-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "wp_unslash( (array) $_POST['items'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/ajax.php",
+        "line": 256
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 256,
+          "expression": "$new_values      = array_map( [ 'WPSEO_Utils', 'sanitize_text_field' ], wp_unslash( (array) $_POST['items'] ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$new_values      = array_map( [ 'WPSEO_Utils', 'sanitize_text_field' ], wp_unslash( (array) $_POST['items'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/ajax.php",
+        "line": 256
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wordpress-seo-rce-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "wp_unslash( (array) $_POST['existingItems'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/ajax.php",
+        "line": 257
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 257,
+          "expression": "$original_values = array_map( [ 'WPSEO_Utils', 'sanitize_text_field' ], wp_unslash( (array) $_POST['existingItems'] ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$original_values = array_map( [ 'WPSEO_Utils', 'sanitize_text_field' ], wp_unslash( (array) $_POST['existingItems'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/ajax.php",
+        "line": 257
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wordpress-seo-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$keyword = sanitize_text_field( wp_unslash( $_POST['keyword'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/ajax.php",
+        "line": 302
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 302,
+          "expression": "$keyword = sanitize_text_field( wp_unslash( $_POST['keyword'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 304,
+          "expression": "$post_ids = WPSEO_Meta::keyword_usage( $keyword, $post_id )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 306,
+          "expression": "$return_object = [\n\t\t'keyword_usage' => $post_ids,\n\t\t'post_types'    => WPSEO_Meta::post_types_for_ids( $post_ids ),\n\t]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 311,
+          "expression": "wp_die(\n\t\t// phpcs:ignore WordPress.Security.EscapeOutput -- Reason: WPSEO_Utils::format_json_encode is safe.\n\t\tWPSEO_Utils::format_json_encode( $return_object ),\n\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_die(\n\t\t// phpcs:ignore WordPress.Security.EscapeOutput -- Reason: WPSEO_Utils::format_json_encode is safe.\n\t\tWPSEO_Utils::format_json_encode( $return_object ),\n\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/ajax.php",
+        "line": 311
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wordpress-seo-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$keyword       = sanitize_text_field( wp_unslash( $_POST['keyword'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/ajax.php",
+        "line": 338
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 338,
+          "expression": "$keyword       = sanitize_text_field( wp_unslash( $_POST['keyword'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 354,
+          "expression": "$usage = $usage[ $keyword ]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 356,
+          "expression": "wp_die(\n\t\t// phpcs:ignore WordPress.Security.EscapeOutput -- Reason: WPSEO_Utils::format_json_encode is safe.\n\t\tWPSEO_Utils::format_json_encode( $usage ),\n\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_die(\n\t\t// phpcs:ignore WordPress.Security.EscapeOutput -- Reason: WPSEO_Utils::format_json_encode is safe.\n\t\tWPSEO_Utils::format_json_encode( $usage ),\n\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/ajax.php",
+        "line": 356
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wordpress-seo-xss-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$keyword = sanitize_text_field( wp_unslash( $_POST['keyword'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/ajax.php",
+        "line": 405
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 405,
+          "expression": "$keyword = sanitize_text_field( wp_unslash( $_POST['keyword'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 407,
+          "expression": "wp_die(\n\t\t// phpcs:ignore WordPress.Security.EscapeOutput -- Reason: WPSEO_Utils::format_json_encode is safe.\n\t\tWPSEO_Utils::format_json_encode( WPSEO_Meta::keyword_usage( $keyword, $post_id ) ),\n\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_die(\n\t\t// phpcs:ignore WordPress.Security.EscapeOutput -- Reason: WPSEO_Utils::format_json_encode is safe.\n\t\tWPSEO_Utils::format_json_encode( WPSEO_Meta::keyword_usage( $keyword, $post_id ) ),\n\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/ajax.php",
+        "line": 407
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wordpress-seo-rce-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$data = wp_unslash( $_POST[ $field_name ] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/metabox/class-metabox.php",
+        "line": 770
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 770,
+          "expression": "$data = wp_unslash( $_POST[ $field_name ] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 774,
+          "expression": "$data = array_map( [ 'WPSEO_Utils', 'sanitize_text_field' ], $data )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 774,
+          "expression": "$data = array_map( [ 'WPSEO_Utils', 'sanitize_text_field' ], $data )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$data = array_map( [ 'WPSEO_Utils', 'sanitize_text_field' ], $data )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/metabox/class-metabox.php",
+        "line": 774
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wordpress-seo-obje-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "object_injection",
+      "source": {
+        "expression": "$data = get_post_meta( $post_id, $key, true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/import/plugins/class-import-smartcrawl.php",
+        "line": 117
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 117,
+          "expression": "$data = get_post_meta( $post_id, $key, true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 118,
+          "expression": "$data = maybe_unserialize( $data )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 118,
+          "expression": "$data = maybe_unserialize( $data )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$data = maybe_unserialize( $data )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/import/plugins/class-import-smartcrawl.php",
+        "line": 118
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordpress-seo-obje-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "object_injection",
+      "source": {
+        "expression": "$data = $wpdb->get_var(\n\t\t\t$wpdb->prepare(\n\t\t\t\t\"SELECT seo FROM {$this->table_name} WHERE blog_id = %d AND \" . $query_where,\n\t\t\t\t$replacements,\n\t\t\t),\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/import/plugins/class-import-squirrly.php",
+        "line": 196
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 196,
+          "expression": "$data = $wpdb->get_var(\n\t\t\t$wpdb->prepare(\n\t\t\t\t\"SELECT seo FROM {$this->table_name} WHERE blog_id = %d AND \" . $query_where,\n\t\t\t\t$replacements,\n\t\t\t),\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 205,
+          "expression": "$data = maybe_unserialize( $data )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 205,
+          "expression": "$data = maybe_unserialize( $data )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$data = maybe_unserialize( $data )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/import/plugins/class-import-squirrly.php",
+        "line": 205
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordpress-seo-obje-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "object_injection",
+      "source": {
+        "expression": "$meta = get_post_meta( $post_id, '_aioseop_opengraph_settings', true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/import/plugins/class-import-aioseo.php",
+        "line": 103
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 103,
+          "expression": "$meta = get_post_meta( $post_id, '_aioseop_opengraph_settings', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 104,
+          "expression": "$meta = maybe_unserialize( $meta )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 104,
+          "expression": "$meta = maybe_unserialize( $meta )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$meta = maybe_unserialize( $meta )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/import/plugins/class-import-aioseo.php",
+        "line": 104
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordpress-seo-open-003",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$request_uri = sanitize_file_name( wp_unslash( $_SERVER['REQUEST_URI'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-bulk-editor.php",
+        "line": 68
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 68,
+          "expression": "$request_uri = sanitize_file_name( wp_unslash( $_SERVER['REQUEST_URI'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 70,
+          "expression": "wp_redirect(\n\t\tremove_query_arg(\n\t\t\t[ '_wp_http_referer', '_wpnonce' ],\n\t\t\t$request_uri,\n\t\t),\n\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_redirect(\n\t\tremove_query_arg(\n\t\t\t[ '_wp_http_referer', '_wpnonce' ],\n\t\t\t$request_uri,\n\t\t),\n\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-bulk-editor.php",
+        "line": 70
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wordpress-seo-file-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$home_path = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-file-editor.php",
+        "line": 18
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 18,
+          "expression": "$home_path = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 21,
+          "expression": "$robots_file    = $home_path . 'robots.txt'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 41,
+          "expression": "$f = fopen( $robots_file, 'x' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$f = fopen( $robots_file, 'x' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-file-editor.php",
+        "line": 41
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wordpress-seo-file-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$home_path = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-file-editor.php",
+        "line": 18
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 18,
+          "expression": "$home_path = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 21,
+          "expression": "$robots_file    = $home_path . 'robots.txt'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 41,
+          "expression": "$f = fopen( $robots_file, 'x' )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 42,
+          "expression": "fwrite( $f, $robots_content )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "fwrite( $f, $robots_content )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-file-editor.php",
+        "line": 42
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wordpress-seo-file-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$home_path = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-file-editor.php",
+        "line": 18
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 18,
+          "expression": "$home_path = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 21,
+          "expression": "$robots_file    = $home_path . 'robots.txt'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 60,
+          "expression": "$f = fopen( $robots_file, 'w+' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$f = fopen( $robots_file, 'w+' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-file-editor.php",
+        "line": 60
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wordpress-seo-file-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$home_path = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-file-editor.php",
+        "line": 18
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 18,
+          "expression": "$home_path = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 21,
+          "expression": "$robots_file    = $home_path . 'robots.txt'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 60,
+          "expression": "$f = fopen( $robots_file, 'w+' )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 61,
+          "expression": "fwrite( $f, $robotsnew )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "fwrite( $f, $robotsnew )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-file-editor.php",
+        "line": 61
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wordpress-seo-file-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$home_path = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-file-editor.php",
+        "line": 18
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 18,
+          "expression": "$home_path = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 22,
+          "expression": "$ht_access_file = $home_path . '.htaccess'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 87,
+          "expression": "$f = fopen( $ht_access_file, 'w+' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$f = fopen( $ht_access_file, 'w+' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-file-editor.php",
+        "line": 87
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wordpress-seo-file-006",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$home_path = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-file-editor.php",
+        "line": 18
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 18,
+          "expression": "$home_path = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 22,
+          "expression": "$ht_access_file = $home_path . '.htaccess'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 87,
+          "expression": "$f = fopen( $ht_access_file, 'w+' )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 88,
+          "expression": "fwrite( $f, $ht_access_new )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "fwrite( $f, $ht_access_new )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-file-editor.php",
+        "line": 88
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wordpress-seo-file-007",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$home_path = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-file-editor.php",
+        "line": 18
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 18,
+          "expression": "$home_path = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 21,
+          "expression": "$robots_file    = $home_path . 'robots.txt'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 142,
+          "expression": "$f = fopen( $robots_file, 'r' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$f = fopen( $robots_file, 'r' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-file-editor.php",
+        "line": 142
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wordpress-seo-file-008",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$home_path = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-file-editor.php",
+        "line": 18
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 18,
+          "expression": "$home_path = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 22,
+          "expression": "$ht_access_file = $home_path . '.htaccess'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 192,
+          "expression": "$f = fopen( $ht_access_file, 'r' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$f = fopen( $ht_access_file, 'r' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/views/tool-file-editor.php",
+        "line": 192
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wordpress-seo-lfi-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "local_file_inclusion",
+      "source": {
+        "expression": "$tool_page = sanitize_text_field( wp_unslash( $_GET['tool'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/pages/tools.php",
+        "line": 19
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 19,
+          "expression": "$tool_page = sanitize_text_field( wp_unslash( $_GET['tool'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 86,
+          "expression": "require_once WPSEO_PATH . 'admin/views/tool-' . $tool_page . '.php'",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "require_once WPSEO_PATH . 'admin/views/tool-' . $tool_page . '.php'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/admin/pages/tools.php",
+        "line": 86
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordpress-seo-sqli-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$orphans = $wpdb->get_col( $query )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/src/repositories/indexable-cleanup-repository.php",
+        "line": 488
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 488,
+          "expression": "$orphans = $wpdb->get_col( $query )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 495,
+          "expression": "$wpdb->query( \"DELETE FROM $indexable_table WHERE object_type = '{$object_type}' AND object_id IN( \" . \\implode( ',', $orphans ) . ' )' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->query( \"DELETE FROM $indexable_table WHERE object_type = '{$object_type}' AND object_id IN( \" . \\implode( ',', $orphans ) . ' )' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/src/repositories/indexable-cleanup-repository.php",
+        "line": 495
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordpress-seo-sqli-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$orphans = $wpdb->get_col( $query )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/src/repositories/indexable-cleanup-repository.php",
+        "line": 526
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 526,
+          "expression": "$orphans = $wpdb->get_col( $query )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 533,
+          "expression": "$wpdb->query( \"DELETE FROM $indexable_table WHERE object_type = 'user' AND object_id IN( \" . \\implode( ',', $orphans ) . ' )' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->query( \"DELETE FROM $indexable_table WHERE object_type = 'user' AND object_id IN( \" . \\implode( ',', $orphans ) . ' )' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/src/repositories/indexable-cleanup-repository.php",
+        "line": 533
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wordpress-seo-sqli-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wordpress-seo",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$orphans = $wpdb->get_col( $query )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/src/repositories/indexable-cleanup-repository.php",
+        "line": 617
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 617,
+          "expression": "$orphans = $wpdb->get_col( $query )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 624,
+          "expression": "$wpdb->query( \"DELETE FROM $table WHERE {$column} IN( \" . \\implode( ',', $orphans ) . ' )' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->query( \"DELETE FROM $table WHERE {$column} IN( \" . \\implode( ',', $orphans ) . ' )' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wordpress-seo/wordpress-seo/src/repositories/indexable-cleanup-repository.php",
+        "line": 624
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ]
+}

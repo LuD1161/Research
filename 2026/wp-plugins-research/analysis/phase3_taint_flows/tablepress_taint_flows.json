@@ -1,0 +1,3655 @@
+{
+  "plugin": "tablepress",
+  "php_files_analyzed": 255,
+  "parse_errors": 0,
+  "total_flows": 52,
+  "by_severity": {
+    "medium": 40,
+    "critical": 3,
+    "high": 4,
+    "low": 5
+  },
+  "by_vulnerability_class": {
+    "rce": 3,
+    "sql_injection": 1,
+    "xss": 37,
+    "open_redirect": 5,
+    "file_inclusion": 6
+  },
+  "flows": [
+    {
+      "flow_id": "tablepress-rce-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$value = isset( $_REQUEST[ $key ] ) ? $_REQUEST[ $key ] : $def",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-core-functions.php",
+        "line": 173
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 173,
+          "expression": "$value = isset( $_REQUEST[ $key ] ) ? $_REQUEST[ $key ] : $def",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 195,
+          "expression": "$input[ $key ] = fs_sanitize_input( $value )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 199,
+          "expression": "$input = empty( $input ) ? $input : sanitize_text_field( $input )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 771,
+          "expression": "array_map( 'fs_urlencode_rfc3986', $input )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map( 'fs_urlencode_rfc3986', $input )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-core-functions.php",
+        "line": 771
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "tablepress-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "tablepress",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$request_url = WP_FS__IS_HTTP_REQUEST ?\n\t\t\t\t$_SERVER['REQUEST_URI'] :\n\t\t\t\t''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/class-fs-logger.php",
+        "line": 394
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 394,
+          "expression": "$request_url = WP_FS__IS_HTTP_REQUEST ?\n\t\t\t\t$_SERVER['REQUEST_URI'] :\n\t\t\t\t''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 398,
+          "expression": "$wpdb->insert(\n\t\t\t\t\"{$wpdb->prefix}fs_logger\",\n\t\t\t\tarray(\n\t\t\t\t\t'process_id'   => self::$_processID,\n\t\t\t\t\t'user_name'    => self::$_ownerName,\n\t\t\t\t\t'logger'       => $this->_id,\n\t\t\t\t\t'log_order'    => $log_order,\n\t\t\t\t\t'type'         => $type,\n\t\t\t\t\t'request_type' => $request_type,\n\t\t\t\t\t'request_url'  => $request_url,\n\t\t\t\t\t'message'      => $message,\n\t\t\t\t\t'file'         => isset( $caller['file'] ) ?\n\t\t\t\t\t\tsubstr( $caller['file'], self::$_abspathLength ) :\n\t\t\t\t\t\t'',\n\t\t\t\t\t'line'         => $caller['line'],\n\t\t\t\t\t'function'     => ( ! empty( $caller['class'] ) ? $caller['class'] . $caller['type'] : '' ) . $caller['function'],\n\t\t\t\t\t'created'      => microtime( true ),\n\t\t\t\t)\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->insert(\n\t\t\t\t\"{$wpdb->prefix}fs_logger\",\n\t\t\t\tarray(\n\t\t\t\t\t'process_id'   => self::$_processID,\n\t\t\t\t\t'user_name'    => self::$_ownerName,\n\t\t\t\t\t'logger'       => $this->_id,\n\t\t\t\t\t'log_order'    => $log_order,\n\t\t\t\t\t'type'         => $type,\n\t\t\t\t\t'request_type' => $request_type,\n\t\t\t\t\t'request_url'  => $request_url,\n\t\t\t\t\t'message'      => $message,\n\t\t\t\t\t'file'         => isset( $caller['file'] ) ?\n\t\t\t\t\t\tsubstr( $caller['file'], self::$_abspathLength ) :\n\t\t\t\t\t\t'',\n\t\t\t\t\t'line'         => $caller['line'],\n\t\t\t\t\t'function'     => ( ! empty( $caller['class'] ) ? $caller['class'] . $caller['type'] : '' ) . $caller['function'],\n\t\t\t\t\t'created'      => microtime( true ),\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/class-fs-logger.php",
+        "line": 398
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "tablepress",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$current = get_site_transient( 'update_plugins' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/class-fs-plugin-updater.php",
+        "line": 343
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 343,
+          "expression": "$current = get_site_transient( 'update_plugins' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 350,
+          "expression": "$r = $current->response[ $file ]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 400,
+          "expression": "$plugin_update_row = preg_replace(\n\t\t\t\t\t'/(\\<div.+>)(.+)(\\<a.+href=\"([^\\s]+)\"([^\\<]+)\\>.+\\<a.+)(\\<\\/div\\>)/is',\n\t\t\t\t\t(\n\t\t\t\t\t\t'$1' .\n\t\t\t\t\t\tsprintf(\n\t\t\t\t\t\t\tfs_text_inline( 'There is a %s of %s available.', 'new-version-available', $this->_fs->get_slug() ),\n\t\t\t\t\t\t\tsprintf(\n\t\t\t\t\t\t\t\t'<a href=\"$4\"%s>%s</a>',\n\t\t\t\t\t\t\t\t'$5',\n\t\t\t\t\t\t\t\t$has_beta_update ?\n\t\t\t\t\t\t\t\t\tfs_text_inline( 'new Beta version', 'new-beta-version', $this->_fs->get_slug() ) :\n\t\t\t\t\t\t\t\t\tfs_text_inline( 'new version', 'new-version', $this->_fs->get_slug() )\n\t\t\t\t\t\t\t),\n\t\t\t\t\t\t\t$this->_fs->get_plugin_title()\n\t\t\t\t\t\t) .\n\t\t\t\t\t\t' ' .\n\t\t\t\t\t\t$this->_fs->version_upgrade_checkout_link( $r->new_version ) .\n\t\t\t\t\t\t'$6'\n\t\t\t\t\t),\n\t\t\t\t\t$plugin_update_row\n\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$plugin_update_row = preg_replace(\n\t\t\t\t\t'/(\\<div.+>)(.+)(\\<a.+href=\"([^\\s]+)\"([^\\<]+)\\>.+\\<a.+)(\\<\\/div\\>)/is',\n\t\t\t\t\t(\n\t\t\t\t\t\t'$1' .\n\t\t\t\t\t\tsprintf(\n\t\t\t\t\t\t\tfs_text_inline( 'There is a %s of %s available.', 'new-version-available', $this->_fs->get_slug() ),\n\t\t\t\t\t\t\tsprintf(\n\t\t\t\t\t\t\t\t'<a href=\"$4\"%s>%s</a>',\n\t\t\t\t\t\t\t\t'$5',\n\t\t\t\t\t\t\t\t$has_beta_update ?\n\t\t\t\t\t\t\t\t\tfs_text_inline( 'new Beta version', 'new-beta-version', $this->_fs->get_slug() ) :\n\t\t\t\t\t\t\t\t\tfs_text_inline( 'new version', 'new-version', $this->_fs->get_slug() )\n\t\t\t\t\t\t\t),\n\t\t\t\t\t\t\t$this->_fs->get_plugin_title()\n\t\t\t\t\t\t) .\n\t\t\t\t\t\t' ' .\n\t\t\t\t\t\t$this->_fs->version_upgrade_checkout_link( $r->new_version ) .\n\t\t\t\t\t\t'$6'\n\t\t\t\t\t),\n\t\t\t\t\t$plugin_update_row\n\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/class-fs-plugin-updater.php",
+        "line": 400
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current = get_site_transient( 'update_plugins' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/class-fs-plugin-updater.php",
+        "line": 343
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 343,
+          "expression": "$current = get_site_transient( 'update_plugins' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 350,
+          "expression": "$r = $current->response[ $file ]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 400,
+          "expression": "$plugin_update_row = preg_replace(\n\t\t\t\t\t'/(\\<div.+>)(.+)(\\<a.+href=\"([^\\s]+)\"([^\\<]+)\\>.+\\<a.+)(\\<\\/div\\>)/is',\n\t\t\t\t\t(\n\t\t\t\t\t\t'$1' .\n\t\t\t\t\t\tsprintf(\n\t\t\t\t\t\t\tfs_text_inline( 'There is a %s of %s available.', 'new-version-available', $this->_fs->get_slug() ),\n\t\t\t\t\t\t\tsprintf(\n\t\t\t\t\t\t\t\t'<a href=\"$4\"%s>%s</a>',\n\t\t\t\t\t\t\t\t'$5',\n\t\t\t\t\t\t\t\t$has_beta_update ?\n\t\t\t\t\t\t\t\t\tfs_text_inline( 'new Beta version', 'new-beta-version', $this->_fs->get_slug() ) :\n\t\t\t\t\t\t\t\t\tfs_text_inline( 'new version', 'new-version', $this->_fs->get_slug() )\n\t\t\t\t\t\t\t),\n\t\t\t\t\t\t\t$this->_fs->get_plugin_title()\n\t\t\t\t\t\t) .\n\t\t\t\t\t\t' ' .\n\t\t\t\t\t\t$this->_fs->version_upgrade_checkout_link( $r->new_version ) .\n\t\t\t\t\t\t'$6'\n\t\t\t\t\t),\n\t\t\t\t\t$plugin_update_row\n\t\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 438,
+          "expression": "$plugin_update_row = str_replace( '</div>', '</div>' . $upgrade_notice_html, $plugin_update_row )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 441,
+          "expression": "echo $plugin_update_row;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $plugin_update_row;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/class-fs-plugin-updater.php",
+        "line": 441
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "tablepress",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$themes_update = get_site_transient( 'update_themes' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/class-fs-plugin-updater.php",
+        "line": 459
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 459,
+          "expression": "$themes_update = get_site_transient( 'update_themes' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 466,
+          "expression": "$prepared_themes[ $theme_basename ]['update'] = preg_replace(\n\t\t\t\t'/(\\<p.+>)(.+)(\\<a.+\\<a.+)\\.(.+\\<\\/p\\>)/is',\n\t\t\t\t'$1 $2 ' . $this->_fs->version_upgrade_checkout_link( $themes_update->response[ $theme_basename ]['new_version'] ) .\n\t\t\t\t'$4',\n\t\t\t\t$prepared_themes[ $theme_basename ]['update']\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$prepared_themes[ $theme_basename ]['update'] = preg_replace(\n\t\t\t\t'/(\\<p.+>)(.+)(\\<a.+\\<a.+)\\.(.+\\<\\/p\\>)/is',\n\t\t\t\t'$1 $2 ' . $this->_fs->version_upgrade_checkout_link( $themes_update->response[ $theme_basename ]['new_version'] ) .\n\t\t\t\t'$4',\n\t\t\t\t$prepared_themes[ $theme_basename ]['update']\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/class-fs-plugin-updater.php",
+        "line": 466
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 958,
+          "expression": "wp_die( $api )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_die( $api )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 958
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1037,
+          "expression": "$low          = empty( $api->banners['low'] ) ? $api->banners['high'] : $api->banners['low']",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 1043,
+          "expression": "echo esc_url( $low );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $low );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1043
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1038,
+          "expression": "$high         = empty( $api->banners['high'] ) ? $api->banners['low'] : $api->banners['high']",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 1050,
+          "expression": "echo esc_url( $high );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $high );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1050
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1058,
+          "expression": "echo \"<div id='{$_tab}-title' class='{$_with_banner}'><div class='vignette'></div><h2>{$api->name}</h2></div>\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo \"<div id='{$_tab}-title' class='{$_with_banner}'><div class='vignette'></div><h2>{$api->name}</h2></div>\";",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1058
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-006",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$section = isset( $_REQUEST['section'] ) ? wp_unslash( $_REQUEST['section'] ) : 'description'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1024
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1024,
+          "expression": "$section = isset( $_REQUEST['section'] ) ? wp_unslash( $_REQUEST['section'] ) : 'description'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1027,
+          "expression": "$section        = array_shift( $section_titles )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1072,
+          "expression": "$class       = ( $section_name === $section ) ? ' class=\"current\"' : ''",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1076,
+          "expression": "echo \"\\t<a name='$san_section' href='$href' $class>\" . esc_html( $title ) . \"</a>\\n\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo \"\\t<a name='$san_section' href='$href' $class>\" . esc_html( $title ) . \"</a>\\n\";",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1076
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-007",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1154,
+          "expression": "printf( fs_text_x_inline( 'Billed %s', 'e.g. billed monthly', 'billed-x', $api->slug ), fs_text_x_inline( 'Monthly', 'as every month', 'monthly', $api->slug ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf( fs_text_x_inline( 'Billed %s', 'e.g. billed monthly', 'billed-x', $api->slug ), fs_text_x_inline( 'Monthly', 'as every month', 'monthly', $api->slug ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1154
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-008",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1156,
+          "expression": "printf( fs_text_x_inline( 'Billed %s', 'e.g. billed monthly', 'billed-x', $api->slug ), fs_text_x_inline( 'Annually', 'as once a year', 'annually', $api->slug ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf( fs_text_x_inline( 'Billed %s', 'e.g. billed monthly', 'billed-x', $api->slug ), fs_text_x_inline( 'Annually', 'as once a year', 'annually', $api->slug ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1156
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-009",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1158,
+          "expression": "printf( fs_text_x_inline( 'Billed %s', 'e.g. billed monthly', 'billed-x', $api->slug ), fs_text_x_inline( 'Once', 'as once a year', 'once', $api->slug ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf( fs_text_x_inline( 'Billed %s', 'e.g. billed monthly', 'billed-x', $api->slug ), fs_text_x_inline( 'Once', 'as once a year', 'once', $api->slug ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1158
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-010",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1196,
+          "expression": "echo esc_url_raw( remove_query_arg( 'billing_cycle', add_query_arg( array( 'plugin_id' => $plan->plugin_id ), $api->checkout_link ) ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url_raw( remove_query_arg( 'billing_cycle', add_query_arg( array( 'plugin_id' => $plan->plugin_id ), $api->checkout_link ) ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1196
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-011",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1239,
+          "expression": "echo fs_esc_attr_x_inline( 'Price', 'noun', 'price', $api->slug )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo fs_esc_attr_x_inline( 'Price', 'noun', 'price', $api->slug )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1239
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-012",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1285,
+          "expression": "printf(\n\t\t\t\t\t\t\t\t\t\t\t/* translators: %s: Discount (e.g. discount of $5 or 10%) */\n\t\t\t\t\t\t\t\t\t\t\t\tfs_esc_html_inline( 'Save %s', 'save-x', $api->slug ), $annual_discount . '%' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf(\n\t\t\t\t\t\t\t\t\t\t\t/* translators: %s: Discount (e.g. discount of $5 or 10%) */\n\t\t\t\t\t\t\t\t\t\t\t\tfs_esc_html_inline( 'Save %s', 'save-x', $api->slug ), $annual_discount . '%' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1285
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-013",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1291,
+          "expression": "echo $this->get_actions_dropdown( $api, $plan )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $this->get_actions_dropdown( $api, $plan )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1291
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-014",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1316,
+          "expression": "echo $api->version;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $api->version;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1316
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-015",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1323,
+          "expression": "echo links_add_target( $api->author, '_blank' );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo links_add_target( $api->author, '_blank' );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1323
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-016",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1331,
+          "expression": "echo $api->last_updated;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $api->last_updated;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1331
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-017",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1355,
+          "expression": "echo $api->tested;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $api->tested;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1355
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-018",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1392,
+          "expression": "echo $api->slug;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $api->slug;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1392
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-019",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1401,
+          "expression": "echo esc_url( $api->homepage );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $api->homepage );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1401
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-020",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1410,
+          "expression": "echo esc_url( $api->donate_link );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $api->donate_link );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1410
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-021",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1454,
+          "expression": "echo $api->slug;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $api->slug;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1454
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-022",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1442,
+          "expression": "$stars_label = sprintf(\n\t\t\t\t\t\t\t\t( ( 1 == $key ) ?\n\t\t\t\t\t\t\t\t\t/* translators: %s: 1 or One */\n\t\t\t\t\t\t\t\t\tfs_text_inline( '%s star', 'x-star', $api->slug ) :\n\t\t\t\t\t\t\t\t\t/* translators: %s: Number larger than 1 */\n\t\t\t\t\t\t\t\t\tfs_text_inline( '%s stars', 'x-stars', $api->slug )\n\t\t\t\t\t\t\t\t),\n\t\t\t\t\t\t\t\tnumber_format_i18n( $key )\n\t\t\t\t\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 1461,
+          "expression": "echo $stars_label",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $stars_label",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1461
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-023",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1441,
+          "expression": "$_rating     = $api->num_ratings ? ( $ratecount / $api->num_ratings ) : 0",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 1463,
+          "expression": "echo absint(92 * $_rating);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo absint(92 * $_rating);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1463
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-024",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1494,
+          "expression": "echo esc_url( $api->donate_link );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $api->donate_link );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1494
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-025",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1513,
+          "expression": "echo '<div class=\"notice notice-error notice-alt\"><p><strong>' . fs_text_inline( 'Error', 'error', $api->slug ) . ':</strong> ' . fs_text_inline( 'This plugin requires a newer version of PHP.', 'newer-php-required-error', $api->slug );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<div class=\"notice notice-error notice-alt\"><p><strong>' . fs_text_inline( 'Error', 'error', $api->slug ) . ':</strong> ' . fs_text_inline( 'This plugin requires a newer version of PHP.', 'newer-php-required-error', $api->slug );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1513
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-026",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1520,
+          "expression": "printf(\n\t\t\t\t\t/* translators: %s: URL to Update PHP page. */\n\t\t\t\t\t\t' ' . fs_text_inline( '<a href=\"%s\" target=\"_blank\">Click here to learn more about updating PHP</a>.', 'php-update-learn-more-link', $api->slug ),\n\t\t\t\t\t\tesc_url( $wp_get_update_php_url )\n\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf(\n\t\t\t\t\t/* translators: %s: URL to Update PHP page. */\n\t\t\t\t\t\t' ' . fs_text_inline( '<a href=\"%s\" target=\"_blank\">Click here to learn more about updating PHP</a>.', 'php-update-learn-more-link', $api->slug ),\n\t\t\t\t\t\tesc_url( $wp_get_update_php_url )\n\t\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1520
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-027",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1536,
+          "expression": "echo '<div class=\"notice notice-warning\"><p>' . '<strong>' . fs_text_inline( 'Warning', 'warning', $api->slug ) . ':</strong> ' . fs_text_inline( 'This plugin has not been tested with your current version of WordPress.', 'not-tested-warning', $api->slug ) . '</p></div>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<div class=\"notice notice-warning\"><p>' . '<strong>' . fs_text_inline( 'Warning', 'warning', $api->slug ) . ':</strong> ' . fs_text_inline( 'This plugin has not been tested with your current version of WordPress.', 'not-tested-warning', $api->slug ) . '</p></div>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1536
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-028",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1538,
+          "expression": "echo '<div class=\"notice notice-warning\"><p>' . '<strong>' . fs_text_inline( 'Warning', 'warning', $api->slug ) . ':</strong> ' . fs_text_inline( 'This plugin has not been marked as compatible with your version of WordPress.', 'not-compatible-warning', $api->slug ) . '</p></div>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<div class=\"notice notice-warning\"><p>' . '<strong>' . fs_text_inline( 'Warning', 'warning', $api->slug ) . ':</strong> ' . fs_text_inline( 'This plugin has not been marked as compatible with your version of WordPress.', 'not-compatible-warning', $api->slug ) . '</p></div>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1538
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-029",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$section = isset( $_REQUEST['section'] ) ? wp_unslash( $_REQUEST['section'] ) : 'description'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1024
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1024,
+          "expression": "$section = isset( $_REQUEST['section'] ) ? wp_unslash( $_REQUEST['section'] ) : 'description'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1027,
+          "expression": "$section        = array_shift( $section_titles )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1547,
+          "expression": "$display = ( $section_name === $section ) ? 'block' : 'none'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1562,
+          "expression": "echo \"\\t<div id='section-{$san_section}' class='section' style='display: {$display};'>\\n\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo \"\\t<div id='section-{$san_section}' class='section' style='display: {$display};'>\\n\";",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1562
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-030",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1542,
+          "expression": "$content = links_add_base_url( $content, 'https://wordpress.org/plugins/' . $api->slug . '/' )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 1543,
+          "expression": "$content = links_add_target( $content, '_blank' )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 1563,
+          "expression": "echo $content;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $content;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1563
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-031",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1585,
+          "expression": "echo $this->get_cta(\n\t\t\t\t\t\t( $this->status['is_premium_installed'] ?\n\t\t\t\t\t\t\tfs_esc_html_inline( 'Latest Version Installed', 'latest-installed', $api->slug ) :\n\t\t\t\t\t\t\tfs_esc_html_inline( 'Latest Free Version Installed', 'latest-free-installed', $api->slug ) ),\n\t\t\t\t\t\tfalse,\n\t\t\t\t\t\ttrue\n\t\t\t\t\t);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $this->get_cta(\n\t\t\t\t\t\t( $this->status['is_premium_installed'] ?\n\t\t\t\t\t\t\tfs_esc_html_inline( 'Latest Version Installed', 'latest-installed', $api->slug ) :\n\t\t\t\t\t\t\tfs_esc_html_inline( 'Latest Free Version Installed', 'latest-free-installed', $api->slug ) ),\n\t\t\t\t\t\tfalse,\n\t\t\t\t\t\ttrue\n\t\t\t\t\t);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1585
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-032",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 932
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 932,
+          "expression": "$args = array(\n\t\t\t\t'slug'   => wp_unslash( $_REQUEST['plugin'] ),\n\t\t\t\t'is_ssl' => is_ssl(),\n\t\t\t\t'fields' => array(\n\t\t\t\t\t'banners'         => true,\n\t\t\t\t\t'reviews'         => true,\n\t\t\t\t\t'downloaded'      => false,\n\t\t\t\t\t'active_installs' => true\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$args = (object) $args",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 955,
+          "expression": "$api = apply_filters( 'fs_plugins_api', false, 'plugin_information', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1595,
+          "expression": "echo $this->get_actions_dropdown( $api, null );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $this->get_actions_dropdown( $api, null );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/includes/fs-plugin-info-dialog.php",
+        "line": 1595
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-033",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$all_plugins = $fs_options->get_option( 'all_plugins' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/templates/debug/plugins-themes-sync.php",
+        "line": 14
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 14,
+          "expression": "$all_plugins = $fs_options->get_option( 'all_plugins' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 36,
+          "expression": "echo count( $all_plugins->plugins )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo count( $all_plugins->plugins )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/templates/debug/plugins-themes-sync.php",
+        "line": 36
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-034",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$all_themes  = $fs_options->get_option( 'all_themes' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/templates/debug/plugins-themes-sync.php",
+        "line": 15
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 15,
+          "expression": "$all_themes  = $fs_options->get_option( 'all_themes' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 57,
+          "expression": "echo count( $all_themes->themes )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo count( $all_themes->themes )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/libraries/freemius/templates/debug/plugins-themes-sync.php",
+        "line": 57
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$tables = wp_unslash( $_POST['table'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 785
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 785,
+          "expression": "$tables = wp_unslash( $_POST['table'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 827,
+          "expression": "$plural = ( count( $tables ) > 1 ) ? '_plural' : ''",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 828,
+          "expression": "$message = \"success_{$bulk_action}{$plural}\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 840,
+          "expression": "$sendback = add_query_arg( array( 'action' => 'list', 'message' => $message ), $sendback )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 842,
+          "expression": "wp_redirect( $sendback )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_redirect( $sendback )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 842
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-file-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$download_filename = sanitize_file_name( $download_filename )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1080
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1080,
+          "expression": "$download_filename = sanitize_file_name( $download_filename )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1081,
+          "expression": "$full_filename = wp_tempnam( $download_filename )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1083,
+          "expression": "unlink( $full_filename )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink( $full_filename )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1083
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-file-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$download_filename = sanitize_file_name( $download_filename )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1080
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1080,
+          "expression": "$download_filename = sanitize_file_name( $download_filename )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1081,
+          "expression": "$full_filename = wp_tempnam( $download_filename )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1116,
+          "expression": "unlink( $full_filename )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink( $full_filename )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1116
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-file-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$download_filename = sanitize_file_name( $download_filename )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1080
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1080,
+          "expression": "$download_filename = sanitize_file_name( $download_filename )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1081,
+          "expression": "$full_filename = wp_tempnam( $download_filename )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1122,
+          "expression": "$download_data = file_get_contents( $full_filename )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$download_data = file_get_contents( $full_filename )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1122
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-file-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$download_filename = sanitize_file_name( $download_filename )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1080
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1080,
+          "expression": "$download_filename = sanitize_file_name( $download_filename )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1081,
+          "expression": "$full_filename = wp_tempnam( $download_filename )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1124,
+          "expression": "unlink( $full_filename )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink( $full_filename )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1124
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-file-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$download_filename = sanitize_file_name( $download_filename )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1080
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1080,
+          "expression": "$download_filename = sanitize_file_name( $download_filename )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1081,
+          "expression": "$full_filename = wp_tempnam( $download_filename )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1127,
+          "expression": "unlink( $full_filename )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink( $full_filename )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1127
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-open-002",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$download_filename = sanitize_file_name( $download_filename )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1080
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1080,
+          "expression": "$download_filename = sanitize_file_name( $download_filename )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1133,
+          "expression": "header( \"Content-Disposition: attachment; filename=\\\"{$download_filename}\\\"\" )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "header( \"Content-Disposition: attachment; filename=\\\"{$download_filename}\\\"\" )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1133
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-open-003",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$download_filename = sanitize_file_name( $download_filename )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1080
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1080,
+          "expression": "$download_filename = sanitize_file_name( $download_filename )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1081,
+          "expression": "$full_filename = wp_tempnam( $download_filename )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1122,
+          "expression": "$download_data = file_get_contents( $full_filename )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1138,
+          "expression": "header( 'Content-Length: ' . strlen( $download_data ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "header( 'Content-Length: ' . strlen( $download_data ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1138
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-035",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$download_filename = sanitize_file_name( $download_filename )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1080
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1080,
+          "expression": "$download_filename = sanitize_file_name( $download_filename )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1081,
+          "expression": "$full_filename = wp_tempnam( $download_filename )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1122,
+          "expression": "$download_data = file_get_contents( $full_filename )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1143,
+          "expression": "echo $download_data;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $download_data;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1143
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-open-004",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$return = ! empty( $_GET['return'] ) ? $_GET['return'] : 'list'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1270
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1270,
+          "expression": "$return = ! empty( $_GET['return'] ) ? $_GET['return'] : 'list'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1296,
+          "expression": "$sendback = add_query_arg( array( 'action' => 'list', 'message' => 'success_delete', 'table_id' => $return_item ), $sendback )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1298,
+          "expression": "wp_redirect( $sendback )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_redirect( $sendback )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1298
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-file-006",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$table_id = ( ! empty( $_GET['item'] ) ) ? $_GET['item'] : false",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1308
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1308,
+          "expression": "$table_id = ( ! empty( $_GET['item'] ) ) ? $_GET['item'] : false",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1323,
+          "expression": "$copy_table_id = TablePress::$model_table->copy( $table_id )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$copy_table_id = TablePress::$model_table->copy( $table_id )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1323
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-open-005",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$return = ! empty( $_GET['return'] ) ? $_GET['return'] : 'list'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1311
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1311,
+          "expression": "$return = ! empty( $_GET['return'] ) ? $_GET['return'] : 'list'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1338,
+          "expression": "$sendback = add_query_arg( array( 'action' => $return, 'message' => 'success_copy', 'table_id' => $return_item ), $sendback )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1340,
+          "expression": "wp_redirect( $sendback )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_redirect( $sendback )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/controllers/controller-admin.php",
+        "line": 1340
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-036",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo \"\\ttable_editor_column_width: \" . absint( TablePress::$model_options->get( 'table_editor_column_width' ) ) . \",\\n\";",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/views/view-edit.php",
+        "line": 247
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 247,
+          "expression": "echo \"\\ttable_editor_column_width: \" . absint( TablePress::$model_options->get( 'table_editor_column_width' ) ) . \",\\n\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo \"\\ttable_editor_column_width: \" . absint( TablePress::$model_options->get( 'table_editor_column_width' ) ) . \",\\n\";",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/views/view-edit.php",
+        "line": 247
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "tablepress-xss-037",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "tablepress",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$css_variables = '--table-editor-line-clamp:' . absint( TablePress::$model_options->get( 'table_editor_line_clamp' ) ) . ';'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/views/view-edit.php",
+        "line": 319
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 319,
+          "expression": "$css_variables = '--table-editor-line-clamp:' . absint( TablePress::$model_options->get( 'table_editor_line_clamp' ) ) . ';'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 320,
+          "expression": "$css_variables = esc_attr( $css_variables )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 321,
+          "expression": "echo \"<div id=\\\"table-editor\\\" style=\\\"{$css_variables}\\\"></div>\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo \"<div id=\\\"table-editor\\\" style=\\\"{$css_variables}\\\"></div>\";",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/tablepress/views/view-edit.php",
+        "line": 321
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ]
+}

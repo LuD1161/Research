@@ -1,0 +1,828 @@
+{
+  "plugin": "simple-history",
+  "php_files_analyzed": 211,
+  "parse_errors": 0,
+  "total_flows": 16,
+  "by_severity": {
+    "critical": 8,
+    "high": 4,
+    "low": 2,
+    "medium": 2
+  },
+  "by_vulnerability_class": {
+    "rce": 6,
+    "xss": 5,
+    "open_redirect": 2,
+    "sql_injection": 2,
+    "ssrf": 1
+  },
+  "flows": [
+    {
+      "flow_id": "simple-history-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$users = $wpdb->get_results(\n\t\t\t$wpdb->prepare(\n\t\t\t\t'SELECT\n\t\t\t\t\tc.value as user_id,\n\t\t\t\t\tCOUNT(*) as count,\n\t\t\t\t\tu.display_name,\n\t\t\t\t\tu.user_login,\n\t\t\t\t\tu.user_email\n\t\t\t\tFROM\n\t\t\t\t\t%i c\n\t\t\t\tJOIN\n\t\t\t\t\t%i h ON h.id = c.history_id\n\t\t\t\tJOIN\n\t\t\t\t\t%i u ON u.ID = CAST(c.value AS UNSIGNED)\n\t\t\t\tWHERE\n\t\t\t\t\tc.key = \"_user_id\"\n\t\t\t\t\tAND CAST(c.value AS UNSIGNED) > 0\n\t\t\t\t\tAND h.date >= FROM_UNIXTIME(%d)\n\t\t\t\t\tAND h.date <= FROM_UNIXTIME(%d)\n\t\t\t\tGROUP BY\n\t\t\t\t\tc.value\n\t\t\t\tORDER BY\n\t\t\t\t\tcount DESC\n\t\t\t\tLIMIT %d',\n\t\t\t\t$contexts_table,\n\t\t\t\t$events_table,\n\t\t\t\t$wpdb->users,\n\t\t\t\t$date_from,\n\t\t\t\t$date_to,\n\t\t\t\t$limit\n\t\t\t)\n\t\t\t// phpcs:enable WordPressVIPMinimum.Variables.RestrictedVariables.user_meta__wpdb__users\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/class-events-stats.php",
+        "line": 282
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 282,
+          "expression": "$users = $wpdb->get_results(\n\t\t\t$wpdb->prepare(\n\t\t\t\t'SELECT\n\t\t\t\t\tc.value as user_id,\n\t\t\t\t\tCOUNT(*) as count,\n\t\t\t\t\tu.display_name,\n\t\t\t\t\tu.user_login,\n\t\t\t\t\tu.user_email\n\t\t\t\tFROM\n\t\t\t\t\t%i c\n\t\t\t\tJOIN\n\t\t\t\t\t%i h ON h.id = c.history_id\n\t\t\t\tJOIN\n\t\t\t\t\t%i u ON u.ID = CAST(c.value AS UNSIGNED)\n\t\t\t\tWHERE\n\t\t\t\t\tc.key = \"_user_id\"\n\t\t\t\t\tAND CAST(c.value AS UNSIGNED) > 0\n\t\t\t\t\tAND h.date >= FROM_UNIXTIME(%d)\n\t\t\t\t\tAND h.date <= FROM_UNIXTIME(%d)\n\t\t\t\tGROUP BY\n\t\t\t\t\tc.value\n\t\t\t\tORDER BY\n\t\t\t\t\tcount DESC\n\t\t\t\tLIMIT %d',\n\t\t\t\t$contexts_table,\n\t\t\t\t$events_table,\n\t\t\t\t$wpdb->users,\n\t\t\t\t$date_from,\n\t\t\t\t$date_to,\n\t\t\t\t$limit\n\t\t\t)\n\t\t\t// phpcs:enable WordPressVIPMinimum.Variables.RestrictedVariables.user_meta__wpdb__users\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 323,
+          "expression": "array_map(\n\t\t\tfunction ( $user ) {\n\t\t\t\t$display_name = trim( (string) $user->display_name );\n\n\t\t\t\tif ( $display_name === '' ) {\n\t\t\t\t\t$display_name = $user->user_login;\n\t\t\t\t}\n\n\t\t\t\treturn [\n\t\t\t\t\t'id'           => $user->user_id,\n\t\t\t\t\t'display_name' => $display_name,\n\t\t\t\t\t'user_email'   => $user->user_email,\n\t\t\t\t\t'avatar'       => get_avatar_url( $user->user_id ),\n\t\t\t\t\t'count'        => (int) $user->count,\n\t\t\t\t];\n\t\t\t},\n\t\t\t$users\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(\n\t\t\tfunction ( $user ) {\n\t\t\t\t$display_name = trim( (string) $user->display_name );\n\n\t\t\t\tif ( $display_name === '' ) {\n\t\t\t\t\t$display_name = $user->user_login;\n\t\t\t\t}\n\n\t\t\t\treturn [\n\t\t\t\t\t'id'           => $user->user_id,\n\t\t\t\t\t'display_name' => $display_name,\n\t\t\t\t\t'user_email'   => $user->user_email,\n\t\t\t\t\t'avatar'       => get_avatar_url( $user->user_id ),\n\t\t\t\t\t'count'        => (int) $user->count,\n\t\t\t\t];\n\t\t\t},\n\t\t\t$users\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/class-events-stats.php",
+        "line": 323
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$results = $wpdb->get_col(\n\t\t\t$wpdb->prepare(\n\t\t\t\t'SELECT history_id FROM %i WHERE `key` = %s',\n\t\t\t\t$contexts_table,\n\t\t\t\t'_sticky'\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/class-helpers.php",
+        "line": 2427
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2427,
+          "expression": "$results = $wpdb->get_col(\n\t\t\t$wpdb->prepare(\n\t\t\t\t'SELECT history_id FROM %i WHERE `key` = %s',\n\t\t\t\t$contexts_table,\n\t\t\t\t'_sticky'\n\t\t\t)\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2435,
+          "expression": "array_map( 'intval', $results )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map( 'intval', $results )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/class-helpers.php",
+        "line": 2435
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "absint( $sample['rules_count'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-alerts-settings-page-teaser.php",
+        "line": 243
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 243,
+          "expression": "printf(\n\t\t\t\t\t\t\t\t\t\t\t\t\t/* translators: %d: number of alert rules */\n\t\t\t\t\t\t\t\t\t\t\t\t\tesc_html( _n( '%d rule', '%d rules', $sample['rules_count'], 'simple-history' ) ),\n\t\t\t\t\t\t\t\t\t\t\t\t\tabsint( $sample['rules_count'] )\n\t\t\t\t\t\t\t\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf(\n\t\t\t\t\t\t\t\t\t\t\t\t\t/* translators: %d: number of alert rules */\n\t\t\t\t\t\t\t\t\t\t\t\t\tesc_html( _n( '%d rule', '%d rules', $sample['rules_count'], 'simple-history' ) ),\n\t\t\t\t\t\t\t\t\t\t\t\t\tabsint( $sample['rules_count'] )\n\t\t\t\t\t\t\t\t\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-alerts-settings-page-teaser.php",
+        "line": 243
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "absint( $event_count )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-alerts-settings-page-teaser.php",
+        "line": 314
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 314,
+          "expression": "printf(\n\t\t\t\t\t\t\t\t\t\t\t/* translators: %d: number of event types */\n\t\t\t\t\t\t\t\t\t\t\tesc_html( _n( 'Monitors %d event type', 'Monitors %d event types', $event_count, 'simple-history' ) ),\n\t\t\t\t\t\t\t\t\t\t\tabsint( $event_count )\n\t\t\t\t\t\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf(\n\t\t\t\t\t\t\t\t\t\t\t/* translators: %d: number of event types */\n\t\t\t\t\t\t\t\t\t\t\tesc_html( _n( 'Monitors %d event type', 'Monitors %d event types', $event_count, 'simple-history' ) ),\n\t\t\t\t\t\t\t\t\t\t\tabsint( $event_count )\n\t\t\t\t\t\t\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-alerts-settings-page-teaser.php",
+        "line": 314
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-xss-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo absint( $sample['recipient_count'] );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-alerts-settings-page-teaser.php",
+        "line": 359
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 359,
+          "expression": "echo absint( $sample['recipient_count'] );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo absint( $sample['recipient_count'] );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-alerts-settings-page-teaser.php",
+        "line": 359
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "simple-history",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$import_post_types = isset( $_POST['import_post_types'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['import_post_types'] ) ) : []",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-import-handler.php",
+        "line": 88
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 88,
+          "expression": "$import_post_types = isset( $_POST['import_post_types'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['import_post_types'] ) ) : []",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 129,
+          "expression": "$results = $importer->import_all(\n\t\t\t[\n\t\t\t\t'post_types'   => $import_post_types,\n\t\t\t\t'import_users' => $import_users,\n\t\t\t\t'limit'        => $import_limit,\n\t\t\t\t'days_back'    => $days_back,\n\t\t\t]\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 167,
+          "expression": "$redirect_url = add_query_arg(\n\t\t\t[\n\t\t\t\t'page'                   => Tools_Menu_Dropin::MENU_SLUG,\n\t\t\t\t'selected-tab'           => Tools_Menu_Dropin::TOOLS_TAB_SLUG,\n\t\t\t\t'selected-sub-tab'       => Import_Dropin::MENU_SLUG,\n\t\t\t\t'import-completed'       => '1',\n\t\t\t\t'posts-imported'         => isset( $results['posts_imported'] ) ? intval( $results['posts_imported'] ) : 0,\n\t\t\t\t'users-imported'         => isset( $results['users_imported'] ) ? intval( $results['users_imported'] ) : 0,\n\t\t\t\t'post-events-created'    => isset( $results['post_events_created'] ) ? intval( $results['post_events_created'] ) : 0,\n\t\t\t\t'user-events-created'    => isset( $results['user_events_created'] ) ? intval( $results['user_events_created'] ) : 0,\n\t\t\t\t'posts-skipped-imported' => isset( $results['posts_skipped_imported'] ) ? intval( $results['posts_skipped_imported'] ) : 0,\n\t\t\t\t'posts-skipped-logged'   => isset( $results['posts_skipped_logged'] ) ? intval( $results['posts_skipped_logged'] ) : 0,\n\t\t\t\t'users-skipped-imported' => isset( $results['users_skipped_imported'] ) ? intval( $results['users_skipped_imported'] ) : 0,\n\t\t\t\t'users-skipped-logged'   => isset( $results['users_skipped_logged'] ) ? intval( $results['users_skipped_logged'] ) : 0,\n\t\t\t],\n\t\t\tadmin_url( 'admin.php' )\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 185,
+          "expression": "wp_safe_redirect( $redirect_url )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( $redirect_url )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-import-handler.php",
+        "line": 185
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "simple-history-open-002",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "simple-history",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$redirect_url = add_query_arg(\n\t\t\t[\n\t\t\t\t'page'             => Tools_Menu_Dropin::MENU_SLUG,\n\t\t\t\t'selected-tab'     => Tools_Menu_Dropin::TOOLS_TAB_SLUG,\n\t\t\t\t'selected-sub-tab' => Import_Dropin::MENU_SLUG,\n\t\t\t\t'delete-completed' => '1',\n\t\t\t\t'events-deleted'   => isset( $results['events_deleted'] ) ? intval( $results['events_deleted'] ) : 0,\n\t\t\t],\n\t\t\tadmin_url( 'admin.php' )\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-import-handler.php",
+        "line": 229
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 229,
+          "expression": "$redirect_url = add_query_arg(\n\t\t\t[\n\t\t\t\t'page'             => Tools_Menu_Dropin::MENU_SLUG,\n\t\t\t\t'selected-tab'     => Tools_Menu_Dropin::TOOLS_TAB_SLUG,\n\t\t\t\t'selected-sub-tab' => Import_Dropin::MENU_SLUG,\n\t\t\t\t'delete-completed' => '1',\n\t\t\t\t'events-deleted'   => isset( $results['events_deleted'] ) ? intval( $results['events_deleted'] ) : 0,\n\t\t\t],\n\t\t\tadmin_url( 'admin.php' )\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 240,
+          "expression": "wp_safe_redirect( $redirect_url )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( $redirect_url )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-import-handler.php",
+        "line": 240
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "simple-history-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "absint( self::CACHE_DURATION_MINUTES )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-history-insights-sidebar-service.php",
+        "line": 611
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 611,
+          "expression": "printf(\n\t\t\t\t/* translators: %d is the number of minutes between cache refreshes */\n\t\t\t\tesc_html__( 'Insights are based on events you can view. Updates every %d minutes.', 'simple-history' ),\n\t\t\t\tabsint( self::CACHE_DURATION_MINUTES )\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf(\n\t\t\t\t/* translators: %d is the number of minutes between cache refreshes */\n\t\t\t\tesc_html__( 'Insights are based on events you can view. Updates every %d minutes.', 'simple-history' ),\n\t\t\t\tabsint( self::CACHE_DURATION_MINUTES )\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-history-insights-sidebar-service.php",
+        "line": 611
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$ids_to_delete = $wpdb->get_col( $sql )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-setup-purge-db-cron.php",
+        "line": 124
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 124,
+          "expression": "$ids_to_delete = $wpdb->get_col( $sql )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 131,
+          "expression": "$sql_ids_in = implode( ',', $ids_to_delete )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 134,
+          "expression": "$sql_delete_history         = \"DELETE FROM {$table_name} WHERE id IN ($sql_ids_in)\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 138,
+          "expression": "$wpdb->query( $sql_delete_history )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->query( $sql_delete_history )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-setup-purge-db-cron.php",
+        "line": 138
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-sqli-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$ids_to_delete = $wpdb->get_col( $sql )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-setup-purge-db-cron.php",
+        "line": 124
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 124,
+          "expression": "$ids_to_delete = $wpdb->get_col( $sql )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 131,
+          "expression": "$sql_ids_in = implode( ',', $ids_to_delete )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 134,
+          "expression": "$sql_delete_history         = \"DELETE FROM {$table_name} WHERE id IN ($sql_ids_in)\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 141,
+          "expression": "$wpdb->query( $sql_delete_history_context )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->query( $sql_delete_history_context )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/inc/services/class-setup-purge-db-cron.php",
+        "line": 141
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "(array) ( $_GET['post'] ?? [] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-post-logger.php",
+        "line": 337
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 337,
+          "expression": "$post_ids = array_map( 'intval', (array) ( $_GET['post'] ?? [] ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$post_ids = array_map( 'intval', (array) ( $_GET['post'] ?? [] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-post-logger.php",
+        "line": 337
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-rce-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$deletedFieldsIDs = explode( '|', (string) sanitize_text_field( wp_unslash( $_POST['_acf_delete_fields'] ) ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-plugin-acf-logger.php",
+        "line": 1015
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1015,
+          "expression": "$deletedFieldsIDs = explode( '|', (string) sanitize_text_field( wp_unslash( $_POST['_acf_delete_fields'] ) ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1016,
+          "expression": "$deletedFieldsIDs = array_map( 'intval', $deletedFieldsIDs )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1016,
+          "expression": "$deletedFieldsIDs = array_map( 'intval', $deletedFieldsIDs )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$deletedFieldsIDs = array_map( 'intval', $deletedFieldsIDs )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-plugin-acf-logger.php",
+        "line": 1016
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-ssrf-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "simple-history",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$repo = isset( $_GET['repo'] ) ? (string) sanitize_text_field( wp_unslash( $_GET['repo'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-plugin-logger.php",
+        "line": 696
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 696,
+          "expression": "$repo = isset( $_GET['repo'] ) ? (string) sanitize_text_field( wp_unslash( $_GET['repo'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 712,
+          "expression": "$api_url = sprintf(\n\t\t\t'https://api.github.com/repos/%1$s/%2$s/readme',\n\t\t\trawurlencode( $repo_username ),\n\t\t\trawurlencode( $repo_repo ) \n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 720,
+          "expression": "$response = wp_remote_get(\n\t\t\t$api_url,\n\t\t\tarray(\n\t\t\t\t'headers' => array(\n\t\t\t\t\t'accept' => 'application/vnd.github.VERSION.html',\n\t\t\t\t),\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_get(\n\t\t\t$api_url,\n\t\t\tarray(\n\t\t\t\t'headers' => array(\n\t\t\t\t\t'accept' => 'application/vnd.github.VERSION.html',\n\t\t\t\t),\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-plugin-logger.php",
+        "line": 720
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "simple-history-xss-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "simple-history",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$repo = isset( $_GET['repo'] ) ? (string) sanitize_text_field( wp_unslash( $_GET['repo'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-plugin-logger.php",
+        "line": 696
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 696,
+          "expression": "$repo = isset( $_GET['repo'] ) ? (string) sanitize_text_field( wp_unslash( $_GET['repo'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 760,
+          "expression": "printf(\n\t\t\t'\n\t\t\t\t<!doctype html>\n\t\t\t\t<style>\n\t\t\t\t\tbody {\n\t\t\t\t\t\tfont-family: sans-serif;\n\t\t\t\t\t\tfont-size: 16px;\n\t\t\t\t\t}\n\t\t\t\t\t.repo-info {\n\t\t\t\t\t\tpadding: 1.25em 1em;\n\t\t\t\t\t\tbackground: #fafafa;\n\t\t\t\t\t\tline-height: 1;\n\t\t\t\t\t}\n\t\t\t\t\t.repo-info p {\n\t\t\t\t\t\tmargin: 0;\n\t\t\t\t\t}\n\t\t\t\t\t    .markdown-body {\n\t\t\t\t        min-width: 200px;\n\t\t\t\t        max-width: 790px;\n\t\t\t\t        margin: 0 auto;\n\t\t\t\t        padding: 30px;\n\t\t\t\t    }\n\n\t\t\t\t\t@import url(\"%3$s\");\n\n\t\t\t\t</style>\n\n\t\t\t\t<base href=\"%4$s/raw/master/\">\n\t\t\t\t<base target=\"_blank\">\n\n\t\t\t\t<header class=\"repo-info\">\n\t\t\t\t\t%1$s\n\t\t\t\t</header>\n\n\t\t\t\t<div class=\"markdown-body readme-contents\">\n\t\t\t\t\t%2$s\n\t\t\t\t</div>\n\t\t\t',\n\t\t\t$repo_info, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\t$escaped_response_body, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\tesc_url( $github_markdown_css_path ), // 3\n\t\t\tesc_url( $repo ) // 4\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf(\n\t\t\t'\n\t\t\t\t<!doctype html>\n\t\t\t\t<style>\n\t\t\t\t\tbody {\n\t\t\t\t\t\tfont-family: sans-serif;\n\t\t\t\t\t\tfont-size: 16px;\n\t\t\t\t\t}\n\t\t\t\t\t.repo-info {\n\t\t\t\t\t\tpadding: 1.25em 1em;\n\t\t\t\t\t\tbackground: #fafafa;\n\t\t\t\t\t\tline-height: 1;\n\t\t\t\t\t}\n\t\t\t\t\t.repo-info p {\n\t\t\t\t\t\tmargin: 0;\n\t\t\t\t\t}\n\t\t\t\t\t    .markdown-body {\n\t\t\t\t        min-width: 200px;\n\t\t\t\t        max-width: 790px;\n\t\t\t\t        margin: 0 auto;\n\t\t\t\t        padding: 30px;\n\t\t\t\t    }\n\n\t\t\t\t\t@import url(\"%3$s\");\n\n\t\t\t\t</style>\n\n\t\t\t\t<base href=\"%4$s/raw/master/\">\n\t\t\t\t<base target=\"_blank\">\n\n\t\t\t\t<header class=\"repo-info\">\n\t\t\t\t\t%1$s\n\t\t\t\t</header>\n\n\t\t\t\t<div class=\"markdown-body readme-contents\">\n\t\t\t\t\t%2$s\n\t\t\t\t</div>\n\t\t\t',\n\t\t\t$repo_info, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\t$escaped_response_body, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\tesc_url( $github_markdown_css_path ), // 3\n\t\t\tesc_url( $repo ) // 4\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-plugin-logger.php",
+        "line": 760
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "simple-history-rce-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$new_ids = array_values( isset( $_POST['menu-item-db-id'] ) ? (array) wp_unslash( $_POST['menu-item-db-id'] ) : array() )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-menu-logger.php",
+        "line": 374
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 374,
+          "expression": "$new_ids = array_values( isset( $_POST['menu-item-db-id'] ) ? (array) wp_unslash( $_POST['menu-item-db-id'] ) : array() )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 499,
+          "expression": "$old_order = array_map( 'intval', array_values( array_intersect( $old_ids, $new_ids ) ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$old_order = array_map( 'intval', array_values( array_intersect( $old_ids, $new_ids ) ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-menu-logger.php",
+        "line": 499
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-history-rce-006",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "simple-history",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$new_ids = array_values( isset( $_POST['menu-item-db-id'] ) ? (array) wp_unslash( $_POST['menu-item-db-id'] ) : array() )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-menu-logger.php",
+        "line": 374
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 374,
+          "expression": "$new_ids = array_values( isset( $_POST['menu-item-db-id'] ) ? (array) wp_unslash( $_POST['menu-item-db-id'] ) : array() )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 500,
+          "expression": "$new_order = array_map( 'intval', array_values( array_intersect( $new_ids, $old_ids ) ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$new_order = array_map( 'intval', array_values( array_intersect( $new_ids, $old_ids ) ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/simple-history/loggers/class-menu-logger.php",
+        "line": 500
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ]
+}

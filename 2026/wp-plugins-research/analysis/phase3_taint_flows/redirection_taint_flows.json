@@ -1,0 +1,366 @@
+{
+  "plugin": "redirection",
+  "php_files_analyzed": 104,
+  "parse_errors": 0,
+  "total_flows": 7,
+  "by_severity": {
+    "high": 2,
+    "low": 2,
+    "critical": 3
+  },
+  "by_vulnerability_class": {
+    "xss": 1,
+    "open_redirect": 2,
+    "sql_injection": 3,
+    "variable_injection": 1
+  },
+  "flows": [
+    {
+      "flow_id": "redirection-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "redirection",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$items = Red_Item::get_all_for_module( intval( $module, 10 ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/redirection/redirection-admin.php",
+        "line": 831
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 831,
+          "expression": "$items = Red_Item::get_all_for_module( intval( $module, 10 ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 837,
+          "expression": "echo $exporter->get_data( $items, array() );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $exporter->get_data( $items, array() );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/redirection/redirection-admin.php",
+        "line": 837
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "redirection-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "redirection",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "'Content-type: text/xml; charset=' . get_option( 'blog_charset' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/redirection/fileio/rss.php",
+        "line": 9
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 9,
+          "expression": "header( 'Content-type: text/xml; charset=' . get_option( 'blog_charset' ), true )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "header( 'Content-type: text/xml; charset=' . get_option( 'blog_charset' ), true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/redirection/fileio/rss.php",
+        "line": 9
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "redirection-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "redirection",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$name = trim( wp_kses( sanitize_text_field( $name ), 'strip' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/redirection/models/group.php",
+        "line": 220
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 220,
+          "expression": "$name = trim( wp_kses( sanitize_text_field( $name ), 'strip' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 221,
+          "expression": "$name = substr( $name, 0, 50 )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 227,
+          "expression": "$data = array(\n\t\t\t\t'name'      => trim( $name ),\n\t\t\t\t'module_id' => intval( $module_id ),\n\t\t\t\t'position'  => intval( $position ),\n\t\t\t\t'status'    => $enabled ? 'enabled' : 'disabled',\n\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 234,
+          "expression": "$wpdb->insert( $wpdb->prefix . 'redirection_groups', $data )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->insert( $wpdb->prefix . 'redirection_groups', $data )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/redirection/models/group.php",
+        "line": 234
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "redirection-sqli-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "redirection",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "array( 'id' => intval( $this->id ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/redirection/models/group.php",
+        "line": 259
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 259,
+          "expression": "$wpdb->update( $wpdb->prefix . 'redirection_groups', array( 'name' => $this->name, 'module_id' => $this->module_id ), array( 'id' => intval( $this->id ) ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->update( $wpdb->prefix . 'redirection_groups', array( 'name' => $this->name, 'module_id' => $this->module_id ), array( 'id' => intval( $this->id ) ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/redirection/models/group.php",
+        "line": 259
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "redirection-sqli-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "redirection",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$data['position'] = $wpdb->get_var( $wpdb->prepare( \"SELECT COUNT(*) FROM {$wpdb->prefix}redirection_items WHERE group_id=%d\", $data['group_id'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/redirection/models/redirect/redirect.php",
+        "line": 627
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 627,
+          "expression": "$data['position'] = $wpdb->get_var( $wpdb->prepare( \"SELECT COUNT(*) FROM {$wpdb->prefix}redirection_items WHERE group_id=%d\", $data['group_id'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 630,
+          "expression": "$data = apply_filters( 'redirection_create_redirect', $data )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 633,
+          "expression": "$data['match_data'] = wp_json_encode( $data['match_data'], JSON_UNESCAPED_SLASHES )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 637,
+          "expression": "$wpdb->insert( $wpdb->prefix . 'redirection_items', $data )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->insert( $wpdb->prefix . 'redirection_items', $data )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/redirection/models/redirect/redirect.php",
+        "line": 637
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "redirection-open-002",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "redirection",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$filename = static::get_csv_filename() . '-' . date_i18n( get_option( 'date_format' ) ) . '.csv'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/redirection/models/log/log.php",
+        "line": 526
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 526,
+          "expression": "$filename = static::get_csv_filename() . '-' . date_i18n( get_option( 'date_format' ) ) . '.csv'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 531,
+          "expression": "header( 'Content-Disposition: attachment; filename=\"' . $filename . '\"' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "header( 'Content-Disposition: attachment; filename=\"' . $filename . '\"' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/redirection/models/log/log.php",
+        "line": 531
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "redirection-vari-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "redirection",
+      "vulnerability_class": "variable_injection",
+      "source": {
+        "expression": "$_SERVER['QUERY_STRING']",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/redirection/actions/pass.php",
+        "line": 38
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 38,
+          "expression": "parse_str( $_SERVER['QUERY_STRING'], $_GET )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "parse_str( $_SERVER['QUERY_STRING'], $_GET )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/redirection/actions/pass.php",
+        "line": 38
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ]
+}
