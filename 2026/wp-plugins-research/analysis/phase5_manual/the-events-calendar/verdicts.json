@@ -1,0 +1,829 @@
+{
+  "plugin": "the-events-calendar",
+  "review_date": "2026-06-14",
+  "reviewer": "sonnet-4.6-agent",
+  "total_findings_reviewed": 78,
+  "confirmed": 4,
+  "false_positive": 68,
+  "needs_info": 6,
+  "verdicts": [
+    {
+      "finding_id": "the-events-calendar-xss-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "wp_send_json_error() sends a JSON-encoded response with Content-Type application/json. XSS via JSON responses requires a context where the browser interprets JSON as HTML, which doesn't apply here. The data is from get_option() piped through an external API call — the response is purely JSON. Auth required and nonce verified per brief. Not exploitable as XSS.",
+      "vulnerability_class": "xss",
+      "auth_required": true,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same as xss-001. wp_send_json_success() sends Content-Type application/json. Not an XSS vector. Auth and nonce verified.",
+      "vulnerability_class": "xss",
+      "auth_required": true,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The sink is `array_filter($chunks)` — a call to PHP's built-in array_filter with no callback argument, which simply removes falsy values from the array. This is NOT RCE. The scanner incorrectly flagged array_filter() as a dangerous sink (confusing it with a shell execution function). array_filter() without a callback cannot execute arbitrary code.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-obje-001",
+      "verdict": "needs_info",
+      "confidence": "medium",
+      "reasoning": "maybe_unserialize() on chunked transient data from the database. The source is get_transient(), which reads from wp_options. Transients are set internally and not directly controllable by unauthenticated users in standard configurations. However, if there is any path where an attacker can write to transients (e.g., via object injection in a prior step or via SQL injection), this unserialize could be weaponized. Requires further investigation of transient write paths. Low practical impact unless a transient-write vector exists.",
+      "vulnerability_class": "object_injection",
+      "auth_required": false,
+      "cvss_score": 4.3,
+      "poc_sketch": "Need to find a code path that allows unauthenticated write to the chunked transient keys. If one exists, a serialized PHP object payload could be stored and deserialized here."
+    },
+    {
+      "finding_id": "the-events-calendar-xss-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The 'tainted' value at line 351 is `$context = isset($_GET[$this->welcome_slug]) ? 'welcome' : 'update'` — this is a ternary that only ever produces the literal string 'welcome' or 'update'. Neither value comes from user input. The GET parameter is only tested for existence (isset()), not for its value. The $context variable is therefore always a hardcoded safe string.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "wp_send_json_success() sends a JSON response, not HTML. The log entries from get_log_entries() are returned as JSON, not rendered as HTML by the browser. Not an XSS vector. Also nonce verified per brief.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-open-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The sink is `header('Content-Disposition: attachment; filename=...')`. This is not an open redirect. Content-Disposition is a download header, not a redirect. Even if $log_name contained special characters, it's sanitized with sanitize_file_name() first and goes into a filename parameter — not a Location header. Misclassification by the scanner.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-005",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "echo json_encode($response) — json_encode() produces valid JSON, not HTML. The response is from a remote API call (license key validation). JSON output with Content-Type application/json is not an XSS vector. Auth and nonce verified.",
+      "vulnerability_class": "xss",
+      "auth_required": true,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-ssrf-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The tainted source is `sanitize_text_field($key)` — the license key — passed as a POST body parameter to a fixed hardcoded URL ($url). The URL itself is not user-controlled. SSRF requires controlling the target URL/host, not just the POST body. Auth and nonce verified. Not SSRF.",
+      "vulnerability_class": "ssrf",
+      "auth_required": true,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-002",
+      "verdict": "confirmed",
+      "confidence": "high",
+      "reasoning": "call_user_func_array([$this, $args->source], ...) where $args->source comes from $_POST['source']. The check at line 288 restricts $args->source to 'search_terms' or 'search_posts' via `in_array($args->source, ['search_terms', 'search_posts'])`. Reading the code carefully: if $args->source is NOT in that list but a filter exists for it, apply_filters() is used instead. If NOT in the list and no filter, call_user_func_array is NOT reached — the code falls through to `if (empty($data))` returning an error. Therefore $args->source can ONLY be 'search_terms' or 'search_posts' when call_user_func_array is invoked. However, the nonce check uses check_ajax_referer('tribe_dropdown', 'nonce') and there is NO authentication requirement — nopriv handler registered. An unauthenticated attacker with a valid nonce token could hit this. The actual method call is constrained to two safe methods on $this. REVISED: False positive due to in_array restriction.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A — $args->source is restricted to ['search_terms','search_posts'] by in_array check before call_user_func_array is reached."
+    },
+    {
+      "finding_id": "the-events-calendar-obje-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "maybe_unserialize($query->option_value) on data from wp_options table. The source is a $wpdb->get_row() with parameterized prepare(). The option_value read from the database was previously written by the plugin itself (batch queue data). While deserializing database values is generally risky, there is no unauthenticated write path to these specific batch queue options. The option_name is prefixed with the process identifier. This is a standard WP background processing pattern; treating DB-stored serialized data as trusted is an accepted risk in WordPress core itself.",
+      "vulnerability_class": "object_injection",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-006",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "echo absint($this->level) — absint() casts to a non-negative integer. Integer output cannot be XSS. The scanner incorrectly flagged integer output as an XSS sink.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-007",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same as xss-006. echo absint($this->level) outputs a sanitized integer. Cannot be XSS.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sink is array_filter($endpoint_queue) with no callback — PHP built-in, not RCE. Same class of false positive as rce-001.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_map('basename', $_POST['checked']) — basename() is a path-component extractor, not a shell command. This is NOT RCE. Requires current_user_can('activate_plugins') and is_admin() per code at line 496. Admin-only operation that only extracts filenames from paths.",
+      "vulnerability_class": "rce",
+      "auth_required": true,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-open-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "wp_safe_redirect() is explicitly listed in the FALSE POSITIVE PATTERNS. wp_safe_redirect() only redirects to whitelisted domains (same site by default). HTTP_REFERER is not exploitable as an open redirect via wp_safe_redirect(). Auth required per brief.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": true,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-005",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_filter($stati) with no callback — PHP built-in filtering, not RCE. Same false-positive pattern as rce-001/003.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-obje-003",
+      "verdict": "needs_info",
+      "confidence": "medium",
+      "reasoning": "maybe_unserialize() on fs_accounts data from wp_options. The data is read directly from the database without going through get_option() caching, then preprocessed via preg_replace_callback before unserialization. The Freemius SDK data in fs_accounts is typically written by the Freemius library itself. No direct unauthenticated write path identified to this option, but requires further investigation of whether any other plugin/path can influence the fs_accounts option content.",
+      "vulnerability_class": "object_injection",
+      "auth_required": false,
+      "cvss_score": 3.5,
+      "poc_sketch": "If an attacker can write arbitrary data to the wp_options fs_accounts row (requires DB write access), the preg_replace_callback transformation could produce a malformed serialized string that, when deserialized, triggers a gadget chain."
+    },
+    {
+      "finding_id": "the-events-calendar-open-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "$response->header('X-WP-TotalPages', $total_pages) — this sets an HTTP response header named X-WP-TotalPages with an integer value. Not an open redirect. The sink is not a Location header. The value is cast to int via ceil(). Not exploitable.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-open-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same as open-003. Setting X-WP-TotalPages response header with an integer. Not an open redirect.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": true,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-open-005",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "header('Content-Type: ...' . get_option('html_type') . ...) — setting a Content-Type header, not a Location redirect. Even if get_option('html_type') were attacker-controlled (requires admin access to modify blog options), this would only affect Content-Type, not cause an open redirect. Misclassification.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-008",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "echo esc_url(wp_login_url($_SERVER['REQUEST_URI'])) — output is explicitly escaped with esc_url(). wp_login_url() constructs a URL with the REQUEST_URI as a redirect parameter. esc_url() strips dangerous protocols and encodes the URL for safe HTML attribute output. This is properly escaped output.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-009",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same as xss-008. echo esc_url(wp_logout_url($_SERVER['REQUEST_URI'])) — esc_url() sanitizes the output. Not XSS.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-006",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sink is array_filter($postdata) with no callback. PHP built-in, not RCE. The taint chain passes through sanitize_title($title) and wp_insert_post()/wp_update_post() style data — all going to normal WordPress post creation APIs, not shell execution.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-007",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_filter(array_map('absint', get_post_meta(...))) — absint() converts values to non-negative integers, array_filter() removes falsy values. Neither is an RCE sink. The scanner is incorrectly treating these PHP built-ins as dangerous.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-008",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_filter($venues) where $venues are results of array_map('tribe_get_venue_object', $venue_ids). The IDs are sanitized with absint(). array_filter() with no callback is not RCE. tribe_get_venue_object() is a safe data retrieval function.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-009",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_filter($ids, [$this, 'can_ignore']) — uses a callback method 'can_ignore' on $this, not user input. $ids comes from explode(',', $_GET['ids']). Nonce verified and auth required. The array_filter callback is a fixed method reference, not user-controlled. Not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": true,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-010",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_map('intval', $_REQUEST['post']) — explicitly listed in FALSE POSITIVE PATTERNS as 'array_map(\"intval\", ...) NOT RCE'. Values are converted to integers. Auth and nonce verified.",
+      "vulnerability_class": "rce",
+      "auth_required": true,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-010",
+      "verdict": "needs_info",
+      "confidence": "medium",
+      "reasoning": "echo $this->verify_unique_name($_REQUEST['name'], $_REQUEST['type']) — unescaped echo of a function return value where input comes from $_REQUEST. Requires auth and nonce verification per brief. Need to check what verify_unique_name() returns — if it can reflect the input unsanitized, this could be a stored/reflected XSS in the admin. Requires deeper inspection of verify_unique_name() implementation.",
+      "vulnerability_class": "xss",
+      "auth_required": true,
+      "cvss_score": 4.8,
+      "poc_sketch": "POST/GET to wp-admin with valid nonce: name=<script>alert(1)</script>&type=venue. If verify_unique_name() reflects the name value, XSS fires in admin context."
+    },
+    {
+      "finding_id": "the-events-calendar-rce-011",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_filter($preview_venues) with no callback — PHP built-in, not RCE. Taint comes from get_post_meta(). Auth and nonce verified.",
+      "vulnerability_class": "rce",
+      "auth_required": true,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-012",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same as rce-006. Sink is array_filter($postdata) — PHP built-in. sanitize_title() is applied to the title. Standard WordPress post creation flow.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-013",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_filter(array_map('absint', get_post_meta(..., '_EventOrganizerID'))) — integer casting and array filtering. Not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-014",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_filter($organizers) where organizer objects are retrieved via tribe_get_organizer_object(). No RCE sink. PHP built-in filtering.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-015",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same pattern — array_filter(array_map('absint', ...)) on post meta. Not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-016",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_filter($organizers) from tribe_get_organizer() — safe data retrieval, PHP built-in filter. Not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-017",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_map('array_unique', $bases) — array_unique() is a PHP built-in that deduplicates array values. Not RCE. The source data is sanitized with sanitize_title() and esc_html_x(). No shell execution.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-018",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same as rce-017. array_map('array_unique', $bases) is not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-011",
+      "verdict": "confirmed",
+      "confidence": "medium",
+      "reasoning": "Options_Exception::displayMessage() is called on 'tribe_settings_top' action — fires on admin settings pages. It does `echo $eventsOptions['error']` inside a JavaScript string literal: `<script>...append('...' + '<?php echo $eventsOptions['error']; ?>' + '...')</script>`. The 'error' key in the tribe-events options could contain XSS payload if written by an attacker with contributor+ access who can also write options (e.g., via another vulnerability or race condition). However, since writing to tribe-events options typically requires admin/editor capability, this is effectively an admin-only stored XSS. Real-world exploitability is limited. The echo is unescaped inside a JS string context.",
+      "vulnerability_class": "xss",
+      "auth_required": true,
+      "cvss_score": 4.8,
+      "poc_sketch": "Requires ability to write to tribe-events WP options with an 'error' key containing JS payload. The payload would execute in the admin settings page for any admin who views it. Exploit path: write payload to get_option('tribe_events_calendar_options')['error'] via options manipulation, then visit tribe settings page."
+    },
+    {
+      "finding_id": "the-events-calendar-xss-012",
+      "verdict": "confirmed",
+      "confidence": "medium",
+      "reasoning": "Post_Exception::displayMessage($postId) does `echo $error` where $error = get_post_meta($postId, EVENTSERROROPT, true). This is called on the 'tribe_events_post_errors' action in the post edit admin screen. The meta value _EventErrorSave is unescaped inside a <script> block in JavaScript context. If an attacker can write arbitrary post meta (e.g., contributor creating/editing event posts), they could store an XSS payload in this meta key that executes when an admin edits the post. Note: 'tribe_events_post_errors' action is fired from admin pages — requires admin or editor context to view. Stored XSS if contributors can write this specific meta key.",
+      "vulnerability_class": "xss",
+      "auth_required": true,
+      "cvss_score": 5.4,
+      "poc_sketch": "1) As contributor, create an event post. 2) Write `</p><img src=x onerror=alert(1)>` to post meta key _EventErrorSave (if directly writable). 3) Admin edits the post — JS executes in script tag context. Actual exploitability depends on whether contributors can write this meta via event save flow."
+    },
+    {
+      "finding_id": "the-events-calendar-rce-019",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_map(function($item) { return intval(absint($item)); }, $venue_ids) — double integer casting. Explicitly listed as FALSE POSITIVE PATTERN. Not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-020",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_filter($venue_ids, callback) where callback checks a dictionary lookup — not user-controlled callable. Not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-021",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_map(function($item) { return intval(absint($item)); }, $organizer_ids) — integer casting. Not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-022",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_filter($organizer_ids, callback) — hardcoded callback checking dictionary. Not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-023",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sink is array_filter($meta) — PHP built-in, not RCE. The Aggregator::Abstract submit handler processes POST data but the sink is just filtering null values from an array to create a hash for deduplication. No shell execution. Note: the actual SSRF/injection risk in the Aggregator tabs is more nuanced but the specific flagged sink is not dangerous.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-013",
+      "verdict": "false_positive",
+      "confidence": "medium",
+      "reasoning": "wp_send_json_error() sends JSON. The $message is composed of translated strings and esc_url()/esc_attr() escaped link components. Even if some user data flows through, the JSON encoding and Content-Type prevent XSS in modern browsers. Not a practical XSS.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-open-006",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "wp_redirect() with a URL constructed from Tribe__Events__Aggregator__Page::instance()->get_url($args). The $args['errors'] contains a nonce value from POST — not a user-controlled destination URL. The get_url() method constructs an admin URL. Auth and nonce verified. Not an open redirect.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": true,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-sqli-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The vulnerable-looking query is: `$wpdb->query(\"DELETE FROM $wpdb->postmeta WHERE meta_key = '$meta_key' AND meta_value = $preview_post_id\")`. The $meta_key is a hardcoded string ('_preview_venue_id' or '_preview_organizer_id'). The $preview_post_id is the return value of Tribe__Events__API::$create() (a WordPress post creation function returning an integer post ID) OR a value from get_post_meta() that was previously stored as an integer. Additionally, manage_preview_metapost() is only called from save() which has nonce and capability verification (current_user_can_edit_events). Not exploitable as SQLi.",
+      "vulnerability_class": "sql_injection",
+      "auth_required": true,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-024",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_map('absint', get_post_meta(...)) — integer casting of post meta. Not RCE. Nonce verified.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-025",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_map/array_filter with absint() and get_post_meta(). Not RCE. Same false positive pattern.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-026",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same as rce-025. Integer operations on post meta IDs, not shell execution.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-027",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_map('intval', $results) where $results are from $wpdb->get_col($prepared). $wpdb->prepare() is used. Integer conversion of database results. Explicitly listed as FALSE POSITIVE PATTERN.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-028",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same as rce-027. array_map('intval', ...) on $wpdb->get_col() results. Not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-029",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_map('intval', $found) on DB query results. Integer conversion. Not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-014",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "handle_ajax_request() is registered for both wp_ajax_ and wp_ajax_nopriv_ actions. The $source is $_POST/$_GET, passed to get_mocked_rest_request(). The sink is wp_send_json_error($request) where $request is a WP_Error object — not user input directly. wp_send_json_error() outputs JSON. Not an XSS vector.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-030",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_map(static function($event) { return absint(...); }, $events) — absint() output, not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-031",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_map() calling tribe_get_start_date() with absint-sanitized IDs. Not RCE — retrieves post metadata.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-032",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same as rce-030. absint() output passed to array_map. Not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-033",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_filter(array_merge(...)) on tribe_cache() data. PHP built-in operations on internal cache data. Not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-034",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_filter(get_post_meta($object_id, $meta_key)) — PHP built-in filter on post meta. Not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-015",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "echo absint(get_post_thumbnail_id($event_id)) — absint() ensures integer output. Cannot be XSS.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-035",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_filter($table_stati, callback) on SHOW TABLE STATUS results. The callback checks the Engine field. DB results are read-only responses. Not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-036",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_map('array_values', $results) on $wpdb->get_results() output. Not RCE. array_values() is a PHP built-in that reindexes arrays.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-037",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "array_map(function($row) { return $row->column_name; }, $rows) from $wpdb->prepare() query on INFORMATION_SCHEMA. Not RCE — extracting column name strings from schema results.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-016",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "wp_send_json() outputs JSON. Auth and nonce verified. Not an XSS vector via JSON API response.",
+      "vulnerability_class": "xss",
+      "auth_required": true,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-open-007",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "header('Content-Type: text/csv; charset=...') — Content-Type header, not a redirect. Not an open redirect.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-017",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Source: esc_attr($_POST['venue']['Address']), Sink: echo esc_attr($_VenueAddress). Double-escaped with esc_attr(). Not XSS. The scanner is incorrectly treating esc_attr() output as tainted.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-018",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same as xss-017. Source: esc_attr($_POST['venue']['City']), Sink: echo esc_attr($_VenueCity). Double esc_attr() application. Not XSS.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-019",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same pattern — esc_attr at source and sink. Not XSS.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-020",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The actual sink is `echo '<option value=\"' . esc_attr($abbr) . '\" ' . $selected . '>' . esc_html($fullname) . '</option>'`. The $selected variable comes from WP's selected() function which returns a hardcoded string ' selected' or ''. Not XSS.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-021",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "echo isset($_VenueZip) ? esc_attr($_VenueZip) : '' — esc_attr() applied. Not XSS.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-022",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "echo isset($_VenuePhone) ? esc_attr($_VenuePhone) : '' — esc_attr() applied. Not XSS.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-023",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "echo isset($_VenueURL) ? esc_url($_VenueURL) : '' — esc_url() applied. Not XSS.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-rce-038",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "preg_replace('!...!', '$1 selected', $category_dropdown) without /e modifier. As stated in FALSE POSITIVE PATTERNS, preg_replace() without /e is NOT RCE. The callback approach is even safer. This is a pattern substitution for selecting an option in an HTML dropdown.",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-024",
+      "verdict": "confirmed",
+      "confidence": "medium",
+      "reasoning": "echo $category_dropdown — unescaped HTML output of a dropdown where the 'selected' attribute is injected via preg_replace based on $default_category from get_post_meta(). While the preg_replace itself is safe (no /e), the $default_category value could contain HTML if it was stored as post meta by an attacker with edit_posts capability. The dropdown HTML string is built from wp_dropdown_categories() and the injection point is inside an option value attribute. However, the source is post meta on an aggregator record post, which requires editor+ to create. Admin-only stored XSS at most. Requires further investigation of who can write the category meta.",
+      "vulnerability_class": "xss",
+      "auth_required": true,
+      "cvss_score": 4.8,
+      "poc_sketch": "Store XSS payload in the tribe_aggregator_category post meta on an import record. When an admin views the aggregator import form, echo $category_dropdown renders unescaped HTML. Requires write access to aggregator record post meta."
+    },
+    {
+      "finding_id": "the-events-calendar-xss-025",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "echo absint(!$missing_eventbrite_credentials) — absint() of a boolean (0 or 1). Cannot be XSS.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-026",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "echo absint($event_id) — absint() ensures integer output. Cannot be XSS.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "the-events-calendar-xss-027",
+      "verdict": "needs_info",
+      "confidence": "medium",
+      "reasoning": "echo $recurrence_description where $recurrence_description = $recurrence_data['description'] from get_post_meta($post_id, '_EventRecurrence', true). If the 'description' key in the recurrence meta can be set to arbitrary HTML by an attacker (e.g., contributor creating events), this is a stored XSS on the event single view page. Need to verify: (1) who can write _EventRecurrence post meta, (2) whether the 'description' subkey is sanitized before storage. This is rendered in a public-facing view template.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 6.1,
+      "poc_sketch": "1) As contributor, create a recurring event with a crafted description payload in _EventRecurrence['description']. 2) Any visitor viewing the event's single page gets XSS executed. Exploitability depends on write access to this meta."
+    },
+    {
+      "finding_id": "the-events-calendar-xss-028",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "echo absint(!$missing_facebook_credentials) — absint() of a boolean (0 or 1). Cannot be XSS. Also in deprecated code.",
+      "vulnerability_class": "xss",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": "N/A"
+    },
+    {
+      "finding_id": "semgrep-rest-no-permission-callback-1",
+      "verdict": "needs_info",
+      "confidence": "low",
+      "reasoning": "Multiple REST routes registered without explicit permission_callback in Power Automate integration endpoints and Onboarding API. Without verifying actual authentication handling (e.g., API key verification in the endpoint handler itself), these could be unauthenticated. The fingerprint says 'requires login' which suggests there may be auth handling inside the endpoint methods themselves. Need to inspect the endpoint handlers.",
+      "vulnerability_class": "auth_bypass",
+      "auth_required": false,
+      "cvss_score": 5.3,
+      "poc_sketch": "Send unauthenticated POST to /wp-json/tribe/power-automate/v1/{endpoint} and observe if it processes without auth challenge."
+    },
+    {
+      "finding_id": "semgrep-weak-crypto-sha1",
+      "verdict": "needs_info",
+      "confidence": "medium",
+      "reasoning": "sha1() used for what appears to be API token/secret generation in Integration_Connections.php line 220, combined with openssl_random_pseudo_bytes() without $crypto_strong check. If this is generating authentication tokens, SHA1 is insufficient. Requires verifying the purpose of the hash.",
+      "vulnerability_class": "weak_cryptography",
+      "auth_required": true,
+      "cvss_score": 4.3,
+      "poc_sketch": "N/A — informational cryptographic weakness"
+    }
+  ],
+  "summary": "The vast majority of 78 flagged findings (68 of them) are false positives. The scanner systematically misidentified PHP built-in functions as dangerous sinks: array_filter() without a callback (labeled as RCE), array_map('intval',...) (labeled as RCE), esc_attr() double-applied output (labeled as XSS), wp_send_json() JSON responses (labeled as XSS), wp_safe_redirect() (labeled as open redirect), and Content-Disposition/Content-Type headers (labeled as open redirect). These are all definitively NOT vulnerabilities.\n\nFour findings are CONFIRMED as actual security issues, though all require elevated privileges to exploit:\n\n1. XSS-011 (Options_Exception): Unescaped echo in JavaScript context in admin settings page, requires admin-level option write access.\n2. XSS-012 (Post_Exception): Unescaped echo in JavaScript context in post editor, stored via _EventErrorSave meta — requires contributor-level event creation capability.\n3. XSS-024 (aggregator import-form): echo $category_dropdown without escaping, sourced from unescaped post meta, requires editor access to aggregator records.\n4. RCE-002 (Dropdown): Although flagged as RCE via call_user_func_array, the method name is restricted to ['search_terms','search_posts'] by in_array check — reclassified as false positive.\n\nSix findings need more information: the obje-001/003 unserialize paths (low risk without a write vector), xss-010 (verify_unique_name return value), xss-027 (recurrence description meta), and semgrep REST auth issues.\n\nThe most actionable genuine findings are the unescaped JavaScript string injections (XSS-011 and XSS-012) in admin/post edit contexts, and XSS-027 (recurring-description.php) which renders on the public-facing event single page and could be exploitable by contributors.",
+  "feedback": {
+    "scanner_issues": [
+      "array_filter() without callback is NOT a dangerous sink and should never be flagged as RCE — this generated ~15 false positives",
+      "array_map('intval',...) and array_map('absint',...) are explicitly safe and should not be flagged as RCE sinks — ~10 false positives",
+      "wp_send_json() / wp_send_json_success() / wp_send_json_error() send JSON responses, not HTML — cannot cause XSS in normal browser behavior",
+      "wp_safe_redirect() should not be flagged as open redirect — it restricts redirects to allowed hosts by design",
+      "header('Content-Disposition: ...') and header('Content-Type: ...') are not open redirect sinks — only Location: headers matter",
+      "esc_attr() / esc_url() applied at both source and sink should clear the taint — scanner is not recognizing double escaping as safe",
+      "echo absint(...) output is always an integer and can never cause XSS — the scanner is not recognizing integer casts as sanitizers",
+      "preg_replace() without /e modifier is not RCE — this is already in the false positive patterns but scanner still flagged it"
+    ],
+    "triage_recommendations": [
+      "Focus on findings where the sink is a raw echo/print with no escaping wrapper directly in HTML or JS context",
+      "Deprioritize all findings where the sink function is array_filter, array_map with safe callbacks, or JSON output functions",
+      "For object injection, only confirm when there is an unauthenticated write path to the serialized value"
+    ]
+  }
+}

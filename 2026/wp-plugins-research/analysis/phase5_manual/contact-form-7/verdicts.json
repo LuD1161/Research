@@ -1,0 +1,135 @@
+{
+  "plugin": "contact-form-7",
+  "reviewed_by": "manual-phase5",
+  "review_date": "2026-06-14",
+  "verdicts": [
+    {
+      "flow_id": "contact-form-7-rce-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The taint analyzer misidentified preg_replace() as a shell-execution sink. wpcf7_sanitize_query_var() (formatting.php:73-87) uses preg_replace with a static, hardcoded pattern ('/%[a-f0-9]{2}/i') — the user-supplied $text is the SUBJECT, not the pattern or replacement. preg_replace with a fixed pattern is not an RCE sink. The function is a string sanitizer that strips percent-encoded chars and collapses spaces. No shell call, eval, or dynamic pattern is involved anywhere in the chain.",
+      "exploitable": false,
+      "auth_required": null,
+      "poc": null
+    },
+    {
+      "flow_id": "contact-form-7-rce-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "Same function as rce-001 (wpcf7_sanitize_query_var). The sink is preg_replace('/ +/', ' ', $text) — again a fixed pattern, user input is only the subject. This is whitespace normalization, not an RCE sink.",
+      "exploitable": false,
+      "auth_required": null,
+      "poc": null
+    },
+    {
+      "flow_id": "contact-form-7-rce-003",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The 'sink' is array_map('sanitize_html_class', $options) — calling sanitize_html_class() on each element. sanitize_html_class is a WordPress sanitizer, not a shell execution function. The taint analyzer flagged array_map as dangerous because it takes a callable, but the callable is a hardcoded string literal 'sanitize_html_class', not user-controlled. No RCE surface exists here.",
+      "exploitable": false,
+      "auth_required": null,
+      "poc": null
+    },
+    {
+      "flow_id": "contact-form-7-rce-004",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The 'sink' is array_filter(array_unique($options)). Neither array_filter with no callback nor array_unique are dangerous. The taint tool incorrectly treats standard PHP array functions as sinks. No shell execution, eval, or dangerous output occurs.",
+      "exploitable": false,
+      "auth_required": null,
+      "poc": null
+    },
+    {
+      "flow_id": "contact-form-7-rce-005",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "get_autocomplete_option() (form-tag.php:170-194) retrieves the 'autocomplete' option from a parsed form tag. The 'sink' is array_filter with a regex validation callback that enforces the pattern /^[a-z]+(?:-[0-9a-z]+)*$/ — this is a strict allowlist filter, not a dangerous sink. After filtering, only safe lowercase autocomplete token strings survive. No RCE path exists.",
+      "exploitable": false,
+      "auth_required": null,
+      "poc": null
+    },
+    {
+      "flow_id": "contact-form-7-rce-006",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "setup_posted_data() (submission.php:351-411) filters $_POST keys to exclude those starting with '_', then immediately passes data through wp_unslash() and sanitize_posted_data() which calls wp_check_invalid_utf8(), wp_kses_no_null(), and wpcf7_strip_whitespaces(). The taint 'sink' is the array_filter() call itself — a data collection step, not a shell/eval/output sink. This is standard form data intake with sanitization. No RCE sink downstream was flagged by the tool; this is a false trigger on a benign collection point.",
+      "exploitable": false,
+      "auth_required": null,
+      "poc": null
+    },
+    {
+      "flow_id": "contact-form-7-rce-007",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "wpcf7_akismet_submitted_params() (akismet.php:110-122) uses array_filter with a closure that calls get_option() on a form tag object and returns a boolean. The 'sink' is the array_filter call itself. No user-controlled data reaches a shell, eval, or output context. The akismet_option variable is coerced to bool and used only for filtering. The taint chain was triggered by get_option() being treated as a source, but the result is only cast to bool.",
+      "exploitable": false,
+      "auth_required": null,
+      "poc": null
+    },
+    {
+      "flow_id": "semgrep-rest-no-permission-callback-1",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "Semgrep flagged rest-api.php lines 19-51 as missing permission_callback. Code inspection shows permission_callback IS present for all four methods on this route — both READABLE (line 25) and CREATABLE (line 39) have explicit closures calling current_user_can('wpcf7_read_contact_forms') and current_user_can('wpcf7_edit_contact_forms') respectively. The semgrep rule's low confidence rating was justified — it is a false positive.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    },
+    {
+      "flow_id": "semgrep-rest-no-permission-callback-2",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "Semgrep flagged rest-api.php lines 53-105 (/contact-forms/{id}). All three methods (READABLE line 59, EDITABLE line 75, DELETABLE line 91) have explicit permission_callback closures with current_user_can() checks for wpcf7_edit_contact_form and wpcf7_delete_contact_form capabilities. Not a vulnerability.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    },
+    {
+      "flow_id": "semgrep-rest-no-permission-callback-3",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "Semgrep flagged rest-api.php lines 107-116 (/contact-forms/{id}/feedback). This route uses '__return_true' as the permission_callback, which is INTENTIONAL — this is the public form submission endpoint that any site visitor must be able to use without authentication. This is by design for a contact form plugin. The route's create_feedback() handler only processes form submissions (requires valid form ID and unit_tag) and sends emails using the pre-configured template; it does not expose admin functionality.",
+      "exploitable": false,
+      "auth_required": false,
+      "poc": null,
+      "notes": "The public /feedback endpoint is intentionally open. The handler validates the form ID, requires a valid unit_tag, and processes submissions through the standard CF7 submission pipeline with full validation. No privilege escalation or data exfiltration is possible."
+    },
+    {
+      "flow_id": "semgrep-rest-no-permission-callback-4",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "Semgrep flagged rest-api.php lines 118-128 (/contact-forms/{id}/feedback/schema). Uses '__return_true' — intentionally public. This endpoint returns the JSON schema of form validation rules for a contact form (read-only metadata). No sensitive data is exposed; it only reveals the form field structure which is already public via the rendered HTML form.",
+      "exploitable": false,
+      "auth_required": false,
+      "poc": null
+    },
+    {
+      "flow_id": "semgrep-rest-no-permission-callback-5",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "Semgrep flagged rest-api.php lines 130-139 (/contact-forms/{id}/refill). Uses '__return_true' — intentionally public. The get_refill() handler returns refill data (e.g., for CAPTCHA regeneration) via the wpcf7_refill_response filter. This is a public endpoint needed for form functionality (e.g., refreshing quiz fields without page reload). No privileged operations are performed.",
+      "exploitable": false,
+      "auth_required": false,
+      "poc": null
+    }
+  ],
+  "summary": {
+    "total_findings": 12,
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 12,
+    "needs_further_review": 0,
+    "overall_assessment": "All 12 flagged findings are false positives. The 7 RCE taint flows were triggered by the taint analyzer incorrectly treating preg_replace (with static patterns), array_map with sanitizer callbacks, array_filter, and boolean-coercion as dangerous sinks. No actual shell execution, eval, or dynamic code execution paths exist. The 5 semgrep REST auth findings are false positives: three management endpoints have proper capability checks, and three public endpoints (/feedback, /schema, /refill) are intentionally open and appropriate for a contact form plugin. Contact Form 7 appears to be correctly implementing WordPress security best practices in this codebase."
+  }
+}

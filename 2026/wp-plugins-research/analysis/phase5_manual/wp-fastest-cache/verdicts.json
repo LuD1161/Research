@@ -1,0 +1,309 @@
+{
+  "plugin": "wp-fastest-cache",
+  "reviewed_at": "2026-06-14",
+  "reviewer_notes": "All 'RCE' findings flagged by the scanner use preg_replace() as the sink — this is NOT an RCE sink (no /e modifier present in PHP 7+, which removed that feature). The scanner incorrectly treats preg_replace as a command-execution function. The actual dangerous sinks in this codebase are: direct $wpdb queries without prepare(), unescaped echo, and wp_remote_request with attacker-influenced URLs. Reviewed all 20 critical and 6 high flows.",
+  "verdicts": [
+    {
+      "flow_id": "wp-fastest-cache-rce-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "The 'sink' is preg_replace() — not a command-execution function. PHP 7 removed the /e modifier that once allowed RCE via preg_replace. The variable $my_home_url (derived from get_option('home') + WPML filter) is only used to build a file-system path string. No exec/system/passthru/shell_exec call follows. This is path manipulation at most, not RCE.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Same as rce-001. preg_replace() is not an RCE sink. The result is used only to modify a $path variable that constructs a filesystem cache directory path. No shell call follows directly from this value. Source is get_option('home') — attacker-controlled only if they can write to the DB (already admin).",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-003",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Same preg_replace false sink pattern. The WPML current_language filter result is used to modify a cache path string. Not an RCE vector.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-004",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Sink is preg_replace() using $_SERVER['HTTP_HOST'] to build a cache directory path string. No shell execution. HTTP_HOST manipulation would only affect which cache subdirectory is chosen (path traversal concern, but constrained by the regex pattern and only executed for path building, not shell commands). This is the same scanner misclassification.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-005",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Same as rce-004. preg_replace() with $_SERVER['HTTP_HOST'] into a cache path. No RCE.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-006",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Same as rce-004/005. preg_replace() path construction, no shell sink.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-007",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Same as rce-004/005/006. Multisite path construction via preg_replace with HTTP_HOST. Not RCE.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-008",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Sink is preg_replace('/__trashed$/', '', $permalink). This strips '__trashed' from a permalink string. The source is intval($comment_id) then get_comment() then get_permalink() — all WP API calls that return normalized URL strings. No exec/shell call. Not RCE. The scanner flagged preg_replace as a code-execution sink, which is incorrect.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-009",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Same as rce-008. preg_replace on permalink for path normalization. Not RCE.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-sqli-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "The source is '$comment_id = intval($comment_id)' — intval() produces an integer, which cannot carry SQL injection payload. The chain then calls get_comment($comment_id) and extracts $comment->comment_post_ID, which is an integer column from the DB. Line 1527 applies intval() again to $post_id. Line 1617 uses $post_id in the query 'WHERE object_id='.$post_id — $post_id is integer-cast twice. Not exploitable as SQLi. The scanner incorrectly propagated taint through intval().",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-010",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Sink is preg_replace('/__trashed$/', '', $page_for_posts_permalink). Source is get_option('page_for_posts') fed to get_permalink(). Not RCE — preg_replace is not a command execution function.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-011",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Same as rce-010. preg_replace on permalink string, not RCE.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-012",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Source: sanitize_user(wp_unslash($value->user_login), true) from get_users() result. The sink preg_replace('/\\s/', '%20', $tmp_user) replaces spaces with %20 for use in an .htaccess RewriteCond rule. sanitize_user() strips unsafe characters. Even if a username had special chars, the result goes into an htaccess rule written by an admin-only function (excludeAdminCookie), not a shell. Not RCE.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-013",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Sink is preg_replace on get_option('home') to extract hostname. Not RCE. This is part of the Varnish purge URL construction in varnish.php. The actual HTTP request is the concern (see ssrf-001/ssrf-002), not this preg_replace step.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-014",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Same as rce-013. preg_replace to strip path component from URL. Not RCE.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-015",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Sink is preg_replace to extract schema ('http://' or 'https://'). Not RCE. See ssrf-001/ssrf-002 for the actual concern downstream.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-ssrf-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "The URL for wp_remote_request() is built as $schema.$server.'/.*' where $schema comes from get_option('home') (schema extraction only — always 'http://' or 'https://') and $server is the Varnish IP saved by an admin via a nonce-protected AJAX handler. An attacker-controlled $server would require the attacker to already be an authenticated admin (the VarnishWPFC::save() function verifies nonce and would have saved the value). The source get_option('home') for schema is admin-controlled database value. No unauthenticated path to influence this. Not exploitable as SSRF by unprivileged users.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "Admin-controlled database values are trusted; admin SSRF is low-impact given existing privileges."
+    },
+    {
+      "flow_id": "wp-fastest-cache-ssrf-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Same as ssrf-001. Secondary request after first request fails. Same auth and trust context.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-016",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Sink is preg_replace() to strip http:// prefix from $_SERVER['HTTP_HOST']. Result goes into $hostname used for Cloudflare zone lookup (sends to cloudflare API). Not a command execution sink. The cloudflare_get_zone_id function is called only from admin-authenticated handlers.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-017",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Same as rce-016. preg_replace to strip www prefix for zone matching. Not RCE.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-018",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Sink is preg_replace('/http:\\/\\//i', 'https://', $_GET['url']). This is called in CdnWPFC::check_url() which begins with 'if(current_user_can(\"manage_options\"))' — admin-only. The URL is then passed to wp_safe_remote_get() which uses WordPress's HTTP API with built-in SSRF protections for safe requests. Guarded by capability check. Not RCE.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-ssrf-003",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "This is check_url() using wp_safe_remote_get() — note 'safe' variant which uses WP's built-in URL safety checks. The function requires current_user_can('manage_options'). There are also explicit IP address blocklist checks (localhost, 127.x, 10.x, 172.x, 192.x, 169.x, 100.x, 198.x, hex/decimal/octal encoding blocks). Admin-only CDN URL validation. Not a meaningful SSRF.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "The function has explicit SSRF mitigations: blocklist of private IP ranges, use of wp_safe_remote_get, admin capability check."
+    },
+    {
+      "flow_id": "wp-fastest-cache-ssrf-004",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Source is get_option('home').$url where $url is a relative URL from CSS/JS processing inside the cache-building process. This runs server-side during page render/minification, not from a user-accessible HTTP endpoint. The $url variable is extracted from the page HTML being processed. wp_remote_get() is used but the URLs are relative paths from the site's own content (CSS/JS files). No user-controlled input path to this function. Not an exploitable SSRF.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-019",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Sink is preg_replace('/^\\/\\//', 'http://', $url) to normalize protocol-relative URLs in CSS/JS content during minification. Not an RCE sink.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-rce-020",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Same as rce-019. preg_replace for https:// normalization. Not RCE.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Source is get_option('WpFastestCacheVarnish') — admin-controlled DB value. It flows into VarnishWPFC::purge_cache() which returns an array with success/message keys, then wp_send_json() serializes it as JSON. wp_send_json() outputs properly Content-Type: application/json header. The response is an API response consumed by JavaScript, not rendered as HTML. Even if message contained HTML, it would need to be unsafely injected by the JS caller to cause XSS. Stored-XSS via admin-controlled option is low severity. Not practically exploitable.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Source: $_POST['server'] sanitized via sanitize_text_field(). Nonce verified (wp_verify_nonce in VarnishWPFC::save()). Handler requires nonce. The purge result (containing an error message from the Varnish server response) is returned as JSON via wp_send_json(). JSON response, not HTML. The 'message' field originates from $response->get_error_message() or hardcoded strings — not from $_POST['server'] directly. Not exploitable XSS.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-xss-003",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Source: get_option('WpFastestCacheVarnish') — admin-controlled. Nonce verified (VarnishWPFC::start()). JSON response via wp_send_json(). Same pattern as xss-002. Not exploitable.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-xss-004",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Source: parse_url(get_option('home'), ...) — hostname and scheme extracted from admin-controlled site URL. Used in an error message string sent via wp_send_json_error(). JSON response, not HTML rendering. Not exploitable as XSS.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-xss-005",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Source: sanitize_text_field($_GET['url']) — sanitized. Handler is cloudflare_change_settings() which checks current_user_can('manage_options'). The flow goes to Cloudflare API request and the zone ID response is returned as JSON via wp_send_json(). Admin-only, JSON response. Not XSS.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-xss-006",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Source: get_option('WpFastestCacheCDN') — JSON data stored by admins. The echo in cdn_options() is guarded by current_user_can('manage_options') check. The echoed value is a JSON string that was previously json_encode()d when saved. Admin-panel context only. Not a meaningful XSS vulnerability.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-xss-007",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Source: get_option('WpFastestCacheExclude') which is a JSON string. It is echoed in a <script> tag as 'WpFcExcludePages.init(<json>)'. This data is written by wpfc_save_exclude_pages_callback() which requires manage_options capability AND nonce verification. The values are sanitized (strip_tags, esc_attr, preg_replace). This is an admin-panel page, rendered only to admins. Admin-to-admin XSS in an already-authenticated admin panel page. Not a meaningful vulnerability.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-fastest-cache-xss-008",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "Source: get_option('WpFastestCacheVarnish'). The template varnish.php echoes $ip (server IP stored by admin) into an input value attribute: <input value='<?php echo $ip; ?>'. This template is included in the admin panel only. Admin-stored value rendered back to admins only. While technically missing esc_attr(), this is an admin-to-admin scenario with no privilege escalation path.",
+      "auth_required": true,
+      "exploitable": false
+    }
+  ],
+  "semgrep_findings_notes": [
+    {
+      "finding": "cache.php line 523 — SQL query with $username from cookie",
+      "assessment": "POTENTIAL_CONCERN — $username is extracted from the WordPress auth cookie and passed through esc_sql(), which does provide escaping. The query is used to check admin status. While esc_sql() is weaker than prepare(), the cookie value is already validated by WordPress session handling. Low practical risk but worth noting the lack of prepare().",
+      "verdict": "FALSE_POSITIVE",
+      "notes": "esc_sql() applied before use. Cookie-derived username. Not directly injectable."
+    },
+    {
+      "finding": "wpFastestCache.php lines 584-614 — DB statistics queries (post_revisions, trashed_contents, etc.)",
+      "assessment": "FALSE_POSITIVE — All these queries use only $wpdb table name prefixes and hardcoded WHERE clauses with no user input. The semgrep rule flagged $wpdb->get_var with a variable in the query string, but the variable is $wpdb->posts/$wpdb->comments etc. (table names, not user input).",
+      "verdict": "FALSE_POSITIVE"
+    },
+    {
+      "finding": "wpFastestCache.php line 1636 — delete_next_prev_cache() with $post_id and $post->post_type in query",
+      "assessment": "POTENTIAL_CONCERN — $post_id is intval()-cast (safe). $post->post_type comes from get_post() return value (DB-sourced, not user input). However, post_type is not integer-cast and is placed unescaped in the SQL string with single quotes. In theory, if post_type were manipulated, it could inject. In practice, post_type values are controlled by WordPress and registered post type names (registered in PHP code), not arbitrary user input. Extremely low exploitability.",
+      "verdict": "FALSE_POSITIVE",
+      "notes": "post_type is from registered post types, not user input. $post_id is intval()-safe."
+    },
+    {
+      "finding": "cdn.php line 233 — unserialize() without allowed_classes",
+      "assessment": "INVESTIGATE — unserialize($cdn_value->zone_id) where the data comes from get_option('WpFastestCacheCDN'). This option is written by admin-only CDN save functions. The zone_id is a Cloudflare zone ID string that was stored after a CdnWPFC::cloudflare_save_zone_id_value() call — that function does serialize() before storing. If an admin can control what gets serialized/stored, this is admin-only object injection, which is low severity. No unauthenticated path to influence zone_id.",
+      "verdict": "FALSE_POSITIVE",
+      "notes": "Admin-only data path. Object injection requires admin write access to options."
+    },
+    {
+      "finding": "wpFastestCache.php line 720 — update_option() without preceding nonce check (CSRF)",
+      "assessment": "NEEDS_CONTEXT — wpfc_save_exclude_pages_callback() at line 714 DOES check nonce (wp_verify_nonce at line 715). The semgrep rule may have flagged a different update_option() call in the same file. Checking line 720 context: it is within the nonce-verified and capability-checked block.",
+      "verdict": "FALSE_POSITIVE"
+    }
+  ],
+  "summary": {
+    "total_flows_reviewed": 33,
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 33,
+    "key_finding": "The scanner's 'RCE' classification for preg_replace() is entirely wrong — PHP 7+ removed the /e modifier that allowed RCE via preg_replace. All 15 'RCE' findings are false positives on this basis. The SQLi finding (sqli-001) is false positive because $post_id goes through intval() twice. The XSS findings all either involve JSON API responses (wp_send_json is not HTML output), admin-only pages, or admin-controlled database values. The SSRF findings involve admin-controlled settings or have explicit mitigations. No confirmed vulnerabilities found."
+  }
+}

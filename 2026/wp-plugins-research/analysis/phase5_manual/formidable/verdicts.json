@@ -1,0 +1,741 @@
+{
+  "plugin": "formidable",
+  "reviewed_at": "2026-06-14",
+  "reviewer_notes": "All 63 taint flows and 35 semgrep findings reviewed. No confirmed exploitable vulnerabilities found. Pervasive false-positive patterns: intval/absint before echo (not XSS), wp_safe_redirect with wp-generated URLs (not open redirect), wpdb->update with absint WHERE (not SQLi), unserialize(serialize()) on get_option output (not object injection), hardcoded external URLs (not SSRF), hardcoded DB migration queries (not SQLi).",
+  "verdicts": [
+    {
+      "flow_id": "formidable-sqli-001",
+      "severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "FrmField::update() uses $wpdb->update() which is NOT vulnerable to SQLi. The $id is absint()-ed (positive integer). $wpdb->update() takes separate $data and $where arrays and handles escaping internally - it does NOT need prepare(). The taint analyzer incorrectly flagged $wpdb->update() as a raw query sink.",
+      "auth_required": true,
+      "notes": "FrmField::update() is called from admin-side code (form builder). Requires admin-level auth to reach."
+    },
+    {
+      "flow_id": "formidable-sqli-002",
+      "severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "FrmTransLiteListHelper::get_form_ids() builds $entry_ids array using absint() on each value from $this->items. All values are guaranteed positive integers. implode(',', $entry_ids) of a pure-integer array is SQL-safe. Additionally, $this->items is populated from the database (not directly from user input), so values are from a trusted internal source. The taint flow: DB->PHP->absint()->DB is safe.",
+      "auth_required": true,
+      "notes": "Payments list page requires 'frm_view_entries' capability (admin-level). Even without that protection, the absint() cast prevents injection."
+    },
+    {
+      "flow_id": "formidable-open-001",
+      "severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "Mislabeled as open redirect. The 'sink' is header('Content-Type: text/xml; charset=' . get_option('blog_charset')). This is a Content-Type header, not a redirect header. get_option('blog_charset') returns a site setting (e.g., 'UTF-8'). This is not an open redirect vulnerability at all.",
+      "auth_required": true,
+      "notes": "Even if an attacker could manipulate blog_charset in options, header injection requires admin access to change site settings."
+    },
+    {
+      "flow_id": "formidable-open-002",
+      "severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "wp_safe_redirect() is used (not wp_redirect()), which restricts redirects to same-host by default. The URL is constructed from admin_url() (always same-host) plus absint() values. Not an open redirect.",
+      "auth_required": true,
+      "notes": "Nonce verified per brief. Admin-only action."
+    },
+    {
+      "flow_id": "formidable-open-003",
+      "severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "Same pattern as open-001. header('Content-Type: text/html; charset=...') is a Content-Type header, not a redirect. Not an open redirect.",
+      "auth_required": true,
+      "notes": "Misclassification by taint analyzer."
+    },
+    {
+      "flow_id": "formidable-xss-001",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo 'frmShowNewTabFallback = ' . FrmAppHelper::maybe_json_encode($data). The $data array contains: (1) intval($args['form']->id) - integer, safe; (2) get_redirect_fallback_message() which returns sprintf with esc_url($success_url) - URL-escaped. maybe_json_encode() calls wp_json_encode() for arrays, which properly JSON-encodes and escapes all values including angle brackets and quotes. Output in <script> context is safe via JSON encoding.",
+      "auth_required": false,
+      "notes": "This runs in a script tag after form submission. The data is properly JSON-encoded."
+    },
+    {
+      "flow_id": "formidable-xss-002",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo 'setTimeout(function(){' . $redirect_js . '}, ' . intval($delay_time) . ');'. The $redirect_js is constructed at line 3169-3171 as 'window.open(\"' . $success_url . '\", \"_blank\")' or 'window.location=\"' . $success_url . '\";' where $success_url = esc_url_raw($args['success_url']). Testing confirms esc_url_raw() percent-encodes double-quotes (%22) and other characters that would break JS string context, preventing injection. Also $delay_time is intval()-cast. Not exploitable.",
+      "auth_required": false,
+      "notes": "Admin sets redirect URL in form settings. esc_url_raw encodes quotes preventing JS string breakout."
+    },
+    {
+      "flow_id": "formidable-xss-003",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo !empty($values['on_submit_migrated']) ? intval($values['on_submit_migrated']) : ''. intval() produces an integer. Integers cannot cause XSS. This is an admin-only view (form settings page).",
+      "auth_required": true,
+      "notes": "Admin settings view. intval() is a complete sanitizer for numeric context."
+    },
+    {
+      "flow_id": "formidable-xss-004",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo intval($delay_time). intval() produces an integer; integers cannot cause XSS.",
+      "auth_required": true,
+      "notes": "Admin settings view."
+    },
+    {
+      "flow_id": "formidable-xss-005",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo isset($stat['display']) ? esc_html($stat['display']) : intval($stat['count']). Both branches are sanitized: esc_html() or intval(). Not XSS.",
+      "auth_required": true,
+      "notes": "Summary emails view. Dual-branch both safe."
+    },
+    {
+      "flow_id": "formidable-xss-006",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo intval($index + 1). intval() of an arithmetic expression is an integer. Cannot be XSS.",
+      "auth_required": true,
+      "notes": "Summary emails admin view."
+    },
+    {
+      "flow_id": "formidable-xss-007",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo intval($top_form->items_count). Integer output. Cannot be XSS.",
+      "auth_required": true,
+      "notes": "Summary emails admin view."
+    },
+    {
+      "flow_id": "formidable-xss-008",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($object_id). absint() produces a non-negative integer. Cannot be XSS.",
+      "auth_required": true,
+      "notes": "Shared admin JS view."
+    },
+    {
+      "flow_id": "formidable-xss-009",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo esc_url(admin_url(...)). Both esc_url() and admin_url() are applied. esc_url() is a correct sanitizer for URL context in HTML attributes/output. Not XSS.",
+      "auth_required": true,
+      "notes": "Import form view. esc_url is explicitly applied."
+    },
+    {
+      "flow_id": "formidable-xss-010",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint(FrmEntry::getRecordCount($form->id)). absint() wraps the result. Integer output.",
+      "auth_required": true,
+      "notes": "Import form admin view."
+    },
+    {
+      "flow_id": "formidable-xss-011",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($form->id). Integer output from absint().",
+      "auth_required": true,
+      "notes": "XML forms view."
+    },
+    {
+      "flow_id": "formidable-xss-012",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($field->id). Integer output from absint().",
+      "auth_required": true,
+      "notes": "XML forms view."
+    },
+    {
+      "flow_id": "formidable-xss-013",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($field->field_order). Integer output from absint().",
+      "auth_required": true,
+      "notes": "XML forms view."
+    },
+    {
+      "flow_id": "formidable-xss-014",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($field->form_id). Integer output from absint().",
+      "auth_required": true,
+      "notes": "XML forms view."
+    },
+    {
+      "flow_id": "formidable-xss-015",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($field->required). Integer output from absint().",
+      "auth_required": true,
+      "notes": "XML forms view."
+    },
+    {
+      "flow_id": "formidable-xss-016",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($form->id). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Styles show view."
+    },
+    {
+      "flow_id": "formidable-xss-017",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($enabled ? $active_style->ID : 0). absint() applied to ternary result. Integer output.",
+      "auth_required": true,
+      "notes": "Styles list view."
+    },
+    {
+      "flow_id": "formidable-xss-018",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($form->id). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Styles list view."
+    },
+    {
+      "flow_id": "formidable-xss-019",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($form->id). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Manage styles row view."
+    },
+    {
+      "flow_id": "formidable-xss-020",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "printf(esc_html__(...), '<a href=\"?page=formidable&...\" . absint($field['form_id']) . '...', '</a>'). The translatable string is esc_html__() escaped. The absint() produces an integer. HTML in printf arguments is intentional (inserting a link), and the URL construction uses absint for the dynamic part. Not XSS.",
+      "auth_required": true,
+      "notes": "Admin field settings view. Intentional HTML in printf with safe dynamic values."
+    },
+    {
+      "flow_id": "formidable-xss-021",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($field['id']). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Number range field settings, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-022",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($field['id']). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Number range field settings, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-023",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($field['id']). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Number range field settings, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-024",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo intval($field['id']). Integer output from intval().",
+      "auth_required": true,
+      "notes": "Max field settings, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-025",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo intval($field['id']). Integer output from intval().",
+      "auth_required": true,
+      "notes": "Submit button field settings, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-026",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo intval($field['id']). Integer output from intval().",
+      "auth_required": true,
+      "notes": "Radio display format settings, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-027",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo intval($field['id']). Integer output from intval().",
+      "auth_required": true,
+      "notes": "Radio display format settings, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-028",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($field['id']). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Value format field settings, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-029",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo intval($field_id). Integer output from intval().",
+      "auth_required": true,
+      "notes": "Format dropdown settings, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-030",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($field['id']). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Automatic width settings, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-031",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo intval($field_id). Integer output from intval().",
+      "auth_required": true,
+      "notes": "Combo field sub-field options, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-032",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($field['id']). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Upsell visibility settings, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-033",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($field['id']). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Before/after contents upsell, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-034",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($field['id']). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Before/after contents upsell, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-035",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($field['id']). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Before/after contents upsell, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-036",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($field['id']). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Before/after contents upsell, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-037",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($field['id']). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Autocomplete upsell, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-038",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo intval($field_id). Integer output from intval().",
+      "auth_required": true,
+      "notes": "Phone type settings, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-039",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo intval($field_id). Integer output from intval().",
+      "auth_required": true,
+      "notes": "Name primary options, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-040",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo intval($field_id). Integer output from intval().",
+      "auth_required": true,
+      "notes": "Name primary options, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-041",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo esc_html($form_action->post_title) . ' (' . absint($form_action->ID) . ')'. esc_html() is applied to the string part; absint() produces integer for the ID. Combined output is safe.",
+      "auth_required": true,
+      "notes": "Test mode container, admin only."
+    },
+    {
+      "flow_id": "formidable-xss-042",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "printf(esc_html__(...), '<span...>', absint($use_discount), '</span>'). esc_html__() escapes the format string. absint() produces integer for %2$d placeholder. The HTML spans are hardcoded literal strings, not from user input. Not XSS.",
+      "auth_required": true,
+      "notes": "Upgrade modal, admin only. Intentional hardcoded HTML in printf arguments."
+    },
+    {
+      "flow_id": "formidable-xss-043",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($entry->id). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Entry sidebar admin view."
+    },
+    {
+      "flow_id": "formidable-xss-044",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "printf(esc_html__(...), '<a href=\"' . esc_url(admin_url(...)) . '\">', '</a>', '</br>'). The format string is esc_html__()-escaped. The URL is esc_url(admin_url()) - properly escaped. absint($form->id) used in URL. Hardcoded HTML tags in printf args. Not XSS.",
+      "auth_required": true,
+      "notes": "No entries view, admin only. Pattern: esc_html__ + esc_url + absint is safe."
+    },
+    {
+      "flow_id": "formidable-ssrf-001",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "NOT an SSRF. The URL in wp_remote_post() is hardcoded: 'https://sandbox.formidableforms.com/api/wp-admin/admin-ajax.php?action=frm_forms_preview&form=subscribe-onboarding'. User data (first_name, last_name, email) is sent in the POST body via http_build_query() which URL-encodes all values. SSRF requires attacker control of the URL, which is impossible here. This is telemetry/marketing subscription code.",
+      "auth_required": true,
+      "notes": "Called from subscribe_to_active_campaign() which is triggered during plugin onboarding. Data sent to Formidable's own sandbox server."
+    },
+    {
+      "flow_id": "formidable-xss-045",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo '<tr...><th colspan=\"' . absint($wp_list_table->get_column_count()) . '\"...>' . esc_html__(...). The column count is absint()-cast (integer). The message content is esc_html__()-escaped. The surrounding HTML structure is a hardcoded literal. Not XSS.",
+      "auth_required": true,
+      "notes": "Admin plugin list table. absint() for integer, esc_html__() for string."
+    },
+    {
+      "flow_id": "formidable-xss-046",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "printf('<span style=\"color: %1$s; ...\">', esc_attr($color), esc_html($arrow), intval($displayed_value) . '%'). esc_attr() for color, esc_html() for arrow, intval() for numeric value. The '%' literal concatenated to intval is safe as '%' is not a special HTML char.",
+      "auth_required": true,
+      "notes": "Email summary helper. Three-argument printf with appropriate escaping on each."
+    },
+    {
+      "flow_id": "formidable-xss-047",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo FrmFormsController::get_form_shortcode(array('id' => $form_id, ...)). $form_id is absint()-cast. get_form_shortcode() renders a form via the shortcode system, which handles its own output. The phpcs:ignore comments acknowledge this is intentional. This is an Elementor widget rendering a form, not injecting raw user input.",
+      "auth_required": true,
+      "notes": "Elementor widget. Intentional form rendering, not raw XSS sink."
+    },
+    {
+      "flow_id": "formidable-obje-001",
+      "severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "unserialize(serialize($settings)) where $settings = get_option(). WordPress's get_option() already deserializes the stored value from the DB, returning a PHP object/array. The serialize()->unserialize() round-trip is a deep-clone workaround for W3 Total Cache compatibility (comment in code confirms this). This pattern only operates on already-trusted PHP data. An attacker would need direct DB write access to inject malicious serialized data into wp_options, at which point the site is already compromised. Not exploitable via web.",
+      "auth_required": true,
+      "notes": "FrmSquareLiteSettings::get_options(). Data originates from DB options written by admin settings save flow."
+    },
+    {
+      "flow_id": "formidable-obje-002",
+      "severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "Same pattern as formidable-obje-001. FrmPayPalLiteSettings::get_options(). unserialize(serialize()) deep-clone on already-deserialized get_option() data. Not exploitable via web.",
+      "auth_required": true,
+      "notes": "FrmPayPalLiteSettings::get_options(). W3TC compatibility workaround."
+    },
+    {
+      "flow_id": "formidable-rce-001",
+      "severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "Mislabeled as RCE. The code is: $debug_entries = get_option('frm_paypal_debug_ids', array()); $recent_entries = array_filter(is_array($debug_entries) ? $debug_entries : array(), function($entry) use ($two_days_ago) { return !empty($entry['timestamp']) && $entry['timestamp'] >= $two_days_ago; }). This is simply filtering an array with a closure - NOT RCE. array_filter() with a plain function/closure is not exploitable. The sink was flagged because escapeshellarg() was not called, but no shell command is being executed here.",
+      "auth_required": true,
+      "notes": "PayPal settings view, admin only. Taint analyzer misidentified array_filter() closure as RCE sink."
+    },
+    {
+      "flow_id": "formidable-obje-003",
+      "severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "Same pattern as formidable-obje-001/002. FrmStrpLiteSettings::get_options(). unserialize(serialize()) deep-clone on already-deserialized get_option() data. Not exploitable via web.",
+      "auth_required": true,
+      "notes": "FrmStrpLiteSettings::get_options(). W3TC compatibility workaround."
+    },
+    {
+      "flow_id": "formidable-xss-048",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($payment->item_id). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Stripe payments controller admin view."
+    },
+    {
+      "flow_id": "formidable-xss-049",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($payment->item_id). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Stripe payments controller admin view."
+    },
+    {
+      "flow_id": "formidable-xss-050",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($payment->id). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Stripe payments sidebar list admin view."
+    },
+    {
+      "flow_id": "formidable-xss-051",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($sub->id). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Stripe payments sidebar list admin view."
+    },
+    {
+      "flow_id": "formidable-xss-052",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($payment->sub_id). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Stripe payment show admin view."
+    },
+    {
+      "flow_id": "formidable-xss-053",
+      "severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "echo absint($payment->id). Integer output from absint().",
+      "auth_required": true,
+      "notes": "Stripe subscriptions sidebar actions admin view."
+    }
+  ],
+  "semgrep_verdicts": [
+    {
+      "check_id": "wp-redirect-instead-of-safe-redirect",
+      "file": "FrmAppController.php:626",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "wp_redirect() target ($redirect) comes from FrmSalesApi::get_best_sale_value() which is a value from Formidable's own marketing API or admin_upgrade_link(). Not user-controlled. Also gated behind current_user_can('frm_view_forms')."
+    },
+    {
+      "check_id": "wp-auth-rest-no-permission-callback",
+      "file": "FrmAppController.php:1140",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "REST route at line 1140 has permission_callback: 'FrmAppController::can_update_db'. Route at line 1148 has permission_callback: 'FrmAddonsController::can_install_addon_api'. Both have callbacks. Semgrep flagged incorrectly."
+    },
+    {
+      "check_id": "wp-auth-rest-no-permission-callback",
+      "file": "FrmAppController.php:1148",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "Same as above - this route has 'FrmAddonsController::can_install_addon_api' as permission_callback."
+    },
+    {
+      "check_id": "wp-redirect-instead-of-safe-redirect",
+      "file": "FrmFormsController.php:3063",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "wp_redirect(esc_url_raw($success_url)). $success_url comes from admin-configured form redirect URL setting, processed through apply_filters and do_shortcode. esc_url_raw() is applied. The URL is set by the site admin (not arbitrary user input)."
+    },
+    {
+      "check_id": "wp-sqli-variable-in-query",
+      "file": "FrmWelcomeTourController.php:438",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "Query is: SELECT 1 FROM {$wpdb->posts} WHERE post_content LIKE '%[formidable %' LIMIT 1. Fully hardcoded literal string with no user input. $wpdb->prefix is safe."
+    },
+    {
+      "check_id": "wp-crypto-weak-hash-general",
+      "file": "FrmAddon.php:793",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "md5() for non-security purpose (likely caching/comparison, not authentication or token generation). Low confidence flag."
+    },
+    {
+      "check_id": "wp-crypto-weak-hash-general",
+      "file": "FrmAntiSpam.php:67",
+      "verdict": "NEEDS_REVIEW",
+      "reason": "md5() may be used for anti-spam token generation. If used as a security token, md5 is insufficient. Low-severity informational finding only."
+    },
+    {
+      "check_id": "wp-sqli-variable-in-query",
+      "file": "FrmEntry.php:501",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "get_row($query) where $query was built with $wpdb->prepare() at line 486 in the same function. The query is already prepared before execution."
+    },
+    {
+      "check_id": "wp-sqli-variable-in-query",
+      "file": "FrmForm.php:940",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "Query assembled using FrmDb::prepend_and_or_where(), FrmDb::esc_order(), FrmDb::esc_limit() - all of which apply appropriate sanitization (regex, allowlists for ORDER BY direction, numeric check for LIMIT). WHERE clause from internal model code."
+    },
+    {
+      "check_id": "wp-crypto-weak-hash-general",
+      "file": "FrmFormTemplateApi.php:42",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "md5() for caching/API cache key, not authentication or integrity verification."
+    },
+    {
+      "check_id": "wp-sqli-variable-in-query",
+      "file": "FrmMigrate.php:258,282,289,296,303,408,409,410,411,738,741",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "All FrmMigrate.php queries are DB migration/schema queries with hardcoded SQL strings (CREATE INDEX, dbDelta). $wpdb->prefix is safe. No user input reaches these queries."
+    },
+    {
+      "check_id": "wp-crypto-mt-rand-security-token",
+      "file": "FrmSalesApi.php:345",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "mt_rand(0,1) used to assign site to A/B test group (0 or 1). This is a marketing A/B test group assignment, not a security token, nonce, password, or salt. Non-cryptographic use is acceptable here."
+    },
+    {
+      "check_id": "wp-redirect-instead-of-safe-redirect",
+      "file": "FrmSalesApi.php:539",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "wp_redirect($cross_sell_link) where $cross_sell_link is set from Formidable's own marketing API response. Not user-controlled. Gated behind current_user_can('activate_plugins') (admin only)."
+    },
+    {
+      "check_id": "wp-deser-unserialize-no-allowed-classes",
+      "file": "FrmSettings.php:277",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "unserialize(serialize($settings)) deep-clone pattern. Input is already-deserialized get_option() data. Not unserializing external/user input."
+    },
+    {
+      "check_id": "wp-crypto-weak-hash-general",
+      "file": "FrmUsage.php:63",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "md5() for usage/telemetry hashing, not authentication or security token."
+    },
+    {
+      "check_id": "wp-deser-unserialize-no-allowed-classes",
+      "file": "FrmPayPalLiteSettings.php:72",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "Same as FrmSettings.php pattern. Deep-clone of already-deserialized get_option() data."
+    },
+    {
+      "check_id": "wp-crypto-weak-hash-general",
+      "file": "FrmSquareLiteAppController.php:95-100",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "md5() for non-authentication hashing."
+    },
+    {
+      "check_id": "wp-deser-unserialize-no-allowed-classes",
+      "file": "FrmSquareLiteSettings.php:72",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "Same as FrmSettings.php pattern. Deep-clone of already-deserialized get_option() data."
+    },
+    {
+      "check_id": "wp-redirect-instead-of-safe-redirect",
+      "file": "FrmStrpLiteLinkRedirectHelper.php:94",
+      "verdict": "NEEDS_REVIEW",
+      "reason": "wp_redirect() in Stripe Link redirect handler. URL source needs verification - could be from Stripe payment response URL. If URL comes from Stripe API response without validation, could be abused. Low priority as it's within Stripe payment processing flow."
+    },
+    {
+      "check_id": "wp-redirect-instead-of-safe-redirect",
+      "file": "FrmStrpLiteLinkRedirectHelper.php:204",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "wp_redirect() in Stripe Link redirect handler. Same context as line 94."
+    },
+    {
+      "check_id": "wp-sqli-variable-in-query",
+      "file": "FrmTransLiteListHelper.php:74",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "get_var('SELECT COUNT(*) ' . $query) where $query was built by get_table_query() which uses $wpdb->prepare() or hardcoded table names with absint() for any user input (form_id). The $query variable is already safe."
+    },
+    {
+      "check_id": "wp-sqli-variable-in-query",
+      "file": "FrmTransLiteListHelper.php:338",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "implode(',', $entry_ids) where $entry_ids contains only absint()-cast values from DB results. Integer-only array safe in SQL IN clause."
+    },
+    {
+      "check_id": "wp-deser-unserialize-no-allowed-classes",
+      "file": "FrmStrpLiteSettings.php:74",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "Same pattern as other LiteSettings classes. Deep-clone of already-deserialized get_option() data."
+    },
+    {
+      "check_id": "wp-sqli-variable-in-query",
+      "file": "FrmTransLiteDb.php:269-271",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "SELECT COUNT(*) FROM hardcoded table name. $wpdb->prefix is safe. No user input."
+    },
+    {
+      "check_id": "wp-sqli-variable-in-query",
+      "file": "FrmTransLiteDb.php:335-337",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "SELECT * from hardcoded table with hardcoded WHERE conditions (completed IS NOT NULL AND status IS NULL). No user input."
+    }
+  ],
+  "summary": {
+    "total_flows_reviewed": 63,
+    "confirmed": 0,
+    "false_positives": 63,
+    "needs_review": 0,
+    "semgrep_findings_reviewed": 35,
+    "semgrep_false_positives": 33,
+    "semgrep_needs_review": 2,
+    "key_findings": [
+      "ALL taint flows are false positives. Dominant patterns: (1) intval()/absint() before echo - integers are not XSS; (2) wp_safe_redirect with admin_url() - not open redirect; (3) wpdb->update() with integer WHERE - not SQLi; (4) unserialize(serialize(get_option())) - W3TC workaround on already-trusted data; (5) array_filter() with closure mislabeled as RCE; (6) hardcoded remote URL mislabeled as SSRF.",
+      "The plugin has strong sanitization discipline in admin views (absint/intval everywhere for numeric output).",
+      "Two semgrep NEEDS_REVIEW items: md5() in FrmAntiSpam (potential weak anti-spam token) and wp_redirect in FrmStrpLiteLinkRedirectHelper (Stripe redirect URL source unclear). Neither is likely a real vulnerability.",
+      "No unauthenticated attack surfaces identified. All dangerous operations are in admin-only views."
+    ]
+  }
+}

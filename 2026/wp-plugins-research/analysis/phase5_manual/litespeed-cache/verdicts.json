@@ -1,0 +1,239 @@
+{
+  "plugin": "litespeed-cache",
+  "reviewed_at": "2026-06-14",
+  "reviewer": "phase5-manual",
+  "verdicts": [
+    {
+      "flow_id": "litespeed-cache-xss-001",
+      "severity_reported": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "intval() output in printf – no XSS",
+      "reasoning": "Source is `intval($allowance)` which produces an integer. The output `'<strong>' . intval($allowance) . '</strong>'` only interpolates a safe integer into static HTML. The scanner flagged `printf` as a sink but the format string and HTML wrapper contain no attacker-controlled data. No XSS possible.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-xss-002",
+      "severity_reported": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "intval() output in echo – no XSS",
+      "reasoning": "Source is `intval($optm_summary['bk_summary']['count'])` which produces an integer. The entire echo contains only static strings and an intval-cast integer. No attacker-controlled input reaches the output. False positive.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-xss-003",
+      "severity_reported": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "get_post_meta sink produces 'checked' or '' only",
+      "reasoning": "The taint flows from `get_post_meta()` but the actual sink at line 36 is `echo $existing_val ? 'checked' : '';`. This is a ternary that outputs only the literal string 'checked' or an empty string regardless of what `$existing_val` contains. No post-meta value can reach the browser verbatim here. False positive.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-xss-004",
+      "severity_reported": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "absint() output in printf – no XSS",
+      "reasoning": "Source is `absint($this->_summary['promo'][0]['quota'])` which produces a non-negative integer. Only the integer is interpolated into the `printf` output. No HTML-injectable data. False positive.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-xss-005",
+      "severity_reported": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "absint() output in printf – no XSS (duplicate of xss-004 pattern)",
+      "reasoning": "Same pattern as xss-004. `absint()` produces an integer. Passing an integer directly to `printf` with a translated format string cannot result in XSS. False positive.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-rce-001",
+      "severity_reported": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "array_map([$this,$cb]) is not RCE – $cb is from a switch on a sanitized value",
+      "reasoning": "The scanner flagged `array_map([$this,$cb], $raw_list)` as an RCE sink because `$cb` is influenced by user input. However, `$cb` is set only inside a strict `switch($sel)` block (lines 958-973) where the only non-default branches assign one of four hardcoded method names: 'purge_cat', 'purge_post', 'purge_tag', 'purge_url'. Any other value of `$sel` hits `default: return;`. The attacker cannot control which method is called beyond these four safe purge methods. Additionally, the action (`ACTION_PURGE_BY`) is gated by `current_user_can('manage_options')` and `wp_verify_nonce()` in `Router::verify_action()`. Not exploitable.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-rce-002",
+      "severity_reported": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "array_map(__CLASS__.'::format_message') is not RCE – static callback, not user-controlled",
+      "reasoning": "The scanner flagged `array_map(__CLASS__ . '::format_message', $params)` as an RCE sink because `$params` contains data derived from `$_SERVER`. The callback is `__CLASS__ . '::format_message'` which is a hardcoded static class method — it is NOT derived from user input at any point. `array_map` only applies `format_message()` to the array elements (which are logged to a file), not as a callable constructed from user input. The `$_SERVER` data flowing into `$params` gets written to a debug log file, not executed. Not RCE.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-open-001",
+      "severity_reported": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "No open redirect – log_type is validated against whitelist before use",
+      "reasoning": "At line 663-665, `$log_type` is immediately checked against `['debug','purge','crawler']` via `in_array(..., true)` and `wp_die()` is called if it doesn't match. The `$filename` (used in Content-Disposition) is constructed as `'litespeed-' . $log_type . '-' . gmdate(...)` where `$log_type` is restricted to three hardcoded values. No redirect occurs; the 'open_redirect' classification is incorrect — this is a file download handler. Not vulnerable.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-open-002",
+      "severity_reported": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "filesize() on whitelist-validated path – not an open redirect or vulnerability",
+      "reasoning": "Same as open-001. The `$log_type` is whitelisted before `$file` is constructed. `filesize($file)` on a validated path is not a vulnerability of any kind. Misclassified.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-file-001",
+      "severity_reported": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "readfile() after whitelist validation – no path traversal",
+      "reasoning": "At debug2.cls.php line 663-666, `$log_type` from `$_GET['log']` is validated against `['debug','purge','crawler']` with strict `in_array(..., true)`. If not in the list, `wp_die()` is called immediately. `$this->path($log_type)` is then called with a value from only three trusted strings, producing a fixed filesystem path. No traversal possible. The scanner missed the whitelist check. Additionally, the handler is dispatched via `Router::verify_type()` + `Router::verify_action()` which requires `manage_options` capability and nonce for `ACTION_DEBUG2`. False positive.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-sqli-001",
+      "severity_reported": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "SQL built from DB-sourced IDs cast to int via array_column – no external injection",
+      "reasoning": "The tainted source at line 120 is `$wpdb->get_results($q, ARRAY_A)` — data read from the plugin's own crawler map DB table. The `$existing` rows contain `id` values which are then used in `implode(',', array_column($existing, 'id'))`. The `id` column in the database is an integer primary key inserted via safe code elsewhere. Even if treated as attacker-controlled, `array_column` extracts the raw DB value and no external HTTP input reaches this query. The upstream query that populates `$this->_tb` is also not user-injectable (it's a crawler status map). This is an internal data pipeline, not externally exploitable SQL injection.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-rce-003",
+      "severity_reported": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "array_map('sanitize_text_field') is not RCE – safe built-in string callback",
+      "reasoning": "The sink is `array_map('sanitize_text_field', explode(',', $control_raw))`. This is using `array_map` with a WordPress built-in function string as the callback — the callback is hardcoded, NOT user-controlled. No RCE is possible through `array_map` when the callable is a static string literal. Additionally, the data at `$_GET['_control']` goes through sanitize and is only used for 'no-vary' string comparison at line 66. The action requires `current_user_can('manage_options')` per the router. False positive.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-rce-004",
+      "severity_reported": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "array_map('trim') on $_SERVER value is not RCE",
+      "reasoning": "The sink is `array_map('trim', explode(',', $server_raw))`. The callback is the PHP built-in 'trim' – hardcoded, not user-controlled. `$_SERVER['LSCACHE_VARY_COOKIE']` is set by the LiteSpeed web server, not by HTTP clients directly (it's a server environment variable). Even if attacker-influenced, the only use of `$vary_arr` is for string comparison via `in_array($db_cookie, $vary_arr, true)` at line 97. No code execution path exists.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-xss-006",
+      "severity_reported": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "REQUEST_URI escaped with esc_url() before output – no XSS",
+      "reasoning": "`$current` is set to `esc_url_raw(wp_unslash($_SERVER['REQUEST_URI']))` and then output as `esc_url($current)`. Double URL-encoding via `esc_url_raw` then `esc_url` ensures all dangerous characters are encoded. Additionally, this is in an admin-only form (admin display page) requiring authentication. Not exploitable.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-xss-007",
+      "severity_reported": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "REQUEST_URI escaped with esc_url() before output – no XSS (duplicate of xss-006)",
+      "reasoning": "Identical pattern to xss-006. `esc_url()` properly sanitizes URL output in HTML attribute context. False positive.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-open-003",
+      "severity_reported": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "wp_safe_redirect() blocks external redirects by design",
+      "reasoning": "`wp_safe_redirect()` only allows redirects to whitelisted hosts (same host by default). Even if `$url` contains a crafted external URL, `wp_safe_redirect` will reject it. The action also requires `manage_options` + nonce. Not an open redirect.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-file-002",
+      "severity_reported": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "file_get_contents($_FILES tmp_name) – admin-only config import, not file inclusion",
+      "reasoning": "This reads an uploaded .data file (enforced by `substr($_FILES['ls_file']['name'], -5) != '.data'` check at line 78). The data is then JSON-decoded and used to update plugin configuration. This is a standard admin-only settings import flow. The action (`ACTION_IMPORT`) requires `current_user_can('manage_options')` + nonce in `Router::verify_action()`. Reading a tmp_name for config import is not a vulnerability — a manage_options user has full admin anyway.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-open-004",
+      "severity_reported": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "wp_safe_redirect() blocks external redirects; admin-only action",
+      "reasoning": "`wp_safe_redirect()` is used which restricts redirects to allowed hosts. The containing function is triggered by `ACTION_CONF` which requires `manage_options` + nonce. Not exploitable as open redirect.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-rce-005",
+      "severity_reported": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "array_map([$this,'_destroy_optm_file']) uses DB metadata – file deletion, not RCE",
+      "reasoning": "The 'sink' is `array_map([$this,'_destroy_optm_file'], $meta_value['sizes'])`. The callback `_destroy_optm_file` performs file deletion of webp/avif optimization artifacts using WordPress filesystem API – it does NOT execute shell commands. The method uses `$this->__media->del()` and `$this->__media->rename()`, which are WP_Filesystem calls. The `$meta_value` comes from `_wp_attachment_metadata` post meta (standard WP image metadata), queried with `$wpdb->prepare()`. Not RCE of any kind.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-xss-008",
+      "severity_reported": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "REQUEST_URI passed to sub_esi_block() is base64-encoded into ESI tag URL parameter",
+      "reasoning": "The `$params` array with `$_SERVER['REQUEST_URI']` is passed to `sub_esi_block()`. Inside that method (line 499), params are serialized as `base64_encode(json_encode($params))` and embedded in a URL query string via `add_query_arg()` then `urlencode()`. The output is `<esi:include src='...'>` which is an ESI processing instruction consumed by the LiteSpeed server, not rendered as HTML to the browser. Even if `REQUEST_URI` contained XSS payloads, they are base64+urlencode'd into a URL parameter. Not exploitable as XSS.",
+      "auth_required": null,
+      "exploitable": false
+    },
+    {
+      "flow_id": "litespeed-cache-open-005",
+      "severity_reported": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "wp_safe_redirect() with DB-sourced URL – not exploitable open redirect",
+      "reasoning": "`$url` is fetched from the plugin's own avatar cache DB table (via `$wpdb->prepare()`). This URL was originally stored by the plugin from external avatar services. Even if this URL could be manipulated (it cannot from external request), `wp_safe_redirect()` would block cross-origin redirects. Not an open redirect.",
+      "auth_required": null,
+      "exploitable": false
+    }
+  ],
+  "summary": {
+    "total_flows_reviewed": 21,
+    "confirmed": 0,
+    "false_positives": 21,
+    "needs_more_investigation": 0,
+    "critical_confirmed": 0,
+    "high_confirmed": 0,
+    "key_findings": [
+      "ALL 21 taint flows are false positives.",
+      "RCE flows (rce-001, rce-003, rce-004): Scanner misidentified `array_map` with hardcoded built-in/method callbacks as RCE. The callable is NEVER user-controlled.",
+      "RCE flows (rce-002, rce-005): array_map callbacks are hardcoded class methods; no shell execution involved.",
+      "XSS flows (xss-001, xss-002, xss-004, xss-005): All sources are intval()/absint() producing integers, not injectable HTML.",
+      "XSS flows (xss-003): Ternary outputs only 'checked' or '' – value never reaches browser.",
+      "XSS flows (xss-006, xss-007): esc_url() is applied before output.",
+      "XSS flow (xss-008): Data is base64+urlencode'd into ESI tag URL, not HTML-rendered.",
+      "File inclusion (file-001): Whitelist validation `in_array(['debug','purge','crawler'])` blocks traversal.",
+      "File inclusion (file-002): Admin-only file upload; reading tmp_name for config import is expected behavior.",
+      "SQL injection (sqli-001): IDs from DB are internal integer primary keys, not externally injectable.",
+      "All admin-facing flows require manage_options + valid nonce via Router::verify_action().",
+      "Open redirects (open-001,002,003,004,005): All use wp_safe_redirect() which prevents external host redirects, or are misclassified file-download/header operations."
+    ]
+  }
+}

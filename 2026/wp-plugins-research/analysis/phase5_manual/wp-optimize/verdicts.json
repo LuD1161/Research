@@ -1,0 +1,401 @@
+{
+  "plugin": "wp-optimize",
+  "reviewed_at": "2026-06-14",
+  "reviewer": "manual-phase5",
+  "verdicts": [
+    {
+      "flow_id": "wp-optimize-rce-002",
+      "severity": "critical",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "Cookie value used in cache filename — preg_replace strips dangerous chars",
+      "reason": "The taint flow ends at preg_replace('/[^a-z0-9_\\-\\=]/i', '-', $_cache_key) which sanitises the value to alphanumeric+hyphen+equals only, then uses it as a cache filename component. This is not RCE. The scanner incorrectly flagged preg_replace as a dangerous sink."
+    },
+    {
+      "flow_id": "wp-optimize-rce-003",
+      "severity": "critical",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "Cookie value used in cache filename — same pattern as rce-002",
+      "reason": "Identical to rce-002. $_COOKIE value is stripped to alphanumeric chars and used as part of a cache filename. Not RCE."
+    },
+    {
+      "flow_id": "wp-optimize-rce-004",
+      "severity": "critical",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "$_GET value used in cache filename — same preg_replace sanitisation",
+      "reason": "Same pattern as rce-002/003. $_GET value is sanitised via preg_replace to alphanumeric+hyphen+equals and appended to a cache filename. Not RCE."
+    },
+    {
+      "flow_id": "wp-optimize-rce-005",
+      "severity": "critical",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "REQUEST_URI in preg_replace — URL canonicalization, not RCE",
+      "reason": "wpo_is_canonical_redirection_needed() takes parse_url(REQUEST_URI, PHP_URL_PATH) and uses preg_replace to append a trailing slash. The sink is a string manipulation used for a redirect-needed check, not shell execution."
+    },
+    {
+      "flow_id": "wp-optimize-rce-006",
+      "severity": "critical",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "REQUEST_URI / HTTP_HOST → preg_replace for URL path normalization",
+      "reason": "wpo_get_url_path() applies preg_replace to normalise the path component of the URL (e.g., replacing index.php). The sink is pure string manipulation. No shell execution, no eval, not RCE."
+    },
+    {
+      "flow_id": "wp-optimize-rce-007",
+      "severity": "critical",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "Same as rce-006 — second preg_replace in wpo_get_url_path()",
+      "reason": "Duplicate of rce-006, second preg_replace call in the same path-normalisation function. Not RCE."
+    },
+    {
+      "flow_id": "wp-optimize-rce-008",
+      "severity": "critical",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "REQUEST_URI → preg_replace whitelist in wpo_current_url()",
+      "reason": "wpo_current_url() first tries filter_var(FILTER_VALIDATE_URL) and falls back to preg_replace('/[^a-z0-9\\-._~:\\/?#\\[\\]@!\\'*+,;=%]/i', '', $url) — a whitelist allowlist. The result is a sanitised URL string stored in a static, not passed to shell. Not RCE."
+    },
+    {
+      "flow_id": "wp-optimize-rce-009",
+      "severity": "critical",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "REQUEST_URI → preg_replace stripping query string",
+      "reason": "preg_replace('/\\?.*/', '', $url) removes the query string for URL comparison. Pure string manipulation, not RCE."
+    },
+    {
+      "flow_id": "wp-optimize-rce-010",
+      "severity": "critical",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "REQUEST_URI → preg_replace for domain stripping",
+      "reason": "preg_replace('#^(http|https):\\/\\/.*\\/#Ui', '/', $url) strips the domain part to get a relative path. Pure string manipulation used for URL exception matching. Not RCE."
+    },
+    {
+      "flow_id": "wp-optimize-rce-011",
+      "severity": "critical",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "REQUEST_URI → wpo_normalize_path() — deduplicate slashes",
+      "reason": "Long chain ending at preg_replace('|(?<=.)/+|', '/', $path) which collapses multiple slashes. This is wpo_normalize_path(), a filesystem path normalisation utility. Not RCE."
+    },
+    {
+      "flow_id": "wp-optimize-rce-012",
+      "severity": "critical",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "$_SERVER value → wpo_early_sanitize_superglobal_text() — ends with htmlspecialchars",
+      "reason": "The function strips control chars with preg_replace then applies htmlspecialchars(). The scanner marks the preg_replace as a dangerous sink, but the returned value is HTML-safe. Not RCE."
+    },
+    {
+      "flow_id": "wp-optimize-rce-013",
+      "severity": "critical",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "HTTP_HOST → wpo_current_url() — same as rce-008",
+      "reason": "HTTP_HOST flows into the same wpo_current_url() function already covered in rce-008. Sanitised by whitelist preg_replace. Not RCE."
+    },
+    {
+      "flow_id": "wp-optimize-rce-014",
+      "severity": "critical",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "get_option('wpo_cache_config') → array_map('trim', ...) — not RCE",
+      "reason": "array_map('trim', $config[$field]) trims whitespace from config arrays. This is the classic false positive pattern explicitly noted in the review guidelines. Not RCE."
+    },
+    {
+      "flow_id": "wp-optimize-rce-015",
+      "severity": "critical",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "intval(get_option) → array_map('trim', ...) — not RCE",
+      "reason": "Source is already intval()-cast. Downstream array_map('trim', ...) is not RCE. FALSE POSITIVE as per known FP patterns."
+    },
+    {
+      "flow_id": "wp-optimize-rce-016",
+      "severity": "high",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "compression_server option → call_user_func — hardcoded class whitelist",
+      "reason": "get_associated_task($server) only returns values from the hardcoded get_allowed_services() array: ['resmushit' => 'Re_Smush_It_Task']. If $server is not in the array, it falls back to the single default. The DB option cannot inject arbitrary class names. Not RCE."
+    },
+    {
+      "flow_id": "wp-optimize-rce-017",
+      "severity": "high",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "Same as rce-016 — compress_single_image() call path",
+      "reason": "Identical class-whitelist protection via get_associated_task(). Not RCE."
+    },
+    {
+      "flow_id": "wp-optimize-rce-018",
+      "severity": "high",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "Same as rce-016 — smush_image() call path",
+      "reason": "Same hardcoded whitelist in get_associated_task(). Not RCE."
+    },
+    {
+      "flow_id": "wp-optimize-rce-019",
+      "severity": "high",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "compression_server → call_user_func([task, 'is_server_online']) — whitelist protected",
+      "reason": "get_associated_task() returns only the single whitelisted class Re_Smush_It_Task. call_user_func invokes a static method on a known class. Not exploitable."
+    },
+    {
+      "flow_id": "wp-optimize-rce-020",
+      "severity": "critical",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "attachment_id from task DB → preg_replace for relative path stripping — not RCE",
+      "reason": "attachment_id comes from task options stored in DB (set at queue creation by admin). File path is obtained via get_attached_file() (WP media library). preg_replace() at sink simply strips the uploads base dir prefix to get a relative path. No shell execution."
+    },
+    {
+      "flow_id": "wp-optimize-rce-021",
+      "severity": "critical",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "backup_prefix option → preg_replace for path normalization — not RCE",
+      "reason": "backup_prefix is appended to a filename with basename() stripping directory traversal, then the relative path is computed via preg_replace to strip the uploads dir prefix. No shell execution."
+    },
+    {
+      "flow_id": "wp-optimize-rce-022",
+      "severity": "critical",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "call_user_func($sanitisation, ...) in fetch_superglobal() — caller-supplied sanitiser is not user-controlled",
+      "reason": "$sanitisation is the 4th parameter of the internal fetch_superglobal() function. All call-sites pass hard-coded function names like 'sanitize_key', 'sanitize_text_field', etc. The parameter cannot be influenced by HTTP input. Not RCE."
+    },
+    {
+      "flow_id": "wp-optimize-rce-001",
+      "severity": "high",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "title": "array_map('trim', get_option('wpo_min_disable_on_url')) — not RCE",
+      "reason": "array_map('trim', ...) is explicitly listed as a known false-positive pattern in the review guidelines. Not RCE."
+    },
+    {
+      "flow_id": "wp-optimize-file-001",
+      "severity": "medium",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "title": "HTTP_HOST inside md5() → file_get_contents — path is md5 hash",
+      "reason": "The filename is constructed as: $cache_file_base . md5(\"$host-$request_uri...\"). The HTTP_HOST is inside the md5() call, so it cannot influence the output to a predictable path or inject path separators. The resulting path is a fixed-length hex string. Not exploitable for file inclusion or traversal."
+    },
+    {
+      "flow_id": "wp-optimize-file-002",
+      "severity": "medium",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "title": "Same as file-001 — HTTP_HOST inside md5() for cache header file",
+      "reason": "Same as file-001, different cache file extension. md5() prevents any meaningful taint propagation."
+    },
+    {
+      "flow_id": "wp-optimize-file-003",
+      "severity": "high",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "title": "$_GET → wpo_rest_cache_filename() → readfile($path) — sanitised to alphanumeric",
+      "reason": "wpo_rest_cache_filename() applies preg_replace('/[^a-z0-9_\\-]/i', '-', ...) to all key-value pairs from $_GET, stripping all path separators and special chars. The resulting filename is prepended with WPO_CACHE_FILES_DIR. Path traversal is not possible because '/' and '.' are replaced with '-'. Not exploitable."
+    },
+    {
+      "flow_id": "wp-optimize-file-004",
+      "severity": "high",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "title": "$_GET → wpo_rest_cache_filename() → file_get_contents($headers_file) — same as file-003",
+      "reason": "Same path construction as file-003 with '.headers' appended. Cannot traverse directories. Not exploitable."
+    },
+    {
+      "flow_id": "wp-optimize-file-005",
+      "severity": "medium",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "title": "get_post_meta('original-file') → realpath() → copy() — requires admin auth",
+      "reason": "Source is post meta 'original-file' written only by the plugin itself (backup_original_image writes it). realpath() resolves symlinks and verifies existence. The copy() overwrites the current image with its own backup. Requires authenticated admin to trigger smush. No attacker-controlled path traversal vector."
+    },
+    {
+      "flow_id": "wp-optimize-file-006",
+      "severity": "high",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "title": "attachment_id → get_attached_file() → copy() — internal file operation, admin only",
+      "reason": "attachment_id comes from task options set by authenticated admin. get_attached_file() looks up WP media library. copy() backs up within uploads dir. validate_file() checks extension. No user-controllable path traversal."
+    },
+    {
+      "flow_id": "wp-optimize-file-007",
+      "severity": "high",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "title": "attachment_id → get_attached_file() → file_put_contents() — internal file write, admin only",
+      "reason": "Same as file-006. file_put_contents() writes the optimised image back to the original media file path. Requires admin auth. Not attacker-exploitable."
+    },
+    {
+      "flow_id": "wp-optimize-ssrf-001",
+      "severity": "high",
+      "verdict": "false_positive",
+      "confidence": "medium",
+      "vuln_class": "ssrf",
+      "title": "api_endpoint option → wp_remote_post() — requires admin privileges to set",
+      "reason": "api_endpoint is a task option validated with filter_var(FILTER_VALIDATE_URL) at line 64. The task option is set at queue creation by an authenticated admin. An admin setting their own API endpoint to an internal URL would be a self-SSRF with no privilege escalation. Not a meaningful external vulnerability."
+    },
+    {
+      "flow_id": "wp-optimize-xss-001",
+      "severity": "high",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "title": "$_REQUEST['page'] → echo — only echoes literal 'active' or ''",
+      "reason": "At line 16, the echo outputs a ternary: ($active_page === $menu['menu_slug']) ? 'active' : ''. The user-supplied $active_page is only used in a strict string comparison; it is never itself echoed. The output is always either the literal string 'active' or empty string."
+    },
+    {
+      "flow_id": "wp-optimize-xss-002",
+      "severity": "high",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "title": "echo intval($smush_options['image_quality']) — intval output is numeric only",
+      "reason": "intval() always returns an integer. echo of an integer cannot produce XSS."
+    },
+    {
+      "flow_id": "wp-optimize-xss-003",
+      "severity": "high",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "title": "echo intval($wpo_minify_options['cache_lifespan']) — same as xss-002",
+      "reason": "intval() cast prevents XSS. Not exploitable."
+    },
+    {
+      "flow_id": "wp-optimize-xss-004",
+      "severity": "high",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "title": "echo get_option(...) ternary — only echoes literal 'checked=\"checked\"' or ''",
+      "reason": "The echo outputs a ternary where both branches are hard-coded string literals. The DB option value controls which branch is taken, never directly echoed. Not XSS."
+    },
+    {
+      "flow_id": "wp-optimize-open-001",
+      "severity": "low",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "open_redirect",
+      "title": "wpo_rest_cache_filename($_GET) → gmdate() → header('Last-Modified:') — no redirect",
+      "reason": "The sink is header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $modified_time) . ' GMT'). $modified_time comes from filemtime() cast to int. The $_GET value flows through wpo_rest_cache_filename() to a file path used only to read mtime; the header value is always a formatted date string. Not an open redirect."
+    },
+    {
+      "flow_id": "wp-optimize-open-002",
+      "severity": "low",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "open_redirect",
+      "title": "Same as open-001 — second Last-Modified header call",
+      "reason": "Same analysis as open-001. Not an open redirect."
+    }
+  ],
+  "semgrep_verdicts": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "file": "cache/class-wp-optimize-page-cache-preloader.php:499",
+      "verdict": "false_positive",
+      "reason": "The query uses esc_sql($multisite_plugin_table_name) for the table name, followed by $wpdb->prepare() for the WHERE clause parameters. Properly protected."
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "file": "cache/class-wpo-page-cache.php:409,418",
+      "verdict": "false_positive",
+      "reason": "Both wp_redirect() calls at lines 409 and 418 are preceded by wp_verify_nonce() checks (lines 405/412) which require the user to be authenticated and possess a valid nonce. The redirect target is constructed via add_query_arg() on the current URL, not from raw user input. Not an open redirect."
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-sha1-password",
+      "file": "cache/file-based-page-cache-functions.php:512",
+      "verdict": "false_positive",
+      "reason": "sha1() is used here for cache filename deduplication when the filename exceeds 240 chars (performance/filesystem use), not for password storage. Not a security issue."
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "file": "includes/class-updraft-smush-manager.php:547,583",
+      "verdict": "needs_review",
+      "reason": "Low confidence finding. Require admin auth to reach these code paths (smush manager). Likely admin-only query building. Low severity even if confirmed."
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "file": "includes/class-wp-optimize-commands.php:1269,1271",
+      "verdict": "false_positive",
+      "reason": "Admin-only command class; requires capability check upstream. $wpdb->query with table name variables typical for DB optimizer functionality."
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "file": "includes/class-wp-optimize-database-information.php:50,139,360,709,711",
+      "verdict": "false_positive",
+      "reason": "Database introspection queries (SHOW TABLES, SHOW TABLE STATUS etc) using table name variables. Table names from WP DB prefix are not user-supplied. Admin-only functionality."
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "file": "optimizations/orphanedtables.php:103,117,146",
+      "verdict": "false_positive",
+      "reason": "Orphaned tables management is admin-only. Table names come from WordPress db prefix enumeration, not user input."
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "file": "multiple md5 usages",
+      "verdict": "false_positive",
+      "reason": "All md5() usages are for cache key generation / filename deduplication, not authentication or integrity verification. Low risk informational finding."
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "file": "minify/class-wp-optimize-minify.php:155",
+      "verdict": "false_positive",
+      "reason": "Redirect target would need to be reviewed in context but minify redirect is typically to a plugin-generated URL, not raw user input."
+    }
+  ],
+  "summary": {
+    "total_reviewed": 36,
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 36,
+    "needs_further_review": 0,
+    "key_findings": [
+      "All 22 taint flows labeled 'rce' are false positives. The scanner incorrectly identifies preg_replace(), array_map('trim'), and call_user_func() with hardcoded class whitelists as RCE sinks.",
+      "All 4 'file_inclusion' critical/high flows are false positives: files-001/002 use md5() making path injection impossible; files-003/004 sanitise with whitelist regex; files-005/006/007 are admin-only internal file operations.",
+      "The single 'ssrf' finding (ssrf-001) requires admin privileges to set the api_endpoint option and validates with FILTER_VALIDATE_URL.",
+      "All 4 'xss' flows are false positives: xss-001 never echoes the user value (only uses it in a comparison); xss-002/003 use intval(); xss-004 echoes only literal strings.",
+      "Both 'open_redirect' flows are mislabelled — the actual sink is a Last-Modified HTTP header using a gmdate() integer value, not a Location redirect.",
+      "Semgrep SQL injection findings are all low-confidence, admin-only code paths using table names not derived from user input."
+    ]
+  }
+}

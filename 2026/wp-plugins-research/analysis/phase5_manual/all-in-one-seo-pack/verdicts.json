@@ -1,0 +1,319 @@
+{
+  "plugin": "all-in-one-seo-pack",
+  "reviewed_at": "2026-06-14",
+  "reviewer_notes": "Reviewed all 9 critical and 9 high taint flows plus all semgrep findings. The scanner misclassified array_map('intval',...), array_filter, usort, preg_replace (non-/e modifier), and internal-data-only calls as RCE sinks. The nopriv endpoint aioseo_connect_process uses a robust HMAC-sha512 challenge/response before allowing plugin install. All reported RCE flows are false positives.",
+  "verdicts": [
+    {
+      "flow_id": "all-in-one-seo-pack-rce-001",
+      "severity_reported": "medium",
+      "vulnerability_class": "rce",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The 'sink' is preg_replace('/\\h/', \"\\n\", $additionalUrls). This is not an RCE sink — preg_replace without the /e modifier cannot execute code. The regex replaces horizontal whitespace with newlines. The data is user-supplied social profile URLs that have been through sanitize_text_field. No command execution path exists.",
+      "auth_required": "unknown — nonce verified per brief",
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-rce-002",
+      "severity_reported": "high",
+      "vulnerability_class": "rce",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Sink is array_map('intval', $bpPageIds) where source is get_option('bp-pages'). array_map with 'intval' is a well-known FALSE POSITIVE pattern explicitly listed in review instructions. This casts page IDs to integers — no code execution possible.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-obje-001",
+      "severity_reported": "high",
+      "vulnerability_class": "object_injection",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The call is maybe_unserialize(get_option('trp_settings', [])). The plugin's own maybeUnserialize() helper passes ['allowed_classes' => false] by default (see app/Common/Utils/Helpers.php line 301). However, this uses WordPress's maybe_unserialize() directly, not the AIOSEO wrapper. WordPress's maybe_unserialize() calls PHP unserialize() without class restrictions. The source is a WP option set by the TranslatePress plugin ('trp_settings'). An attacker would need database write access or a separate SQLi to poison this option, making this a second-order issue that requires prior database compromise. Not directly exploitable.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-rce-003",
+      "severity_reported": "high",
+      "vulnerability_class": "rce",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Sink is array_map('intval', explode(',', sanitize_text_field(wp_unslash($_GET['ids'])))). The array_map('intval',...) pattern is explicitly a FALSE POSITIVE — all values are cast to integers. Used to populate 'post__in' in a get_posts() call. No command execution possible.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-rce-004",
+      "severity_reported": "critical",
+      "vulnerability_class": "rce",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source is get_option('active_plugins'), sink is array_map() with a static function that extracts $plugin['Version']. This reads WP plugin version data for telemetry reporting. The 'sink' is a plain PHP closure performing a property access — not a command execution sink. No exploitable path.",
+      "auth_required": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-rce-005",
+      "severity_reported": "critical",
+      "vulnerability_class": "rce",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Sink is array_map('intval', explode(',', sanitize_text_field(wp_unslash($_GET['ids'])))). As with rce-003, this is the intval-cast false positive pattern. The ids are used in a WP_Post lookup (getPost($id)), which is safe. No command execution.",
+      "auth_required": false,
+      "exploitable": false,
+      "note": "The function runs in a 'post_row_actions' or 'bulk_actions' hook context that fires in admin. Admin-only context."
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-xss-001",
+      "severity_reported": "high",
+      "vulnerability_class": "xss",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The sink is 'echo intval($id)'. The intval() function converts any value to a plain integer — integers cannot contain XSS payloads. $id comes from iterating over the $options array key which is a PHP array key (already integer-typed in a foreach). No XSS possible.",
+      "auth_required": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-xss-002",
+      "severity_reported": "high",
+      "vulnerability_class": "xss",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Identical to xss-001. echo intval($id) in an HTML attribute context — intval() produces an integer, not user-controlled HTML. Cannot be XSS.",
+      "auth_required": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-xss-003",
+      "severity_reported": "high",
+      "vulnerability_class": "xss",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Identical to xss-001/002. echo intval($id) in a radio input value attribute. Integer output cannot be XSS.",
+      "auth_required": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-open-001",
+      "severity_reported": "low",
+      "vulnerability_class": "open_redirect",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "wp_safe_redirect() is used, which restricts redirects to the current host or explicitly allowed hosts. Even though $requestUri from $_SERVER['REQUEST_URI'] is used, wp_safe_redirect(home_url() . untrailingslashit($requestUri)) prepends home_url() making external redirect impossible. wp_safe_redirect() would block an absolute URL injection anyway.",
+      "auth_required": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-rce-006",
+      "severity_reported": "critical",
+      "vulnerability_class": "rce",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Sink is preg_replace('/(.*sitemap)(0|1){1}?(\\.xml(\\.gz)?)$/i', '$1$3', $requestUri). This is a standard preg_replace without the /e modifier. The replacement string uses backreferences ($1$3) from a fixed pattern, not from user input. No code execution possible via preg_replace without /e.",
+      "auth_required": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-open-002",
+      "severity_reported": "low",
+      "vulnerability_class": "open_redirect",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "wp_safe_redirect(home_url() . $pathWithoutNumber) — same analysis as open-001. wp_safe_redirect prevents off-host redirects. The path is prefixed with home_url() so external domains cannot be injected.",
+      "auth_required": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-rce-007",
+      "severity_reported": "critical",
+      "vulnerability_class": "rce",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Sink is array_filter() with a closure doing absint() comparisons on $child->parent and $listItem->id. array_filter is not a command execution sink; it filters an array using a boolean callback. absint() is used for sanitization. No RCE vector.",
+      "auth_required": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-rce-008",
+      "severity_reported": "critical",
+      "vulnerability_class": "rce",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source is explode('/', get_option('permalink_structure')), sink is array_filter() on the result. This reads a WordPress option (permalink structure) and splits it into segments. array_filter is not an RCE sink. No command execution possible.",
+      "auth_required": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-rce-009",
+      "severity_reported": "critical",
+      "vulnerability_class": "rce",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source is intval(wp_get_current_user()->ID), sink is array_filter(aioseo()->addons->doAddonFunction(...)). The user ID is passed to an addon function for schema graph generation. doAddonFunction() calls registered addon callbacks — this is internal plugin dispatch, not user-controlled code execution. intval() on user ID eliminates injection. No RCE.",
+      "auth_required": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-rce-010",
+      "severity_reported": "critical",
+      "vulnerability_class": "rce",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Sink is array_filter($checks, function($check) use ($priorityFilter) { return $check['priority'] === $priorityFilter; }). This filters an internal checklist array by comparing against a sanitize_text_field()-processed value. array_filter with a comparison closure is not an RCE sink. No command execution.",
+      "auth_required": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-rce-011",
+      "severity_reported": "critical",
+      "vulnerability_class": "rce",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Sink is usort($checks, callback) — sorting an internal array. usort is not an RCE sink. The sort comparator only compares array values; it does not eval or exec anything. No command execution possible.",
+      "auth_required": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-rce-012",
+      "severity_reported": "high",
+      "vulnerability_class": "rce",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source is sanitize_text_field($faq['answer']), sink is array_filter([\"Service response code: $responseCode\", $serviceError]). The FAQ data is sent via wp_remote_post() to an AIOSEO external AI service, and the 'sink' is building an error detail string. No command execution sink — array_filter on string literals is not RCE. The data goes to an external HTTPS API call, not to exec/shell_exec/etc.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-rce-013",
+      "severity_reported": "high",
+      "vulnerability_class": "rce",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Identical pattern to rce-012. Source is sanitize_text_field($keyPoint['explanation']), sink is array_filter() building error detail strings. No RCE sink present.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-open-003",
+      "severity_reported": "low",
+      "vulnerability_class": "open_redirect",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source is absint(sanitize_text_field(wp_unslash($_GET['replytocom']))), used as '#comment-' . $replyToCom in wp_safe_redirect(). absint() ensures the value is a non-negative integer. The fragment '#comment-123' appended to a URL cannot redirect off-host. wp_safe_redirect() would block it anyway.",
+      "auth_required": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-open-004",
+      "severity_reported": "low",
+      "vulnerability_class": "open_redirect",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source is trailingslashit(get_option('home')) prepended to a query var value. wp_redirect() is used (not wp_safe_redirect). However, the $categoryUrl is constructed as home_url() + query var suffix — the base is always the site home URL. The query var 'aioseo_category_redirect' would need to be a path from WordPress's own rewrite rules, not raw user input. No direct user input flows into the redirect target without WP URL routing.",
+      "auth_required": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-xss-004",
+      "severity_reported": "high",
+      "vulnerability_class": "xss",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Sink is echo sprintf(__('...'), date_i18n(get_option('date_format')), date_i18n(get_option('time_format'))). The date_i18n() function formats a timestamp using a date format option. While date_format and time_format are WordPress options, they are admin-controlled settings. date_i18n() output in a sitemap XSL template would require the attacker to be an admin to change the format, and admins can already execute arbitrary code. Insufficient privilege escalation to be a valid finding.",
+      "auth_required": "admin-controlled options",
+      "exploitable": false
+    },
+    {
+      "flow_id": "all-in-one-seo-pack-rce-014",
+      "severity_reported": "critical",
+      "vulnerability_class": "rce",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Sink is array_map(function($kp) { return ['keyphrase' => sanitize_text_field((string)$kp)]; }, $additional). This maps an array of keyphrases through sanitize_text_field. array_map with a sanitizing closure is not an RCE sink. The result is stored in post meta. No command execution.",
+      "auth_required": false,
+      "exploitable": false
+    }
+  ],
+  "semgrep_verdicts": [
+    {
+      "check_id": "wp-auth-rest-no-permission-callback",
+      "file": "app/Common/Api/Api.php",
+      "verdict": "FALSE_POSITIVE",
+      "reasoning": "The registerRoutes() method always provides a permission_callback: either options['permissions'] or the default 'validRequest' method. validRequest() checks is_user_logged_in() && validateAccess(). All routes have explicit 'access' keys. The semgrep rule triggered because it saw register_rest_route() without a literal 'permission_callback' key in a hardcoded array, but the code constructs the array programmatically with the callback always present."
+    },
+    {
+      "check_id": "wp-sqli-variable-in-query (Uninstall.php:66)",
+      "file": "app/Common/Main/Uninstall.php",
+      "verdict": "FALSE_POSITIVE",
+      "reasoning": "DROP TABLE IF EXISTS `esc_sql($tableName)` — esc_sql() is the correct WordPress way to escape SQL identifiers. This runs only during plugin uninstall (requires administrator privileges). Table names come from an internal plugin method getDbTables(), not user input."
+    },
+    {
+      "check_id": "wp-deser-unserialize-no-allowed-classes (Helpers.php:317)",
+      "file": "app/Common/Utils/Helpers.php",
+      "verdict": "FALSE_POSITIVE",
+      "reasoning": "Line 317 is unserialize(serialize($object)) used for deep-cloning a PHP object (not untrusted data). serialize/unserialize is used here to clone an internal plugin object; the input is a plugin-created object, not user-controlled. No injection risk."
+    },
+    {
+      "check_id": "wp-redirect-instead-of-safe-redirect (Lite/Admin/Admin.php:107)",
+      "file": "app/Lite/Admin/Admin.php",
+      "verdict": "FALSE_POSITIVE",
+      "reasoning": "The wp_redirect() targets are hardcoded AIOSEO marketing URLs from $mappedUrls (aioseo()->helpers->utmUrl(AIOSEO_MARKETING_URL . 'lite-upgrade/', ...)). No user-controlled input flows into the redirect URL. The only user control is which GET parameter is set (which selects from the pre-defined map), not the destination URL."
+    },
+    {
+      "check_id": "wp-crypto-sha1-password (multiple files)",
+      "files": [
+        "app/Common/Api/WritingAssistant.php:164",
+        "app/Common/Models/CrawlCleanupBlockedArg.php:111,191",
+        "app/Common/Models/CrawlCleanupLog.php:78,98",
+        "app/Common/QueryArgs/CrawlCleanup.php:304",
+        "app/Common/Services/RobotsService.php:244",
+        "app/Common/Traits/Helpers/Strings.php:693",
+        "app/Common/Traits/Helpers/WpContext.php:697",
+        "app/Common/Utils/Database.php:1779"
+      ],
+      "verdict": "FALSE_POSITIVE",
+      "reasoning": "sha1() is used for content hashing (deduplication, cache keys, change detection) — NOT for password storage. The rule 'wp-crypto-sha1-password' is triggering on non-password contexts. Using sha1() for content fingerprinting is acceptable (weak collision resistance is irrelevant for deduplication). No security impact."
+    },
+    {
+      "check_id": "wp-crypto-weak-hash-general (multiple files — md5)",
+      "files": [
+        "app/Common/Admin/Notices/WpNotices.php:178",
+        "app/Common/Migration/Wpml.php:67",
+        "app/Common/Social/Image.php:67",
+        "app/Common/Traits/Helpers/Api.php:224",
+        "app/Common/Traits/Helpers/DateTime.php:174",
+        "app/Common/Traits/Helpers/Vue.php:32",
+        "app/Common/Traits/Helpers/WpUri.php:94,269",
+        "app/Common/Utils/ActionScheduler.php:341",
+        "app/Common/Utils/Database.php:1544",
+        "app/Lite/Traits/Helpers/Vue.php:28"
+      ],
+      "verdict": "FALSE_POSITIVE",
+      "reasoning": "md5() is used for cache keys, asset fingerprinting (ETags/versioning), and deduplication hashes — not for authentication tokens or passwords. Weak collision resistance is not a security issue in these contexts."
+    }
+  ],
+  "nopriv_endpoint_analysis": {
+    "aioseo_connect_process": {
+      "file": "app/Lite/Admin/Connect.php",
+      "verdict": "FALSE_POSITIVE",
+      "reasoning": "This endpoint handles Pro plugin installation via a connect flow. It requires: (1) a valid $hashedOth token sent as POST['token'], (2) the token must match hash_hmac('sha512', $oth, wp_salt()) where $oth is a random secret stored server-side in sensitive options BEFORE the request is made. The secret is only set during the authenticated generateConnectUrl() flow (requires 'install_plugins' capability). An unauthenticated attacker cannot know $oth (random 512-bit hash, never exposed) and cannot compute the HMAC without wp_salt(). The token is consumed (deleted) after use. $downloadUrl from POST['file'] is passed to WP plugin installer only after HMAC verification passes. This is a well-designed connect flow — not exploitable unauthenticated."
+    },
+    "aioseo_is_installed": {
+      "file": "app/Common/SearchStatistics/Api/Listener.php",
+      "verdict": "INFORMATIONAL",
+      "reasoning": "Returns plugin version and pro status. Information disclosure of plugin version to unauthenticated callers. Low severity — version info is generally public."
+    },
+    "aioseo_rauthenticate": {
+      "file": "app/Common/SearchStatistics/Api/Listener.php",
+      "verdict": "FALSE_POSITIVE",
+      "reasoning": "Validates a trust token (TT) before responding. The TT is a pre-shared secret from the search statistics authentication flow. Requires knowing the trust token stored in sensitiveOptions. No auth bypass possible without the token."
+    }
+  },
+  "summary": {
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 23,
+    "needs_further_investigation": 0,
+    "notes": "All 23 taint flows are false positives. The scanner incorrectly classified array_map('intval',...), array_filter(), usort(), preg_replace() (no /e flag), and internal function dispatch as RCE sinks. XSS findings are all on intval() outputs (impossible to inject). Open redirects use wp_safe_redirect() or hardcoded URLs. The one interesting nopriv endpoint (aioseo_connect_process) has a robust HMAC-sha512 challenge that prevents unauthenticated exploitation. Semgrep findings are all informational (weak crypto for non-auth purposes, false-positive auth check, safe unserialize context). No confirmed vulnerabilities found."
+  }
+}

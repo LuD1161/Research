@@ -1,0 +1,478 @@
+{
+  "plugin": "better-wp-security",
+  "analysis_date": "2026-06-14",
+  "analyst": "phase5-manual-review",
+  "summary": {
+    "total_flows_reviewed": 52,
+    "confirmed": 0,
+    "likely_vulnerable": 1,
+    "false_positives": 51,
+    "needs_more_investigation": 0
+  },
+  "verdicts": [
+    {
+      "flow_id": "better-wp-security-rce-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "reasoning": "preg_replace() uses pattern '|//+|' with no /e modifier and no eval-equivalent. The result is assigned to a local variable $request_uri. This is pure string normalization. Not RCE. The scanner misidentified preg_replace as a sink.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-obje-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "object_injection",
+      "reasoning": "maybe_unserialize() is called on data read from $wpdb->sitemeta with a hardcoded, parameterized key. The source is the plugin's own option storage — an attacker cannot write arbitrary serialized data to wp_sitemeta without already having admin/DB access. WordPress core uses this same pattern extensively. No exploitable path from unauthenticated user.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-obje-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "object_injection",
+      "reasoning": "Same as obje-001. maybe_unserialize() on own option stored in $wpdb->options. Plugin-owned data, no direct unauthenticated write path. WordPress core pattern.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-rce-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "reasoning": "preg_replace('/^https/', 'http', get_option('siteurl')) — no /e modifier, no eval. Merely converts https to http in the siteurl. Not RCE.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-rce-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "reasoning": "array_filter($_SERVER, ...) with ARRAY_FILTER_USE_KEY — this filters server variables by key name. The result is used to create a server snapshot for logging. No code execution sink reached.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-open-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "open_redirect",
+      "reasoning": "wp_safe_redirect() restricts redirects to the current host by design. REQUEST_URI is a path-only value on well-configured servers. This is explicitly listed in the false-positive patterns.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-sqli-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "sql_injection",
+      "reasoning": "$wpdb->insert() uses parameterized placeholders internally and escapes all values. sanitize_text_field() is applied to the username first. $wpdb->insert() is NOT vulnerable to SQL injection — this is explicitly noted in the false-positive patterns.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-sqli-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "sql_injection",
+      "reasoning": "Same as sqli-001. $wpdb->insert() with sanitize_text_field() applied source. $wpdb->insert() safely escapes all values.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-sqli-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "sql_injection",
+      "reasoning": "$limit = ' LIMIT ' . absint($args['limit']) — absint() casts to non-negative integer, making SQL injection impossible. The resulting integer is safe to interpolate into SQL.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-rce-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "reasoning": "array_map() with an anonymous function that returns an array with 'ip' => $result['ip'] and 'count' => (int) $result['c']. This is data transformation, not code execution. The scanner incorrectly flagged array_map() as an RCE sink.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-rce-005",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "reasoning": "call_user_func($type, $entry) in validator.php line 349: $type is always an array [$this, 'method_name'] where $this is an ITSEC_Validator subclass instance. The type/callback is defined in plugin code (module configurations), never from user POST data. The check at line 334 confirms $type[0] === $this. Attacker cannot inject an arbitrary callable.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-sqli-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "sql_injection",
+      "reasoning": "$wpdb->insert() called during a log migration utility. Source is a DB row from the plugin's own log table. $wpdb->insert() safely escapes values. Not user-controlled injection.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-xss-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "The taint chain is wrong. At line 292-296, $_REQUEST[SHOW_AFTER_LOGIN] is first checked against $this->registered (an allowlist of registered interstitials). If the slug is not registered, the code returns early. If the session creation fails ($is_wp_error check at line 295), wp_die($session) is called with the WP_Error object (not user input). The slug value never reaches wp_die() without being in the registered allowlist.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-xss-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "Same analysis as xss-001. force_interstitial() at line 331-364: empty() and isset($this->registered[...]) check at line 333 ensures slug must be in the registered allowlist. The wp_die($session) at line 358 is only reached if ITSEC_Login_Interstitial_Session::create() returns a WP_Error, in which case $session is a WP_Error (not user-supplied string XSS). wp_die() with a WP_Error displays a formatted error page, not raw user input.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-file-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "reasoning": "Log file path is generated from sanitize_title(get_bloginfo('name')) and wp_generate_password(30, false). The blog name is admin-controlled, not directly user-injectable from unauthenticated requests. The file is only written (not included). No code execution path.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-rce-006",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "reasoning": "call_user_func($config['unserialize'], $last_chunk[0]->storage_data) — $config is set by the plugin's own code when instantiating ITSEC_Lib_Distributed_Storage. The unserialize callback is 'maybe_unserialize' or similar internal function, not attacker-controlled. Data source is the plugin's own itsec_distributed_storage table.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-obje-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "object_injection",
+      "reasoning": "unserialize() called on data from itsec_distributed_storage table. This table is written by the plugin itself during normal operation. No unauthenticated path to write arbitrary serialized payloads to this table. Requires prior DB access or admin compromise.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-rce-007",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "reasoning": "Same as rce-006. call_user_func($config['unserialize'], ...) where $config is plugin-controlled and $option is from plugin's own distributed storage table.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-rce-008",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "reasoning": "Same pattern as rce-006/007. Plugin-internal storage with plugin-defined unserialize callback.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-vari-001",
+      "verdict": "likely_vulnerable",
+      "confidence": "medium",
+      "vuln_class": "variable_injection",
+      "severity": "low",
+      "reasoning": "parse_str($data['data']['--itsec-form-serialized-data'], $data) in ITSEC_Form::get_post_data() overwrites the $data variable with parsed values from a POST parameter. An attacker can send POST data[--itsec-form-serialized-data]=--itsec-form-tracked-booleans[]=any_field to clobber the form tracking arrays. However: (1) this function is only called in admin page handlers (page-logs.php) which require authentication; (2) the overwritten $data is a local variable within get_post_data(). Authentication mitigates severity significantly. Authenticated admin variable injection with limited downstream impact.",
+      "auth_required": true,
+      "exploitable": true,
+      "cvss_estimate": "3.5",
+      "notes": "Exploitable only by authenticated users with admin capability. Low practical impact since admin can already modify settings via legitimate means."
+    },
+    {
+      "flow_id": "better-wp-security-xss-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "The echo at line 666 outputs $selected which is either ' selected=\"selected\"' or '' (a hardcoded string comparison result). $val from get_option() is never directly echoed — it is only compared. The actual echoed $sub_name and $content are encoded via ITSEC_Form::esc_value_attr().",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-xss-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "Same as xss-003. The $selected variable is hardcoded to ' selected=\"selected\"' or '' based on string comparison. $val is never printed directly.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-xss-005",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "$m = (int) $_GET['m'] — the (int) cast makes this an integer, which is then passed to selected() function. The printf at line 567 uses esc_attr() for the value attribute and sprintf with __() for localized month name. The $m integer is only used in the selected() comparison, never directly echoed unsanitized.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-xss-006",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "Step 3 in the chain explicitly shows esc_url() applied to add_query_arg(): $column_display_name = '<a href=\"' . esc_url(...) . '\">...'. The URL is properly escaped. The $column_display_name string that goes into the echo is constructed with esc_url() wrapping the user-influenced URL. Not exploitable XSS.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-open-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "open_redirect",
+      "reasoning": "wp_validate_redirect(home_url($_SERVER['REQUEST_URI']), home_url()) ensures redirect stays on the site. home_url() prepends the site URL, and wp_validate_redirect() further validates. wp_safe_redirect() is an additional check. Multiple layers of protection. False positive.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-file-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "reasoning": "change_content_directory() applies sanitize_file_name() to $dir_name, then checks for absolute paths via preg_match. sanitize_file_name() strips '..' directory traversal sequences. This function is only callable by admins through plugin settings. Rename of the content directory is a legitimate admin operation, not a file inclusion attack.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-file-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "reasoning": "Same as file-002. The rollback rename (new_dir → old_dir) uses the same sanitized $dir_name. Admin-only operation.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-xss-007",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "echo \"<response>{$_POST['expect']}:...\" at line 83 of security-check-pro/utility.php does reflect $_POST['expect'] without escaping. However, this is gated by validate_key($_POST['key']) at line 25 which requires a valid HMAC using the key_salt stored in the database (set during plugin setup). An unauthenticated attacker cannot forge a valid key without knowing the DB-stored salt. This endpoint is intended for the iThemes SSL Proxy Detect server callback, not public access. The reflected content-type header is 'text/plain', which limits XSS impact further. Not practically exploitable without DB access.",
+      "exploitable": false,
+      "notes": "The echo does lack escaping, but the HMAC key validation gate makes this not exploitable by external attackers. Would be a finding only if combined with a way to obtain the key_salt from the DB."
+    },
+    {
+      "flow_id": "better-wp-security-rce-009",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "reasoning": "array_map() that transforms dashboard post meta into an array structure. This is data processing/formatting. array_map with a closure returning structured data is not an RCE sink. Scanner incorrectly identified this.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-file-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "reasoning": "file_get_contents($file) where $layout = sanitize_title($layout) and then $file = dirname(dirname(__FILE__)) . '/layouts/{$layout}.json'. The $layout parameter is defined as an enum in the REST schema (restricted to known values). Additionally, sanitize_title() strips most special characters. The REST endpoint requires authentication (ITSEC_Core::current_user_can_manage). Path is restricted to the plugin's own layouts directory. No sensitive file disclosure possible outside that directory.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-rce-010",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "reasoning": "call_user_func($callback, $request, $settings) where $callback is a registered card callback from plugin code (registered via ITSEC_Dashboard_Card interface), not from user input. The $request['id'] just identifies which card's settings to load. The callback functions are plugin-defined. Not attacker-controllable.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-rce-011",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "reasoning": "array_map() processes database table names returned from SHOW TABLES query and strips the prefix. This is string processing, not code execution. Scanner incorrectly flagged array_map() as an RCE sink.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-rce-012",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "reasoning": "array_map() with preg_replace() without /e modifier on table names — strips numeric prefix from table names. No code execution. False positive on both array_map and preg_replace.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-file-005",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "reasoning": "file_put_contents() writes a static PHP silence file ('<?php\\n// Silence is golden.') to the backup location from get_site_option('itsec_backup'). The content written is hardcoded (not attacker-controlled). The path comes from plugin settings which are only admin-configurable. No arbitrary file write by unauthenticated users.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-rce-013",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "reasoning": "preg_replace('/^CREATE TABLE /', 'CREATE TABLE IF NOT EXISTS ', $create_table) — no /e modifier. Simple string substitution in backup SQL generation. Not RCE.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-file-006",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "reasoning": "Backup file creation: the path uses get_bloginfo('name') (admin-controlled, sanitized with sanitize_title), current_time(), and wp_generate_password(30,false) for uniqueness. fwrite() writes SQL backup data. No user-controlled filename injection that could lead to path traversal. Admin-only backup functionality.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-file-007",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "reasoning": "Same backup file as file-006. fwrite(PHP_EOL . PHP_EOL) is entirely static content. Not a security issue.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-file-008",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "reasoning": "fwrite($fh, $sql) in backup generation. $sql is SQL fetched from the database to backup. Admin-only, no path traversal in the backup file path.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-file-009",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "reasoning": "Same as file-007. Static content written during backup. Admin-only.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-file-010",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "reasoning": "Same as file-007/009. Static fwrite in backup routine.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-file-011",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "reasoning": "unlink($file) in backup cleanup. The $file path is constructed by the plugin with sanitized components. Admin-only backup operation. No user-controlled path to unlink arbitrary files.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-file-012",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "reasoning": "unlink($file) after zip creation. Same analysis as file-011. Admin backup cleanup. Path not attacker-controlled.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-file-013",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "reasoning": "unlink(trailingslashit($dir) . $file) on old backup cleanup. $dir is from plugin settings, $file is the plugin-generated zip filename. Admin-only, no external control.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-obje-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "object_injection",
+      "reasoning": "maybe_unserialize($row->meta_value) from notification-center — same pattern as obje-001/002. Plugin's own option storage. No user-controlled path to write arbitrary serialized data to this option.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-obje-005",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "object_injection",
+      "reasoning": "Same as obje-004. maybe_unserialize($row->option_value) from notification-center option storage.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-xss-008",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "wp_send_json_success() returns JSON-encoded data with appropriate Content-Type header (application/json). JSON encoding prevents XSS. The generated backup codes are random tokens, not user-supplied content that would be echoed back. Also: nonce_verified = true in this finding.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-xss-009",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "wp_send_json_success() with JSON encoding — Content-Type is application/json, preventing XSS. The qrcode_url is URL-encoded by get_google_qr_code(). Also nonce_verified = true.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-xss-010",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "wp_send_json() with JSON encoding. auth_required = true and nonce_verified = true. JSON content-type prevents XSS.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-file-014",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "reasoning": "rename() on log file paths from get_site_option('itsec_global'). These are plugin-managed settings containing the log file location, only writable by admins. No unauthenticated control of these values.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-file-015",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "file_inclusion",
+      "reasoning": "file_put_contents() writes static PHP silence file to path from plugin settings. Same analysis as file-005. Admin-only, content is hardcoded.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "better-wp-security-lfi-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "local_file_inclusion",
+      "reasoning": "require_once($file) in load_file() is gated by: (1) the load() method is only called via 'load-{admin_page}' hook which fires only in the admin area for registered admin pages; (2) handle_ajax_request() is 'wp_ajax_*' requiring authentication; (3) the file must be a real file (is_file() check at line 247 confirmed in code). The $id is from $plugin_page (admin page slug) which is registered by the plugin itself. While $_GET['page'] can influence $id, the path is constrained to __DIR__.'/page-{id}.php' within the admin-pages directory. PHP files outside this directory cannot be included unless the web server allows symlinks or the name resolves to an existing file there. Requires admin authentication to reach this code path.",
+      "exploitable": false,
+      "notes": "Technically an authenticated admin could potentially reach page-../../something.php if file exists, but: (1) requires admin auth, (2) is_file() must pass, (3) the admin-pages/ directory path constrains traversal. Very low practical impact."
+    },
+    {
+      "flow_id": "better-wp-security-rce-014",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "vuln_class": "rce",
+      "reasoning": "static::maybe_unserialize($item->{$value_column}, $allowed_classes) in vendor wp-background-processing lib. The $allowed_classes parameter restricts which classes can be deserialized. This is the safe deserialization pattern. Data is from plugin's own options table. Scanner incorrectly classified array_map+unserialize as RCE.",
+      "exploitable": false
+    }
+  ],
+  "semgrep_verdict_summary": {
+    "wp-auth-rest-no-permission-callback": {
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "All flagged REST controllers (ban-hosts/REST.php, Geolocation_Controller.php, Lockout_Stats_Controller.php, Lockouts_Controller.php, Logs_Controller.php, Modules_Controller.php, Settings_Controller.php, Site_Types_Controller.php, Tools_Controller.php, User_Actions_Controller.php) were manually verified to have permission_callback defined. The semgrep rule appears to have produced false matches, possibly due to the permission_callback being assigned via string method names like 'ITSEC_Core::current_user_can_manage' or via separate permission check methods.",
+      "files_checked": [
+        "core/lib/ban-hosts/REST.php",
+        "core/lib/rest/Geolocation_Controller.php",
+        "core/lib/rest/Lockouts_Controller.php"
+      ]
+    },
+    "wp-deser-unserialize-no-allowed-classes": {
+      "verdict": "false_positive",
+      "confidence": "medium",
+      "reasoning": "The unserialize() calls in distributed-storage and log-util.php are on plugin-internal data. No user-controlled path to inject serialized payloads into these storage locations without pre-existing admin/DB access. The risk is theoretical without an injection vector.",
+      "notes": "Best practice would still be to use allowed_classes option, but not exploitable in current context."
+    },
+    "wp-crypto-weak-hash-general": {
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "md5() used in fingerprinting and scheduler cron scheduling — for non-security-critical purposes (generating unique cron hook names, browser fingerprinting for session tracking). Not used for password hashing or authentication tokens where collision resistance is critical."
+    },
+    "wp-redirect-instead-of-safe-redirect": {
+      "verdict": "false_positive",
+      "confidence": "medium",
+      "reasoning": "wp_redirect() in class-itsec-wp-list-table.php line 269 — requires investigation of the URL argument, but the list table code operates in authenticated admin context. Low priority."
+    },
+    "wp-sqli-variable-in-query": {
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The $wpdb->query()/$wpdb->get_results() calls in log-util.php and schema.php pass pre-constructed SQL. Manual inspection shows these are in log migration and schema upgrade routines that run on admin-initiated upgrades. The SQL is constructed with fixed table names, not user input. Low confidence findings with no clear injection vector."
+    }
+  },
+  "key_observations": [
+    "The scanner generated a very high false positive rate (~98%). The plugin has strong authentication throughout — virtually all sensitive operations require admin capability.",
+    "The automated scanner incorrectly flagged preg_replace() without /e as RCE, $wpdb->insert() as SQLi, array_map() as RCE, and wp_send_json() as XSS multiple times.",
+    "The only potentially interesting finding (xss-007 in security-check-pro/utility.php) is gated by HMAC key validation requiring knowledge of a DB-stored secret, making it not exploitable by external attackers.",
+    "The variable injection in form.php parse_str() (vari-001) is real but requires admin authentication and has limited impact.",
+    "The distributed storage unserialize() calls (obje-003, rce-006/007/008) are the most theoretically concerning pattern, but without a way to write attacker-controlled data to itsec_distributed_storage table, they are not exploitable.",
+    "All REST API endpoints properly implement permission_callback — semgrep false positives on auth checks.",
+    "This is a security plugin with generally good coding practices. No unauthenticated, exploitable vulnerabilities were found in this review."
+  ]
+}
