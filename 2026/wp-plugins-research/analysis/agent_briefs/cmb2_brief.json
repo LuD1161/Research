@@ -1,0 +1,319 @@
+{
+  "plugin_slug": "cmb2",
+  "priority_score": 13,
+  "metadata": {
+    "php_files": 60,
+    "total_lines": 16177
+  },
+  "attack_surface_summary": "# Attack Surface: cmb2\n\n> Generated: 2026-06-15T02:06:20Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 104,
+    "total_sinks": 51,
+    "total_sanitizers": 101,
+    "direct_flows": 12,
+    "functions_with_sources": 42,
+    "functions_with_sinks": 42,
+    "files_analyzed": 60,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "cmb2-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "cmb2",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$image = '<img class=\"cmb-image-display\" style=\"max-width: ' . absint( $size ) . 'px; width: 100%; height: auto;\" src=\"' . esc_url( $url_value ) . '\" alt=\"\" />'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cmb2/includes/CMB2_Field_Display.php",
+        "line": 446
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 446,
+          "expression": "$image = '<img class=\"cmb-image-display\" style=\"max-width: ' . absint( $size ) . 'px; width: 100%; height: auto;\" src=\"' . esc_url( $url_value ) . '\" alt=\"\" />'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 449,
+          "expression": "echo $image;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $image;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cmb2/includes/CMB2_Field_Display.php",
+        "line": 449
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "cmb2-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "cmb2",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$oembed_string = sanitize_text_field( $_REQUEST['oembed_url'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cmb2/includes/CMB2_Ajax.php",
+        "line": 71
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 71,
+          "expression": "$oembed_string = sanitize_text_field( $_REQUEST['oembed_url'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 82,
+          "expression": "$oembed_url = esc_url( $oembed_string )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 92,
+          "expression": "$html = $this->get_oembed( array(\n\t\t\t'url'         => $oembed_url,\n\t\t\t'object_id'   => $_REQUEST['object_id'],\n\t\t\t'object_type' => isset( $_REQUEST['object_type'] ) ? $_REQUEST['object_type'] : 'post',\n\t\t\t'oembed_args' => $embed_args,\n\t\t\t'field_id'    => $_REQUEST['field_id'],\n\t\t) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 100,
+          "expression": "wp_send_json_success( $html )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $html )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/cmb2/includes/CMB2_Ajax.php",
+        "line": 100
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/cmb2/includes/CMB2_Hookup_Base.php",
+      "start": {
+        "line": 82,
+        "col": 3,
+        "offset": 2057
+      },
+      "end": {
+        "line": 82,
+        "col": 36,
+        "offset": 2090
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/cmb2/includes/CMB2_Utils.php",
+      "start": {
+        "line": 761,
+        "col": 3,
+        "offset": 22617
+      },
+      "end": {
+        "line": 761,
+        "col": 65,
+        "offset": 22679
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/cmb2/includes/rest-api/CMB2_REST_Controller_Boxes.php",
+      "start": {
+        "line": 61,
+        "col": 3,
+        "offset": 1418
+      },
+      "end": {
+        "line": 69,
+        "col": 7,
+        "offset": 1785
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/cmb2/includes/rest-api/CMB2_REST_Controller_Boxes.php",
+      "start": {
+        "line": 76,
+        "col": 3,
+        "offset": 2072
+      },
+      "end": {
+        "line": 84,
+        "col": 7,
+        "offset": 2461
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/cmb2/includes/rest-api/CMB2_REST_Controller_Fields.php",
+      "start": {
+        "line": 41,
+        "col": 3,
+        "offset": 1362
+      },
+      "end": {
+        "line": 49,
+        "col": 7,
+        "offset": 1761
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/cmb2/includes/rest-api/CMB2_REST_Controller_Fields.php",
+      "start": {
+        "line": 56,
+        "col": 3,
+        "offset": 1922
+      },
+      "end": {
+        "line": 77,
+        "col": 7,
+        "offset": 2936
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 0,
+    "taint_high": 1,
+    "taint_total": 2,
+    "semgrep_error": 0,
+    "semgrep_warning": 6
+  }
+}

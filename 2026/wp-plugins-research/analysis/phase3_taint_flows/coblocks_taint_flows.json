@@ -1,0 +1,160 @@
+{
+  "plugin": "coblocks",
+  "php_files_analyzed": 60,
+  "parse_errors": 0,
+  "total_flows": 3,
+  "by_severity": {
+    "high": 1,
+    "medium": 2
+  },
+  "by_vulnerability_class": {
+    "ssrf": 1,
+    "xss": 2
+  },
+  "flows": [
+    {
+      "flow_id": "coblocks-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "coblocks",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "array(\n\t\t\t\t'timeout' => 30,\n\t\t\t\t'body'    => array(\n\t\t\t\t\t'secret'   => get_option( 'coblocks_google_recaptcha_secret_key' ),\n\t\t\t\t\t'response' => $recaptcha_token,\n\t\t\t\t),\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/coblocks/includes/class-coblocks-form.php",
+        "line": 1119
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1119,
+          "expression": "$verify_token_request = wp_remote_post(\n\t\t\tself::GCAPTCHA_VERIFY_URL,\n\t\t\tarray(\n\t\t\t\t'timeout' => 30,\n\t\t\t\t'body'    => array(\n\t\t\t\t\t'secret'   => get_option( 'coblocks_google_recaptcha_secret_key' ),\n\t\t\t\t\t'response' => $recaptcha_token,\n\t\t\t\t),\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$verify_token_request = wp_remote_post(\n\t\t\tself::GCAPTCHA_VERIFY_URL,\n\t\t\tarray(\n\t\t\t\t'timeout' => 30,\n\t\t\t\t'body'    => array(\n\t\t\t\t\t'secret'   => get_option( 'coblocks_google_recaptcha_secret_key' ),\n\t\t\t\t\t'response' => $recaptcha_token,\n\t\t\t\t),\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/coblocks/includes/class-coblocks-form.php",
+        "line": 1119
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "coblocks-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "coblocks",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$id = filter_input( INPUT_POST, 'id', FILTER_SANITIZE_NUMBER_INT )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/coblocks/includes/admin/class-coblocks-crop-settings.php",
+        "line": 97
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 97,
+          "expression": "$id = filter_input( INPUT_POST, 'id', FILTER_SANITIZE_NUMBER_INT )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 108,
+          "expression": "$original_image_id = isset( $attachment_meta[ self::ORIGINAL_META_KEY ] ) ? $attachment_meta[ self::ORIGINAL_META_KEY ] : $id",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 112,
+          "expression": "wp_send_json_success(\n\t\t\tarray(\n\t\t\t\t'id'   => $original_image_id,\n\t\t\t\t'url'  => wp_get_attachment_image_url( $original_image_id, 'original' ),\n\t\t\t\t'crop' => $crop,\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success(\n\t\t\tarray(\n\t\t\t\t'id'   => $original_image_id,\n\t\t\t\t'url'  => wp_get_attachment_image_url( $original_image_id, 'original' ),\n\t\t\t\t'crop' => $crop,\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/coblocks/includes/admin/class-coblocks-crop-settings.php",
+        "line": 112
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "coblocks-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "coblocks",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$new_id = $this->image_media_crop(\n\t\t\tintval( $_POST['id'] ),\n\t\t\tfloatval( $_POST['cropX'] ),\n\t\t\tfloatval( $_POST['cropY'] ),\n\t\t\tfloatval( $_POST['cropWidth'] ),\n\t\t\tfloatval( $_POST['cropHeight'] ),\n\t\t\tfloatval( $_POST['cropRotation'] )\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/coblocks/includes/admin/class-coblocks-crop-settings.php",
+        "line": 157
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 157,
+          "expression": "$new_id = $this->image_media_crop(\n\t\t\tintval( $_POST['id'] ),\n\t\t\tfloatval( $_POST['cropX'] ),\n\t\t\tfloatval( $_POST['cropY'] ),\n\t\t\tfloatval( $_POST['cropWidth'] ),\n\t\t\tfloatval( $_POST['cropHeight'] ),\n\t\t\tfloatval( $_POST['cropRotation'] )\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 172,
+          "expression": "wp_send_json_success(\n\t\t\tarray(\n\t\t\t\t'success' => true,\n\t\t\t\t'id'      => $new_id,\n\t\t\t\t'url'     => wp_get_attachment_image_url( $new_id, 'original' ),\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success(\n\t\t\tarray(\n\t\t\t\t'success' => true,\n\t\t\t\t'id'      => $new_id,\n\t\t\t\t'url'     => wp_get_attachment_image_url( $new_id, 'original' ),\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/coblocks/includes/admin/class-coblocks-crop-settings.php",
+        "line": 172
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    }
+  ]
+}

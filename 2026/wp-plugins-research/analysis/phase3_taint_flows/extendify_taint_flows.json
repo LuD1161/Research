@@ -1,0 +1,523 @@
+{
+  "plugin": "extendify",
+  "php_files_analyzed": 130,
+  "parse_errors": 0,
+  "total_flows": 10,
+  "by_severity": {
+    "high": 2,
+    "critical": 7,
+    "medium": 1
+  },
+  "by_vulnerability_class": {
+    "ssrf": 2,
+    "rce": 8
+  },
+  "flows": [
+    {
+      "flow_id": "extendify-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "[\n            'headers' => [\n                'Content-Type' => 'application/json',\n                'referer' => get_bloginfo('url'),\n            ],\n            'body' => wp_json_encode([\n                'wpLanguage' => get_locale(),\n                'siteProfile' => get_option('extendify_site_profile', []),\n                'siteId' => get_option('extendify_site_id'),\n                'version' => Config::$version,\n                'title' => get_bloginfo('name'),\n                'wpVersion' => get_bloginfo('version'),\n                'partnerId' => PartnerData::$id,\n                'devbuild' => constant('EXTENDIFY_DEVMODE'),\n            ]),\n        ]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/AutoLaunch/Services/WooCommerceImporter.php",
+        "line": 29
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 29,
+          "expression": "$response = wp_remote_post(Constants::AI_HOST . '/api/plugins/woo/content', [\n            'headers' => [\n                'Content-Type' => 'application/json',\n                'referer' => get_bloginfo('url'),\n            ],\n            'body' => wp_json_encode([\n                'wpLanguage' => get_locale(),\n                'siteProfile' => get_option('extendify_site_profile', []),\n                'siteId' => get_option('extendify_site_id'),\n                'version' => Config::$version,\n                'title' => get_bloginfo('name'),\n                'wpVersion' => get_bloginfo('version'),\n                'partnerId' => PartnerData::$id,\n                'devbuild' => constant('EXTENDIFY_DEVMODE'),\n            ]),\n        ])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(Constants::AI_HOST . '/api/plugins/woo/content', [\n            'headers' => [\n                'Content-Type' => 'application/json',\n                'referer' => get_bloginfo('url'),\n            ],\n            'body' => wp_json_encode([\n                'wpLanguage' => get_locale(),\n                'siteProfile' => get_option('extendify_site_profile', []),\n                'siteId' => get_option('extendify_site_id'),\n                'version' => Config::$version,\n                'title' => get_bloginfo('name'),\n                'wpVersion' => get_bloginfo('version'),\n                'partnerId' => PartnerData::$id,\n                'devbuild' => constant('EXTENDIFY_DEVMODE'),\n            ]),\n        ])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/AutoLaunch/Services/WooCommerceImporter.php",
+        "line": 29
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "extendify-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$filter = sanitize_text_field(wp_unslash($_REQUEST['filter'] ?? 'active'))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/PluginNotifications/NotificationsListTable.php",
+        "line": 96
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 96,
+          "expression": "$filter = sanitize_text_field(wp_unslash($_REQUEST['filter'] ?? 'active'))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 97,
+          "expression": "$items = array_values(Admin::getNotices($filter))",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 109,
+          "expression": "usort($items, function ($a, $b) use ($orderby, $order) {\n            $result = strcmp($a[$orderby] ?? '', $b[$orderby] ?? '');\n            return $order === 'asc' ? $result : -$result;\n        })",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "usort($items, function ($a, $b) use ($orderby, $order) {\n            $result = strcmp($a[$orderby] ?? '', $b[$orderby] ?? '');\n            return $order === 'asc' ? $result : -$result;\n        })",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/PluginNotifications/NotificationsListTable.php",
+        "line": 109
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "extendify-rce-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "extendify",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "wp_unslash($_REQUEST['notification'] ?? [])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/PluginNotifications/NotificationsListTable.php",
+        "line": 136
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 136,
+          "expression": "$ids = array_map('sanitize_text_field', wp_unslash($_REQUEST['notification'] ?? []))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$ids = array_map('sanitize_text_field', wp_unslash($_REQUEST['notification'] ?? []))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/PluginNotifications/NotificationsListTable.php",
+        "line": 136
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "extendify-ssrf-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "[\n            'headers' => [\n                'Content-Type' => 'application/json',\n                'referer' => get_bloginfo('url'),\n            ],\n            'body' => wp_json_encode([\n                'wpLanguage' => get_locale(),\n                'siteProfile' => get_option('extendify_site_profile', []),\n                'siteId' => get_option('extendify_site_id'),\n                'version' => Config::$version,\n                'title' => get_bloginfo('name'),\n                'wpVersion' => get_bloginfo('version'),\n                'partnerId' => PartnerData::$id,\n                'devbuild' => constant('EXTENDIFY_DEVMODE'),\n            ]),\n        ]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Launch/Services/WooCommerceImporter.php",
+        "line": 29
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 29,
+          "expression": "$response = wp_remote_post(Constants::AI_HOST . '/api/plugins/woo/content', [\n            'headers' => [\n                'Content-Type' => 'application/json',\n                'referer' => get_bloginfo('url'),\n            ],\n            'body' => wp_json_encode([\n                'wpLanguage' => get_locale(),\n                'siteProfile' => get_option('extendify_site_profile', []),\n                'siteId' => get_option('extendify_site_id'),\n                'version' => Config::$version,\n                'title' => get_bloginfo('name'),\n                'wpVersion' => get_bloginfo('version'),\n                'partnerId' => PartnerData::$id,\n                'devbuild' => constant('EXTENDIFY_DEVMODE'),\n            ]),\n        ])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(Constants::AI_HOST . '/api/plugins/woo/content', [\n            'headers' => [\n                'Content-Type' => 'application/json',\n                'referer' => get_bloginfo('url'),\n            ],\n            'body' => wp_json_encode([\n                'wpLanguage' => get_locale(),\n                'siteProfile' => get_option('extendify_site_profile', []),\n                'siteId' => get_option('extendify_site_id'),\n                'version' => Config::$version,\n                'title' => get_bloginfo('name'),\n                'wpVersion' => get_bloginfo('version'),\n                'partnerId' => PartnerData::$id,\n                'devbuild' => constant('EXTENDIFY_DEVMODE'),\n            ]),\n        ])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Launch/Services/WooCommerceImporter.php",
+        "line": 29
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "extendify-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$results = $wpdb->get_results(\n            $wpdb->prepare(\n                \"SELECT * FROM $table WHERE user_id = %d ORDER BY id DESC LIMIT 150\",\n                $user_id\n            ),\n            ARRAY_A\n        )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Agent/Controllers/ChatHistoryController.php",
+        "line": 40
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 40,
+          "expression": "$results = $wpdb->get_results(\n            $wpdb->prepare(\n                \"SELECT * FROM $table WHERE user_id = %d ORDER BY id DESC LIMIT 150\",\n                $user_id\n            ),\n            ARRAY_A\n        )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 47,
+          "expression": "array_map(function ($item) {\n            return [\n                'id'        => $item['event_id'],\n                'type'      => $item['type'],\n                'details'   => json_decode($item['details'], true),\n            ];\n        }, $results)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(function ($item) {\n            return [\n                'id'        => $item['event_id'],\n                'type'      => $item['type'],\n                'details'   => json_decode($item['details'], true),\n            ];\n        }, $results)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Agent/Controllers/ChatHistoryController.php",
+        "line": 47
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "extendify-rce-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$toursData = get_option('extendify_assist_tour_progress', [])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/VersionMigrator.php",
+        "line": 75
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 75,
+          "expression": "$toursData = get_option('extendify_assist_tour_progress', [])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 76,
+          "expression": "$state = ($toursData['state']['progress'] ?? null)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 78,
+          "expression": "$state = array_map(function ($progress) use ($normalizeMathBug) {\n                $progress['openedCount'] = $normalizeMathBug($progress['openedCount']);\n                $progress['closedManuallyCount'] = $normalizeMathBug($progress['closedManuallyCount']);\n                $progress['completedCount'] = $normalizeMathBug($progress['completedCount']);\n                return $progress;\n            }, $state)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 78,
+          "expression": "$state = array_map(function ($progress) use ($normalizeMathBug) {\n                $progress['openedCount'] = $normalizeMathBug($progress['openedCount']);\n                $progress['closedManuallyCount'] = $normalizeMathBug($progress['closedManuallyCount']);\n                $progress['completedCount'] = $normalizeMathBug($progress['completedCount']);\n                return $progress;\n            }, $state)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$state = array_map(function ($progress) use ($normalizeMathBug) {\n                $progress['openedCount'] = $normalizeMathBug($progress['openedCount']);\n                $progress['closedManuallyCount'] = $normalizeMathBug($progress['closedManuallyCount']);\n                $progress['completedCount'] = $normalizeMathBug($progress['completedCount']);\n                return $progress;\n            }, $state)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/VersionMigrator.php",
+        "line": 78
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "extendify-rce-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$kbData = get_option('extendify_assist_support_articles', [])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/VersionMigrator.php",
+        "line": 95
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 95,
+          "expression": "$kbData = get_option('extendify_assist_support_articles', [])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 96,
+          "expression": "$state = ($kbData['state']['viewedArticles'] ?? null)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 98,
+          "expression": "$kbData['state']['viewedArticles'] = array_map($normalizeCount, $state)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$kbData['state']['viewedArticles'] = array_map($normalizeCount, $state)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/VersionMigrator.php",
+        "line": 98
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "extendify-rce-006",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$router = get_option(\"extendify_{$key}_router\", [])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/VersionMigrator.php",
+        "line": 104
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 104,
+          "expression": "$router = get_option(\"extendify_{$key}_router\", [])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 105,
+          "expression": "$state = ($router['state']['viewedPages'] ?? null)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 107,
+          "expression": "$router['state']['viewedPages'] = array_map($normalizeCount, $state)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$router['state']['viewedPages'] = array_map($normalizeCount, $state)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/VersionMigrator.php",
+        "line": 107
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "extendify-rce-007",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$hash = substr(get_post_meta($formId, '_hash', true), 0, 7)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/PluginDependencies/Forms/ContactForm7.php",
+        "line": 60
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 60,
+          "expression": "$hash = substr(get_post_meta($formId, '_hash', true), 0, 7)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 64,
+          "expression": "$updatedContent = preg_replace('/\"hash\":\"[a-f0-9]+\"/', '\"hash\":\"' . $hash . '\"', $updatedContent)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$updatedContent = preg_replace('/\"hash\":\"[a-f0-9]+\"/', '\"hash\":\"' . $hash . '\"', $updatedContent)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/PluginDependencies/Forms/ContactForm7.php",
+        "line": 64
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "extendify-rce-008",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$hash = substr(get_post_meta($formId, '_hash', true), 0, 7)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/PluginDependencies/Forms/ContactForm7.php",
+        "line": 60
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 60,
+          "expression": "$hash = substr(get_post_meta($formId, '_hash', true), 0, 7)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 66,
+          "expression": "$updatedContent = preg_replace(\n            '/\\[contact-form-7 id=\"[a-f0-9]+\"/',\n            '[contact-form-7 id=\"' . $hash . '\"',\n            $updatedContent\n        )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$updatedContent = preg_replace(\n            '/\\[contact-form-7 id=\"[a-f0-9]+\"/',\n            '[contact-form-7 id=\"' . $hash . '\"',\n            $updatedContent\n        )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/PluginDependencies/Forms/ContactForm7.php",
+        "line": 66
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ]
+}

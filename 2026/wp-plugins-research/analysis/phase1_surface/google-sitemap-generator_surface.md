@@ -1,6 +1,6 @@
 # Attack Surface: google-sitemap-generator
 
-> Generated: 2026-06-14T21:21:10Z
+> Generated: 2026-06-15T02:06:22Z
 
 ## Section 1: Entry Points
 

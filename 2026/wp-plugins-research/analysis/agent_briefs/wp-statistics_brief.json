@@ -1,0 +1,2786 @@
+{
+  "plugin_slug": "wp-statistics",
+  "priority_score": 253,
+  "metadata": {
+    "php_files": 737,
+    "total_lines": 91700
+  },
+  "attack_surface_summary": "# Attack Surface: wp-statistics\n\n> Generated: 2026-06-15T02:06:30Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 563,
+    "total_sinks": 378,
+    "total_sanitizers": 1685,
+    "direct_flows": 161,
+    "functions_with_sources": 293,
+    "functions_with_sinks": 246,
+    "files_analyzed": 737,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "wp-statistics-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "get_user_meta($user_id)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/class-wp-statistics-user.php",
+        "line": 66
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 66,
+          "expression": "$user_info['meta'] = array_map(function ($a) {\n            return $a[0];\n        }, get_user_meta($user_id))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$user_info['meta'] = array_map(function ($a) {\n            return $a[0];\n        }, get_user_meta($user_id))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/class-wp-statistics-user.php",
+        "line": 66
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$result = $wpdb->get_var($wpdb->prepare(\"SELECT SUM(hits) FROM {$table_name} WHERE `last_counter` < %s\", $date_string))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/class-wp-statistics-purge.php",
+        "line": 25
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 25,
+          "expression": "$result = $wpdb->get_var($wpdb->prepare(\"SELECT SUM(hits) FROM {$table_name} WHERE `last_counter` < %s\", $date_string))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 33,
+          "expression": "$insert = $wpdb->insert(\n                        DB::table('historical'),\n                        array(\n                            'value'    => $result,\n                            'category' => 'visits',\n                            'page_id'  => -2,\n                            'uri'      => '-2',\n                        )\n                    )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$insert = $wpdb->insert(\n                        DB::table('historical'),\n                        array(\n                            'value'    => $result,\n                            'category' => 'visits',\n                            'page_id'  => -2,\n                            'uri'      => '-2',\n                        )\n                    )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/class-wp-statistics-purge.php",
+        "line": 33
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-sqli-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$historical = $wpdb->get_var(\n                        $wpdb->prepare(\n                            \"SELECT sum(count) FROM {$table_name} WHERE `uri` = %s AND `date` < %s\",\n                            $row->uri,\n                            $date_string\n                        )\n                    )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/class-wp-statistics-purge.php",
+        "line": 127
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 127,
+          "expression": "$historical = $wpdb->get_var(\n                        $wpdb->prepare(\n                            \"SELECT sum(count) FROM {$table_name} WHERE `uri` = %s AND `date` < %s\",\n                            $row->uri,\n                            $date_string\n                        )\n                    )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 146,
+          "expression": "$insert = $wpdb->insert(\n                            DB::table('historical'),\n                            array(\n                                'value'    => $historical,\n                                'category' => 'uri',\n                                'uri'      => $row->uri,\n                                'page_id'  => Pages::uri_to_id($row->uri),\n                            )\n                        )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$insert = $wpdb->insert(\n                            DB::table('historical'),\n                            array(\n                                'value'    => $historical,\n                                'category' => 'uri',\n                                'uri'      => $row->uri,\n                                'page_id'  => Pages::uri_to_id($row->uri),\n                            )\n                        )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/class-wp-statistics-purge.php",
+        "line": 146
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$parameters[$key] = sanitize_text_field($value)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/class-wp-statistics-admin-ajax.php",
+        "line": 163
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 163,
+          "expression": "$parameters[$key] = sanitize_text_field($value)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 169,
+          "expression": "wp_send_json($class::get($parameters))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json($class::get($parameters))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/class-wp-statistics-admin-ajax.php",
+        "line": 169
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo sprintf(__('Your next report is scheduled to be sent on <b>%1$s at %2$s</b>.', 'wp-statistics'), wp_date(get_option('date_format'), $next_scheduled_time), wp_date(get_option('time_format'), $next_scheduled_time))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/settings/notifications.php",
+        "line": 50
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 50,
+          "expression": "echo sprintf(__('Your next report is scheduled to be sent on <b>%1$s at %2$s</b>.', 'wp-statistics'), wp_date(get_option('date_format'), $next_scheduled_time), wp_date(get_option('time_format'), $next_scheduled_time))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf(__('Your next report is scheduled to be sent on <b>%1$s at %2$s</b>.', 'wp-statistics'), wp_date(get_option('date_format'), $next_scheduled_time), wp_date(get_option('time_format'), $next_scheduled_time))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/settings/notifications.php",
+        "line": 50
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo TimeZone::getLocalDate(get_option('date_format'), $event->timestamp) . ' ' . __('at', 'wp-statistics') . ' ' . TimeZone::getLocalDate(get_option('time_format'), $event->timestamp);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/settings/advanced.php",
+        "line": 303
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 303,
+          "expression": "echo TimeZone::getLocalDate(get_option('date_format'), $event->timestamp) . ' ' . __('at', 'wp-statistics') . ' ' . TimeZone::getLocalDate(get_option('time_format'), $event->timestamp);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo TimeZone::getLocalDate(get_option('date_format'), $event->timestamp) . ' ' . __('at', 'wp-statistics') . ' ' . TimeZone::getLocalDate(get_option('time_format'), $event->timestamp);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/settings/advanced.php",
+        "line": 303
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo str_replace('F', 'M', get_option('date_format'))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/layout/date.range.php",
+        "line": 47
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 47,
+          "expression": "echo str_replace('F', 'M', get_option('date_format'))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo str_replace('F', 'M', get_option('date_format'))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/layout/date.range.php",
+        "line": 47
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$backUrl = esc_url_raw($_SERVER['HTTP_REFERER'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/layout/title.php",
+        "line": 14
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 14,
+          "expression": "$backUrl = esc_url_raw($_SERVER['HTTP_REFERER'])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 22,
+          "expression": "echo esc_url($backUrl)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url($backUrl)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/layout/title.php",
+        "line": 22
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo isset($_GET['page']) && $_GET['page'] === $sub_item['slug'] ? 'active' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/layout/partials/menu-link.php",
+        "line": 41
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 41,
+          "expression": "echo isset($_GET['page']) && $_GET['page'] === $sub_item['slug'] ? 'active' : ''",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo isset($_GET['page']) && $_GET['page'] === $sub_item['slug'] ? 'active' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/layout/partials/menu-link.php",
+        "line": 41
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo number_format_i18n(intval($item->visitors));",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/pages/devices/single-browser.php",
+        "line": 39
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 39,
+          "expression": "echo number_format_i18n(intval($item->visitors));",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo number_format_i18n(intval($item->visitors));",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/pages/devices/single-browser.php",
+        "line": 39
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$tab = isset($_POST['tab']) && $_POST['tab'] ? sanitize_text_field($_POST['tab']) : 'general-settings'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/pages/class-wp-statistics-admin-page-settings.php",
+        "line": 108
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 108,
+          "expression": "$tab = isset($_POST['tab']) && $_POST['tab'] ? sanitize_text_field($_POST['tab']) : 'general-settings'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 112,
+          "expression": "wp_redirect(add_query_arg(array(\n                    'save_setting' => 'yes',\n                    'tab'          => $tab,\n                ), Menus::admin_url('settings')))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_redirect(add_query_arg(array(\n                    'save_setting' => 'yes',\n                    'tab'          => $tab,\n                ), Menus::admin_url('settings')))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/pages/class-wp-statistics-admin-page-settings.php",
+        "line": 112
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-statistics-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$items = $wpdb->get_results( $wpdb->prepare( $sql, $args ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/libraries/wp-background-processing/wp-background-process.php",
+        "line": 480
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 480,
+          "expression": "$items = $wpdb->get_results( $wpdb->prepare( $sql, $args ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 485,
+          "expression": "$batches = array_map(\n\t\t\t\tfunction ( $item ) use ( $column, $value_column ) {\n\t\t\t\t\t$batch       = new \\stdClass();\n\t\t\t\t\t$batch->key  = $item->{$column};\n\t\t\t\t\t$batch->data = maybe_unserialize( $item->{$value_column} );\n\n\t\t\t\t\treturn $batch;\n\t\t\t\t},\n\t\t\t\t$items\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$batches = array_map(\n\t\t\t\tfunction ( $item ) use ( $column, $value_column ) {\n\t\t\t\t\t$batch       = new \\stdClass();\n\t\t\t\t\t$batch->key  = $item->{$column};\n\t\t\t\t\t$batch->data = maybe_unserialize( $item->{$value_column} );\n\n\t\t\t\t\treturn $batch;\n\t\t\t\t},\n\t\t\t\t$items\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/libraries/wp-background-processing/wp-background-process.php",
+        "line": 485
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo esc_url(get_term_link(intval($category['term_id'])));",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/tables/category-pages.php",
+        "line": 48
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 48,
+          "expression": "echo esc_url(get_term_link(intval($category['term_id'])));",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url(get_term_link(intval($category['term_id'])));",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/tables/category-pages.php",
+        "line": 48
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-009",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo sprintf(\n            // translators: 1: Start date - 2: To date - 3: Views count - 4: Visitors count.\n            __('Over the past week (<b>%1$s - %2$s</b>), this post has been <b>viewed %3$s times by %4$s visitors</b>', 'wp-statistics'),\n            esc_html($summary['fromString']),\n            esc_html($summary['toString']),\n            number_format(intval($summary['thisPeriodViews'])),\n            number_format(intval($summary['thisPeriodVisitors']))\n        );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/meta-box/post-summary.php",
+        "line": 24
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 24,
+          "expression": "echo sprintf(\n            // translators: 1: Start date - 2: To date - 3: Views count - 4: Visitors count.\n            __('Over the past week (<b>%1$s - %2$s</b>), this post has been <b>viewed %3$s times by %4$s visitors</b>', 'wp-statistics'),\n            esc_html($summary['fromString']),\n            esc_html($summary['toString']),\n            number_format(intval($summary['thisPeriodViews'])),\n            number_format(intval($summary['thisPeriodVisitors']))\n        );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf(\n            // translators: 1: Start date - 2: To date - 3: Views count - 4: Visitors count.\n            __('Over the past week (<b>%1$s - %2$s</b>), this post has been <b>viewed %3$s times by %4$s visitors</b>', 'wp-statistics'),\n            esc_html($summary['fromString']),\n            esc_html($summary['toString']),\n            number_format(intval($summary['thisPeriodViews'])),\n            number_format(intval($summary['thisPeriodVisitors']))\n        );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/meta-box/post-summary.php",
+        "line": 24
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-010",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo sprintf(\n                // translators: 1: Referrer link - 2: Referrer name - 3: Referrer count.\n                __(', with \\'<a href=\"%1$s\" target=\"_blank\" rel=\"noreferrer nofollow\">%2$s</a>\\' leading with <b>%3$s referrals</b>', 'wp-statistics'),\n                esc_url($thisPeriodTopReferrer),\n                esc_html($thisPeriodTopReferrerLabel),\n                number_format(intval($summary['thisPeriodTopReferrerCount']))\n            );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/meta-box/post-summary.php",
+        "line": 35
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 35,
+          "expression": "echo sprintf(\n                // translators: 1: Referrer link - 2: Referrer name - 3: Referrer count.\n                __(', with \\'<a href=\"%1$s\" target=\"_blank\" rel=\"noreferrer nofollow\">%2$s</a>\\' leading with <b>%3$s referrals</b>', 'wp-statistics'),\n                esc_url($thisPeriodTopReferrer),\n                esc_html($thisPeriodTopReferrerLabel),\n                number_format(intval($summary['thisPeriodTopReferrerCount']))\n            );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf(\n                // translators: 1: Referrer link - 2: Referrer name - 3: Referrer count.\n                __(', with \\'<a href=\"%1$s\" target=\"_blank\" rel=\"noreferrer nofollow\">%2$s</a>\\' leading with <b>%3$s referrals</b>', 'wp-statistics'),\n                esc_url($thisPeriodTopReferrer),\n                esc_html($thisPeriodTopReferrerLabel),\n                number_format(intval($summary['thisPeriodTopReferrerCount']))\n            );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/meta-box/post-summary.php",
+        "line": 35
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-011",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo sprintf(\n        // translators: 1: Views count - 2: Visitors count.\n        __('In total, this post has been <b>viewed %1$s times by %2$s visitors</b>', 'wp-statistics'),\n        number_format(intval($summary['totalViews'])),\n        number_format(intval($summary['totalVisitors']))\n    );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/meta-box/post-summary.php",
+        "line": 47
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 47,
+          "expression": "echo sprintf(\n        // translators: 1: Views count - 2: Visitors count.\n        __('In total, this post has been <b>viewed %1$s times by %2$s visitors</b>', 'wp-statistics'),\n        number_format(intval($summary['totalViews'])),\n        number_format(intval($summary['totalVisitors']))\n    );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf(\n        // translators: 1: Views count - 2: Visitors count.\n        __('In total, this post has been <b>viewed %1$s times by %2$s visitors</b>', 'wp-statistics'),\n        number_format(intval($summary['totalViews'])),\n        number_format(intval($summary['totalVisitors']))\n    );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/meta-box/post-summary.php",
+        "line": 47
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-012",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo sprintf(\n            // translators: 1: Referrer link - 2: Referrer name - 3: Referrer count.\n            __(', with \\'<a href=\"%1$s\" target=\"_blank\" rel=\"noreferrer nofollow\">%2$s</a>\\' leading with <b>%3$s referrals</b>', 'wp-statistics'),\n            esc_url($topReferrer),\n            esc_html($topReferrerLabel),\n            number_format(intval($summary['topReferrerCount']))\n        );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/meta-box/post-summary.php",
+        "line": 56
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 56,
+          "expression": "echo sprintf(\n            // translators: 1: Referrer link - 2: Referrer name - 3: Referrer count.\n            __(', with \\'<a href=\"%1$s\" target=\"_blank\" rel=\"noreferrer nofollow\">%2$s</a>\\' leading with <b>%3$s referrals</b>', 'wp-statistics'),\n            esc_url($topReferrer),\n            esc_html($topReferrerLabel),\n            number_format(intval($summary['topReferrerCount']))\n        );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf(\n            // translators: 1: Referrer link - 2: Referrer name - 3: Referrer count.\n            __(', with \\'<a href=\"%1$s\" target=\"_blank\" rel=\"noreferrer nofollow\">%2$s</a>\\' leading with <b>%3$s referrals</b>', 'wp-statistics'),\n            esc_url($topReferrer),\n            esc_html($topReferrerLabel),\n            number_format(intval($summary['topReferrerCount']))\n        );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/meta-box/post-summary.php",
+        "line": 56
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$value = $_REQUEST[$param]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Utils/Request.php",
+        "line": 21
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 21,
+          "expression": "$value = $_REQUEST[$param]",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 44,
+          "expression": "array_map('sanitize_text_field', $value)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map('sanitize_text_field', $value)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Utils/Request.php",
+        "line": 44
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-rce-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$wpDateFormat = get_option('date_format')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Admin/Posts/PostsManager.php",
+        "line": 204
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 204,
+          "expression": "$wpDateFormat = get_option('date_format')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 234,
+          "expression": "$chartData[$shortDate] = [\n                'ymdDate'   => $hit->date,\n                'hits'      => !empty($hit->visitors) ? intval($hit->visitors) : intval($hit->views),\n                'fullDate'  => gmdate($wpDateFormat, strtotime($hit->date)),\n            ]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 242,
+          "expression": "uasort($chartData, function ($a, $b) {\n            if ($a['ymdDate'] == $b['ymdDate']) {\n                return 0;\n            }\n            return ($a['ymdDate'] < $b['ymdDate']) ? -1 : 1;\n        })",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "uasort($chartData, function ($a, $b) {\n            if ($a['ymdDate'] == $b['ymdDate']) {\n                return 0;\n            }\n            return ($a['ymdDate'] < $b['ymdDate']) ? -1 : 1;\n        })",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Admin/Posts/PostsManager.php",
+        "line": 242
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-rce-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$activePluginsKeys = get_option('active_plugins', array())",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Admin/AnonymizedUsageData/AnonymizedUsageDataProvider.php",
+        "line": 215
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 215,
+          "expression": "$activePluginsKeys = get_option('active_plugins', array())",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 217,
+          "expression": "$pluginFolders = array_map(function ($plugin) {\n            return explode('/', $plugin)[0];\n        }, $activePluginsKeys)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$pluginFolders = array_map(function ($plugin) {\n            return explode('/', $plugin)[0];\n        }, $activePluginsKeys)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Admin/AnonymizedUsageData/AnonymizedUsageDataProvider.php",
+        "line": 217
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-rce-006",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$userMetaboxes = get_user_meta(get_current_user_id(), \"meta-box-order_$currentScreen\", true)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Admin/Metabox/MetaboxHelper.php",
+        "line": 115
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 115,
+          "expression": "$userMetaboxes = get_user_meta(get_current_user_id(), \"meta-box-order_$currentScreen\", true)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 123,
+          "expression": "$contextMetaboxes = explode(',', $userMetaboxes[$context])",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 126,
+          "expression": "$contextMetaboxes = array_filter($contextMetaboxes, function ($metabox) use ($screenMetaboxes) {\n                    return strpos($metabox, 'wp-statistics') !== false && isset($screenMetaboxes[$metabox]);\n                })",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 126,
+          "expression": "$contextMetaboxes = array_filter($contextMetaboxes, function ($metabox) use ($screenMetaboxes) {\n                    return strpos($metabox, 'wp-statistics') !== false && isset($screenMetaboxes[$metabox]);\n                })",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$contextMetaboxes = array_filter($contextMetaboxes, function ($metabox) use ($screenMetaboxes) {\n                    return strpos($metabox, 'wp-statistics') !== false && isset($screenMetaboxes[$metabox]);\n                })",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Admin/Metabox/MetaboxHelper.php",
+        "line": 126
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-013",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$pluginSlug = Request::has('plugin_slug') ? wp_unslash(Request::get('plugin_slug')) : false",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Admin/LicenseManagement/Plugin/PluginActions.php",
+        "line": 132
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 132,
+          "expression": "$pluginSlug = Request::has('plugin_slug') ? wp_unslash(Request::get('plugin_slug')) : false",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 137,
+          "expression": "wp_send_json_success([\n                'active' => $this->pluginHandler->isPluginActive($pluginSlug),\n                'data'   => $this->pluginHandler->getPluginData($pluginSlug),\n            ])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success([\n                'active' => $this->pluginHandler->isPluginActive($pluginSlug),\n                'data'   => $this->pluginHandler->getPluginData($pluginSlug),\n            ])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Admin/LicenseManagement/Plugin/PluginActions.php",
+        "line": 137
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-statistics-rce-007",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$visitors = intval($item->visitors)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Charts/DataProvider/SearchEngineChartDataProvider.php",
+        "line": 69
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 69,
+          "expression": "$visitors = intval($item->visitors)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 70,
+          "expression": "$thisParsedData[$item->source_name][$item->last_counter] = $visitors",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 75,
+          "expression": "uasort($thisParsedData, function($a, $b) {\n            return array_sum($b) - array_sum($a);\n        })",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "uasort($thisParsedData, function($a, $b) {\n            return array_sum($b) - array_sum($a);\n        })",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Charts/DataProvider/SearchEngineChartDataProvider.php",
+        "line": 75
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-rce-008",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$count = intval($item->count)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Charts/DataProvider/ExclusionsChartDataProvider.php",
+        "line": 63
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 63,
+          "expression": "$count = intval($item->count)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 64,
+          "expression": "$parsedData[$item->reason][$item->date] = $count",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 69,
+          "expression": "uasort($parsedData, function($a, $b) {\n            return array_sum($b) - array_sum($a);\n        })",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "uasort($parsedData, function($a, $b) {\n            return array_sum($b) - array_sum($a);\n        })",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Charts/DataProvider/ExclusionsChartDataProvider.php",
+        "line": 69
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-rce-009",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$visitors = intval($item->visitors)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Charts/DataProvider/SocialMediaChartDataProvider.php",
+        "line": 69
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 69,
+          "expression": "$visitors = intval($item->visitors)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 70,
+          "expression": "$thisParsedData[$item->source_name][$item->last_counter] = $visitors",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 75,
+          "expression": "uasort($thisParsedData, function($a, $b) {\n            return array_sum($b) - array_sum($a);\n        })",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "uasort($thisParsedData, function($a, $b) {\n            return array_sum($b) - array_sum($a);\n        })",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Charts/DataProvider/SocialMediaChartDataProvider.php",
+        "line": 75
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/wp-statistics/includes/admin/pages/class-wp-statistics-admin-page-settings.php",
+      "start": {
+        "line": 112,
+        "col": 17,
+        "offset": 3575
+      },
+      "end": {
+        "line": 115,
+        "col": 51,
+        "offset": 3747
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/wp-statistics/includes/admin/pages/class-wp-statistics-admin-page-settings.php",
+      "start": {
+        "line": 484,
+        "col": 13,
+        "offset": 16192
+      },
+      "end": {
+        "line": 484,
+        "col": 104,
+        "offset": 16283
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/admin/pages/class-wp-statistics-admin-page-settings.php",
+      "start": {
+        "line": 503,
+        "col": 9,
+        "offset": 16663
+      },
+      "end": {
+        "line": 503,
+        "col": 97,
+        "offset": 16751
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/wp-statistics/includes/api/v2/class-wp-statistics-api-hit.php",
+      "start": {
+        "line": 60,
+        "col": 9,
+        "offset": 1342
+      },
+      "end": {
+        "line": 69,
+        "col": 12,
+        "offset": 1821
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/wp-statistics/includes/api/v2/class-wp-statistics-api-meta-box.php",
+      "start": {
+        "line": 34,
+        "col": 9,
+        "offset": 744
+      },
+      "end": {
+        "line": 54,
+        "col": 12,
+        "offset": 1545
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-country.php",
+      "start": {
+        "line": 120,
+        "col": 23,
+        "offset": 3594
+      },
+      "end": {
+        "line": 120,
+        "col": 72,
+        "offset": 3643
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-db.php",
+      "start": {
+        "line": 118,
+        "col": 17,
+        "offset": 3694
+      },
+      "end": {
+        "line": 118,
+        "col": 63,
+        "offset": 3740
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-db.php",
+      "start": {
+        "line": 177,
+        "col": 23,
+        "offset": 5195
+      },
+      "end": {
+        "line": 177,
+        "col": 68,
+        "offset": 5240
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-db.php",
+      "start": {
+        "line": 218,
+        "col": 27,
+        "offset": 6458
+      },
+      "end": {
+        "line": 218,
+        "col": 77,
+        "offset": 6508
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-db.php",
+      "start": {
+        "line": 246,
+        "col": 9,
+        "offset": 7066
+      },
+      "end": {
+        "line": 246,
+        "col": 55,
+        "offset": 7112
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-db.php",
+      "start": {
+        "line": 257,
+        "col": 9,
+        "offset": 7284
+      },
+      "end": {
+        "line": 257,
+        "col": 53,
+        "offset": 7328
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-helper.php",
+      "start": {
+        "line": 620,
+        "col": 9,
+        "offset": 18009
+      },
+      "end": {
+        "line": 620,
+        "col": 39,
+        "offset": 18039
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-helper.php",
+      "start": {
+        "line": 1230,
+        "col": 23,
+        "offset": 39578
+      },
+      "end": {
+        "line": 1230,
+        "col": 108,
+        "offset": 39663
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-helper.php",
+      "start": {
+        "line": 1264,
+        "col": 24,
+        "offset": 40312
+      },
+      "end": {
+        "line": 1264,
+        "col": 159,
+        "offset": 40447
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-helper.php",
+      "start": {
+        "line": 1279,
+        "col": 27,
+        "offset": 40834
+      },
+      "end": {
+        "line": 1279,
+        "col": 138,
+        "offset": 40945
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-helper.php",
+      "start": {
+        "line": 1280,
+        "col": 27,
+        "offset": 40973
+      },
+      "end": {
+        "line": 1280,
+        "col": 133,
+        "offset": 41079
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-helper.php",
+      "start": {
+        "line": 1312,
+        "col": 30,
+        "offset": 41919
+      },
+      "end": {
+        "line": 1312,
+        "col": 120,
+        "offset": 42009
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-helper.php",
+      "start": {
+        "line": 1313,
+        "col": 30,
+        "offset": 42040
+      },
+      "end": {
+        "line": 1313,
+        "col": 115,
+        "offset": 42125
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-helper.php",
+      "start": {
+        "line": 1345,
+        "col": 27,
+        "offset": 42992
+      },
+      "end": {
+        "line": 1345,
+        "col": 122,
+        "offset": 43087
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-helper.php",
+      "start": {
+        "line": 1346,
+        "col": 27,
+        "offset": 43115
+      },
+      "end": {
+        "line": 1346,
+        "col": 80,
+        "offset": 43168
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-historical.php",
+      "start": {
+        "line": 49,
+        "col": 19,
+        "offset": 1156
+      },
+      "end": {
+        "line": 49,
+        "col": 39,
+        "offset": 1176
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-historical.php",
+      "start": {
+        "line": 61,
+        "col": 17,
+        "offset": 1445
+      },
+      "end": {
+        "line": 61,
+        "col": 82,
+        "offset": 1510
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-install.php",
+      "start": {
+        "line": 128,
+        "col": 9,
+        "offset": 4157
+      },
+      "end": {
+        "line": 128,
+        "col": 42,
+        "offset": 4190
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-install.php",
+      "start": {
+        "line": 131,
+        "col": 9,
+        "offset": 4237
+      },
+      "end": {
+        "line": 131,
+        "col": 222,
+        "offset": 4450
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-install.php",
+      "start": {
+        "line": 134,
+        "col": 9,
+        "offset": 4509
+      },
+      "end": {
+        "line": 134,
+        "col": 31,
+        "offset": 4531
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-install.php",
+      "start": {
+        "line": 417,
+        "col": 16,
+        "offset": 17339
+      },
+      "end": {
+        "line": 417,
+        "col": 88,
+        "offset": 17411
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-ip.php",
+      "start": {
+        "line": 397,
+        "col": 25,
+        "offset": 12652
+      },
+      "end": {
+        "line": 397,
+        "col": 114,
+        "offset": 12741
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-pages.php",
+      "start": {
+        "line": 264,
+        "col": 13,
+        "offset": 8217
+      },
+      "end": {
+        "line": 264,
+        "col": 33,
+        "offset": 8237
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-pages.php",
+      "start": {
+        "line": 541,
+        "col": 19,
+        "offset": 18962
+      },
+      "end": {
+        "line": 541,
+        "col": 124,
+        "offset": 19067
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-pages.php",
+      "start": {
+        "line": 593,
+        "col": 16,
+        "offset": 21042
+      },
+      "end": {
+        "line": 593,
+        "col": 160,
+        "offset": 21186
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-referred.php",
+      "start": {
+        "line": 181,
+        "col": 37,
+        "offset": 5362
+      },
+      "end": {
+        "line": 181,
+        "col": 57,
+        "offset": 5382
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-referred.php",
+      "start": {
+        "line": 181,
+        "col": 81,
+        "offset": 5406
+      },
+      "end": {
+        "line": 181,
+        "col": 105,
+        "offset": 5430
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-referred.php",
+      "start": {
+        "line": 200,
+        "col": 23,
+        "offset": 5914
+      },
+      "end": {
+        "line": 200,
+        "col": 75,
+        "offset": 5966
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-referred.php",
+      "start": {
+        "line": 267,
+        "col": 16,
+        "offset": 7824
+      },
+      "end": {
+        "line": 267,
+        "col": 113,
+        "offset": 7921
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-uninstall.php",
+      "start": {
+        "line": 88,
+        "col": 9,
+        "offset": 3281
+      },
+      "end": {
+        "line": 88,
+        "col": 93,
+        "offset": 3365
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-uninstall.php",
+      "start": {
+        "line": 89,
+        "col": 9,
+        "offset": 3375
+      },
+      "end": {
+        "line": 89,
+        "col": 93,
+        "offset": 3459
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-uninstall.php",
+      "start": {
+        "line": 93,
+        "col": 13,
+        "offset": 3541
+      },
+      "end": {
+        "line": 93,
+        "col": 56,
+        "offset": 3584
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-visitor.php",
+      "start": {
+        "line": 313,
+        "col": 19,
+        "offset": 10450
+      },
+      "end": {
+        "line": 313,
+        "col": 51,
+        "offset": 10482
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/class-wp-statistics-visitor.php",
+      "start": {
+        "line": 488,
+        "col": 16,
+        "offset": 16883
+      },
+      "end": {
+        "line": 488,
+        "col": 36,
+        "offset": 16903
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-statistics/includes/libraries/wp-background-processing/wp-background-process.php",
+      "start": {
+        "line": 288,
+        "col": 3,
+        "offset": 5564
+      },
+      "end": {
+        "line": 288,
+        "col": 45,
+        "offset": 5606
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/template-functions.php",
+      "start": {
+        "line": 359,
+        "col": 16,
+        "offset": 10991
+      },
+      "end": {
+        "line": 359,
+        "col": 36,
+        "offset": 11011
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/template-functions.php",
+      "start": {
+        "line": 362,
+        "col": 16,
+        "offset": 11120
+      },
+      "end": {
+        "line": 362,
+        "col": 34,
+        "offset": 11138
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/template-functions.php",
+      "start": {
+        "line": 466,
+        "col": 12,
+        "offset": 14137
+      },
+      "end": {
+        "line": 466,
+        "col": 32,
+        "offset": 14157
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/template-functions.php",
+      "start": {
+        "line": 821,
+        "col": 12,
+        "offset": 25950
+      },
+      "end": {
+        "line": 821,
+        "col": 32,
+        "offset": 25970
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/includes/template-functions.php",
+      "start": {
+        "line": 864,
+        "col": 15,
+        "offset": 27136
+      },
+      "end": {
+        "line": 864,
+        "col": 39,
+        "offset": 27160
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/wp-statistics/src/Abstracts/BaseRestAPI.php",
+      "start": {
+        "line": 67,
+        "col": 9,
+        "offset": 1512
+      },
+      "end": {
+        "line": 74,
+        "col": 12,
+        "offset": 1862
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-statistics/src/Models/OnlineModel.php",
+      "start": {
+        "line": 81,
+        "col": 9,
+        "offset": 2205
+      },
+      "end": {
+        "line": 81,
+        "col": 77,
+        "offset": 2273
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-statistics/src/Service/Admin/AnonymizedUsageData/AnonymizedUsageDataSender.php",
+      "start": {
+        "line": 31,
+        "col": 13,
+        "offset": 748
+      },
+      "end": {
+        "line": 41,
+        "col": 15,
+        "offset": 1240
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-statistics/src/Service/Admin/LicenseManagement/ApiCommunicator.php",
+      "start": {
+        "line": 72,
+        "col": 9,
+        "offset": 2658
+      },
+      "end": {
+        "line": 72,
+        "col": 108,
+        "offset": 2757
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/wp-statistics/src/Service/Admin/NoticeHandler/Notice.php",
+      "start": {
+        "line": 147,
+        "col": 13,
+        "offset": 4528
+      },
+      "end": {
+        "line": 147,
+        "col": 82,
+        "offset": 4597
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/wp-statistics/src/Service/Admin/Overview/OverviewPage.php",
+      "start": {
+        "line": 53,
+        "col": 13,
+        "offset": 1677
+      },
+      "end": {
+        "line": 53,
+        "col": 77,
+        "offset": 1741
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/src/Service/Admin/PrivacyAudit/Audits/StoredUserAgentStringData.php",
+      "start": {
+        "line": 19,
+        "col": 26,
+        "offset": 516
+      },
+      "end": {
+        "line": 19,
+        "col": 203,
+        "offset": 693
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/src/Service/Admin/PrivacyAudit/Audits/StoredUserIdData.php",
+      "start": {
+        "line": 19,
+        "col": 20,
+        "offset": 498
+      },
+      "end": {
+        "line": 19,
+        "col": 152,
+        "offset": 630
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-statistics/src/Service/Admin/PrivacyAudit/Audits/UnhashedIpAddress.php",
+      "start": {
+        "line": 19,
+        "col": 24,
+        "offset": 490
+      },
+      "end": {
+        "line": 19,
+        "col": 175,
+        "offset": 641
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/wp-statistics/src/Service/Database/Migrations/BackgroundProcess/BackgroundProcessManager.php",
+      "start": {
+        "line": 548,
+        "col": 9,
+        "offset": 17135
+      },
+      "end": {
+        "line": 548,
+        "col": 65,
+        "offset": 17191
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/wp-statistics/src/Service/Database/Migrations/Queue/QueueManager.php",
+      "start": {
+        "line": 207,
+        "col": 9,
+        "offset": 6817
+      },
+      "end": {
+        "line": 207,
+        "col": 48,
+        "offset": 6856
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-statistics/src/Traits/TransientCacheTrait.php",
+      "start": {
+        "line": 20,
+        "col": 9,
+        "offset": 373
+      },
+      "end": {
+        "line": 20,
+        "col": 44,
+        "offset": 408
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/wp-statistics/src/Utils/Signature.php",
+      "start": {
+        "line": 16,
+        "col": 9,
+        "offset": 340
+      },
+      "end": {
+        "line": 16,
+        "col": 50,
+        "offset": 381
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 11,
+    "taint_high": 12,
+    "taint_total": 25,
+    "semgrep_error": 0,
+    "semgrep_warning": 58
+  }
+}

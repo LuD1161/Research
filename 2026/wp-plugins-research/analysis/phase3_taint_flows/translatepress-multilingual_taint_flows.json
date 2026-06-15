@@ -1,0 +1,2279 @@
+{
+  "plugin": "translatepress-multilingual",
+  "php_files_analyzed": 127,
+  "parse_errors": 0,
+  "total_flows": 34,
+  "by_severity": {
+    "medium": 17,
+    "high": 10,
+    "critical": 3,
+    "low": 4
+  },
+  "by_vulnerability_class": {
+    "xss": 14,
+    "sql_injection": 2,
+    "ssrf": 5,
+    "rce": 6,
+    "local_file_inclusion": 1,
+    "object_injection": 1,
+    "open_redirect": 4,
+    "file_inclusion": 1
+  },
+  "flows": [
+    {
+      "flow_id": "translatepress-multilingual-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$string = ( isset($_POST['original_string']) ) ? $_POST['original_string'] : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-translation-memory.php",
+        "line": 69
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 69,
+          "expression": "$string = ( isset($_POST['original_string']) ) ? $_POST['original_string'] : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 94,
+          "expression": "$dictionary = $this->get_similar_string_translation( $string, $number, $table_name )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 96,
+          "expression": "echo json_encode($dictionary);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo json_encode($dictionary);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-translation-memory.php",
+        "line": 96
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "translatepress-multilingual-sqli-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$trp_settings = get_option( 'trp_settings', false )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-plugin-optin.php",
+        "line": 90
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 90,
+          "expression": "$trp_settings = get_option( 'trp_settings', false )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 100,
+          "expression": "$dictionary_table_name = $wpdb->prefix . 'trp_dictionary_' . strtolower( $trp_settings['default-language'] ) . '_'. strtolower( $trp_settings['translation-languages'][1] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 102,
+          "expression": "$wpdb->get_var( \"SHOW TABLES LIKE '$dictionary_table_name'\" )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->get_var( \"SHOW TABLES LIKE '$dictionary_table_name'\" )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-plugin-optin.php",
+        "line": 102
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "translatepress-multilingual-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$args = array(\n            'method' => 'POST',\n            'body'   => array(\n                'home_url'              => home_url(),\n                'product'               => 'trp',\n                'email'                 => self::$plugin_optin_email,\n                'name'                  => self::get_user_name(),\n                'version'               => self::get_current_active_version(),\n                'license'               => get_option('trp_license_key'),\n                'active_plugins'        => json_encode( get_option( 'active_plugins', array() ) ),\n                'wp_version'            => get_bloginfo('version'),\n                'wp_locale'             => get_locale(),\n                'plugin_version'        => defined( 'TRP_PLUGIN_VERSION' ) ? TRP_PLUGIN_VERSION : '',\n                'php_version'           => defined( 'PHP_VERSION' ) ? PHP_VERSION : '',\n            ),\n        )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-plugin-optin.php",
+        "line": 312
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 312,
+          "expression": "$args = array(\n            'method' => 'POST',\n            'body'   => array(\n                'home_url'              => home_url(),\n                'product'               => 'trp',\n                'email'                 => self::$plugin_optin_email,\n                'name'                  => self::get_user_name(),\n                'version'               => self::get_current_active_version(),\n                'license'               => get_option('trp_license_key'),\n                'active_plugins'        => json_encode( get_option( 'active_plugins', array() ) ),\n                'wp_version'            => get_bloginfo('version'),\n                'wp_locale'             => get_locale(),\n                'plugin_version'        => defined( 'TRP_PLUGIN_VERSION' ) ? TRP_PLUGIN_VERSION : '',\n                'php_version'           => defined( 'PHP_VERSION' ) ? PHP_VERSION : '',\n            ),\n        )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 334,
+          "expression": "$version_number = explode( '.', $args['body'][$key] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 337,
+          "expression": "$args['body'][$key] = $version_number[0] . '.' . $version_number[1]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 340,
+          "expression": "$args = apply_filters( 'cozmoslabs_plugin_optin_trp_metadata', $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 342,
+          "expression": "$request = wp_remote_post( self::$stats_url, $args )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$request = wp_remote_post( self::$stats_url, $args )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-plugin-optin.php",
+        "line": 342
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$req_uri = isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( strtr( wp_unslash( $_SERVER['REQUEST_URI'] ), array(\n            '{' => '%7B',\n            '}' => '%7D',\n            '\"' => '%22',\n            '<' => '%3C',\n            '>' => '%3E',\n        ) ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-url-converter.php",
+        "line": 751
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 751,
+          "expression": "$req_uri = isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( strtr( wp_unslash( $_SERVER['REQUEST_URI'] ), array(\n            '{' => '%7B',\n            '}' => '%7D',\n            '\"' => '%22',\n            '<' => '%3C',\n            '>' => '%3E',\n        ) ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 769,
+          "expression": "$req_uri = ltrim( $req_uri, '/' )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 770,
+          "expression": "$req_uri = preg_replace( $home_path_regex, '', $req_uri )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 770,
+          "expression": "$req_uri = preg_replace( $home_path_regex, '', $req_uri )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$req_uri = preg_replace( $home_path_regex, '', $req_uri )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-url-converter.php",
+        "line": 770
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$originals = (empty($_POST['originals']) )? array() : json_decode(stripslashes($_POST['originals']))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-editor-api-regular-strings.php",
+        "line": 39
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 39,
+          "expression": "$originals = (empty($_POST['originals']) )? array() : json_decode(stripslashes($_POST['originals']))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 52,
+          "expression": "$dictionaries = $this->get_translation_for_strings( $ids, $originals, $block_type, $skip_machine_translation )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 59,
+          "expression": "$dictionary_by_original = trp_sort_dictionary_by_original( $dictionaries, 'regular', $string_group, sanitize_text_field( $_POST['language'] ) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 61,
+          "expression": "echo trp_safe_json_encode( $dictionary_by_original );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo trp_safe_json_encode( $dictionary_by_original );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-editor-api-regular-strings.php",
+        "line": 61
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "translatepress-multilingual-xss-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$strings = json_decode(stripslashes($_POST['strings']))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-editor-api-regular-strings.php",
+        "line": 192
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 192,
+          "expression": "$strings = json_decode(stripslashes($_POST['strings']))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 193,
+          "expression": "$update_strings = $this->save_translations_of_strings( $strings )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 196,
+          "expression": "echo trp_safe_json_encode( $update_strings );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo trp_safe_json_encode( $update_strings );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-editor-api-regular-strings.php",
+        "line": 196
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "translatepress-multilingual-xss-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$dictionaries = $this->get_translation_for_strings( array(), array( stripslashes( $_POST['original'] ) ), $active_block_type, array() )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-editor-api-regular-strings.php",
+        "line": 283
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 283,
+          "expression": "$dictionaries = $this->get_translation_for_strings( array(), array( stripslashes( $_POST['original'] ) ), $active_block_type, array() )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 350,
+          "expression": "echo trp_safe_json_encode( $dictionaries );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo trp_safe_json_encode( $dictionaries );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-editor-api-regular-strings.php",
+        "line": 350
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "translatepress-multilingual-lfi-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "local_file_inclusion",
+      "source": {
+        "expression": "$step = sanitize_text_field(isset($_GET['step']) ? $_GET['step'] : 'welcome')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-onboarding.php",
+        "line": 60
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 60,
+          "expression": "$step = sanitize_text_field(isset($_GET['step']) ? $_GET['step'] : 'welcome')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 63,
+          "expression": "$file = TRP_PLUGIN_DIR . 'includes/onboarding/class-' . $step . '.php'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 65,
+          "expression": "include_once($file)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "include_once($file)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-onboarding.php",
+        "line": 65
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-rce-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$language_code = isset( $_REQUEST['trp_updb_lang'] ) ? sanitize_text_field( $_REQUEST['trp_updb_lang'] ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-upgrade.php",
+        "line": 527
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 527,
+          "expression": "$language_code = isset( $_REQUEST['trp_updb_lang'] ) ? sanitize_text_field( $_REQUEST['trp_updb_lang'] ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 539,
+          "expression": "$callback_return = call_user_func( $update_details['callback'], $language_code, $inferior_limit, $batch_size, $extra_params )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$callback_return = call_user_func( $update_details['callback'], $language_code, $inferior_limit, $batch_size, $extra_params )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-upgrade.php",
+        "line": 539
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "translatepress-multilingual-xss-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$language_code = isset( $_REQUEST['trp_updb_lang'] ) ? sanitize_text_field( $_REQUEST['trp_updb_lang'] ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-upgrade.php",
+        "line": 527
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 527,
+          "expression": "$language_code = isset( $_REQUEST['trp_updb_lang'] ) ? sanitize_text_field( $_REQUEST['trp_updb_lang'] ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 586,
+          "expression": "$request['trp_updb_lang'] = $language_code",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 591,
+          "expression": "$request['progress_message'] = '<p><strong>SQL Error:</strong> ' . esc_html($this->db->last_error) . '</p>' . $request['progress_message']",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 593,
+          "expression": "$query_arguments = array(\n\t\t\t'action'                    => 'trp_update_database',\n\t\t\t'trp_updb_action'           => $request['trp_updb_action'],\n\t\t\t'trp_updb_lang'             => $request['trp_updb_lang'],\n\t\t\t'trp_updb_batch'            => $request['trp_updb_batch'],\n\t\t\t'trp_updb_extra_params'     => isset($request['trp_updb_extra_params']) ? base64_encode(json_encode($request['trp_updb_extra_params'])) : base64_encode(json_encode(array())),\n\t\t\t'trp_updb_nonce'            => wp_create_nonce('tpupdatedatabase'),\n\t\t\t'trp_update_completed'      => 'no',\n\t\t\t'progress_message'          => $request['progress_message']\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 603,
+          "expression": "echo( json_encode( $query_arguments ));",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo( json_encode( $query_arguments ));",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-upgrade.php",
+        "line": 603
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "translatepress-multilingual-ssrf-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$api_params = array(\n                    'edd_action' => 'get_version',\n                    'item_name' => isset($data['item_name']) ? $data['item_name'] : false,\n                    'item_id' => isset($data['item_id']) ? $data['item_id'] : false,\n                    'slug' => sanitize_text_field( $_REQUEST['slug'] ),\n                    'author' => $data['author'],\n                    'url' => home_url(),\n                    'beta' => !empty($data['beta'])\n                )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-edd-sl-plugin-updater.php",
+        "line": 464
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 464,
+          "expression": "$api_params = array(\n                    'edd_action' => 'get_version',\n                    'item_name' => isset($data['item_name']) ? $data['item_name'] : false,\n                    'item_id' => isset($data['item_id']) ? $data['item_id'] : false,\n                    'slug' => sanitize_text_field( $_REQUEST['slug'] ),\n                    'author' => $data['author'],\n                    'url' => home_url(),\n                    'beta' => !empty($data['beta'])\n                )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 475,
+          "expression": "$request = wp_remote_post($this->api_url, array('timeout' => 15, 'sslverify' => $verify_ssl, 'body' => $api_params))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$request = wp_remote_post($this->api_url, array('timeout' => 15, 'sslverify' => $verify_ssl, 'body' => $api_params))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-edd-sl-plugin-updater.php",
+        "line": 475
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "translatepress-multilingual-obje-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "object_injection",
+      "source": {
+        "expression": "$api_params = array(\n                    'edd_action' => 'get_version',\n                    'item_name' => isset($data['item_name']) ? $data['item_name'] : false,\n                    'item_id' => isset($data['item_id']) ? $data['item_id'] : false,\n                    'slug' => sanitize_text_field( $_REQUEST['slug'] ),\n                    'author' => $data['author'],\n                    'url' => home_url(),\n                    'beta' => !empty($data['beta'])\n                )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-edd-sl-plugin-updater.php",
+        "line": 464
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 464,
+          "expression": "$api_params = array(\n                    'edd_action' => 'get_version',\n                    'item_name' => isset($data['item_name']) ? $data['item_name'] : false,\n                    'item_id' => isset($data['item_id']) ? $data['item_id'] : false,\n                    'slug' => sanitize_text_field( $_REQUEST['slug'] ),\n                    'author' => $data['author'],\n                    'url' => home_url(),\n                    'beta' => !empty($data['beta'])\n                )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 475,
+          "expression": "$request = wp_remote_post($this->api_url, array('timeout' => 15, 'sslverify' => $verify_ssl, 'body' => $api_params))",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 478,
+          "expression": "$version_info = json_decode(wp_remote_retrieve_body($request))",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 483,
+          "expression": "$version_info->sections = maybe_unserialize($version_info->sections)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$version_info->sections = maybe_unserialize($version_info->sections)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-edd-sl-plugin-updater.php",
+        "line": 483
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "translatepress-multilingual-ssrf-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$machine_translation_settings = get_option( 'trp_machine_translation_settings', false )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-edd-sl-plugin-updater.php",
+        "line": 694
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 694,
+          "expression": "$machine_translation_settings = get_option( 'trp_machine_translation_settings', false )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 703,
+          "expression": "$api_params['translation_engine'] = $machine_translation_settings['translation-engine']",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 720,
+          "expression": "$response = wp_remote_post($this->store_url, array('timeout' => 15, 'sslverify' => false, 'body' => $api_params))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post($this->store_url, array('timeout' => 15, 'sslverify' => false, 'body' => $api_params))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-edd-sl-plugin-updater.php",
+        "line": 720
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-ssrf-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$machine_translation_settings = get_option( 'trp_machine_translation_settings', false )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-edd-sl-plugin-updater.php",
+        "line": 800
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 800,
+          "expression": "$machine_translation_settings = get_option( 'trp_machine_translation_settings', false )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 809,
+          "expression": "$api_params['translation_engine'] = $machine_translation_settings['translation-engine']",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 826,
+          "expression": "$response = wp_remote_post( $this->store_url, array( 'timeout' => 15, 'sslverify' => false, 'body' => $api_params ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post( $this->store_url, array( 'timeout' => 15, 'sslverify' => false, 'body' => $api_params ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-edd-sl-plugin-updater.php",
+        "line": 826
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "translatepress-multilingual-ssrf-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$license = trim( $this->get_option( 'trp_license_key' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-edd-sl-plugin-updater.php",
+        "line": 937
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 937,
+          "expression": "$license = trim( $this->get_option( 'trp_license_key' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 944,
+          "expression": "$api_params = array(\n                        'edd_action' => 'deactivate_license',\n                        'license'    => $license,\n                        'item_name'  => urlencode( $active_pro_addon_name ), // the name of our product in EDD\n                        'url'        => home_url()\n                    )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 952,
+          "expression": "$response = wp_remote_post( $this->store_url, array( 'timeout' => 15, 'sslverify' => false, 'body' => $api_params ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post( $this->store_url, array( 'timeout' => 15, 'sslverify' => false, 'body' => $api_params ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-edd-sl-plugin-updater.php",
+        "line": 952
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "translatepress-multilingual-xss-006",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo ( isset( $_GET['trp-edit-translation'] ) && $_GET['trp-edit-translation'] == 'preview' ) ? 'data-trp-unpreviewable=\"trp-unpreviewable\"' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-language-switcher.php",
+        "line": 306
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 306,
+          "expression": "echo ( isset( $_GET['trp-edit-translation'] ) && $_GET['trp-edit-translation'] == 'preview' ) ? 'data-trp-unpreviewable=\"trp-unpreviewable\"' : ''",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ( isset( $_GET['trp-edit-translation'] ) && $_GET['trp-edit-translation'] == 'preview' ) ? 'data-trp-unpreviewable=\"trp-unpreviewable\"' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-language-switcher.php",
+        "line": 306
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-xss-007",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo ( isset( $_GET['trp-edit-translation'] ) && $_GET['trp-edit-translation'] == 'preview' ) ? 'data-trp-unpreviewable=\"trp-unpreviewable\"' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-language-switcher.php",
+        "line": 315
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 315,
+          "expression": "echo ( isset( $_GET['trp-edit-translation'] ) && $_GET['trp-edit-translation'] == 'preview' ) ? 'data-trp-unpreviewable=\"trp-unpreviewable\"' : ''",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ( isset( $_GET['trp-edit-translation'] ) && $_GET['trp-edit-translation'] == 'preview' ) ? 'data-trp-unpreviewable=\"trp-unpreviewable\"' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-language-switcher.php",
+        "line": 315
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-xss-008",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo ( isset( $_GET['trp-edit-translation'] ) && $_GET['trp-edit-translation'] == 'preview' ) ? 'data-trp-unpreviewable=\"trp-unpreviewable\"' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-language-switcher.php",
+        "line": 358
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 358,
+          "expression": "echo ( isset( $_GET['trp-edit-translation'] ) && $_GET['trp-edit-translation'] == 'preview' ) ? 'data-trp-unpreviewable=\"trp-unpreviewable\"' : ''",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ( isset( $_GET['trp-edit-translation'] ) && $_GET['trp-edit-translation'] == 'preview' ) ? 'data-trp-unpreviewable=\"trp-unpreviewable\"' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/class-language-switcher.php",
+        "line": 358
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-xss-009",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$license = get_option( 'trp_license_key' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/mtapi/functions.php",
+        "line": 266
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 266,
+          "expression": "$license = get_option( 'trp_license_key' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 278,
+          "expression": "$site_status = $mtapi_server->lookup_site($license, home_url())",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 280,
+          "expression": "$site_status['quota'] = isset ( $site_status['quota'] ) ? $site_status['quota'] : 0",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 281,
+          "expression": "$quota = intval(ceil($site_status['quota'] / 5))",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 282,
+          "expression": "echo trp_safe_json_encode( ['quota' => $quota ] );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo trp_safe_json_encode( ['quota' => $quota ] );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/mtapi/functions.php",
+        "line": 282
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "translatepress-multilingual-rce-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$current_slug = isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( $_SERVER['REQUEST_URI'] ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/advanced-settings/do-not-translate-certain-paths.php",
+        "line": 149
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 149,
+          "expression": "$current_slug = isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( $_SERVER['REQUEST_URI'] ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 153,
+          "expression": "$current_slug = str_replace( trim( $site_url_components['path'] ), '', $current_slug )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 160,
+          "expression": "$current_slug = preg_replace( \"/$replace/i\", '', ltrim( $current_slug, '/' ), 1)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 160,
+          "expression": "$current_slug = preg_replace( \"/$replace/i\", '', ltrim( $current_slug, '/' ), 1)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$current_slug = preg_replace( \"/$replace/i\", '', ltrim( $current_slug, '/' ), 1)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/advanced-settings/do-not-translate-certain-paths.php",
+        "line": 160
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-rce-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$settings          = get_option( 'trp_settings', false )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/advanced-settings/do-not-translate-certain-paths.php",
+        "line": 255
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 255,
+          "expression": "$settings          = get_option( 'trp_settings', false )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 291,
+          "expression": "$searchText = '\\/' . $settings['url-slugs'][$settings['default-language']]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 292,
+          "expression": "$path_no_domain = preg_replace( \"/$searchText/i\", '' , $path_no_domain, 1 )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$path_no_domain = preg_replace( \"/$searchText/i\", '' , $path_no_domain, 1 )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/advanced-settings/do-not-translate-certain-paths.php",
+        "line": 292
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$settings          = get_option( 'trp_settings', false )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/advanced-settings/do-not-translate-certain-paths.php",
+        "line": 255
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 255,
+          "expression": "$settings          = get_option( 'trp_settings', false )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 265,
+          "expression": "$current_original_url = $url_converter->get_url_for_language( $settings['default-language'], null, '' )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 279,
+          "expression": "$path_no_domain = trp_remove_prefix($absolute_home, $current_original_url )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 292,
+          "expression": "$path_no_domain = preg_replace( \"/$searchText/i\", '' , $path_no_domain, 1 )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 293,
+          "expression": "$current_original_url = $absolute_home . $path_no_domain",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 304,
+          "expression": "wp_redirect( $current_original_url, $status )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_redirect( $current_original_url, $status )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/advanced-settings/do-not-translate-certain-paths.php",
+        "line": 304
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-open-002",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$settings          = get_option( 'trp_settings', false )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/advanced-settings/do-not-translate-certain-paths.php",
+        "line": 255
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 255,
+          "expression": "$settings          = get_option( 'trp_settings', false )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 265,
+          "expression": "$current_original_url = $url_converter->get_url_for_language( $settings['default-language'], null, '' )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 279,
+          "expression": "$path_no_domain = trp_remove_prefix($absolute_home, $current_original_url )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 292,
+          "expression": "$path_no_domain = preg_replace( \"/$searchText/i\", '' , $path_no_domain, 1 )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 293,
+          "expression": "$current_original_url = $absolute_home . $path_no_domain",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 316,
+          "expression": "wp_redirect( $current_original_url, $status )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_redirect( $current_original_url, $status )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/advanced-settings/do-not-translate-certain-paths.php",
+        "line": 316
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-rce-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$settings          = get_option( 'trp_settings', false )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/advanced-settings/do-not-translate-certain-paths.php",
+        "line": 515
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 515,
+          "expression": "$settings          = get_option( 'trp_settings', false )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 553,
+          "expression": "$replace      = '\\/' . $settings['url-slugs'][ $current_lang ]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 554,
+          "expression": "$current_slug = preg_replace( \"/$replace/i\", '', ltrim( $current_slug, '/' ), 1 )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$current_slug = preg_replace( \"/$replace/i\", '', ltrim( $current_slug, '/' ), 1 )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/advanced-settings/do-not-translate-certain-paths.php",
+        "line": 554
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-open-003",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$main_domain = get_option( 'home' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/advanced-settings/do-not-translate-certain-paths.php",
+        "line": 608
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 608,
+          "expression": "$main_domain = get_option( 'home' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 613,
+          "expression": "$redirect_url = trailingslashit( $main_domain ) . ltrim( $parsed_redirect['path'], '/' )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 620,
+          "expression": "wp_redirect( $redirect_url, $status )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_redirect( $redirect_url, $status )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/advanced-settings/do-not-translate-certain-paths.php",
+        "line": 620
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-rce-006",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$timezone_string = get_option( 'timezone_string' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/gettext/class-gettext-manager.php",
+        "line": 395
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 395,
+          "expression": "$timezone_string = get_option( 'timezone_string' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 397,
+          "expression": "$timezone_object = timezone_open( $timezone_string )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 400,
+          "expression": "$date_object     = date_create( '', $timezone_object )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 403,
+          "expression": "$formatted        = date_format( $date_object, $timezone_format )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 405,
+          "expression": "$dateformatstring = preg_replace( \"/([^\\\\\\])$timezone_format/\", \"\\\\1\" . backslashit( $formatted ), $dateformatstring )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$dateformatstring = preg_replace( \"/([^\\\\\\])$timezone_format/\", \"\\\\1\" . backslashit( $formatted ), $dateformatstring )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/gettext/class-gettext-manager.php",
+        "line": 405
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-xss-010",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$post_language = ( isset( $_POST['language'] ) ) ? sanitize_text_field( $_POST['language'] ) : null",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/string-translation/class-string-translation-api-gettext.php",
+        "line": 140
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 140,
+          "expression": "$post_language = ( isset( $_POST['language'] ) ) ? sanitize_text_field( $_POST['language'] ) : null",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 141,
+          "expression": "$dictionary_by_original = trp_sort_dictionary_by_original( $dictionaries, 'gettext', $localized_text['gettextstrings'], $post_language )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 166,
+          "expression": "echo trp_safe_json_encode( array('dictionary' => $dictionary_by_original ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo trp_safe_json_encode( array('dictionary' => $dictionary_by_original ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/string-translation/class-string-translation-api-gettext.php",
+        "line": 166
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "translatepress-multilingual-sqli-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$query          = \"FROM `\" . sanitize_text_field( $original_table ) . \"` AS original_strings \"",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/string-translation/class-string-translation-helper.php",
+        "line": 240
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 240,
+          "expression": "$query          = \"FROM `\" . sanitize_text_field( $original_table ) . \"` AS original_strings \"",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 336,
+          "expression": "$query = $this->add_where_clauses_to_query( $query, $where_clauses )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 343,
+          "expression": "$search['queries'] = array_merge( $search['queries'], [$results_query . $query] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 344,
+          "expression": "$query             = implode( ' UNION ', $search['queries'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 369,
+          "expression": "$results_query = isset( $search ) ? $query : $results_query . $query",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 370,
+          "expression": "$originals     = $wpdb->get_results( $results_query, OBJECT_K )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$originals     = $wpdb->get_results( $results_query, OBJECT_K )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/string-translation/class-string-translation-helper.php",
+        "line": 370
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-file-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$upload = wp_handle_upload($_FILES['plugin_zip_file'], $overrides)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/onboarding/class-install.php",
+        "line": 44
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 44,
+          "expression": "$upload = wp_handle_upload($_FILES['plugin_zip_file'], $overrides)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 51,
+          "expression": "$zip_path = $upload['file']",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 59,
+          "expression": "unlink($zip_path)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink($zip_path)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/onboarding/class-install.php",
+        "line": 59
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "translatepress-multilingual-xss-011",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$previous_step = get_transient('trp_onboarding_previous_step')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/onboarding/class-install.php",
+        "line": 187
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 187,
+          "expression": "$previous_step = get_transient('trp_onboarding_previous_step')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 188,
+          "expression": "$back_step = ($previous_step) ? $previous_step : 'languages'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 190,
+          "expression": "echo esc_url(add_query_arg(['step' => $back_step]));",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url(add_query_arg(['step' => $back_step]));",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/onboarding/class-install.php",
+        "line": 190
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-open-004",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$previous_step = get_transient('trp_onboarding_previous_step')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/onboarding/class-license.php",
+        "line": 44
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 44,
+          "expression": "$previous_step = get_transient('trp_onboarding_previous_step')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 45,
+          "expression": "$previous_step = ($previous_step) ? $previous_step : 'languages'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 46,
+          "expression": "wp_redirect(add_query_arg(['step' => $previous_step]))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_redirect(add_query_arg(['step' => $previous_step]))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/includes/onboarding/class-license.php",
+        "line": 46
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "translatepress-multilingual-xss-012",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$data = get_option('trp_db_stored_data', array() )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/partials/main-settings-language-selector.php",
+        "line": 55
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 55,
+          "expression": "$data = get_option('trp_db_stored_data', array() )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 56,
+          "expression": "$formality_supported_languages = $show_formality && isset( $data['trp_mt_supported_languages'][ $this->settings['trp_machine_translation_settings']['translation-engine']] ) ? $data['trp_mt_supported_languages'][ $this->settings['trp_machine_translation_settings']['translation-engine']]['formality-supported-languages'] : null",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 60,
+          "expression": "$language_supports_formality = isset( $formality_supported_languages ) ? isset( $formality_supported_languages[$selected_language_code] ) && $formality_supported_languages[$selected_language_code]  === 'true' : null",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 98,
+          "expression": "$formality_disabled = !$language_supports_formality && !$stripped_formal_language || $stripped_formal_language === 'false'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 100,
+          "expression": "echo $formality_disabled ? 'title=\"' . esc_attr__( \"This language does not support formality. \", 'translatepress-multilingual' ) . '\"' : '';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $formality_disabled ? 'title=\"' . esc_attr__( \"This language does not support formality. \", 'translatepress-multilingual' ) . '\"' : '';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/partials/main-settings-language-selector.php",
+        "line": 100
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-xss-013",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$data = get_option('trp_db_stored_data', array() )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/partials/main-settings-language-selector.php",
+        "line": 55
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 55,
+          "expression": "$data = get_option('trp_db_stored_data', array() )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 56,
+          "expression": "$formality_supported_languages = $show_formality && isset( $data['trp_mt_supported_languages'][ $this->settings['trp_machine_translation_settings']['translation-engine']] ) ? $data['trp_mt_supported_languages'][ $this->settings['trp_machine_translation_settings']['translation-engine']]['formality-supported-languages'] : null",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 60,
+          "expression": "$language_supports_formality = isset( $formality_supported_languages ) ? isset( $formality_supported_languages[$selected_language_code] ) && $formality_supported_languages[$selected_language_code]  === 'true' : null",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 98,
+          "expression": "$formality_disabled = !$language_supports_formality && !$stripped_formal_language || $stripped_formal_language === 'false'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 102,
+          "expression": "echo $formality_disabled ? 'trp-formality-disabled' : '';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $formality_disabled ? 'trp-formality-disabled' : '';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/partials/main-settings-language-selector.php",
+        "line": 102
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "translatepress-multilingual-xss-014",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "translatepress-multilingual",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo ( isset( $_GET['trp-edit-translation'] ) && $_GET['trp-edit-translation'] == 'preview' ) ? 'data-trp-unpreviewable=\"trp-unpreviewable\"' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/partials/language-switcher-shortcode.php",
+        "line": 10
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 10,
+          "expression": "echo ( isset( $_GET['trp-edit-translation'] ) && $_GET['trp-edit-translation'] == 'preview' ) ? 'data-trp-unpreviewable=\"trp-unpreviewable\"' : ''",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ( isset( $_GET['trp-edit-translation'] ) && $_GET['trp-edit-translation'] == 'preview' ) ? 'data-trp-unpreviewable=\"trp-unpreviewable\"' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/translatepress-multilingual/partials/language-switcher-shortcode.php",
+        "line": 10
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ]
+}

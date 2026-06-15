@@ -1,0 +1,1152 @@
+{
+  "plugin": "wp-statistics",
+  "php_files_analyzed": 709,
+  "parse_errors": 0,
+  "total_flows": 25,
+  "by_severity": {
+    "critical": 11,
+    "high": 12,
+    "low": 1,
+    "medium": 1
+  },
+  "by_vulnerability_class": {
+    "rce": 9,
+    "sql_injection": 2,
+    "xss": 13,
+    "open_redirect": 1
+  },
+  "flows": [
+    {
+      "flow_id": "wp-statistics-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "get_user_meta($user_id)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/class-wp-statistics-user.php",
+        "line": 66
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 66,
+          "expression": "$user_info['meta'] = array_map(function ($a) {\n            return $a[0];\n        }, get_user_meta($user_id))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$user_info['meta'] = array_map(function ($a) {\n            return $a[0];\n        }, get_user_meta($user_id))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/class-wp-statistics-user.php",
+        "line": 66
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$result = $wpdb->get_var($wpdb->prepare(\"SELECT SUM(hits) FROM {$table_name} WHERE `last_counter` < %s\", $date_string))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/class-wp-statistics-purge.php",
+        "line": 25
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 25,
+          "expression": "$result = $wpdb->get_var($wpdb->prepare(\"SELECT SUM(hits) FROM {$table_name} WHERE `last_counter` < %s\", $date_string))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 33,
+          "expression": "$insert = $wpdb->insert(\n                        DB::table('historical'),\n                        array(\n                            'value'    => $result,\n                            'category' => 'visits',\n                            'page_id'  => -2,\n                            'uri'      => '-2',\n                        )\n                    )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$insert = $wpdb->insert(\n                        DB::table('historical'),\n                        array(\n                            'value'    => $result,\n                            'category' => 'visits',\n                            'page_id'  => -2,\n                            'uri'      => '-2',\n                        )\n                    )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/class-wp-statistics-purge.php",
+        "line": 33
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-sqli-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$historical = $wpdb->get_var(\n                        $wpdb->prepare(\n                            \"SELECT sum(count) FROM {$table_name} WHERE `uri` = %s AND `date` < %s\",\n                            $row->uri,\n                            $date_string\n                        )\n                    )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/class-wp-statistics-purge.php",
+        "line": 127
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 127,
+          "expression": "$historical = $wpdb->get_var(\n                        $wpdb->prepare(\n                            \"SELECT sum(count) FROM {$table_name} WHERE `uri` = %s AND `date` < %s\",\n                            $row->uri,\n                            $date_string\n                        )\n                    )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 146,
+          "expression": "$insert = $wpdb->insert(\n                            DB::table('historical'),\n                            array(\n                                'value'    => $historical,\n                                'category' => 'uri',\n                                'uri'      => $row->uri,\n                                'page_id'  => Pages::uri_to_id($row->uri),\n                            )\n                        )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$insert = $wpdb->insert(\n                            DB::table('historical'),\n                            array(\n                                'value'    => $historical,\n                                'category' => 'uri',\n                                'uri'      => $row->uri,\n                                'page_id'  => Pages::uri_to_id($row->uri),\n                            )\n                        )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/class-wp-statistics-purge.php",
+        "line": 146
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$parameters[$key] = sanitize_text_field($value)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/class-wp-statistics-admin-ajax.php",
+        "line": 163
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 163,
+          "expression": "$parameters[$key] = sanitize_text_field($value)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 169,
+          "expression": "wp_send_json($class::get($parameters))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json($class::get($parameters))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/class-wp-statistics-admin-ajax.php",
+        "line": 169
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo sprintf(__('Your next report is scheduled to be sent on <b>%1$s at %2$s</b>.', 'wp-statistics'), wp_date(get_option('date_format'), $next_scheduled_time), wp_date(get_option('time_format'), $next_scheduled_time))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/settings/notifications.php",
+        "line": 50
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 50,
+          "expression": "echo sprintf(__('Your next report is scheduled to be sent on <b>%1$s at %2$s</b>.', 'wp-statistics'), wp_date(get_option('date_format'), $next_scheduled_time), wp_date(get_option('time_format'), $next_scheduled_time))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf(__('Your next report is scheduled to be sent on <b>%1$s at %2$s</b>.', 'wp-statistics'), wp_date(get_option('date_format'), $next_scheduled_time), wp_date(get_option('time_format'), $next_scheduled_time))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/settings/notifications.php",
+        "line": 50
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo TimeZone::getLocalDate(get_option('date_format'), $event->timestamp) . ' ' . __('at', 'wp-statistics') . ' ' . TimeZone::getLocalDate(get_option('time_format'), $event->timestamp);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/settings/advanced.php",
+        "line": 303
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 303,
+          "expression": "echo TimeZone::getLocalDate(get_option('date_format'), $event->timestamp) . ' ' . __('at', 'wp-statistics') . ' ' . TimeZone::getLocalDate(get_option('time_format'), $event->timestamp);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo TimeZone::getLocalDate(get_option('date_format'), $event->timestamp) . ' ' . __('at', 'wp-statistics') . ' ' . TimeZone::getLocalDate(get_option('time_format'), $event->timestamp);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/settings/advanced.php",
+        "line": 303
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo str_replace('F', 'M', get_option('date_format'))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/layout/date.range.php",
+        "line": 47
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 47,
+          "expression": "echo str_replace('F', 'M', get_option('date_format'))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo str_replace('F', 'M', get_option('date_format'))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/layout/date.range.php",
+        "line": 47
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$backUrl = esc_url_raw($_SERVER['HTTP_REFERER'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/layout/title.php",
+        "line": 14
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 14,
+          "expression": "$backUrl = esc_url_raw($_SERVER['HTTP_REFERER'])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 22,
+          "expression": "echo esc_url($backUrl)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url($backUrl)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/layout/title.php",
+        "line": 22
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo isset($_GET['page']) && $_GET['page'] === $sub_item['slug'] ? 'active' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/layout/partials/menu-link.php",
+        "line": 41
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 41,
+          "expression": "echo isset($_GET['page']) && $_GET['page'] === $sub_item['slug'] ? 'active' : ''",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo isset($_GET['page']) && $_GET['page'] === $sub_item['slug'] ? 'active' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/layout/partials/menu-link.php",
+        "line": 41
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo number_format_i18n(intval($item->visitors));",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/pages/devices/single-browser.php",
+        "line": 39
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 39,
+          "expression": "echo number_format_i18n(intval($item->visitors));",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo number_format_i18n(intval($item->visitors));",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/templates/pages/devices/single-browser.php",
+        "line": 39
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$tab = isset($_POST['tab']) && $_POST['tab'] ? sanitize_text_field($_POST['tab']) : 'general-settings'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/pages/class-wp-statistics-admin-page-settings.php",
+        "line": 108
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 108,
+          "expression": "$tab = isset($_POST['tab']) && $_POST['tab'] ? sanitize_text_field($_POST['tab']) : 'general-settings'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 112,
+          "expression": "wp_redirect(add_query_arg(array(\n                    'save_setting' => 'yes',\n                    'tab'          => $tab,\n                ), Menus::admin_url('settings')))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_redirect(add_query_arg(array(\n                    'save_setting' => 'yes',\n                    'tab'          => $tab,\n                ), Menus::admin_url('settings')))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/admin/pages/class-wp-statistics-admin-page-settings.php",
+        "line": 112
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-statistics-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$items = $wpdb->get_results( $wpdb->prepare( $sql, $args ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/libraries/wp-background-processing/wp-background-process.php",
+        "line": 480
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 480,
+          "expression": "$items = $wpdb->get_results( $wpdb->prepare( $sql, $args ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 485,
+          "expression": "$batches = array_map(\n\t\t\t\tfunction ( $item ) use ( $column, $value_column ) {\n\t\t\t\t\t$batch       = new \\stdClass();\n\t\t\t\t\t$batch->key  = $item->{$column};\n\t\t\t\t\t$batch->data = maybe_unserialize( $item->{$value_column} );\n\n\t\t\t\t\treturn $batch;\n\t\t\t\t},\n\t\t\t\t$items\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$batches = array_map(\n\t\t\t\tfunction ( $item ) use ( $column, $value_column ) {\n\t\t\t\t\t$batch       = new \\stdClass();\n\t\t\t\t\t$batch->key  = $item->{$column};\n\t\t\t\t\t$batch->data = maybe_unserialize( $item->{$value_column} );\n\n\t\t\t\t\treturn $batch;\n\t\t\t\t},\n\t\t\t\t$items\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/includes/libraries/wp-background-processing/wp-background-process.php",
+        "line": 485
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo esc_url(get_term_link(intval($category['term_id'])));",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/tables/category-pages.php",
+        "line": 48
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 48,
+          "expression": "echo esc_url(get_term_link(intval($category['term_id'])));",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url(get_term_link(intval($category['term_id'])));",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/tables/category-pages.php",
+        "line": 48
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-009",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo sprintf(\n            // translators: 1: Start date - 2: To date - 3: Views count - 4: Visitors count.\n            __('Over the past week (<b>%1$s - %2$s</b>), this post has been <b>viewed %3$s times by %4$s visitors</b>', 'wp-statistics'),\n            esc_html($summary['fromString']),\n            esc_html($summary['toString']),\n            number_format(intval($summary['thisPeriodViews'])),\n            number_format(intval($summary['thisPeriodVisitors']))\n        );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/meta-box/post-summary.php",
+        "line": 24
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 24,
+          "expression": "echo sprintf(\n            // translators: 1: Start date - 2: To date - 3: Views count - 4: Visitors count.\n            __('Over the past week (<b>%1$s - %2$s</b>), this post has been <b>viewed %3$s times by %4$s visitors</b>', 'wp-statistics'),\n            esc_html($summary['fromString']),\n            esc_html($summary['toString']),\n            number_format(intval($summary['thisPeriodViews'])),\n            number_format(intval($summary['thisPeriodVisitors']))\n        );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf(\n            // translators: 1: Start date - 2: To date - 3: Views count - 4: Visitors count.\n            __('Over the past week (<b>%1$s - %2$s</b>), this post has been <b>viewed %3$s times by %4$s visitors</b>', 'wp-statistics'),\n            esc_html($summary['fromString']),\n            esc_html($summary['toString']),\n            number_format(intval($summary['thisPeriodViews'])),\n            number_format(intval($summary['thisPeriodVisitors']))\n        );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/meta-box/post-summary.php",
+        "line": 24
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-010",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo sprintf(\n                // translators: 1: Referrer link - 2: Referrer name - 3: Referrer count.\n                __(', with \\'<a href=\"%1$s\" target=\"_blank\" rel=\"noreferrer nofollow\">%2$s</a>\\' leading with <b>%3$s referrals</b>', 'wp-statistics'),\n                esc_url($thisPeriodTopReferrer),\n                esc_html($thisPeriodTopReferrerLabel),\n                number_format(intval($summary['thisPeriodTopReferrerCount']))\n            );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/meta-box/post-summary.php",
+        "line": 35
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 35,
+          "expression": "echo sprintf(\n                // translators: 1: Referrer link - 2: Referrer name - 3: Referrer count.\n                __(', with \\'<a href=\"%1$s\" target=\"_blank\" rel=\"noreferrer nofollow\">%2$s</a>\\' leading with <b>%3$s referrals</b>', 'wp-statistics'),\n                esc_url($thisPeriodTopReferrer),\n                esc_html($thisPeriodTopReferrerLabel),\n                number_format(intval($summary['thisPeriodTopReferrerCount']))\n            );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf(\n                // translators: 1: Referrer link - 2: Referrer name - 3: Referrer count.\n                __(', with \\'<a href=\"%1$s\" target=\"_blank\" rel=\"noreferrer nofollow\">%2$s</a>\\' leading with <b>%3$s referrals</b>', 'wp-statistics'),\n                esc_url($thisPeriodTopReferrer),\n                esc_html($thisPeriodTopReferrerLabel),\n                number_format(intval($summary['thisPeriodTopReferrerCount']))\n            );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/meta-box/post-summary.php",
+        "line": 35
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-011",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo sprintf(\n        // translators: 1: Views count - 2: Visitors count.\n        __('In total, this post has been <b>viewed %1$s times by %2$s visitors</b>', 'wp-statistics'),\n        number_format(intval($summary['totalViews'])),\n        number_format(intval($summary['totalVisitors']))\n    );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/meta-box/post-summary.php",
+        "line": 47
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 47,
+          "expression": "echo sprintf(\n        // translators: 1: Views count - 2: Visitors count.\n        __('In total, this post has been <b>viewed %1$s times by %2$s visitors</b>', 'wp-statistics'),\n        number_format(intval($summary['totalViews'])),\n        number_format(intval($summary['totalVisitors']))\n    );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf(\n        // translators: 1: Views count - 2: Visitors count.\n        __('In total, this post has been <b>viewed %1$s times by %2$s visitors</b>', 'wp-statistics'),\n        number_format(intval($summary['totalViews'])),\n        number_format(intval($summary['totalVisitors']))\n    );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/meta-box/post-summary.php",
+        "line": 47
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-012",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo sprintf(\n            // translators: 1: Referrer link - 2: Referrer name - 3: Referrer count.\n            __(', with \\'<a href=\"%1$s\" target=\"_blank\" rel=\"noreferrer nofollow\">%2$s</a>\\' leading with <b>%3$s referrals</b>', 'wp-statistics'),\n            esc_url($topReferrer),\n            esc_html($topReferrerLabel),\n            number_format(intval($summary['topReferrerCount']))\n        );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/meta-box/post-summary.php",
+        "line": 56
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 56,
+          "expression": "echo sprintf(\n            // translators: 1: Referrer link - 2: Referrer name - 3: Referrer count.\n            __(', with \\'<a href=\"%1$s\" target=\"_blank\" rel=\"noreferrer nofollow\">%2$s</a>\\' leading with <b>%3$s referrals</b>', 'wp-statistics'),\n            esc_url($topReferrer),\n            esc_html($topReferrerLabel),\n            number_format(intval($summary['topReferrerCount']))\n        );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf(\n            // translators: 1: Referrer link - 2: Referrer name - 3: Referrer count.\n            __(', with \\'<a href=\"%1$s\" target=\"_blank\" rel=\"noreferrer nofollow\">%2$s</a>\\' leading with <b>%3$s referrals</b>', 'wp-statistics'),\n            esc_url($topReferrer),\n            esc_html($topReferrerLabel),\n            number_format(intval($summary['topReferrerCount']))\n        );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/views/components/meta-box/post-summary.php",
+        "line": 56
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$value = $_REQUEST[$param]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Utils/Request.php",
+        "line": 21
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 21,
+          "expression": "$value = $_REQUEST[$param]",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 44,
+          "expression": "array_map('sanitize_text_field', $value)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map('sanitize_text_field', $value)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Utils/Request.php",
+        "line": 44
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-rce-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$wpDateFormat = get_option('date_format')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Admin/Posts/PostsManager.php",
+        "line": 204
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 204,
+          "expression": "$wpDateFormat = get_option('date_format')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 234,
+          "expression": "$chartData[$shortDate] = [\n                'ymdDate'   => $hit->date,\n                'hits'      => !empty($hit->visitors) ? intval($hit->visitors) : intval($hit->views),\n                'fullDate'  => gmdate($wpDateFormat, strtotime($hit->date)),\n            ]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 242,
+          "expression": "uasort($chartData, function ($a, $b) {\n            if ($a['ymdDate'] == $b['ymdDate']) {\n                return 0;\n            }\n            return ($a['ymdDate'] < $b['ymdDate']) ? -1 : 1;\n        })",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "uasort($chartData, function ($a, $b) {\n            if ($a['ymdDate'] == $b['ymdDate']) {\n                return 0;\n            }\n            return ($a['ymdDate'] < $b['ymdDate']) ? -1 : 1;\n        })",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Admin/Posts/PostsManager.php",
+        "line": 242
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-rce-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$activePluginsKeys = get_option('active_plugins', array())",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Admin/AnonymizedUsageData/AnonymizedUsageDataProvider.php",
+        "line": 215
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 215,
+          "expression": "$activePluginsKeys = get_option('active_plugins', array())",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 217,
+          "expression": "$pluginFolders = array_map(function ($plugin) {\n            return explode('/', $plugin)[0];\n        }, $activePluginsKeys)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$pluginFolders = array_map(function ($plugin) {\n            return explode('/', $plugin)[0];\n        }, $activePluginsKeys)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Admin/AnonymizedUsageData/AnonymizedUsageDataProvider.php",
+        "line": 217
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-rce-006",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$userMetaboxes = get_user_meta(get_current_user_id(), \"meta-box-order_$currentScreen\", true)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Admin/Metabox/MetaboxHelper.php",
+        "line": 115
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 115,
+          "expression": "$userMetaboxes = get_user_meta(get_current_user_id(), \"meta-box-order_$currentScreen\", true)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 123,
+          "expression": "$contextMetaboxes = explode(',', $userMetaboxes[$context])",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 126,
+          "expression": "$contextMetaboxes = array_filter($contextMetaboxes, function ($metabox) use ($screenMetaboxes) {\n                    return strpos($metabox, 'wp-statistics') !== false && isset($screenMetaboxes[$metabox]);\n                })",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 126,
+          "expression": "$contextMetaboxes = array_filter($contextMetaboxes, function ($metabox) use ($screenMetaboxes) {\n                    return strpos($metabox, 'wp-statistics') !== false && isset($screenMetaboxes[$metabox]);\n                })",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$contextMetaboxes = array_filter($contextMetaboxes, function ($metabox) use ($screenMetaboxes) {\n                    return strpos($metabox, 'wp-statistics') !== false && isset($screenMetaboxes[$metabox]);\n                })",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Admin/Metabox/MetaboxHelper.php",
+        "line": 126
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-xss-013",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$pluginSlug = Request::has('plugin_slug') ? wp_unslash(Request::get('plugin_slug')) : false",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Admin/LicenseManagement/Plugin/PluginActions.php",
+        "line": 132
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 132,
+          "expression": "$pluginSlug = Request::has('plugin_slug') ? wp_unslash(Request::get('plugin_slug')) : false",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 137,
+          "expression": "wp_send_json_success([\n                'active' => $this->pluginHandler->isPluginActive($pluginSlug),\n                'data'   => $this->pluginHandler->getPluginData($pluginSlug),\n            ])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success([\n                'active' => $this->pluginHandler->isPluginActive($pluginSlug),\n                'data'   => $this->pluginHandler->getPluginData($pluginSlug),\n            ])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Admin/LicenseManagement/Plugin/PluginActions.php",
+        "line": 137
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-statistics-rce-007",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$visitors = intval($item->visitors)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Charts/DataProvider/SearchEngineChartDataProvider.php",
+        "line": 69
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 69,
+          "expression": "$visitors = intval($item->visitors)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 70,
+          "expression": "$thisParsedData[$item->source_name][$item->last_counter] = $visitors",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 75,
+          "expression": "uasort($thisParsedData, function($a, $b) {\n            return array_sum($b) - array_sum($a);\n        })",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "uasort($thisParsedData, function($a, $b) {\n            return array_sum($b) - array_sum($a);\n        })",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Charts/DataProvider/SearchEngineChartDataProvider.php",
+        "line": 75
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-rce-008",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$count = intval($item->count)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Charts/DataProvider/ExclusionsChartDataProvider.php",
+        "line": 63
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 63,
+          "expression": "$count = intval($item->count)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 64,
+          "expression": "$parsedData[$item->reason][$item->date] = $count",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 69,
+          "expression": "uasort($parsedData, function($a, $b) {\n            return array_sum($b) - array_sum($a);\n        })",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "uasort($parsedData, function($a, $b) {\n            return array_sum($b) - array_sum($a);\n        })",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Charts/DataProvider/ExclusionsChartDataProvider.php",
+        "line": 69
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-statistics-rce-009",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-statistics",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$visitors = intval($item->visitors)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Charts/DataProvider/SocialMediaChartDataProvider.php",
+        "line": 69
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 69,
+          "expression": "$visitors = intval($item->visitors)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 70,
+          "expression": "$thisParsedData[$item->source_name][$item->last_counter] = $visitors",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 75,
+          "expression": "uasort($thisParsedData, function($a, $b) {\n            return array_sum($b) - array_sum($a);\n        })",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "uasort($thisParsedData, function($a, $b) {\n            return array_sum($b) - array_sum($a);\n        })",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-statistics/src/Service/Charts/DataProvider/SocialMediaChartDataProvider.php",
+        "line": 75
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ]
+}

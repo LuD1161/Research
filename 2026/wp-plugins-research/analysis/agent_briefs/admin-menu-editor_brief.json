@@ -1,0 +1,787 @@
+{
+  "plugin_slug": "admin-menu-editor",
+  "priority_score": 58,
+  "metadata": {
+    "php_files": 224,
+    "total_lines": 39449
+  },
+  "attack_surface_summary": "# Attack Surface: admin-menu-editor\n\n> Generated: 2026-06-15T02:06:18Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 106,
+    "total_sinks": 198,
+    "total_sanitizers": 296,
+    "direct_flows": 33,
+    "functions_with_sources": 57,
+    "functions_with_sinks": 133,
+    "files_analyzed": 224,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "admin-menu-editor-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "admin-menu-editor",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$row = $wpdb->get_row($wpdb->prepare(\r\n\t\t\t\t\"SELECT * FROM {$wpdb->sitemeta} WHERE meta_key = %s LIMIT 1\",\r\n\t\t\t\t$option\r\n\t\t\t))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/admin-menu-editor/includes/menu-editor-core.php",
+        "line": 2899
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2899,
+          "expression": "$row = $wpdb->get_row($wpdb->prepare(\r\n\t\t\t\t\"SELECT * FROM {$wpdb->sitemeta} WHERE meta_key = %s LIMIT 1\",\r\n\t\t\t\t$option\r\n\t\t\t))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2913,
+          "expression": "$wpdb->insert(\r\n\t\t\t\t$wpdb->sitemeta,\r\n\t\t\t\tarray(\r\n\t\t\t\t\t'site_id' => $row->site_id,\r\n\t\t\t\t\t'meta_key' => $option,\r\n\t\t\t\t\t'meta_value' => $row->meta_value,\r\n\t\t\t\t),\r\n\t\t\t\tarray('%d', '%s', '%s')\r\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->insert(\r\n\t\t\t\t$wpdb->sitemeta,\r\n\t\t\t\tarray(\r\n\t\t\t\t\t'site_id' => $row->site_id,\r\n\t\t\t\t\t'meta_key' => $option,\r\n\t\t\t\t\t'meta_value' => $row->meta_value,\r\n\t\t\t\t),\r\n\t\t\t\tarray('%d', '%s', '%s')\r\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/admin-menu-editor/includes/menu-editor-core.php",
+        "line": 2913
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "admin-menu-editor-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "admin-menu-editor",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$rawParams = $_REQUEST",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/admin-menu-editor/includes/ajax-wrapper-v2/src/Action.php",
+        "line": 183
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 183,
+          "expression": "$rawParams = $_REQUEST",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 190,
+          "expression": "$rawParams = wp_unslash($rawParams)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 194,
+          "expression": "$inputParams = call_user_func($this->customParamParser, $rawParams)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$inputParams = call_user_func($this->customParamParser, $rawParams)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/admin-menu-editor/includes/ajax-wrapper-v2/src/Action.php",
+        "line": 194
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "admin-menu-editor-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "admin-menu-editor",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$rawParams = $_REQUEST",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/admin-menu-editor/includes/ajax-wrapper-v2/src/Action.php",
+        "line": 183
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 183,
+          "expression": "$rawParams = $_REQUEST",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 190,
+          "expression": "$rawParams = wp_unslash($rawParams)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 199,
+          "expression": "$inputParams = $rawParams",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 207,
+          "expression": "$value = $inputParams[$name]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 209,
+          "expression": "$value = call_user_func($parser, $value)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 209,
+          "expression": "$value = call_user_func($parser, $value)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$value = call_user_func($parser, $value)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/admin-menu-editor/includes/ajax-wrapper-v2/src/Action.php",
+        "line": 209
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "admin-menu-editor-rce-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "admin-menu-editor",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$rawParams = $_REQUEST",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/admin-menu-editor/ajax-wrapper/AjaxWrapper.php",
+        "line": 281
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 281,
+          "expression": "$rawParams = $_REQUEST",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 288,
+          "expression": "$rawParams = wp_unslash($rawParams)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 292,
+          "expression": "$inputParams = $rawParams",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 297,
+          "expression": "$value = $this->validateParameter($settings, $inputParams[$name], $name)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 320,
+          "expression": "$value = call_user_func(self::$defaultValidators[$settings['type']], $value, $name)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 320,
+          "expression": "$value = call_user_func(self::$defaultValidators[$settings['type']], $value, $name)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$value = call_user_func(self::$defaultValidators[$settings['type']], $value, $name)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/admin-menu-editor/ajax-wrapper/AjaxWrapper.php",
+        "line": 320
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "admin-menu-editor-rce-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "admin-menu-editor",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$rawParams = $_REQUEST",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/admin-menu-editor/ajax-wrapper/AjaxWrapper.php",
+        "line": 281
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 281,
+          "expression": "$rawParams = $_REQUEST",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 288,
+          "expression": "$rawParams = wp_unslash($rawParams)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 292,
+          "expression": "$inputParams = $rawParams",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 297,
+          "expression": "$value = $this->validateParameter($settings, $inputParams[$name], $name)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 320,
+          "expression": "$value = call_user_func(self::$defaultValidators[$settings['type']], $value, $name)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 326,
+          "expression": "$success = call_user_func($settings['validateCallback'], $value)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$success = call_user_func($settings['validateCallback'], $value)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/admin-menu-editor/ajax-wrapper/AjaxWrapper.php",
+        "line": 326
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "admin-menu-editor-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "admin-menu-editor",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "'Content-Type: application/json; charset=' . get_option('blog_charset')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/admin-menu-editor/ajax-wrapper/AjaxWrapper.php",
+        "line": 388
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 388,
+          "expression": "header('Content-Type: application/json; charset=' . get_option('blog_charset'))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "header('Content-Type: application/json; charset=' . get_option('blog_charset'))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/admin-menu-editor/ajax-wrapper/AjaxWrapper.php",
+        "line": 388
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "admin-menu-editor-obje-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "admin-menu-editor",
+      "vulnerability_class": "object_injection",
+      "source": {
+        "expression": "$value = get_site_option($this->optionName, $defaultValue)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/admin-menu-editor/customizables/Storage/ScopedOptionStorage.php",
+        "line": 41
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 41,
+          "expression": "$value = get_site_option($this->optionName, $defaultValue)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 52,
+          "expression": "$value = unserialize(gzuncompress(base64_decode(\n\t\t\t\tsubstr($value, strlen(self::COMPRESSED_VALUE_PREFIX)\n\t\t\t\t))))",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 52,
+          "expression": "$value = unserialize(gzuncompress(base64_decode(\n\t\t\t\tsubstr($value, strlen(self::COMPRESSED_VALUE_PREFIX)\n\t\t\t\t))))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$value = unserialize(gzuncompress(base64_decode(\n\t\t\t\tsubstr($value, strlen(self::COMPRESSED_VALUE_PREFIX)\n\t\t\t\t))))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/admin-menu-editor/customizables/Storage/ScopedOptionStorage.php",
+        "line": 52
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-sha1-password",
+      "path": "plugins/src/admin-menu-editor/customizables/Rendering/TabbedPanelRenderer.php",
+      "start": {
+        "line": 123,
+        "col": 4,
+        "offset": 3528
+      },
+      "end": {
+        "line": 125,
+        "col": 6,
+        "offset": 3636
+      },
+      "extra": {
+        "message": "sha1() is a cryptographically weak hash function not suitable for password storage. Use wp_hash_password() or password_hash() with a modern algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-916",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/admin-menu-editor/customizables/Storage/ScopedOptionStorage.php",
+      "start": {
+        "line": 52,
+        "col": 13,
+        "offset": 1448
+      },
+      "end": {
+        "line": 54,
+        "col": 9,
+        "offset": 1553
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/admin-menu-editor/includes/editor-page.php",
+      "start": {
+        "line": 424,
+        "col": 4,
+        "offset": 13748
+      },
+      "end": {
+        "line": 424,
+        "col": 66,
+        "offset": 13810
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/admin-menu-editor/includes/editor-page.php",
+      "start": {
+        "line": 450,
+        "col": 5,
+        "offset": 14606
+      },
+      "end": {
+        "line": 450,
+        "col": 102,
+        "offset": 14703
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/admin-menu-editor/includes/menu-editor-core.php",
+      "start": {
+        "line": 2887,
+        "col": 3,
+        "offset": 111004
+      },
+      "end": {
+        "line": 2887,
+        "col": 50,
+        "offset": 111051
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/admin-menu-editor/includes/menu-editor-core.php",
+      "start": {
+        "line": 2890,
+        "col": 3,
+        "offset": 111111
+      },
+      "end": {
+        "line": 2890,
+        "col": 49,
+        "offset": 111157
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/admin-menu-editor/includes/menu-editor-core.php",
+      "start": {
+        "line": 2925,
+        "col": 3,
+        "offset": 112100
+      },
+      "end": {
+        "line": 2925,
+        "col": 32,
+        "offset": 112129
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/admin-menu-editor/includes/shadow_plugin_framework.php",
+      "start": {
+        "line": 91,
+        "col": 4,
+        "offset": 3187
+      },
+      "end": {
+        "line": 91,
+        "col": 63,
+        "offset": 3246
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/admin-menu-editor/includes/shadow_plugin_framework.php",
+      "start": {
+        "line": 132,
+        "col": 21,
+        "offset": 4508
+      },
+      "end": {
+        "line": 132,
+        "col": 102,
+        "offset": 4589
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 4,
+    "taint_high": 0,
+    "taint_total": 7,
+    "semgrep_error": 1,
+    "semgrep_warning": 8
+  }
+}

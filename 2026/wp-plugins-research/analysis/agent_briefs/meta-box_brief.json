@@ -1,0 +1,314 @@
+{
+  "plugin_slug": "meta-box",
+  "priority_score": 18,
+  "metadata": {
+    "php_files": 104,
+    "total_lines": 12395
+  },
+  "attack_surface_summary": "# Attack Surface: meta-box\n\n> Generated: 2026-06-15T02:06:24Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 45,
+    "total_sinks": 84,
+    "total_sanitizers": 174,
+    "direct_flows": 34,
+    "functions_with_sources": 29,
+    "functions_with_sinks": 62,
+    "files_analyzed": 104,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "meta-box-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "meta-box",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$meta_box      = wp_parse_args( $meta_box, [\n\t\t\t'title'          => $default_title,\n\t\t\t'id'             => ! empty( $meta_box['title'] ) ? sanitize_title( $meta_box['title'] ) : sanitize_title( $default_title ),\n\t\t\t'context'        => 'normal',\n\t\t\t'priority'       => 'high',\n\t\t\t'post_types'     => 'post',\n\t\t\t'autosave'       => false,\n\t\t\t'default_hidden' => false,\n\t\t\t'style'          => 'default',\n\t\t\t'class'          => '',\n\t\t\t'fields'         => [],\n\t\t] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/meta-box/inc/meta-box.php",
+        "line": 314
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 314,
+          "expression": "$meta_box      = wp_parse_args( $meta_box, [\n\t\t\t'title'          => $default_title,\n\t\t\t'id'             => ! empty( $meta_box['title'] ) ? sanitize_title( $meta_box['title'] ) : sanitize_title( $default_title ),\n\t\t\t'context'        => 'normal',\n\t\t\t'priority'       => 'high',\n\t\t\t'post_types'     => 'post',\n\t\t\t'autosave'       => false,\n\t\t\t'default_hidden' => false,\n\t\t\t'style'          => 'default',\n\t\t\t'class'          => '',\n\t\t\t'fields'         => [],\n\t\t] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 334,
+          "expression": "$meta_box['post_types'] = array_filter( array_map( 'sanitize_key', Arr::from_csv( $meta_box['post_types'] ) ) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 334,
+          "expression": "$meta_box['post_types'] = array_filter( array_map( 'sanitize_key', Arr::from_csv( $meta_box['post_types'] ) ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$meta_box['post_types'] = array_filter( array_map( 'sanitize_key', Arr::from_csv( $meta_box['post_types'] ) ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/meta-box/inc/meta-box.php",
+        "line": 334
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "meta-box-rce-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "meta-box",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "function ( $item ): array {\n\t\t\treturn [\n\t\t\t\t'url'         => $item->get_permalink(),\n\t\t\t\t'title'       => $item->get_title(),\n\t\t\t\t'description' => $item->get_description(),\n\t\t\t\t'content'     => $item->get_content(),\n\t\t\t\t'date'        => $item->get_date( get_option( 'date_format' ) ),\n\t\t\t\t'timestamp'   => $item->get_date( 'U' ),\n\t\t\t];\n\t\t}",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/meta-box/src/Dashboard/Dashboard.php",
+        "line": 294
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 294,
+          "expression": "$items = array_map( function ( $item ): array {\n\t\t\treturn [\n\t\t\t\t'url'         => $item->get_permalink(),\n\t\t\t\t'title'       => $item->get_title(),\n\t\t\t\t'description' => $item->get_description(),\n\t\t\t\t'content'     => $item->get_content(),\n\t\t\t\t'date'        => $item->get_date( get_option( 'date_format' ) ),\n\t\t\t\t'timestamp'   => $item->get_date( 'U' ),\n\t\t\t];\n\t\t}, $items )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$items = array_map( function ( $item ): array {\n\t\t\treturn [\n\t\t\t\t'url'         => $item->get_permalink(),\n\t\t\t\t'title'       => $item->get_title(),\n\t\t\t\t'description' => $item->get_description(),\n\t\t\t\t'content'     => $item->get_content(),\n\t\t\t\t'date'        => $item->get_date( get_option( 'date_format' ) ),\n\t\t\t\t'timestamp'   => $item->get_date( 'U' ),\n\t\t\t];\n\t\t}, $items )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/meta-box/src/Dashboard/Dashboard.php",
+        "line": 294
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "meta-box-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "meta-box",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$items = array_map( function ( $item ): array {\n\t\t\treturn [\n\t\t\t\t'url'         => $item->get_permalink(),\n\t\t\t\t'title'       => $item->get_title(),\n\t\t\t\t'description' => $item->get_description(),\n\t\t\t\t'content'     => $item->get_content(),\n\t\t\t\t'date'        => $item->get_date( get_option( 'date_format' ) ),\n\t\t\t\t'timestamp'   => $item->get_date( 'U' ),\n\t\t\t];\n\t\t}, $items )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/meta-box/src/Dashboard/Dashboard.php",
+        "line": 294
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 294,
+          "expression": "$items = array_map( function ( $item ): array {\n\t\t\treturn [\n\t\t\t\t'url'         => $item->get_permalink(),\n\t\t\t\t'title'       => $item->get_title(),\n\t\t\t\t'description' => $item->get_description(),\n\t\t\t\t'content'     => $item->get_content(),\n\t\t\t\t'date'        => $item->get_date( get_option( 'date_format' ) ),\n\t\t\t\t'timestamp'   => $item->get_date( 'U' ),\n\t\t\t];\n\t\t}, $items )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 305,
+          "expression": "wp_send_json_success( $items )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $items )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/meta-box/src/Dashboard/Dashboard.php",
+        "line": 305
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/meta-box/inc/fields/icon.php",
+      "start": {
+        "line": 24,
+        "col": 4,
+        "offset": 742
+      },
+      "end": {
+        "line": 24,
+        "col": 40,
+        "offset": 778
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/meta-box/inc/fields/icon.php",
+      "start": {
+        "line": 39,
+        "col": 3,
+        "offset": 1292
+      },
+      "end": {
+        "line": 39,
+        "col": 55,
+        "offset": 1344
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/meta-box/inc/fields/post.php",
+      "start": {
+        "line": 122,
+        "col": 3,
+        "offset": 3611
+      },
+      "end": {
+        "line": 122,
+        "col": 42,
+        "offset": 3650
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/meta-box/inc/fields/user.php",
+      "start": {
+        "line": 126,
+        "col": 3,
+        "offset": 3329
+      },
+      "end": {
+        "line": 126,
+        "col": 42,
+        "offset": 3368
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/meta-box/src/Updater/Checker.php",
+      "start": {
+        "line": 173,
+        "col": 3,
+        "offset": 4378
+      },
+      "end": {
+        "line": 173,
+        "col": 56,
+        "offset": 4431
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 1,
+    "taint_high": 0,
+    "taint_total": 3,
+    "semgrep_error": 0,
+    "semgrep_warning": 5
+  }
+}

@@ -1,0 +1,649 @@
+{
+  "plugin": "amp",
+  "php_files_analyzed": 234,
+  "parse_errors": 0,
+  "total_flows": 11,
+  "by_severity": {
+    "high": 9,
+    "critical": 2
+  },
+  "by_vulnerability_class": {
+    "xss": 8,
+    "rce": 1,
+    "ssrf": 1,
+    "object_injection": 1
+  },
+  "flows": [
+    {
+      "flow_id": "amp-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$queried_object = get_post_meta( $post->ID, self::QUERIED_OBJECT_POST_META_KEY, true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/includes/validation/class-amp-validated-url-post-type.php",
+        "line": 2342
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2342,
+          "expression": "$queried_object = get_post_meta( $post->ID, self::QUERIED_OBJECT_POST_META_KEY, true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2353,
+          "expression": "$link = get_edit_user_link( $queried_object['id'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 2355,
+          "expression": "printf( '<a href=\"%s\">%s</a>', esc_url( $link ), esc_html__( 'Edit User', 'amp' ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf( '<a href=\"%s\">%s</a>', esc_url( $link ), esc_html__( 'Edit User', 'amp' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/includes/validation/class-amp-validated-url-post-type.php",
+        "line": 2355
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$stylesheets = get_post_meta( $post->ID, self::STYLESHEETS_POST_META_KEY, true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/includes/validation/class-amp-validated-url-post-type.php",
+        "line": 2426
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2426,
+          "expression": "$stylesheets = get_post_meta( $post->ID, self::STYLESHEETS_POST_META_KEY, true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2440,
+          "expression": "$stylesheets = json_decode( $stylesheets, true )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 2468,
+          "expression": "$pending_stylesheet_indices = array_keys( $stylesheets )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 2469,
+          "expression": "usort(\n\t\t\t$pending_stylesheet_indices,\n\t\t\tstatic function ( $a, $b ) use ( $stylesheets ) {\n\t\t\t\treturn $stylesheets[ $a ]['priority'] - $stylesheets[ $b ]['priority'];\n\t\t\t}\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "usort(\n\t\t\t$pending_stylesheet_indices,\n\t\t\tstatic function ( $a, $b ) use ( $stylesheets ) {\n\t\t\t\treturn $stylesheets[ $a ]['priority'] - $stylesheets[ $b ]['priority'];\n\t\t\t}\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/includes/validation/class-amp-validated-url-post-type.php",
+        "line": 2469
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "[\n\t\t\t\t\t'cookies'     => wp_unslash( $_COOKIE ), // phpcs:ignore WordPressVIPMinimum.Variables.RestrictedVariables.cache_constraints___COOKIE -- Pass along cookies so private pages and drafts can be accessed.\n\t\t\t\t\t'timeout'     => 15, // phpcs:ignore WordPressVIPMinimum.Performance.RemoteRequestTimeout.timeout_timeout -- Increase from default of 5 to give extra time for the plugin to identify the sources for any given validation errors.\n\t\t\t\t\t/** This filter is documented in wp-includes/class-wp-http-streams.php */\n\t\t\t\t\t'sslverify'   => apply_filters( 'https_local_ssl_verify', false ),\n\t\t\t\t\t'redirection' => 0, // Because we're in a loop for redirection.\n\t\t\t\t\t'headers'     => [\n\t\t\t\t\t\t'Cache-Control' => 'no-cache',\n\t\t\t\t\t],\n\t\t\t\t]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/includes/validation/class-amp-validation-manager.php",
+        "line": 2277
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2277,
+          "expression": "$r = wp_remote_get(\n\t\t\t\t$validation_url,\n\t\t\t\t[\n\t\t\t\t\t'cookies'     => wp_unslash( $_COOKIE ), // phpcs:ignore WordPressVIPMinimum.Variables.RestrictedVariables.cache_constraints___COOKIE -- Pass along cookies so private pages and drafts can be accessed.\n\t\t\t\t\t'timeout'     => 15, // phpcs:ignore WordPressVIPMinimum.Performance.RemoteRequestTimeout.timeout_timeout -- Increase from default of 5 to give extra time for the plugin to identify the sources for any given validation errors.\n\t\t\t\t\t/** This filter is documented in wp-includes/class-wp-http-streams.php */\n\t\t\t\t\t'sslverify'   => apply_filters( 'https_local_ssl_verify', false ),\n\t\t\t\t\t'redirection' => 0, // Because we're in a loop for redirection.\n\t\t\t\t\t'headers'     => [\n\t\t\t\t\t\t'Cache-Control' => 'no-cache',\n\t\t\t\t\t],\n\t\t\t\t]\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$r = wp_remote_get(\n\t\t\t\t$validation_url,\n\t\t\t\t[\n\t\t\t\t\t'cookies'     => wp_unslash( $_COOKIE ), // phpcs:ignore WordPressVIPMinimum.Variables.RestrictedVariables.cache_constraints___COOKIE -- Pass along cookies so private pages and drafts can be accessed.\n\t\t\t\t\t'timeout'     => 15, // phpcs:ignore WordPressVIPMinimum.Performance.RemoteRequestTimeout.timeout_timeout -- Increase from default of 5 to give extra time for the plugin to identify the sources for any given validation errors.\n\t\t\t\t\t/** This filter is documented in wp-includes/class-wp-http-streams.php */\n\t\t\t\t\t'sslverify'   => apply_filters( 'https_local_ssl_verify', false ),\n\t\t\t\t\t'redirection' => 0, // Because we're in a loop for redirection.\n\t\t\t\t\t'headers'     => [\n\t\t\t\t\t\t'Cache-Control' => 'no-cache',\n\t\t\t\t\t],\n\t\t\t\t]\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/includes/validation/class-amp-validation-manager.php",
+        "line": 2277
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 23
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 23,
+          "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 32,
+          "expression": "$alignwide_max = $content_max_width > 0 ? $content_max_width * 2 : 1920",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 75,
+          "expression": "echo sprintf( '%dpx', $alignwide_max );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf( '%dpx', $alignwide_max );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 75
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-xss-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 23
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 23,
+          "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 32,
+          "expression": "$alignwide_max = $content_max_width > 0 ? $content_max_width * 2 : 1920",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 77,
+          "expression": "echo sprintf( '%dpx', $alignwide_max );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf( '%dpx', $alignwide_max );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 77
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 23
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 23,
+          "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 32,
+          "expression": "$alignwide_max = $content_max_width > 0 ? $content_max_width * 2 : 1920",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 78,
+          "expression": "echo sprintf( '%dpx', $alignwide_max );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf( '%dpx', $alignwide_max );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 78
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-xss-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 23
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 23,
+          "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 32,
+          "expression": "$alignwide_max = $content_max_width > 0 ? $content_max_width * 2 : 1920",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 79,
+          "expression": "echo sprintf( '%dpx', $alignwide_max );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf( '%dpx', $alignwide_max );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 79
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-xss-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 23
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 23,
+          "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 32,
+          "expression": "$alignwide_max = $content_max_width > 0 ? $content_max_width * 2 : 1920",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 80,
+          "expression": "echo sprintf( '%dpx', $alignwide_max );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf( '%dpx', $alignwide_max );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 80
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-xss-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 23
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 23,
+          "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 115,
+          "expression": "echo sprintf( '%dpx', $content_max_width );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf( '%dpx', $content_max_width );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 115
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-xss-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$content_max_width = absint( $this->get( 'content_max_width' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/back-compat/templates-v0-3/style.php",
+        "line": 76
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 76,
+          "expression": "$content_max_width = absint( $this->get( 'content_max_width' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 78,
+          "expression": "echo sprintf( '%dpx', $content_max_width );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf( '%dpx', $content_max_width );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/back-compat/templates-v0-3/style.php",
+        "line": 78
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-obje-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "object_injection",
+      "source": {
+        "expression": "$cached_response = get_transient( $cache_key )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/src/RemoteRequest/CachedRemoteGetRequest.php",
+        "line": 112
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 112,
+          "expression": "$cached_response = get_transient( $cache_key )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 116,
+          "expression": "$cached_response = unserialize( $cached_response, [ CachedResponse::class, DateTimeImmutable::class ] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 116,
+          "expression": "$cached_response = unserialize( $cached_response, [ CachedResponse::class, DateTimeImmutable::class ] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$cached_response = unserialize( $cached_response, [ CachedResponse::class, DateTimeImmutable::class ] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/src/RemoteRequest/CachedRemoteGetRequest.php",
+        "line": 116
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ]
+}

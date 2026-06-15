@@ -1,0 +1,3805 @@
+{
+  "plugin_slug": "backwpup",
+  "priority_score": 203,
+  "metadata": {
+    "php_files": 4720,
+    "total_lines": 702668
+  },
+  "attack_surface_summary": "# Attack Surface: backwpup\n\n> Generated: 2026-06-15T02:06:19Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 1492,
+    "total_sinks": 955,
+    "total_sanitizers": 1682,
+    "direct_flows": 444,
+    "functions_with_sources": 748,
+    "functions_with_sinks": 628,
+    "files_analyzed": 4721,
+    "parse_errors": 1
+  },
+  "taint_flows": [
+    {
+      "flow_id": "backwpup-rce-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$status_filter = sanitize_text_field( wp_unslash( $_GET['status'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-jobs.php",
+        "line": 90
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 90,
+          "expression": "$status_filter = sanitize_text_field( wp_unslash( $_GET['status'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 92,
+          "expression": "$status_filter = $status_filter ? sanitize_text_field( $status_filter ) : ''",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 99,
+          "expression": "array_filter(\n\t\t\t$jobs,\n\t\t\tfunction ( $job_id ) use ( $status_filter ) {\n\t\t\t\tswitch ( $status_filter ) {\n\t\t\t\t\tcase 'disabled':\n\t\t\t\t\t\treturn empty( BackWPup_Option::get( $job_id, 'activetype', '' ) );\n\t\t\t\t}\n\t\t\t\treturn true;\n\t\t\t}\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_filter(\n\t\t\t$jobs,\n\t\t\tfunction ( $job_id ) use ( $status_filter ) {\n\t\t\t\tswitch ( $status_filter ) {\n\t\t\t\t\tcase 'disabled':\n\t\t\t\t\t\treturn empty( BackWPup_Option::get( $job_id, 'activetype', '' ) );\n\t\t\t\t}\n\t\t\t\treturn true;\n\t\t\t}\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-jobs.php",
+        "line": 99
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-rce-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$jobs = filter_input( INPUT_GET, 'jobs', FILTER_DEFAULT, FILTER_REQUIRE_ARRAY )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-jobs.php",
+        "line": 536
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 536,
+          "expression": "$jobs = filter_input( INPUT_GET, 'jobs', FILTER_DEFAULT, FILTER_REQUIRE_ARRAY )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 540,
+          "expression": "array_map( 'absint', $jobs )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map( 'absint', $jobs )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-jobs.php",
+        "line": 540
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo absint( $job_object->warnings );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-jobs.php",
+        "line": 911
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 911,
+          "expression": "echo absint( $job_object->warnings );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo absint( $job_object->warnings );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-jobs.php",
+        "line": 911
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backwpup-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo absint( $job_object->errors );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-jobs.php",
+        "line": 912
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 912,
+          "expression": "echo absint( $job_object->errors );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo absint( $job_object->errors );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-jobs.php",
+        "line": 912
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backwpup-xss-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$log_folder = get_site_option( 'backwpup_cfg_logfolder' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-jobs.php",
+        "line": 1117
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1117,
+          "expression": "$log_folder = get_site_option( 'backwpup_cfg_logfolder' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1118,
+          "expression": "$log_folder = BackWPup_File::get_absolute_path( $log_folder )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1125,
+          "expression": "$logfile       = self::get_logfile_path( $log_folder, $logfile_param )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1221,
+          "expression": "$data_ro_return = [\n\t\t\t'log_pos'          => strlen( $logfiledata ) + $logpos,\n\t\t\t'log_text'         => self::render_log_content( substr( $logfiledata, $startpos, $length ) ),\n\t\t\t'warning_count'    => $warnings,\n\t\t\t'error_count'      => $errors,\n\t\t\t'running_time'     => $runtime,\n\t\t\t'step_percent'     => $step_percent,\n\t\t\t'on_step'          => $onstep,\n\t\t\t'last_msg'         => $lastmsg,\n\t\t\t'last_error_msg'   => $lasterrormsg,\n\t\t\t'sub_step_percent' => $substep_percent,\n\t\t\t'restart_url'      => $restart_url,\n\t\t\t'job_done'         => $done,\n\t\t\t'step_done'        => $step_done,\n\t\t\t'step_todo'        => $step_todo,\n\t\t\t'substeps_todo'    => $substeps_todo,\n\t\t\t'substeps_done'    => $substeps_done,\n\t\t\t'job_id'           => $job_object->job['jobid'],\n\t\t]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 1241,
+          "expression": "wp_send_json( $data_ro_return )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json( $data_ro_return )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-jobs.php",
+        "line": 1241
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$current_url = add_query_arg( $_GET, $base_url )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-jobs.php",
+        "line": 1342
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1342,
+          "expression": "$current_url = add_query_arg( $_GET, $base_url )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1343,
+          "expression": "$current_url = remove_query_arg( [ '_wpnonce', '_wp_http_referer' ], $current_url )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1344,
+          "expression": "$current_url = add_query_arg( '_wpnonce', wp_create_nonce( self::LIST_NONCE_ACTION ), $current_url )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1346,
+          "expression": "wp_safe_redirect( $current_url )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( $current_url )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-jobs.php",
+        "line": 1346
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-xss-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$post = wp_unslash( $_POST )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-destination-rsc.php",
+        "line": 452
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 452,
+          "expression": "$post = wp_unslash( $_POST )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 457,
+          "expression": "$args['rscregion']   = isset( $post['rscregion'] ) ? sanitize_text_field( $post['rscregion'] ) : ''",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 498,
+          "expression": "echo BackWPupHelpers::component( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\t\t'form/select',\n\t\t\t\t[\n\t\t\t\t\t'name'       => 'rsccontainer',\n\t\t\t\t\t'identifier' => 'rsccontainer',\n\t\t\t\t\t'label'      => esc_html__( 'Container selection', 'backwpup' ),\n\t\t\t\t\t'withEmpty'  => false,\n\t\t\t\t\t'value'      => $args['rscselected'], // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\t\t\t'options'    => $mapped_containers, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\t\t]\n\t\t\t);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo BackWPupHelpers::component( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\t\t'form/select',\n\t\t\t\t[\n\t\t\t\t\t'name'       => 'rsccontainer',\n\t\t\t\t\t'identifier' => 'rsccontainer',\n\t\t\t\t\t'label'      => esc_html__( 'Container selection', 'backwpup' ),\n\t\t\t\t\t'withEmpty'  => false,\n\t\t\t\t\t'value'      => $args['rscselected'], // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\t\t\t'options'    => $mapped_containers, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\t\t]\n\t\t\t);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-destination-rsc.php",
+        "line": 498
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-open-002",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$post_anchor        = isset( $_POST['anchor'] ) ? sanitize_text_field( wp_unslash( $_POST['anchor'] ) ) : null",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-admin.php",
+        "line": 856
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 856,
+          "expression": "$post_anchor        = isset( $_POST['anchor'] ) ? sanitize_text_field( wp_unslash( $_POST['anchor'] ) ) : null",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 914,
+          "expression": "wp_safe_redirect( add_query_arg( $query_args, network_admin_url( 'admin.php' ) ) . $post_anchor )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( add_query_arg( $query_args, network_admin_url( 'admin.php' ) ) . $post_anchor )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-admin.php",
+        "line": 914
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$jobs = get_option( 'backwpup_jobs', [] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-migrate.php",
+        "line": 18
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 18,
+          "expression": "$jobs = get_option( 'backwpup_jobs', [] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 24,
+          "expression": "$cron_jobs    = array_filter( $jobs, fn( $job ) => isset( $job['cron'] ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$cron_jobs    = array_filter( $jobs, fn( $job ) => isset( $job['cron'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-migrate.php",
+        "line": 24
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backwpup-rce-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$list = get_site_option( $key, [] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-destinations.php",
+        "line": 199
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 199,
+          "expression": "$list = get_site_option( $key, [] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 202,
+          "expression": "$files = array_filter( (array) $list )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$files = array_filter( (array) $list )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-destinations.php",
+        "line": 202
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backwpup-xss-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$msazure_selected = filter_input(\n\t\t\tINPUT_POST,\n\t\t\t'msazureselected'\n\t\t) ?: ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-destination-msazure.php",
+        "line": 482
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 482,
+          "expression": "$msazure_selected = filter_input(\n\t\t\tINPUT_POST,\n\t\t\t'msazureselected'\n\t\t) ?: ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 494,
+          "expression": "$args['msazureselected']                                  = $msazure_selected",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 530,
+          "expression": "echo BackWPupHelpers::component( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\t\t'form/select',\n\t\t\t\t[\n\t\t\t\t\t'name'       => 'msazurecontainer',\n\t\t\t\t\t'identifier' => 'msazurecontainer',\n\t\t\t\t\t'label'      => esc_html__( 'Bucket selection', 'backwpup' ),\n\t\t\t\t\t'withEmpty'  => false,\n\t\t\t\t\t'value'      => $args['msazureselected'], // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\t\t\t'options'    => $containers_list, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\t\t]\n\t\t\t\t);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo BackWPupHelpers::component( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\t\t'form/select',\n\t\t\t\t[\n\t\t\t\t\t'name'       => 'msazurecontainer',\n\t\t\t\t\t'identifier' => 'msazurecontainer',\n\t\t\t\t\t'label'      => esc_html__( 'Bucket selection', 'backwpup' ),\n\t\t\t\t\t'withEmpty'  => false,\n\t\t\t\t\t'value'      => $args['msazureselected'], // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\t\t\t'options'    => $containers_list, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped\n\t\t\t\t]\n\t\t\t\t);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-destination-msazure.php",
+        "line": 530
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-xss-006",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args['s3base_signature'] = sanitize_text_field($_POST['s3base_signature'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-destination-s3.php",
+        "line": 71
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 71,
+          "expression": "$args['s3base_signature'] = sanitize_text_field($_POST['s3base_signature'])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 76,
+          "expression": "$args['s3region'] = $args['s3base_url']",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 145,
+          "expression": "echo BackWPupHelpers::component(\"form/select\", [\n\t\t\t\t\t\t\"name\" => \"s3bucket\",\n\t\t\t\t\t\t\"identifier\" => \"s3bucket\",\n\t\t\t\t\t\t\"label\" => __(\"Bucket selection\", 'backwpup'),\n\t\t\t\t\t\t\"withEmpty\" => false,\n\t\t\t\t\t\t\"value\" => $args['s3bucketselected'],\n\t\t\t\t\t\t\"options\" => $mappedBuckets,\n\t\t\t\t\t]);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo BackWPupHelpers::component(\"form/select\", [\n\t\t\t\t\t\t\"name\" => \"s3bucket\",\n\t\t\t\t\t\t\"identifier\" => \"s3bucket\",\n\t\t\t\t\t\t\"label\" => __(\"Bucket selection\", 'backwpup'),\n\t\t\t\t\t\t\"withEmpty\" => false,\n\t\t\t\t\t\t\"value\" => $args['s3bucketselected'],\n\t\t\t\t\t\t\"options\" => $mappedBuckets,\n\t\t\t\t\t]);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-destination-s3.php",
+        "line": 145
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-rce-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$id           = intval( $id )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-option.php",
+        "line": 453
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 453,
+          "expression": "$id           = intval( $id )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 457,
+          "expression": "$filtered_jobs = array_filter( $jobs_options, fn( $job ) => ( $job['jobid'] ?? null ) !== $id )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$filtered_jobs = array_filter( $jobs_options, fn( $job ) => ( $job['jobid'] ?? null ) !== $id )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-option.php",
+        "line": 457
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backwpup-rce-006",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$request_backup_files = filter_input( INPUT_GET, 'backupfiles', FILTER_DEFAULT, FILTER_REQUIRE_ARRAY )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-backups.php",
+        "line": 530
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 530,
+          "expression": "$request_backup_files = filter_input( INPUT_GET, 'backupfiles', FILTER_DEFAULT, FILTER_REQUIRE_ARRAY )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 534,
+          "expression": "$request_backup_files = array_map( 'sanitize_text_field', wp_unslash( $request_backup_files ) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 534,
+          "expression": "$request_backup_files = array_map( 'sanitize_text_field', wp_unslash( $request_backup_files ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$request_backup_files = array_map( 'sanitize_text_field', wp_unslash( $request_backup_files ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-backups.php",
+        "line": 534
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-open-003",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$current_url = add_query_arg( $_GET, $base_url )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-backups.php",
+        "line": 853
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 853,
+          "expression": "$current_url = add_query_arg( $_GET, $base_url )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 854,
+          "expression": "$current_url = remove_query_arg( [ '_wpnonce', '_wp_http_referer' ], $current_url )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 855,
+          "expression": "$current_url = add_query_arg( '_wpnonce', wp_create_nonce( self::LIST_NONCE_ACTION ), $current_url )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 857,
+          "expression": "wp_safe_redirect( $current_url )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( $current_url )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-backups.php",
+        "line": 857
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-rce-007",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$default_id_job_files    = get_site_option( Plugin::FILES_JOB_ID, false )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-onboarding.php",
+        "line": 46
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 46,
+          "expression": "$default_id_job_files    = get_site_option( Plugin::FILES_JOB_ID, false )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 66,
+          "expression": "$job_frequency = [\n\t\t\t'files'    => array_merge(\n\t\t\t\t$first_backup_job_data,\n\t\t\t\t[\n\t\t\t\t\t'job_id'    => $default_id_job_files,\n\t\t\t\t\t'frequency' => $files_job_frequency,\n\t\t\t\t\t'type'      => BackWPup_JobTypes::$type_job_files,\n\t\t\t\t\t'activ'     => $files_job_status,\n\t\t\t\t\t'cron'      => $files_cron_value,\n\t\t\t\t\t'tempjob'   => false,\n\t\t\t\t]\n\t\t\t\t),\n\t\t\t'database' => array_merge(\n\t\t\t\t$first_backup_job_data,\n\t\t\t\t[\n\t\t\t\t\t'job_id'    => $default_id_job_database,\n\t\t\t\t\t'frequency' => $database_job_frequency,\n\t\t\t\t\t'type'      => BackWPup_JobTypes::$type_job_database,\n\t\t\t\t\t'activ'     => $database_job_status,\n\t\t\t\t\t'cron'      => $db_cron_value,\n\t\t\t\t\t'tempjob'   => false,\n\t\t\t\t]\n\t\t\t\t),\n\t\t]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 91,
+          "expression": "$mixed_data_type = array_filter( array_column( $job_frequency, 'activ' ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$mixed_data_type = array_filter( array_column( $job_frequency, 'activ' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-onboarding.php",
+        "line": 91
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backwpup-rce-008",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "wp_unslash( $value )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-onboarding.php",
+        "line": 209
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 209,
+          "expression": "$sanitized_data[ $key ] = array_map( 'sanitize_text_field', wp_unslash( $value ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$sanitized_data[ $key ] = array_map( 'sanitize_text_field', wp_unslash( $value ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-onboarding.php",
+        "line": 209
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backwpup-rce-009",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "trim( (string) sanitize_text_field( wp_unslash( $_POST['jobrunauthkey'] ) ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-settings.php",
+        "line": 527
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 527,
+          "expression": "$new_options['backwpup_cfg_jobrunauthkey'] = preg_replace( '/[^a-zA-Z0-9]/', '', trim( (string) sanitize_text_field( wp_unslash( $_POST['jobrunauthkey'] ) ) ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$new_options['backwpup_cfg_jobrunauthkey'] = preg_replace( '/[^a-zA-Z0-9]/', '', trim( (string) sanitize_text_field( wp_unslash( $_POST['jobrunauthkey'] ) ) ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-settings.php",
+        "line": 527
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backwpup-xss-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "backwpup",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo absint(\n\t\t\t\t\t\t\t\t\t\tget_site_option( 'backwpup_cfg_maxlogs' )\n\t\t\t\t\t\t\t\t\t\t\t\t);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-settings.php",
+        "line": 698
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 698,
+          "expression": "echo absint(\n\t\t\t\t\t\t\t\t\t\tget_site_option( 'backwpup_cfg_maxlogs' )\n\t\t\t\t\t\t\t\t\t\t\t\t);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo absint(\n\t\t\t\t\t\t\t\t\t\tget_site_option( 'backwpup_cfg_maxlogs' )\n\t\t\t\t\t\t\t\t\t\t\t\t);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-settings.php",
+        "line": 698
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backwpup-xss-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "backwpup",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo absint( get_site_option( 'backwpup_cfg_jobstepretry' ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-settings.php",
+        "line": 784
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 784,
+          "expression": "echo absint( get_site_option( 'backwpup_cfg_jobstepretry' ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo absint( get_site_option( 'backwpup_cfg_jobstepretry' ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-settings.php",
+        "line": 784
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backwpup-xss-009",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "backwpup",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo absint( get_site_option( 'backwpup_cfg_jobmaxexecutiontime' ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-settings.php",
+        "line": 798
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 798,
+          "expression": "echo absint( get_site_option( 'backwpup_cfg_jobmaxexecutiontime' ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo absint( get_site_option( 'backwpup_cfg_jobmaxexecutiontime' ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-settings.php",
+        "line": 798
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backwpup-xss-010",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "backwpup",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$authentication = get_site_option(\n\t\t\t\t\t'backwpup_cfg_authentication',\n\t\t\t\t\t[\n\t\t\t\t\t\t'method'         => '',\n\t\t\t\t\t\t'basic_user'     => '',\n\t\t\t\t\t\t'basic_password' => '',\n\t\t\t\t\t\t'user_id'        => 0,\n\t\t\t\t\t\t'query_arg'      => '',\n\t\t\t\t\t]\n\t\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-settings.php",
+        "line": 1004
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1004,
+          "expression": "$authentication = get_site_option(\n\t\t\t\t\t'backwpup_cfg_authentication',\n\t\t\t\t\t[\n\t\t\t\t\t\t'method'         => '',\n\t\t\t\t\t\t'basic_user'     => '',\n\t\t\t\t\t\t'basic_password' => '',\n\t\t\t\t\t\t'user_id'        => 0,\n\t\t\t\t\t\t'query_arg'      => '',\n\t\t\t\t\t]\n\t\t\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1150,
+          "expression": "echo '<option value=\"' . esc_attr( $user->ID ) . '\" ' . selected(\n\t\t\t\t\t\t\t\t\t\t\t\t\t$authentication['user_id'],\n\t\t\t\t\t\t\t\t\t\t\t\t\t$user->ID,\n\t\t\t\t\t\t\t\t\t\t\t\t\tfalse\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t) . '>' . esc_html( $user->display_name ) . '</option>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<option value=\"' . esc_attr( $user->ID ) . '\" ' . selected(\n\t\t\t\t\t\t\t\t\t\t\t\t\t$authentication['user_id'],\n\t\t\t\t\t\t\t\t\t\t\t\t\t$user->ID,\n\t\t\t\t\t\t\t\t\t\t\t\t\tfalse\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t) . '>' . esc_html( $user->display_name ) . '</option>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-settings.php",
+        "line": 1150
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backwpup-xss-011",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "backwpup",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$server_name  = isset( $_SERVER['SERVER_NAME'] ) ? sanitize_text_field( wp_unslash( $_SERVER['SERVER_NAME'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-message-box.php",
+        "line": 89
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 89,
+          "expression": "$server_name  = isset( $_SERVER['SERVER_NAME'] ) ? sanitize_text_field( wp_unslash( $_SERVER['SERVER_NAME'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 91,
+          "expression": "$base_url     = '//' . $server_name . $request_uri",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 93,
+          "expression": "$url          = add_query_arg(\n\t\t\t[ 'backwpup_msg_' . $this->box_id => 1 ],\n\t\t\t$base_url\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 97,
+          "expression": "$url          = wp_nonce_url( $url, $nonce_action )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 101,
+          "expression": "echo esc_url( $url );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $url );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-message-box.php",
+        "line": 101
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backwpup-xss-012",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo '<td><span style=\"color:#e66f00;\">' . sprintf( esc_html__( 'working since %d seconds', 'backwpup' ), absint( $runtime ) ) . '</span></td>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-backwpup.php",
+        "line": 307
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 307,
+          "expression": "echo '<td><span style=\"color:#e66f00;\">' . sprintf( esc_html__( 'working since %d seconds', 'backwpup' ), absint( $runtime ) ) . '</span></td>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<td><span style=\"color:#e66f00;\">' . sprintf( esc_html__( 'working since %d seconds', 'backwpup' ), absint( $runtime ) ) . '</span></td>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-backwpup.php",
+        "line": 307
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backwpup-rce-010",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "wp_unslash( $_GET['logfiles'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-logs.php",
+        "line": 382
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 382,
+          "expression": "$logfiles = array_map( 'sanitize_text_field', wp_unslash( $_GET['logfiles'] ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$logfiles = array_map( 'sanitize_text_field', wp_unslash( $_GET['logfiles'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-logs.php",
+        "line": 382
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-rce-011",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$post_data = wp_unslash( $_POST )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 51
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 51,
+          "expression": "$post_data = wp_unslash( $_POST )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 63,
+          "expression": "$type_post = isset( $post_data['type'] ) ? (array) $post_data['type'] : []",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 64,
+          "expression": "$type_post = array_map( 'sanitize_text_field', $type_post )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 64,
+          "expression": "$type_post = array_map( 'sanitize_text_field', $type_post )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$type_post = array_map( 'sanitize_text_field', $type_post )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 64
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-rce-012",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$post_data = wp_unslash( $_POST )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 51
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 51,
+          "expression": "$post_data = wp_unslash( $_POST )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 178,
+          "expression": "$cronminutes = isset( $post_data['cronminutes'] ) ? (array) $post_data['cronminutes'] : []",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 179,
+          "expression": "$cronminutes = array_map( 'sanitize_text_field', $cronminutes )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 179,
+          "expression": "$cronminutes = array_map( 'sanitize_text_field', $cronminutes )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$cronminutes = array_map( 'sanitize_text_field', $cronminutes )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 179
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-rce-013",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$post_data = wp_unslash( $_POST )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 51
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 51,
+          "expression": "$post_data = wp_unslash( $_POST )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 180,
+          "expression": "$cronhours   = isset( $post_data['cronhours'] ) ? (array) $post_data['cronhours'] : []",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 181,
+          "expression": "$cronhours   = array_map( 'sanitize_text_field', $cronhours )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 181,
+          "expression": "$cronhours   = array_map( 'sanitize_text_field', $cronhours )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$cronhours   = array_map( 'sanitize_text_field', $cronhours )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 181
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-rce-014",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$post_data = wp_unslash( $_POST )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 51
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 51,
+          "expression": "$post_data = wp_unslash( $_POST )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 182,
+          "expression": "$cronmday    = isset( $post_data['cronmday'] ) ? (array) $post_data['cronmday'] : []",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 183,
+          "expression": "$cronmday    = array_map( 'sanitize_text_field', $cronmday )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 183,
+          "expression": "$cronmday    = array_map( 'sanitize_text_field', $cronmday )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$cronmday    = array_map( 'sanitize_text_field', $cronmday )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 183
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-rce-015",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$post_data = wp_unslash( $_POST )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 51
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 51,
+          "expression": "$post_data = wp_unslash( $_POST )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 184,
+          "expression": "$cronmon     = isset( $post_data['cronmon'] ) ? (array) $post_data['cronmon'] : []",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 185,
+          "expression": "$cronmon     = array_map( 'sanitize_text_field', $cronmon )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 185,
+          "expression": "$cronmon     = array_map( 'sanitize_text_field', $cronmon )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$cronmon     = array_map( 'sanitize_text_field', $cronmon )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 185
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-rce-016",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$post_data = wp_unslash( $_POST )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 51
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 51,
+          "expression": "$post_data = wp_unslash( $_POST )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 186,
+          "expression": "$cronwday    = isset( $post_data['cronwday'] ) ? (array) $post_data['cronwday'] : []",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 187,
+          "expression": "$cronwday    = array_map( 'sanitize_text_field', $cronwday )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 187,
+          "expression": "$cronwday    = array_map( 'sanitize_text_field', $cronwday )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$cronwday    = array_map( 'sanitize_text_field', $cronwday )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 187
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-xss-013",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "backwpup",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$tab_url = wp_nonce_url( network_admin_url( 'admin.php?page=backwpupeditjob&tab=' . rawurlencode( $id ) . '&jobid=' . absint( $jobid ) ), 'edit-job' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 448
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 448,
+          "expression": "$tab_url = wp_nonce_url( network_admin_url( 'admin.php?page=backwpupeditjob&tab=' . rawurlencode( $id ) . '&jobid=' . absint( $jobid ) ), 'edit-job' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 449,
+          "expression": "echo '<a href=\"' . esc_url( $tab_url ) . '\" class=\"nav-tab' . esc_attr( $addclass ) . '\" id=\"tab-' . esc_attr( $id ) . '\" data-nexttab=\"' . esc_attr( $id ) . '\" style=' . esc_attr( $display ) . '>' . esc_html( $tab_data['name'] ) . '</a>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<a href=\"' . esc_url( $tab_url ) . '\" class=\"nav-tab' . esc_attr( $addclass ) . '\" id=\"tab-' . esc_attr( $id ) . '\" data-nexttab=\"' . esc_attr( $id ) . '\" style=' . esc_attr( $display ) . '>' . esc_html( $tab_data['name'] ) . '</a>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 449
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backwpup-rce-017",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$post_data   = wp_unslash( $_POST )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 1017
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1017,
+          "expression": "$post_data   = wp_unslash( $_POST )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1018,
+          "expression": "$cronminutes = isset( $post_data['cronminutes'] ) ? (array) $post_data['cronminutes'] : []",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1019,
+          "expression": "$cronminutes = array_map( 'sanitize_text_field', $cronminutes )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1019,
+          "expression": "$cronminutes = array_map( 'sanitize_text_field', $cronminutes )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$cronminutes = array_map( 'sanitize_text_field', $cronminutes )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 1019
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-rce-018",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$post_data   = wp_unslash( $_POST )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 1017
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1017,
+          "expression": "$post_data   = wp_unslash( $_POST )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1020,
+          "expression": "$cronhours   = isset( $post_data['cronhours'] ) ? (array) $post_data['cronhours'] : []",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1021,
+          "expression": "$cronhours   = array_map( 'sanitize_text_field', $cronhours )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1021,
+          "expression": "$cronhours   = array_map( 'sanitize_text_field', $cronhours )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$cronhours   = array_map( 'sanitize_text_field', $cronhours )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 1021
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-rce-019",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$post_data   = wp_unslash( $_POST )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 1017
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1017,
+          "expression": "$post_data   = wp_unslash( $_POST )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1022,
+          "expression": "$cronmday    = isset( $post_data['cronmday'] ) ? (array) $post_data['cronmday'] : []",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1023,
+          "expression": "$cronmday    = array_map( 'sanitize_text_field', $cronmday )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1023,
+          "expression": "$cronmday    = array_map( 'sanitize_text_field', $cronmday )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$cronmday    = array_map( 'sanitize_text_field', $cronmday )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 1023
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-rce-020",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$post_data   = wp_unslash( $_POST )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 1017
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1017,
+          "expression": "$post_data   = wp_unslash( $_POST )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1024,
+          "expression": "$cronmon     = isset( $post_data['cronmon'] ) ? (array) $post_data['cronmon'] : []",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1025,
+          "expression": "$cronmon     = array_map( 'sanitize_text_field', $cronmon )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1025,
+          "expression": "$cronmon     = array_map( 'sanitize_text_field', $cronmon )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$cronmon     = array_map( 'sanitize_text_field', $cronmon )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 1025
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-rce-021",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$post_data   = wp_unslash( $_POST )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 1017
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1017,
+          "expression": "$post_data   = wp_unslash( $_POST )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1026,
+          "expression": "$cronwday    = isset( $post_data['cronwday'] ) ? (array) $post_data['cronwday'] : []",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1027,
+          "expression": "$cronwday    = array_map( 'sanitize_text_field', $cronwday )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1027,
+          "expression": "$cronwday    = array_map( 'sanitize_text_field', $cronwday )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$cronwday    = array_map( 'sanitize_text_field', $cronwday )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 1027
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-xss-014",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo '<span class=\"bwu-message-error\">' . sprintf( esc_html__( 'ATTENTION: Job runs every %d minutes!', 'backwpup' ), absint( $repeatmins ) ) . '</span><br />';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 1085
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1085,
+          "expression": "echo '<span class=\"bwu-message-error\">' . sprintf( esc_html__( 'ATTENTION: Job runs every %d minutes!', 'backwpup' ), absint( $repeatmins ) ) . '</span><br />';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<span class=\"bwu-message-error\">' . sprintf( esc_html__( 'ATTENTION: Job runs every %d minutes!', 'backwpup' ), absint( $repeatmins ) ) . '</span><br />';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-page-editjob.php",
+        "line": 1085
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-rce-022",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$list = get_site_transient( 'backwpup_' . strtolower( $jobdest ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-destination-sugarsync.php",
+        "line": 138
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 138,
+          "expression": "$list = get_site_transient( 'backwpup_' . strtolower( $jobdest ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 160,
+          "expression": "array_filter( $list )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_filter( $list )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/inc/class-destination-sugarsync.php",
+        "line": 160
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backwpup-xss-015",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "backwpup",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$job_url = wp_nonce_url(\n\t\t\tadd_query_arg(\n\t\t\t\t[\n\t\t\t\t\t'page'  => 'backwpupeditjob',\n\t\t\t\t\t'tab'   => 'dest-dropbox',\n\t\t\t\t\t'jobid' => absint( $job_id ),\n\t\t\t\t],\n\t\t\t\tnetwork_admin_url( 'admin.php' )\n\t\t\t),\n\t\t\t'edit-job'\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/views/notice/dropbox.php",
+        "line": 19
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 19,
+          "expression": "$job_url = wp_nonce_url(\n\t\t\tadd_query_arg(\n\t\t\t\t[\n\t\t\t\t\t'page'  => 'backwpupeditjob',\n\t\t\t\t\t'tab'   => 'dest-dropbox',\n\t\t\t\t\t'jobid' => absint( $job_id ),\n\t\t\t\t],\n\t\t\t\tnetwork_admin_url( 'admin.php' )\n\t\t\t),\n\t\t\t'edit-job'\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 32,
+          "expression": "echo esc_url( $job_url );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $job_url );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/views/notice/dropbox.php",
+        "line": 32
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backwpup-rce-023",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$args = ! empty( $_GET ) ? $_GET : []",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/src/Admin/Notices/Notices.php",
+        "line": 189
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 189,
+          "expression": "$args = ! empty( $_GET ) ? $_GET : []",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 200,
+          "expression": "$actual = array_merge( (array) $actual, [ $args['box'] ] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 201,
+          "expression": "$actual = array_filter( $actual )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 201,
+          "expression": "$actual = array_filter( $actual )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$actual = array_filter( $actual )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/src/Admin/Notices/Notices.php",
+        "line": 201
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "backwpup-rce-024",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "backwpup",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$jobs = get_option( 'backwpup_jobs', [] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/src/Admin/Notices/Notices/Notice513.php",
+        "line": 50
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 50,
+          "expression": "$jobs = get_option( 'backwpup_jobs', [] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 54,
+          "expression": "$legacy_disabled_jobs = array_filter(\n\t\t\t\t$jobs,\n\t\t\t\tfn( $job ) => isset( $job['legacy'] ) && true === $job['legacy'] && ( ! isset( $job['activetype'] ) || empty( $job['activetype'] ) )\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$legacy_disabled_jobs = array_filter(\n\t\t\t\t$jobs,\n\t\t\t\tfn( $job ) => isset( $job['legacy'] ) && true === $job['legacy'] && ( ! isset( $job['activetype'] ) || empty( $job['activetype'] ) )\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/backwpup/src/Admin/Notices/Notices/Notice513.php",
+        "line": 54
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/backwpup/inc/BackWPup.php",
+      "start": {
+        "line": 153,
+        "col": 3,
+        "offset": 3968
+      },
+      "end": {
+        "line": 153,
+        "col": 72,
+        "offset": 4037
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/backwpup/inc/class-admin.php",
+      "start": {
+        "line": 496,
+        "col": 5,
+        "offset": 13776
+      },
+      "end": {
+        "line": 496,
+        "col": 141,
+        "offset": 13912
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/backwpup/inc/class-admin.php",
+      "start": {
+        "line": 496,
+        "col": 5,
+        "offset": 13776
+      },
+      "end": {
+        "line": 496,
+        "col": 142,
+        "offset": 13913
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/backwpup/inc/class-admin.php",
+      "start": {
+        "line": 511,
+        "col": 5,
+        "offset": 14393
+      },
+      "end": {
+        "line": 511,
+        "col": 153,
+        "offset": 14541
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/backwpup/inc/class-admin.php",
+      "start": {
+        "line": 511,
+        "col": 5,
+        "offset": 14393
+      },
+      "end": {
+        "line": 511,
+        "col": 154,
+        "offset": 14542
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/backwpup/inc/class-cron.php",
+      "start": {
+        "line": 250,
+        "col": 4,
+        "offset": 6866
+      },
+      "end": {
+        "line": 250,
+        "col": 85,
+        "offset": 6947
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/backwpup/inc/class-cron.php",
+      "start": {
+        "line": 620,
+        "col": 3,
+        "offset": 19024
+      },
+      "end": {
+        "line": 620,
+        "col": 86,
+        "offset": 19107
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/backwpup/inc/class-encryption-fallback.php",
+      "start": {
+        "line": 39,
+        "col": 3,
+        "offset": 1182
+      },
+      "end": {
+        "line": 39,
+        "col": 46,
+        "offset": 1225
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/backwpup/inc/class-encryption-mcrypt.php",
+      "start": {
+        "line": 48,
+        "col": 3,
+        "offset": 1362
+      },
+      "end": {
+        "line": 48,
+        "col": 48,
+        "offset": 1407
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/backwpup/inc/class-encryption-mcrypt.php",
+      "start": {
+        "line": 131,
+        "col": 3,
+        "offset": 3984
+      },
+      "end": {
+        "line": 131,
+        "col": 28,
+        "offset": 4009
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/backwpup/inc/class-encryption-mcrypt.php",
+      "start": {
+        "line": 133,
+        "col": 3,
+        "offset": 4013
+      },
+      "end": {
+        "line": 135,
+        "col": 91,
+        "offset": 4244
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/backwpup/inc/class-encryption-openssl.php",
+      "start": {
+        "line": 50,
+        "col": 3,
+        "offset": 1095
+      },
+      "end": {
+        "line": 50,
+        "col": 46,
+        "offset": 1138
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-openssl-random-pseudo-not-strong",
+      "path": "plugins/src/backwpup/inc/class-encryption-openssl.php",
+      "start": {
+        "line": 76,
+        "col": 3,
+        "offset": 1624
+      },
+      "end": {
+        "line": 76,
+        "col": 104,
+        "offset": 1725
+      },
+      "extra": {
+        "message": "openssl_random_pseudo_bytes() without checking the $crypto_strong output parameter may return non-cryptographically-strong bytes on some systems. Always check the second argument or prefer random_bytes() which throws on failure.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-338",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/backwpup/inc/class-install.php",
+      "start": {
+        "line": 42,
+        "col": 5,
+        "offset": 1279
+      },
+      "end": {
+        "line": 42,
+        "col": 173,
+        "offset": 1447
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/backwpup/inc/class-job.php",
+      "start": {
+        "line": 1940,
+        "col": 4,
+        "offset": 59425
+      },
+      "end": {
+        "line": 1940,
+        "col": 99,
+        "offset": 59520
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/backwpup/inc/class-jobtype-wpexp.php",
+      "start": {
+        "line": 194,
+        "col": 5,
+        "offset": 8187
+      },
+      "end": {
+        "line": 194,
+        "col": 91,
+        "offset": 8273
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/backwpup/inc/class-jobtype-wpexp.php",
+      "start": {
+        "line": 392,
+        "col": 6,
+        "offset": 19118
+      },
+      "end": {
+        "line": 392,
+        "col": 73,
+        "offset": 19185
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-rce-assert-variable",
+      "path": "plugins/src/backwpup/inc/dependencies/inpsyde/plugin-environment-checker/src/EnvironmentChecker.php",
+      "start": {
+        "line": 38,
+        "col": 4,
+        "offset": 934
+      },
+      "end": {
+        "line": 38,
+        "col": 55,
+        "offset": 985
+      },
+      "extra": {
+        "message": "Passing a variable to assert() can execute arbitrary code (RCE). Do not pass user-controlled or dynamic strings to assert().\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "rce",
+          "cwe": "CWE-94",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Admin/Chatbot/API/ChatbotRest.php",
+      "start": {
+        "line": 50,
+        "col": 3,
+        "offset": 956
+      },
+      "end": {
+        "line": 75,
+        "col": 5,
+        "offset": 1682
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/backwpup/src/Admin/Frontend/Subscriber.php",
+      "start": {
+        "line": 117,
+        "col": 4,
+        "offset": 3555
+      },
+      "end": {
+        "line": 117,
+        "col": 71,
+        "offset": 3622
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Admin/Messages/API/Rest.php",
+      "start": {
+        "line": 30,
+        "col": 3,
+        "offset": 722
+      },
+      "end": {
+        "line": 39,
+        "col": 5,
+        "offset": 985
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Backups/API/Rest.php",
+      "start": {
+        "line": 105,
+        "col": 3,
+        "offset": 2387
+      },
+      "end": {
+        "line": 122,
+        "col": 5,
+        "offset": 2871
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Backups/API/Rest.php",
+      "start": {
+        "line": 124,
+        "col": 3,
+        "offset": 2875
+      },
+      "end": {
+        "line": 150,
+        "col": 5,
+        "offset": 3665
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Backups/API/Rest.php",
+      "start": {
+        "line": 152,
+        "col": 3,
+        "offset": 3669
+      },
+      "end": {
+        "line": 175,
+        "col": 5,
+        "offset": 4354
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Backups/History/Frontend/API/Rest.php",
+      "start": {
+        "line": 67,
+        "col": 3,
+        "offset": 1856
+      },
+      "end": {
+        "line": 91,
+        "col": 5,
+        "offset": 2514
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Backups/History/Frontend/API/Rest.php",
+      "start": {
+        "line": 93,
+        "col": 3,
+        "offset": 2518
+      },
+      "end": {
+        "line": 117,
+        "col": 5,
+        "offset": 3183
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/backwpup/src/Common/ErrorSignals/ErrorSignalsContextStore.php",
+      "start": {
+        "line": 183,
+        "col": 4,
+        "offset": 4086
+      },
+      "end": {
+        "line": 189,
+        "col": 6,
+        "offset": 4325
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/backwpup/src/Common/ErrorSignals/ErrorSignalsStore.php",
+      "start": {
+        "line": 80,
+        "col": 4,
+        "offset": 2092
+      },
+      "end": {
+        "line": 80,
+        "col": 131,
+        "offset": 2219
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Frontend/API/Rest.php",
+      "start": {
+        "line": 50,
+        "col": 3,
+        "offset": 1160
+      },
+      "end": {
+        "line": 58,
+        "col": 5,
+        "offset": 1384
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Jobs/API/Rest.php",
+      "start": {
+        "line": 97,
+        "col": 3,
+        "offset": 2436
+      },
+      "end": {
+        "line": 130,
+        "col": 5,
+        "offset": 3573
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Jobs/API/Rest.php",
+      "start": {
+        "line": 132,
+        "col": 3,
+        "offset": 3577
+      },
+      "end": {
+        "line": 156,
+        "col": 5,
+        "offset": 4304
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Jobs/API/Rest.php",
+      "start": {
+        "line": 158,
+        "col": 3,
+        "offset": 4308
+      },
+      "end": {
+        "line": 175,
+        "col": 5,
+        "offset": 4813
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Jobs/API/Rest.php",
+      "start": {
+        "line": 177,
+        "col": 3,
+        "offset": 4817
+      },
+      "end": {
+        "line": 194,
+        "col": 5,
+        "offset": 5296
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Jobs/API/Rest.php",
+      "start": {
+        "line": 196,
+        "col": 3,
+        "offset": 5300
+      },
+      "end": {
+        "line": 204,
+        "col": 5,
+        "offset": 5542
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Jobs/API/Rest.php",
+      "start": {
+        "line": 206,
+        "col": 3,
+        "offset": 5546
+      },
+      "end": {
+        "line": 214,
+        "col": 5,
+        "offset": 5787
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Jobs/API/Rest.php",
+      "start": {
+        "line": 216,
+        "col": 3,
+        "offset": 5791
+      },
+      "end": {
+        "line": 287,
+        "col": 5,
+        "offset": 8574
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Jobs/API/Rest.php",
+      "start": {
+        "line": 289,
+        "col": 3,
+        "offset": 8578
+      },
+      "end": {
+        "line": 329,
+        "col": 5,
+        "offset": 9990
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Jobs/API/Rest.php",
+      "start": {
+        "line": 331,
+        "col": 3,
+        "offset": 9994
+      },
+      "end": {
+        "line": 341,
+        "col": 5,
+        "offset": 10323
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Jobs/API/Rest.php",
+      "start": {
+        "line": 346,
+        "col": 3,
+        "offset": 10362
+      },
+      "end": {
+        "line": 370,
+        "col": 5,
+        "offset": 11127
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/Jobs/Frontend/API/Rest.php",
+      "start": {
+        "line": 48,
+        "col": 3,
+        "offset": 1121
+      },
+      "end": {
+        "line": 56,
+        "col": 5,
+        "offset": 1344
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/StorageProviders/API/Rest.php",
+      "start": {
+        "line": 82,
+        "col": 3,
+        "offset": 2504
+      },
+      "end": {
+        "line": 90,
+        "col": 5,
+        "offset": 2755
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/StorageProviders/API/Rest.php",
+      "start": {
+        "line": 92,
+        "col": 3,
+        "offset": 2759
+      },
+      "end": {
+        "line": 100,
+        "col": 5,
+        "offset": 3003
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/StorageProviders/API/Rest.php",
+      "start": {
+        "line": 102,
+        "col": 3,
+        "offset": 3007
+      },
+      "end": {
+        "line": 110,
+        "col": 5,
+        "offset": 3249
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/StorageProviders/API/Rest.php",
+      "start": {
+        "line": 112,
+        "col": 3,
+        "offset": 3253
+      },
+      "end": {
+        "line": 120,
+        "col": 5,
+        "offset": 3496
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/StorageProviders/API/Rest.php",
+      "start": {
+        "line": 122,
+        "col": 3,
+        "offset": 3500
+      },
+      "end": {
+        "line": 130,
+        "col": 5,
+        "offset": 3764
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/backwpup/src/StorageProviders/Frontend/API/Rest.php",
+      "start": {
+        "line": 50,
+        "col": 3,
+        "offset": 1290
+      },
+      "end": {
+        "line": 58,
+        "col": 5,
+        "offset": 1531
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/backwpup/uninstall.php",
+      "start": {
+        "line": 41,
+        "col": 3,
+        "offset": 1497
+      },
+      "end": {
+        "line": 41,
+        "col": 91,
+        "offset": 1585
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/backwpup/uninstall.php",
+      "start": {
+        "line": 44,
+        "col": 3,
+        "offset": 1734
+      },
+      "end": {
+        "line": 44,
+        "col": 93,
+        "offset": 1824
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/backwpup/uninstall.php",
+      "start": {
+        "line": 48,
+        "col": 2,
+        "offset": 1940
+      },
+      "end": {
+        "line": 48,
+        "col": 90,
+        "offset": 2028
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 7,
+    "taint_high": 8,
+    "taint_total": 42,
+    "semgrep_error": 1,
+    "semgrep_warning": 48
+  }
+}

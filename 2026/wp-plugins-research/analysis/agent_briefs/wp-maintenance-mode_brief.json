@@ -1,0 +1,742 @@
+{
+  "plugin_slug": "wp-maintenance-mode",
+  "priority_score": 25,
+  "metadata": {
+    "php_files": 71,
+    "total_lines": 18257
+  },
+  "attack_surface_summary": "# Attack Surface: wp-maintenance-mode\n\n> Generated: 2026-06-15T02:06:29Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 491,
+    "total_sinks": 114,
+    "total_sanitizers": 435,
+    "direct_flows": 509,
+    "functions_with_sources": 103,
+    "functions_with_sinks": 73,
+    "files_analyzed": 71,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "wp-maintenance-mode-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "wp-maintenance-mode",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$protocol         = ! empty( $_SERVER['SERVER_PROTOCOL'] ) && in_array( $_SERVER['SERVER_PROTOCOL'], array( 'HTTP/1.1', 'HTTP/1.0' ), true ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode.php",
+        "line": 733
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 733,
+          "expression": "$protocol         = ! empty( $_SERVER['SERVER_PROTOCOL'] ) && in_array( $_SERVER['SERVER_PROTOCOL'], array( 'HTTP/1.1', 'HTTP/1.0' ), true ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 783,
+          "expression": "header( \"$protocol $status_code Service Unavailable\", true, $status_code )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "header( \"$protocol $status_code Service Unavailable\", true, $status_code )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode.php",
+        "line": 783
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-maintenance-mode-sqli-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-maintenance-mode",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$email   = isset( $_POST['email'] ) ? sanitize_email( $_POST['email'] ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode.php",
+        "line": 1334
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1334,
+          "expression": "$email   = isset( $_POST['email'] ) ? sanitize_email( $_POST['email'] ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1425,
+          "expression": "$wpdb->insert(\n\t\t\t\t\t\t$wpdb->prefix . 'wpmm_subscribers',\n\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t'email'       => sanitize_email( $email ),\n\t\t\t\t\t\t\t'insert_date' => date( 'Y-m-d H:i:s' ),\n\t\t\t\t\t\t),\n\t\t\t\t\t\tarray( '%s', '%s' )\n\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->insert(\n\t\t\t\t\t\t$wpdb->prefix . 'wpmm_subscribers',\n\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t'email'       => sanitize_email( $email ),\n\t\t\t\t\t\t\t'insert_date' => date( 'Y-m-d H:i:s' ),\n\t\t\t\t\t\t),\n\t\t\t\t\t\tarray( '%s', '%s' )\n\t\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode.php",
+        "line": 1425
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-maintenance-mode-sqli-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-maintenance-mode",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "array(\n\t\t\t\t\t\t\t'email'       => sanitize_email( $email ),\n\t\t\t\t\t\t\t'insert_date' => date( 'Y-m-d H:i:s' ),\n\t\t\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode.php",
+        "line": 1425
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1425,
+          "expression": "$wpdb->insert(\n\t\t\t\t\t\t$wpdb->prefix . 'wpmm_subscribers',\n\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t'email'       => sanitize_email( $email ),\n\t\t\t\t\t\t\t'insert_date' => date( 'Y-m-d H:i:s' ),\n\t\t\t\t\t\t),\n\t\t\t\t\t\tarray( '%s', '%s' )\n\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->insert(\n\t\t\t\t\t\t$wpdb->prefix . 'wpmm_subscribers',\n\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t'email'       => sanitize_email( $email ),\n\t\t\t\t\t\t\t'insert_date' => date( 'Y-m-d H:i:s' ),\n\t\t\t\t\t\t),\n\t\t\t\t\t\tarray( '%s', '%s' )\n\t\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode.php",
+        "line": 1425
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-maintenance-mode-rce-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-maintenance-mode",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$_POST['options']['general']['redirection'] = esc_url_raw( $_POST['options']['general']['redirection'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode-admin.php",
+        "line": 447
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 447,
+          "expression": "$_POST['options']['general']['redirection'] = esc_url_raw( $_POST['options']['general']['redirection'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 450,
+          "expression": "$exclude_array = explode( \"\\n\", $_POST['options']['general']['exclude'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 452,
+          "expression": "$_POST['options']['general']['exclude'] = array_filter( array_map( 'trim', $exclude_array ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$_POST['options']['general']['exclude'] = array_filter( array_map( 'trim', $exclude_array ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode-admin.php",
+        "line": 452
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-maintenance-mode-rce-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-maintenance-mode",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$_POST['options']['general']['redirection'] = esc_url_raw( $_POST['options']['general']['redirection'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode-admin.php",
+        "line": 447
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 447,
+          "expression": "$_POST['options']['general']['redirection'] = esc_url_raw( $_POST['options']['general']['redirection'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 450,
+          "expression": "$exclude_array = explode( \"\\n\", $_POST['options']['general']['exclude'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 452,
+          "expression": "$_POST['options']['general']['exclude'] = array_filter( array_map( 'trim', $exclude_array ) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 453,
+          "expression": "$_POST['options']['general']['exclude'] = array_map( 'sanitize_textarea_field', $_POST['options']['general']['exclude'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 453,
+          "expression": "$_POST['options']['general']['exclude'] = array_map( 'sanitize_textarea_field', $_POST['options']['general']['exclude'] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$_POST['options']['general']['exclude'] = array_map( 'sanitize_textarea_field', $_POST['options']['general']['exclude'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode-admin.php",
+        "line": 453
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-maintenance-mode-rce-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-maintenance-mode",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$_POST['options']['modules']['countdown_start']   = sanitize_text_field( $_POST['options']['modules']['countdown_start'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode-admin.php",
+        "line": 510
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 510,
+          "expression": "$_POST['options']['modules']['countdown_start']   = sanitize_text_field( $_POST['options']['modules']['countdown_start'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 511,
+          "expression": "$_POST['options']['modules']['countdown_details'] = array_map( 'trim', $_POST['options']['modules']['countdown_details'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 511,
+          "expression": "$_POST['options']['modules']['countdown_details'] = array_map( 'trim', $_POST['options']['modules']['countdown_details'] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$_POST['options']['modules']['countdown_details'] = array_map( 'trim', $_POST['options']['modules']['countdown_details'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode-admin.php",
+        "line": 511
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-maintenance-mode-ssrf-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-maintenance-mode",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$_POST['options']['gdpr']['contact_form_tail']   = wp_kses( $_POST['options']['gdpr']['contact_form_tail'], wpmm_gdpr_textarea_allowed_html() )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode-admin.php",
+        "line": 588
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 588,
+          "expression": "$_POST['options']['gdpr']['contact_form_tail']   = wp_kses( $_POST['options']['gdpr']['contact_form_tail'], wpmm_gdpr_textarea_allowed_html() )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 589,
+          "expression": "$_POST['options']['gdpr']['subscribe_form_tail'] = wp_kses( $_POST['options']['gdpr']['subscribe_form_tail'], wpmm_gdpr_textarea_allowed_html() )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 826,
+          "expression": "$response = wp_remote_post(\n\t\t\t\tself::SUBSCRIBE_ROUTE,\n\t\t\t\tarray(\n\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t\t),\n\t\t\t\t\t'body'    => wp_json_encode(\n\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t'slug'  => 'wp-maintenance-mode',\n\t\t\t\t\t\t\t'site'  => get_site_url(),\n\t\t\t\t\t\t\t'email' => $_POST['email'],\n\t\t\t\t\t\t\t'data'  => array(\n\t\t\t\t\t\t\t\t'category' => get_option( 'wpmm_page_category' ),\n\t\t\t\t\t\t\t),\n\t\t\t\t\t\t)\n\t\t\t\t\t),\n\t\t\t\t)\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(\n\t\t\t\tself::SUBSCRIBE_ROUTE,\n\t\t\t\tarray(\n\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t\t),\n\t\t\t\t\t'body'    => wp_json_encode(\n\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t'slug'  => 'wp-maintenance-mode',\n\t\t\t\t\t\t\t'site'  => get_site_url(),\n\t\t\t\t\t\t\t'email' => $_POST['email'],\n\t\t\t\t\t\t\t'data'  => array(\n\t\t\t\t\t\t\t\t'category' => get_option( 'wpmm_page_category' ),\n\t\t\t\t\t\t\t),\n\t\t\t\t\t\t)\n\t\t\t\t\t),\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode-admin.php",
+        "line": 826
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-maintenance-mode-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-maintenance-mode",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$_POST['options']['gdpr']['contact_form_tail']   = wp_kses( $_POST['options']['gdpr']['contact_form_tail'], wpmm_gdpr_textarea_allowed_html() )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode-admin.php",
+        "line": 588
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 588,
+          "expression": "$_POST['options']['gdpr']['contact_form_tail']   = wp_kses( $_POST['options']['gdpr']['contact_form_tail'], wpmm_gdpr_textarea_allowed_html() )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 589,
+          "expression": "$_POST['options']['gdpr']['subscribe_form_tail'] = wp_kses( $_POST['options']['gdpr']['subscribe_form_tail'], wpmm_gdpr_textarea_allowed_html() )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 826,
+          "expression": "$response = wp_remote_post(\n\t\t\t\tself::SUBSCRIBE_ROUTE,\n\t\t\t\tarray(\n\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t\t),\n\t\t\t\t\t'body'    => wp_json_encode(\n\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t'slug'  => 'wp-maintenance-mode',\n\t\t\t\t\t\t\t'site'  => get_site_url(),\n\t\t\t\t\t\t\t'email' => $_POST['email'],\n\t\t\t\t\t\t\t'data'  => array(\n\t\t\t\t\t\t\t\t'category' => get_option( 'wpmm_page_category' ),\n\t\t\t\t\t\t\t),\n\t\t\t\t\t\t)\n\t\t\t\t\t),\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 849,
+          "expression": "wp_send_json_success( $response )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $response )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode-admin.php",
+        "line": 849
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-maintenance-mode-rce-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-maintenance-mode",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$dismissed_notices = get_user_meta( $user_id, $this->dismissed_notices_key, true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode-admin.php",
+        "line": 1158
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1158,
+          "expression": "$dismissed_notices = get_user_meta( $user_id, $this->dismissed_notices_key, true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1160,
+          "expression": "array_filter( explode( ',', $dismissed_notices ), 'trim' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_filter( explode( ',', $dismissed_notices ), 'trim' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode-admin.php",
+        "line": 1160
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-maintenance-mode-ssrf-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-maintenance-mode",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "array(\n\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t\t),\n\t\t\t\t\t'body'    => wp_json_encode(\n\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t'slug'  => 'wp-maintenance-mode',\n\t\t\t\t\t\t\t'site'  => get_site_url(),\n\t\t\t\t\t\t\t'email' => $_POST['email'],\n\t\t\t\t\t\t\t'data'  => array(\n\t\t\t\t\t\t\t\t'category' => get_option( 'wpmm_page_category' ),\n\t\t\t\t\t\t\t),\n\t\t\t\t\t\t)\n\t\t\t\t\t),\n\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode-admin.php",
+        "line": 826
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 826,
+          "expression": "$response = wp_remote_post(\n\t\t\t\tself::SUBSCRIBE_ROUTE,\n\t\t\t\tarray(\n\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t\t),\n\t\t\t\t\t'body'    => wp_json_encode(\n\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t'slug'  => 'wp-maintenance-mode',\n\t\t\t\t\t\t\t'site'  => get_site_url(),\n\t\t\t\t\t\t\t'email' => $_POST['email'],\n\t\t\t\t\t\t\t'data'  => array(\n\t\t\t\t\t\t\t\t'category' => get_option( 'wpmm_page_category' ),\n\t\t\t\t\t\t\t),\n\t\t\t\t\t\t)\n\t\t\t\t\t),\n\t\t\t\t)\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(\n\t\t\t\tself::SUBSCRIBE_ROUTE,\n\t\t\t\tarray(\n\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t\t),\n\t\t\t\t\t'body'    => wp_json_encode(\n\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t'slug'  => 'wp-maintenance-mode',\n\t\t\t\t\t\t\t'site'  => get_site_url(),\n\t\t\t\t\t\t\t'email' => $_POST['email'],\n\t\t\t\t\t\t\t'data'  => array(\n\t\t\t\t\t\t\t\t'category' => get_option( 'wpmm_page_category' ),\n\t\t\t\t\t\t\t),\n\t\t\t\t\t\t)\n\t\t\t\t\t),\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode-admin.php",
+        "line": 826
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-maintenance-mode-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-maintenance-mode",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$response = wp_remote_post(\n\t\t\t\tself::SUBSCRIBE_ROUTE,\n\t\t\t\tarray(\n\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t\t),\n\t\t\t\t\t'body'    => wp_json_encode(\n\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t'slug'  => 'wp-maintenance-mode',\n\t\t\t\t\t\t\t'site'  => get_site_url(),\n\t\t\t\t\t\t\t'email' => $_POST['email'],\n\t\t\t\t\t\t\t'data'  => array(\n\t\t\t\t\t\t\t\t'category' => get_option( 'wpmm_page_category' ),\n\t\t\t\t\t\t\t),\n\t\t\t\t\t\t)\n\t\t\t\t\t),\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode-admin.php",
+        "line": 826
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 826,
+          "expression": "$response = wp_remote_post(\n\t\t\t\tself::SUBSCRIBE_ROUTE,\n\t\t\t\tarray(\n\t\t\t\t\t'headers' => array(\n\t\t\t\t\t\t'Content-Type' => 'application/json',\n\t\t\t\t\t),\n\t\t\t\t\t'body'    => wp_json_encode(\n\t\t\t\t\t\tarray(\n\t\t\t\t\t\t\t'slug'  => 'wp-maintenance-mode',\n\t\t\t\t\t\t\t'site'  => get_site_url(),\n\t\t\t\t\t\t\t'email' => $_POST['email'],\n\t\t\t\t\t\t\t'data'  => array(\n\t\t\t\t\t\t\t\t'category' => get_option( 'wpmm_page_category' ),\n\t\t\t\t\t\t\t),\n\t\t\t\t\t\t)\n\t\t\t\t\t),\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 849,
+          "expression": "wp_send_json_success( $response )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $response )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode-admin.php",
+        "line": 849
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode-admin.php",
+      "start": {
+        "line": 334,
+        "col": 5,
+        "offset": 15752
+      },
+      "end": {
+        "line": 334,
+        "col": 66,
+        "offset": 15813
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/wp-maintenance-mode/includes/classes/wp-maintenance-mode.php",
+      "start": {
+        "line": 986,
+        "col": 4,
+        "offset": 34222
+      },
+      "end": {
+        "line": 986,
+        "col": 32,
+        "offset": 34250
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/wp-maintenance-mode/includes/functions/helpers.php",
+      "start": {
+        "line": 52,
+        "col": 11,
+        "offset": 1002
+      },
+      "end": {
+        "line": 52,
+        "col": 101,
+        "offset": 1092
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/wp-maintenance-mode/views/maintenance.php",
+      "start": {
+        "line": 22,
+        "col": 3,
+        "offset": 834
+      },
+      "end": {
+        "line": 22,
+        "col": 29,
+        "offset": 860
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 1,
+    "taint_high": 0,
+    "taint_total": 11,
+    "semgrep_error": 0,
+    "semgrep_warning": 4
+  }
+}

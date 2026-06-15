@@ -1,0 +1,1320 @@
+{
+  "plugin": "siteorigin-panels",
+  "php_files_analyzed": 81,
+  "parse_errors": 0,
+  "total_flows": 19,
+  "by_severity": {
+    "medium": 16,
+    "high": 3
+  },
+  "by_vulnerability_class": {
+    "sql_injection": 2,
+    "xss": 12,
+    "rce": 3,
+    "ssrf": 1,
+    "file_inclusion": 1
+  },
+  "flows": [
+    {
+      "flow_id": "siteorigin-panels-sqli-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$post_content = wp_unslash( $_POST['post_content'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin.php",
+        "line": 862
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 862,
+          "expression": "$post_content = wp_unslash( $_POST['post_content'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 866,
+          "expression": "$page_id = wp_insert_post( array(\n\t\t\t\t// TRANSLATORS: This is the default name given to a user's home page.\n\t\t\t\t'post_title'     => __( 'Home Page', 'siteorigin-panels' ),\n\t\t\t\t'post_status'    => ! empty( $_POST['siteorigin_panels_home_enabled'] ) ? 'publish' : 'draft',\n\t\t\t\t'post_type'      => 'page',\n\t\t\t\t'post_content'   => $post_content,\n\t\t\t\t'comment_status' => 'closed',\n\t\t\t) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 926,
+          "expression": "$post = get_post( $page_id )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 931,
+          "expression": "$wpdb->update( $wpdb->posts, array( 'post_status' => 'draft' ), array( 'ID' => $post->ID ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->update( $wpdb->posts, array( 'post_status' => 'draft' ), array( 'ID' => $post->ID ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin.php",
+        "line": 931
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "siteorigin-panels-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$old_panels_data = get_post_meta( $_POST['post_id'], 'panels_data', true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin.php",
+        "line": 1387
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1387,
+          "expression": "$old_panels_data = get_post_meta( $_POST['post_id'], 'panels_data', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1393,
+          "expression": "$panels_data['widgets'] = $this->process_raw_widgets(\n\t\t\t$panels_data['widgets'],\n\t\t\t! empty( $old_panels_data['widgets'] ) ? $old_panels_data['widgets'] : false,\n\t\t\tfalse\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1398,
+          "expression": "$panels_data = SiteOrigin_Panels_Styles_Admin::single()->sanitize_all( $panels_data )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1403,
+          "expression": "echo SiteOrigin_Panels::renderer()->render( (int) $_POST['post_id'], false, $panels_data );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo SiteOrigin_Panels::renderer()->render( (int) $_POST['post_id'], false, $panels_data );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin.php",
+        "line": 1403
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "siteorigin-panels-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$panels_data = json_decode( wp_unslash( $_POST['panels_data'] ), true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin.php",
+        "line": 1438
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1438,
+          "expression": "$panels_data = json_decode( wp_unslash( $_POST['panels_data'] ), true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1444,
+          "expression": "$panels_data['widgets'] = $this->process_raw_widgets(\n\t\t\t$panels_data['widgets'],\n\t\t\t! empty( $old_panels_data['widgets'] ) ? $old_panels_data['widgets'] : false,\n\t\t\tfalse\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1449,
+          "expression": "$panels_data = SiteOrigin_Panels_Styles_Admin::single()->sanitize_all( $panels_data )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1459,
+          "expression": "$return['preview'] = $this->generate_panels_preview( (int) $_POST['post_id'], $panels_data )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 1461,
+          "expression": "echo wp_json_encode( $return );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo wp_json_encode( $return );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin.php",
+        "line": 1461
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "siteorigin-panels-rce-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$_REQUEST",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin.php",
+        "line": 1486
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1486,
+          "expression": "$request = array_map( 'stripslashes_deep', $_REQUEST )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$request = array_map( 'stripslashes_deep', $_REQUEST )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin.php",
+        "line": 1486
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "siteorigin-panels-xss-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$request = array_map( 'stripslashes_deep', $_REQUEST )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin.php",
+        "line": 1486
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1486,
+          "expression": "$request = array_map( 'stripslashes_deep', $_REQUEST )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1488,
+          "expression": "$widget_class = sanitize_text_field( $request['widget'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1489,
+          "expression": "$widget_class = apply_filters( 'siteorigin_panels_widget_class', $widget_class )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1492,
+          "expression": "$form = apply_filters( 'siteorigin_panels_ajax_widget_form', $form, $widget_class, $instance )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 1494,
+          "expression": "echo $form;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $form;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin.php",
+        "line": 1494
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "siteorigin-panels-xss-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$panels_data = json_decode( wp_unslash( $_POST['panelsData'] ), true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin.php",
+        "line": 1519
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1519,
+          "expression": "$panels_data = json_decode( wp_unslash( $_POST['panelsData'] ), true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1525,
+          "expression": "$panels_data['widgets'] = SiteOrigin_Panels_Admin::single()->process_raw_widgets( $panels_data['widgets'], false, true, true )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1526,
+          "expression": "$panels_data = SiteOrigin_Panels_Styles_Admin::single()->sanitize_all( $panels_data )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1533,
+          "expression": "$rendered_layout = SiteOrigin_Panels::renderer()->render( $builder_id, true, $panels_data, $layout_data )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 1546,
+          "expression": "echo $rendered_layout;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $rendered_layout;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin.php",
+        "line": 1546
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "siteorigin-panels-xss-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$panels_data = get_post_meta( $post_id, 'panels_data', true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin.php",
+        "line": 1577
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1577,
+          "expression": "$panels_data = get_post_meta( $post_id, 'panels_data', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1580,
+          "expression": "$widgets_count = count( $panels_data['widgets'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1581,
+          "expression": "printf( _n( '%s Widget', '%s Widgets', $widgets_count, 'siteorigin-panels' ), $widgets_count )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf( _n( '%s Widget', '%s Widgets', $widgets_count, 'siteorigin-panels' ), $widgets_count )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin.php",
+        "line": 1581
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "siteorigin-panels-rce-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "function( $niche ) {\n\t\t\t\t\t\t\t\t\t\treturn 'so-' . sanitize_title( $niche );\n\t\t\t\t\t\t\t\t\t}",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 323
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 323,
+          "expression": "$formatted_niches = array_map( function( $niche ) {\n\t\t\t\t\t\t\t\t\t\treturn 'so-' . sanitize_title( $niche );\n\t\t\t\t\t\t\t\t\t}, $niche_names )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$formatted_niches = array_map( function( $niche ) {\n\t\t\t\t\t\t\t\t\t\treturn 'so-' . sanitize_title( $niche );\n\t\t\t\t\t\t\t\t\t}, $niche_names )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 323
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "siteorigin-panels-sqli-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$search = ! empty( $_REQUEST['search'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['search'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 238
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 238,
+          "expression": "$search = ! empty( $_REQUEST['search'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['search'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 387,
+          "expression": "$results = $wpdb->get_results( \"\n\t\t\t\tSELECT SQL_CALC_FOUND_ROWS DISTINCT ID, post_title, meta.meta_value\n\t\t\t\tFROM {$wpdb->posts} AS posts\n\t\t\t\tJOIN {$wpdb->postmeta} AS meta ON posts.ID = meta.post_id\n\t\t\t\tWHERE\n\t\t\t\t\tposts.post_type = '\" . esc_sql( $post_type->name ) . \"'\n\t\t\t\t\tAND meta.meta_key = 'panels_data'\n\t\t\t\t\t\" . ( ! empty( $search ) ? 'AND posts.post_title LIKE \"%' . esc_sql( $search ) . '%\"' : '' ) . \"\n\t\t\t\t\tAND ( posts.post_status = 'publish' OR posts.post_status = 'draft' \" . $include_private . ')\n\t\t\t\tORDER BY post_date DESC\n\t\t\t\tLIMIT 16 OFFSET ' . (int) ( $page_num - 1 ) * 16 )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$results = $wpdb->get_results( \"\n\t\t\t\tSELECT SQL_CALC_FOUND_ROWS DISTINCT ID, post_title, meta.meta_value\n\t\t\t\tFROM {$wpdb->posts} AS posts\n\t\t\t\tJOIN {$wpdb->postmeta} AS meta ON posts.ID = meta.post_id\n\t\t\t\tWHERE\n\t\t\t\t\tposts.post_type = '\" . esc_sql( $post_type->name ) . \"'\n\t\t\t\t\tAND meta.meta_key = 'panels_data'\n\t\t\t\t\t\" . ( ! empty( $search ) ? 'AND posts.post_title LIKE \"%' . esc_sql( $search ) . '%\"' : '' ) . \"\n\t\t\t\t\tAND ( posts.post_status = 'publish' OR posts.post_status = 'draft' \" . $include_private . ')\n\t\t\t\tORDER BY post_date DESC\n\t\t\t\tLIMIT 16 OFFSET ' . (int) ( $page_num - 1 ) * 16 )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 387
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "siteorigin-panels-xss-006",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$type = ! empty( $_REQUEST['type'] ) ? sanitize_key( $_REQUEST['type'] ) : 'directory-siteorigin'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 237
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 237,
+          "expression": "$type = ! empty( $_REQUEST['type'] ) ? sanitize_key( $_REQUEST['type'] ) : 'directory-siteorigin'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 420,
+          "expression": "$return = apply_filters( 'siteorigin_panels_layouts_result', $return, $type )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 422,
+          "expression": "echo wp_json_encode( $return );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo wp_json_encode( $return );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 422
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "siteorigin-panels-ssrf-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$layout_id = isset( $_REQUEST['lid'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['lid'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 496
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 496,
+          "expression": "$layout_id = isset( $_REQUEST['lid'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['lid'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 561,
+          "expression": "$url = $directory[ 'url' ] . 'layout/' . urlencode( $layout_id ) . '/?action=download'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 564,
+          "expression": "$url = add_query_arg( $directory[ 'args' ], $url )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 567,
+          "expression": "$response = wp_remote_get( $url )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_get( $url )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 567
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "siteorigin-panels-xss-007",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$layout_id = isset( $_REQUEST['lid'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['lid'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 496
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 496,
+          "expression": "$layout_id = isset( $_REQUEST['lid'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['lid'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 561,
+          "expression": "$url = $directory[ 'url' ] . 'layout/' . urlencode( $layout_id ) . '/?action=download'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 564,
+          "expression": "$url = add_query_arg( $directory[ 'args' ], $url )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 567,
+          "expression": "$response = wp_remote_get( $url )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 577,
+          "expression": "wp_send_json_error( array(\n\t\t\t\t\t\t'error'   => true,\n\t\t\t\t\t\t'message' => 'HTTP Error ' . $response['response']['code'] . ': There was a problem fetching the layout. Please try again later.',\n\t\t\t\t\t) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_error( array(\n\t\t\t\t\t\t'error'   => true,\n\t\t\t\t\t\t'message' => 'HTTP Error ' . $response['response']['code'] . ': There was a problem fetching the layout. Please try again later.',\n\t\t\t\t\t) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 577
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "siteorigin-panels-xss-008",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$layout_id = isset( $_REQUEST['lid'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['lid'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 496
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 496,
+          "expression": "$layout_id = isset( $_REQUEST['lid'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['lid'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 585,
+          "expression": "$panels_data = get_post_meta( $layout_id, 'panels_data', true )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 596,
+          "expression": "$panels_data = apply_filters( 'siteorigin_panels_data', $panels_data, false )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 597,
+          "expression": "$panels_data['widgets'] = SiteOrigin_Panels_Admin::single()->process_raw_widgets( $panels_data['widgets'], array(), true, true )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 601,
+          "expression": "$panels_data['widgets'] = $this->close_all_containers( $panels_data['widgets'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 604,
+          "expression": "wp_send_json_success( $panels_data )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( $panels_data )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 604
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "siteorigin-panels-file-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$_FILES['panels_import_data']['tmp_name']",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 649
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 649,
+          "expression": "$json = file_get_contents( $_FILES['panels_import_data']['tmp_name'] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$json = file_get_contents( $_FILES['panels_import_data']['tmp_name'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 649
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "siteorigin-panels-xss-009",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$json = file_get_contents( $_FILES['panels_import_data']['tmp_name'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 649
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 649,
+          "expression": "$json = file_get_contents( $_FILES['panels_import_data']['tmp_name'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 650,
+          "expression": "$panels_data = $this->decode_panels_data( $json, $_FILES['panels_import_data']['tmp_name'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 653,
+          "expression": "$panels_data = apply_filters( 'siteorigin_panels_data', $panels_data, false )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 654,
+          "expression": "$panels_data['widgets'] = SiteOrigin_Panels_Admin::single()->process_raw_widgets( $panels_data['widgets'], array(), true, true )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 657,
+          "expression": "$panels_data['widgets'] = $this->close_all_containers( $panels_data['widgets'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 660,
+          "expression": "echo wp_json_encode( $panels_data );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo wp_json_encode( $panels_data );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 660
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "siteorigin-panels-xss-010",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$export_data = wp_unslash( $_POST['panels_export_data'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 672
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 672,
+          "expression": "$export_data = wp_unslash( $_POST['panels_export_data'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 673,
+          "expression": "$decoded_export_data = $this->decode_panels_data( $export_data )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 676,
+          "expression": "$decoded_export_data['id'] = sanitize_title_with_dashes( $decoded_export_data['name'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 685,
+          "expression": "echo wp_json_encode( $decoded_export_data );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo wp_json_encode( $decoded_export_data );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/admin-layouts.php",
+        "line": 685
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "siteorigin-panels-rce-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$query_args['paged'] = isset( $_GET['paged'] ) ? (int) $_GET['paged'] : 1",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/widgets/post-loop.php",
+        "line": 202
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 202,
+          "expression": "$query_args['paged'] = isset( $_GET['paged'] ) ? (int) $_GET['paged'] : 1",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 215,
+          "expression": "$query_args['post__not_in'] = explode( ',', $query_args['post__not_in'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 216,
+          "expression": "$query_args['post__not_in'] = array_map( 'intval', $query_args['post__not_in'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 216,
+          "expression": "$query_args['post__not_in'] = array_map( 'intval', $query_args['post__not_in'] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$query_args['post__not_in'] = array_map( 'intval', $query_args['post__not_in'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/inc/widgets/post-loop.php",
+        "line": 216
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "siteorigin-panels-xss-011",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$the_page = get_post( get_option( 'siteorigin_panels_home_page_id' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/tpl/admin-home-page.php",
+        "line": 27
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 27,
+          "expression": "$the_page = get_post( get_option( 'siteorigin_panels_home_page_id' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 29,
+          "expression": "echo esc_url( admin_url( 'post.php?post=' . $the_page->ID . '&action=edit' ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( admin_url( 'post.php?post=' . $the_page->ID . '&action=edit' ) );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/tpl/admin-home-page.php",
+        "line": 29
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "siteorigin-panels-xss-012",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "siteorigin-panels",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$data = json_decode( wp_unslash( $_POST['live_editor_panels_data'] ), true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/tpl/live-editor-preview.php",
+        "line": 27
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 27,
+          "expression": "$data = json_decode( wp_unslash( $_POST['live_editor_panels_data'] ), true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 35,
+          "expression": "$data['widgets'] = SiteOrigin_Panels_Admin::single()->process_raw_widgets( $data['widgets'], false, false )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 37,
+          "expression": "echo siteorigin_panels_render( 'l' . md5( serialize( $data ) ), true, $data );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo siteorigin_panels_render( 'l' . md5( serialize( $data ) ), true, $data );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/siteorigin-panels/tpl/live-editor-preview.php",
+        "line": 37
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ]
+}

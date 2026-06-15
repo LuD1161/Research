@@ -1,0 +1,189 @@
+{
+  "plugin_slug": "webp-converter-for-media",
+  "priority_score": 19,
+  "metadata": {
+    "php_files": 240,
+    "total_lines": 19546
+  },
+  "attack_surface_summary": "# Attack Surface: webp-converter-for-media\n\n> Generated: 2026-06-15T02:06:27Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 92,
+    "total_sinks": 78,
+    "total_sanitizers": 331,
+    "direct_flows": 11,
+    "functions_with_sources": 48,
+    "functions_with_sinks": 44,
+    "files_analyzed": 240,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "webp-converter-for-media-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "webp-converter-for-media",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo count( get_site_transient( CronStatusManager::CRON_PATHS_TRANSIENT ) ?: [] );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/webp-converter-for-media/templates/components/server/options.php",
+        "line": 52
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 52,
+          "expression": "echo count( get_site_transient( CronStatusManager::CRON_PATHS_TRANSIENT ) ?: [] );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo count( get_site_transient( CronStatusManager::CRON_PATHS_TRANSIENT ) ?: [] );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/webp-converter-for-media/templates/components/server/options.php",
+        "line": 52
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "webp-converter-for-media-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "webp-converter-for-media",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$headers['Authorization'] = 'Basic ' . base64_encode( $_SERVER['PHP_AUTH_USER'] . ':' . $_SERVER['PHP_AUTH_PW'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/webp-converter-for-media/src/Conversion/Cron/CronInitiator.php",
+        "line": 101
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 101,
+          "expression": "$headers['Authorization'] = 'Basic ' . base64_encode( $_SERVER['PHP_AUTH_USER'] . ':' . $_SERVER['PHP_AUTH_PW'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 104,
+          "expression": "$args = [\n\t\t\t'timeout'   => 0.01,\n\t\t\t'blocking'  => false,\n\t\t\t'sslverify' => apply_filters( 'https_local_ssl_verify', false ),\n\t\t\t'headers'   => $headers,\n\t\t]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 115,
+          "expression": "$response = wp_remote_post( CronConversionEndpoint::get_route_url(), $args )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post( CronConversionEndpoint::get_route_url(), $args )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/webp-converter-for-media/src/Conversion/Cron/CronInitiator.php",
+        "line": 115
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "webp-converter-for-media-ssrf-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "webp-converter-for-media",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "sprintf( '%1$s:%2$s', $_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/webp-converter-for-media/src/Service/FileLoader.php",
+        "line": 135
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 135,
+          "expression": "curl_setopt( $ch, CURLOPT_USERPWD, sprintf( '%1$s:%2$s', $_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW'] ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "curl_setopt( $ch, CURLOPT_USERPWD, sprintf( '%1$s:%2$s', $_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW'] ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/webp-converter-for-media/src/Service/FileLoader.php",
+        "line": 135
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/webp-converter-for-media/src/Conversion/Endpoint/EndpointIntegrator.php",
+      "start": {
+        "line": 36,
+        "col": 3,
+        "offset": 736
+      },
+      "end": {
+        "line": 63,
+        "col": 5,
+        "offset": 1859
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 0,
+    "taint_high": 3,
+    "taint_total": 3,
+    "semgrep_error": 0,
+    "semgrep_warning": 1
+  }
+}

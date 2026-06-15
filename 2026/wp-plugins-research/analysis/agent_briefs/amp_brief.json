@@ -1,0 +1,1165 @@
+{
+  "plugin_slug": "amp",
+  "priority_score": 94,
+  "metadata": {
+    "php_files": 1446,
+    "total_lines": 198708
+  },
+  "attack_surface_summary": "# Attack Surface: amp\n\n> Generated: 2026-06-15T02:06:19Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 303,
+    "total_sinks": 403,
+    "total_sanitizers": 600,
+    "direct_flows": 115,
+    "functions_with_sources": 122,
+    "functions_with_sinks": 260,
+    "files_analyzed": 1446,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "amp-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$queried_object = get_post_meta( $post->ID, self::QUERIED_OBJECT_POST_META_KEY, true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/includes/validation/class-amp-validated-url-post-type.php",
+        "line": 2342
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2342,
+          "expression": "$queried_object = get_post_meta( $post->ID, self::QUERIED_OBJECT_POST_META_KEY, true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2353,
+          "expression": "$link = get_edit_user_link( $queried_object['id'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 2355,
+          "expression": "printf( '<a href=\"%s\">%s</a>', esc_url( $link ), esc_html__( 'Edit User', 'amp' ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf( '<a href=\"%s\">%s</a>', esc_url( $link ), esc_html__( 'Edit User', 'amp' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/includes/validation/class-amp-validated-url-post-type.php",
+        "line": 2355
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$stylesheets = get_post_meta( $post->ID, self::STYLESHEETS_POST_META_KEY, true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/includes/validation/class-amp-validated-url-post-type.php",
+        "line": 2426
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2426,
+          "expression": "$stylesheets = get_post_meta( $post->ID, self::STYLESHEETS_POST_META_KEY, true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2440,
+          "expression": "$stylesheets = json_decode( $stylesheets, true )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 2468,
+          "expression": "$pending_stylesheet_indices = array_keys( $stylesheets )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 2469,
+          "expression": "usort(\n\t\t\t$pending_stylesheet_indices,\n\t\t\tstatic function ( $a, $b ) use ( $stylesheets ) {\n\t\t\t\treturn $stylesheets[ $a ]['priority'] - $stylesheets[ $b ]['priority'];\n\t\t\t}\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "usort(\n\t\t\t$pending_stylesheet_indices,\n\t\t\tstatic function ( $a, $b ) use ( $stylesheets ) {\n\t\t\t\treturn $stylesheets[ $a ]['priority'] - $stylesheets[ $b ]['priority'];\n\t\t\t}\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/includes/validation/class-amp-validated-url-post-type.php",
+        "line": 2469
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "[\n\t\t\t\t\t'cookies'     => wp_unslash( $_COOKIE ), // phpcs:ignore WordPressVIPMinimum.Variables.RestrictedVariables.cache_constraints___COOKIE -- Pass along cookies so private pages and drafts can be accessed.\n\t\t\t\t\t'timeout'     => 15, // phpcs:ignore WordPressVIPMinimum.Performance.RemoteRequestTimeout.timeout_timeout -- Increase from default of 5 to give extra time for the plugin to identify the sources for any given validation errors.\n\t\t\t\t\t/** This filter is documented in wp-includes/class-wp-http-streams.php */\n\t\t\t\t\t'sslverify'   => apply_filters( 'https_local_ssl_verify', false ),\n\t\t\t\t\t'redirection' => 0, // Because we're in a loop for redirection.\n\t\t\t\t\t'headers'     => [\n\t\t\t\t\t\t'Cache-Control' => 'no-cache',\n\t\t\t\t\t],\n\t\t\t\t]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/includes/validation/class-amp-validation-manager.php",
+        "line": 2277
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2277,
+          "expression": "$r = wp_remote_get(\n\t\t\t\t$validation_url,\n\t\t\t\t[\n\t\t\t\t\t'cookies'     => wp_unslash( $_COOKIE ), // phpcs:ignore WordPressVIPMinimum.Variables.RestrictedVariables.cache_constraints___COOKIE -- Pass along cookies so private pages and drafts can be accessed.\n\t\t\t\t\t'timeout'     => 15, // phpcs:ignore WordPressVIPMinimum.Performance.RemoteRequestTimeout.timeout_timeout -- Increase from default of 5 to give extra time for the plugin to identify the sources for any given validation errors.\n\t\t\t\t\t/** This filter is documented in wp-includes/class-wp-http-streams.php */\n\t\t\t\t\t'sslverify'   => apply_filters( 'https_local_ssl_verify', false ),\n\t\t\t\t\t'redirection' => 0, // Because we're in a loop for redirection.\n\t\t\t\t\t'headers'     => [\n\t\t\t\t\t\t'Cache-Control' => 'no-cache',\n\t\t\t\t\t],\n\t\t\t\t]\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$r = wp_remote_get(\n\t\t\t\t$validation_url,\n\t\t\t\t[\n\t\t\t\t\t'cookies'     => wp_unslash( $_COOKIE ), // phpcs:ignore WordPressVIPMinimum.Variables.RestrictedVariables.cache_constraints___COOKIE -- Pass along cookies so private pages and drafts can be accessed.\n\t\t\t\t\t'timeout'     => 15, // phpcs:ignore WordPressVIPMinimum.Performance.RemoteRequestTimeout.timeout_timeout -- Increase from default of 5 to give extra time for the plugin to identify the sources for any given validation errors.\n\t\t\t\t\t/** This filter is documented in wp-includes/class-wp-http-streams.php */\n\t\t\t\t\t'sslverify'   => apply_filters( 'https_local_ssl_verify', false ),\n\t\t\t\t\t'redirection' => 0, // Because we're in a loop for redirection.\n\t\t\t\t\t'headers'     => [\n\t\t\t\t\t\t'Cache-Control' => 'no-cache',\n\t\t\t\t\t],\n\t\t\t\t]\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/includes/validation/class-amp-validation-manager.php",
+        "line": 2277
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 23
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 23,
+          "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 32,
+          "expression": "$alignwide_max = $content_max_width > 0 ? $content_max_width * 2 : 1920",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 75,
+          "expression": "echo sprintf( '%dpx', $alignwide_max );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf( '%dpx', $alignwide_max );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 75
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-xss-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 23
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 23,
+          "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 32,
+          "expression": "$alignwide_max = $content_max_width > 0 ? $content_max_width * 2 : 1920",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 77,
+          "expression": "echo sprintf( '%dpx', $alignwide_max );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf( '%dpx', $alignwide_max );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 77
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 23
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 23,
+          "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 32,
+          "expression": "$alignwide_max = $content_max_width > 0 ? $content_max_width * 2 : 1920",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 78,
+          "expression": "echo sprintf( '%dpx', $alignwide_max );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf( '%dpx', $alignwide_max );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 78
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-xss-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 23
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 23,
+          "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 32,
+          "expression": "$alignwide_max = $content_max_width > 0 ? $content_max_width * 2 : 1920",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 79,
+          "expression": "echo sprintf( '%dpx', $alignwide_max );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf( '%dpx', $alignwide_max );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 79
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-xss-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 23
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 23,
+          "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 32,
+          "expression": "$alignwide_max = $content_max_width > 0 ? $content_max_width * 2 : 1920",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 80,
+          "expression": "echo sprintf( '%dpx', $alignwide_max );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf( '%dpx', $alignwide_max );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 80
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-xss-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 23
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 23,
+          "expression": "$content_max_width       = absint( $this->get( 'content_max_width' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 115,
+          "expression": "echo sprintf( '%dpx', $content_max_width );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf( '%dpx', $content_max_width );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/templates/style.php",
+        "line": 115
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-xss-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$content_max_width = absint( $this->get( 'content_max_width' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/back-compat/templates-v0-3/style.php",
+        "line": 76
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 76,
+          "expression": "$content_max_width = absint( $this->get( 'content_max_width' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 78,
+          "expression": "echo sprintf( '%dpx', $content_max_width );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf( '%dpx', $content_max_width );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/back-compat/templates-v0-3/style.php",
+        "line": 78
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "amp-obje-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "amp",
+      "vulnerability_class": "object_injection",
+      "source": {
+        "expression": "$cached_response = get_transient( $cache_key )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/src/RemoteRequest/CachedRemoteGetRequest.php",
+        "line": 112
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 112,
+          "expression": "$cached_response = get_transient( $cache_key )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 116,
+          "expression": "$cached_response = unserialize( $cached_response, [ CachedResponse::class, DateTimeImmutable::class ] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 116,
+          "expression": "$cached_response = unserialize( $cached_response, [ CachedResponse::class, DateTimeImmutable::class ] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$cached_response = unserialize( $cached_response, [ CachedResponse::class, DateTimeImmutable::class ] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/amp/src/RemoteRequest/CachedRemoteGetRequest.php",
+        "line": 116
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/amp/includes/options/class-amp-reader-theme-rest-controller.php",
+      "start": {
+        "line": 43,
+        "col": 3,
+        "offset": 772
+      },
+      "end": {
+        "line": 54,
+        "col": 5,
+        "offset": 1084
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/amp/includes/sanitizers/class-amp-style-sanitizer.php",
+      "start": {
+        "line": 1690,
+        "col": 3,
+        "offset": 59353
+      },
+      "end": {
+        "line": 1690,
+        "col": 80,
+        "offset": 59430
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/amp/includes/sanitizers/class-amp-style-sanitizer.php",
+      "start": {
+        "line": 2182,
+        "col": 3,
+        "offset": 79109
+      },
+      "end": {
+        "line": 2192,
+        "col": 4,
+        "offset": 79587
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/amp/includes/sanitizers/class-amp-style-sanitizer.php",
+      "start": {
+        "line": 2992,
+        "col": 3,
+        "offset": 108245
+      },
+      "end": {
+        "line": 2992,
+        "col": 60,
+        "offset": 108302
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/amp/includes/uninstall-functions.php",
+      "start": {
+        "line": 201,
+        "col": 2,
+        "offset": 4726
+      },
+      "end": {
+        "line": 204,
+        "col": 3,
+        "offset": 4915
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/amp/includes/utils/class-amp-image-dimension-extractor.php",
+      "start": {
+        "line": 266,
+        "col": 3,
+        "offset": 8257
+      },
+      "end": {
+        "line": 266,
+        "col": 27,
+        "offset": 8281
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/amp/includes/validation/class-amp-validated-url-post-type.php",
+      "start": {
+        "line": 685,
+        "col": 3,
+        "offset": 21564
+      },
+      "end": {
+        "line": 685,
+        "col": 23,
+        "offset": 21584
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/amp/includes/validation/class-amp-validated-url-post-type.php",
+      "start": {
+        "line": 810,
+        "col": 3,
+        "offset": 25658
+      },
+      "end": {
+        "line": 810,
+        "col": 23,
+        "offset": 25678
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/amp/includes/validation/class-amp-validation-error-taxonomy.php",
+      "start": {
+        "line": 443,
+        "col": 3,
+        "offset": 13643
+      },
+      "end": {
+        "line": 443,
+        "col": 38,
+        "offset": 13678
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/amp/includes/validation/class-amp-validation-manager.php",
+      "start": {
+        "line": 2211,
+        "col": 5,
+        "offset": 72691
+      },
+      "end": {
+        "line": 2211,
+        "col": 121,
+        "offset": 72807
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/amp/src/BackgroundTask/MonitorCssTransientCaching.php",
+      "start": {
+        "line": 211,
+        "col": 16,
+        "offset": 5817
+      },
+      "end": {
+        "line": 213,
+        "col": 4,
+        "offset": 5938
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/amp/src/BackgroundTask/RecurringBackgroundTask.php",
+      "start": {
+        "line": 88,
+        "col": 3,
+        "offset": 2843
+      },
+      "end": {
+        "line": 88,
+        "col": 36,
+        "offset": 2876
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/amp/src/OptionsRESTController.php",
+      "start": {
+        "line": 122,
+        "col": 3,
+        "offset": 2639
+      },
+      "end": {
+        "line": 140,
+        "col": 5,
+        "offset": 3302
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/amp/src/PairedUrlStructure/LegacyReaderUrlStructure.php",
+      "start": {
+        "line": 137,
+        "col": 3,
+        "offset": 4187
+      },
+      "end": {
+        "line": 137,
+        "col": 28,
+        "offset": 4212
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/amp/src/RemoteRequest/CachedRemoteGetRequest.php",
+      "start": {
+        "line": 111,
+        "col": 3,
+        "offset": 3181
+      },
+      "end": {
+        "line": 111,
+        "col": 71,
+        "offset": 3249
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/amp/src/Validation/ScannableURLsRestController.php",
+      "start": {
+        "line": 82,
+        "col": 3,
+        "offset": 1912
+      },
+      "end": {
+        "line": 101,
+        "col": 5,
+        "offset": 2517
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/amp/src/Validation/URLValidationRESTController.php",
+      "start": {
+        "line": 80,
+        "col": 3,
+        "offset": 1863
+      },
+      "end": {
+        "line": 107,
+        "col": 5,
+        "offset": 2830
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/amp/src/Validation/ValidationCountsRestController.php",
+      "start": {
+        "line": 58,
+        "col": 3,
+        "offset": 1423
+      },
+      "end": {
+        "line": 70,
+        "col": 5,
+        "offset": 1788
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 2,
+    "taint_high": 9,
+    "taint_total": 11,
+    "semgrep_error": 0,
+    "semgrep_warning": 18
+  }
+}

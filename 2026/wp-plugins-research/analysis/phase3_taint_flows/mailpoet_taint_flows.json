@@ -1,0 +1,953 @@
+{
+  "plugin": "mailpoet",
+  "php_files_analyzed": 3673,
+  "parse_errors": 0,
+  "total_flows": 20,
+  "by_severity": {
+    "high": 2,
+    "critical": 17,
+    "low": 1
+  },
+  "by_vulnerability_class": {
+    "file_inclusion": 1,
+    "rce": 17,
+    "xss": 1,
+    "open_redirect": 1
+  },
+  "flows": [
+    {
+      "flow_id": "mailpoet-file-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$logDir = getenv('MAILPOET_TRACY_LOG_DIR')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/mailpoet_initializer.php",
+        "line": 24
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 24,
+          "expression": "$logDir = getenv('MAILPOET_TRACY_LOG_DIR')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 30,
+          "expression": "mkdir($logDir, 0777, true)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "mkdir($logDir, 0777, true)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/mailpoet_initializer.php",
+        "line": 30
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "function($row) {\n      $row['revenue'] = round(floatval($row['revenue']), 2);\n      $row['orders_count'] = intval($row['orders_count']);\n      return $row;\n    }",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Statistics/StatisticsWooCommercePurchasesRepository.php",
+        "line": 111
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 111,
+          "expression": "$data = array_map(function($row) {\n      $row['revenue'] = round(floatval($row['revenue']), 2);\n      $row['orders_count'] = intval($row['orders_count']);\n      return $row;\n    }, $data)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$data = array_map(function($row) {\n      $row['revenue'] = round(floatval($row['revenue']), 2);\n      $row['orders_count'] = intval($row['orders_count']);\n      return $row;\n    }, $data)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Statistics/StatisticsWooCommercePurchasesRepository.php",
+        "line": 111
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$formId = isset($_GET['mailpoet_form_iframe']) && is_numeric($_GET['mailpoet_form_iframe']) ? (int)$_GET['mailpoet_form_iframe'] : 0",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Form/Widget.php",
+        "line": 64
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 64,
+          "expression": "$formId = isset($_GET['mailpoet_form_iframe']) && is_numeric($_GET['mailpoet_form_iframe']) ? (int)$_GET['mailpoet_form_iframe'] : 0",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 67,
+          "expression": "$formHtml = $this->widget(\n      [\n        'form' => $formId,\n        'form_type' => 'iframe',\n      ]\n    )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 93,
+          "expression": "$data = [\n      'language_attributes' => $languageAttributes,\n      'scripts' => $scripts,\n      'form' => $formHtml,\n      'mailpoet_form' => [\n        'ajax_url' => WPFunctions::get()->adminUrl('admin-ajax.php', 'absolute'),\n        'is_rtl' => $isRtl,\n        'collect_subscriber_timezones' => $this->settings->isSettingEnabled('collect_subscriber_timezones.enabled'),\n      ],\n      'fonts_link' => $this->customFonts->generateHtmlCustomFontLink(),\n      'mailpoet_public_css_url' => Env::$assetsUrl . '/dist/css/' . $this->renderer->getCssAsset('mailpoet-public.css'),\n    ]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 109,
+          "expression": "echo $this->renderer->render('form/iframe.html', $data);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $this->renderer->render('form/iframe.html', $data);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Form/Widget.php",
+        "line": 109
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "function ($option) {\n      $option['id'] = intval($option['id']);\n      return $option;\n    }",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Form/Block/Segment.php",
+        "line": 57
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 57,
+          "expression": "$options = array_map(function ($option) {\n      $option['id'] = intval($option['id']);\n      return $option;\n    }, $options)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$options = array_map(function ($option) {\n      $option['id'] = intval($option['id']);\n      return $option;\n    }, $options)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Form/Block/Segment.php",
+        "line": 57
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "mailpoet",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$charset = get_option('blog_charset')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/API/JSON/Response.php",
+        "line": 49
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 49,
+          "expression": "$charset = get_option('blog_charset')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 50,
+          "expression": "header('Content-Type: application/json; charset=' . (is_string($charset) ? $charset : 'UTF-8'))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "header('Content-Type: application/json; charset=' . (is_string($charset) ? $charset : 'UTF-8'))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/API/JSON/Response.php",
+        "line": 50
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$result = $wpdb->get_col(\n      // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- The number of replacements is dynamic.\n      $wpdb->prepare(\n        \"\n          SELECT DISTINCT tt.term_id\n          FROM {$wpdb->term_taxonomy} tt\n          JOIN %i AS oi ON oi.order_id IN (\" . $orderIdsSubquery . /* phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The subquery uses placeholders. */ \") AND oi.order_item_type = 'line_item'\n          JOIN %i AS pid ON oi.order_item_id = pid.order_item_id AND pid.meta_key = '_product_id'\n          JOIN {$wpdb->posts} p ON pid.meta_value = p.ID\n          JOIN {$wpdb->term_relationships} tr ON IF(p.post_type = 'product_variation', p.post_parent, p.ID) = tr.object_id AND tr.term_taxonomy_id = tt.term_taxonomy_id\n          WHERE tt.taxonomy = %s\n          ORDER BY tt.term_id ASC\n        \",\n        array_merge(\n          [$wpdb->prefix . 'woocommerce_order_items'],\n          $orderIdsSubqueryArgs,\n          [\n            $wpdb->prefix . 'woocommerce_order_itemmeta',\n            (string)($taxonomy),\n          ]\n        )\n      )\n    )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Integrations/WooCommerce/Fields/CustomerOrderFieldsFactory.php",
+        "line": 382
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 382,
+          "expression": "$result = $wpdb->get_col(\n      // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- The number of replacements is dynamic.\n      $wpdb->prepare(\n        \"\n          SELECT DISTINCT tt.term_id\n          FROM {$wpdb->term_taxonomy} tt\n          JOIN %i AS oi ON oi.order_id IN (\" . $orderIdsSubquery . /* phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The subquery uses placeholders. */ \") AND oi.order_item_type = 'line_item'\n          JOIN %i AS pid ON oi.order_item_id = pid.order_item_id AND pid.meta_key = '_product_id'\n          JOIN {$wpdb->posts} p ON pid.meta_value = p.ID\n          JOIN {$wpdb->term_relationships} tr ON IF(p.post_type = 'product_variation', p.post_parent, p.ID) = tr.object_id AND tr.term_taxonomy_id = tt.term_taxonomy_id\n          WHERE tt.taxonomy = %s\n          ORDER BY tt.term_id ASC\n        \",\n        array_merge(\n          [$wpdb->prefix . 'woocommerce_order_items'],\n          $orderIdsSubqueryArgs,\n          [\n            $wpdb->prefix . 'woocommerce_order_itemmeta',\n            (string)($taxonomy),\n          ]\n        )\n      )\n    )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 405,
+          "expression": "array_map('intval', $result)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map('intval', $result)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Integrations/WooCommerce/Fields/CustomerOrderFieldsFactory.php",
+        "line": 405
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-rce-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$result = $wpdb->get_col(\n      $wpdb->prepare(\n        \"\n          SELECT DISTINCT tt.parent\n          FROM {$wpdb->term_taxonomy} AS tt\n          WHERE tt.parent != 0\n          AND tt.term_id IN (\" . implode(',', array_fill(0, count($termIds), '%s')) . \")\n        \",\n        $termIds\n      )\n    )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Integrations/WooCommerce/Fields/TermParentsLoader.php",
+        "line": 19
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 19,
+          "expression": "$result = $wpdb->get_col(\n      $wpdb->prepare(\n        \"\n          SELECT DISTINCT tt.parent\n          FROM {$wpdb->term_taxonomy} AS tt\n          WHERE tt.parent != 0\n          AND tt.term_id IN (\" . implode(',', array_fill(0, count($termIds), '%s')) . \")\n        \",\n        $termIds\n      )\n    )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 30,
+          "expression": "$parentIds = array_map('intval', $result)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$parentIds = array_map('intval', $result)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Integrations/WooCommerce/Fields/TermParentsLoader.php",
+        "line": 30
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-rce-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$products = $wpdb->get_results(\n      \"\n        SELECT ID, post_title\n        FROM {$wpdb->posts}\n        WHERE post_type = 'product'\n        AND post_status = 'publish'\n        ORDER BY post_title ASC\n      \",\n      ARRAY_A\n    )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Integrations/WooCommerce/Fields/OrderFieldsFactory.php",
+        "line": 411
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 411,
+          "expression": "$products = $wpdb->get_results(\n      \"\n        SELECT ID, post_title\n        FROM {$wpdb->posts}\n        WHERE post_type = 'product'\n        AND post_status = 'publish'\n        ORDER BY post_title ASC\n      \",\n      ARRAY_A\n    )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 422,
+          "expression": "array_map(function ($product) {\n      /** @var array{ID:int, post_title:string} $product */\n      $id = $product['ID'];\n      $title = $product['post_title'];\n      return ['id' => (int)$id, 'name' => \"$title (#$id)\"];\n    }, (array)$products)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(function ($product) {\n      /** @var array{ID:int, post_title:string} $product */\n      $id = $product['ID'];\n      $title = $product['post_title'];\n      return ['id' => (int)$id, 'name' => \"$title (#$id)\"];\n    }, (array)$products)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Integrations/WooCommerce/Fields/OrderFieldsFactory.php",
+        "line": 422
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-rce-006",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$automationId = intval($automationId)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Engine/Endpoints/Automations/AutomationVersionsGetEndpoint.php",
+        "line": 28
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 28,
+          "expression": "$automationId = intval($automationId)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 34,
+          "expression": "$versions = $this->automationStorage->getAutomationVersionDates($automationId)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 37,
+          "expression": "$items = array_map(\n      function (array $version) use ($currentVersionId): array {\n        return [\n          'id' => $version['id'],\n          'created_at' => $version['created_at']->format(\\DateTimeInterface::ATOM),\n          'is_current' => $version['id'] === $currentVersionId,\n        ];\n      },\n      $versions\n    )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$items = array_map(\n      function (array $version) use ($currentVersionId): array {\n        return [\n          'id' => $version['id'],\n          'created_at' => $version['created_at']->format(\\DateTimeInterface::ATOM),\n          'is_current' => $version['id'] === $currentVersionId,\n        ];\n      },\n      $versions\n    )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Engine/Endpoints/Automations/AutomationVersionsGetEndpoint.php",
+        "line": 37
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-rce-007",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$results = $wpdb->get_results(\n      $wpdb->prepare(\n        '\n          SELECT *\n          FROM %i\n          WHERE automation_run_id = %d\n          ORDER BY id ASC\n        ',\n        $this->table,\n        $automationRunId\n      ),\n      ARRAY_A\n    )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Engine/Storage/AutomationRunLogStorage.php",
+        "line": 97
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 97,
+          "expression": "$results = $wpdb->get_results(\n      $wpdb->prepare(\n        '\n          SELECT *\n          FROM %i\n          WHERE automation_run_id = %d\n          ORDER BY id ASC\n        ',\n        $this->table,\n        $automationRunId\n      ),\n      ARRAY_A\n    )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 116,
+          "expression": "array_map(function($data) {\n        /** @var array $data - for PHPStan because it conflicts with expected callable(mixed): mixed)|null */\n        return AutomationRunLog::fromArray($data);\n      }, $results)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(function($data) {\n        /** @var array $data - for PHPStan because it conflicts with expected callable(mixed): mixed)|null */\n        return AutomationRunLog::fromArray($data);\n      }, $results)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Engine/Storage/AutomationRunLogStorage.php",
+        "line": 116
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-rce-008",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$automationRuns = $wpdb->get_results(\n      $wpdb->prepare(\n        'SELECT * FROM %i WHERE automation_id = %d ORDER BY id',\n        $this->table,\n        $automation->getId()\n      ),\n      ARRAY_A\n    )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Engine/Storage/AutomationRunStorage.php",
+        "line": 85
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 85,
+          "expression": "$automationRuns = $wpdb->get_results(\n      $wpdb->prepare(\n        'SELECT * FROM %i WHERE automation_id = %d ORDER BY id',\n        $this->table,\n        $automation->getId()\n      ),\n      ARRAY_A\n    )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 97,
+          "expression": "$automationRunIds = array_column($automationRuns, 'id')",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 98,
+          "expression": "$subjects = $wpdb->get_results(\n      $wpdb->prepare(\n        '\n          SELECT *\n          FROM %i\n          WHERE automation_run_id IN (' . implode(',', array_fill(0, count($automationRunIds), '%s')) . ')\n          ORDER BY automation_run_id, id\n        ',\n        array_merge(\n          [$this->subjectTable],\n          $automationRunIds,\n        )\n      ),\n      ARRAY_A\n    )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 114,
+          "expression": "array_map(\n      function($runData) use ($subjects): AutomationRun {\n        /** @var array $runData - PHPStan expects as array_map first parameter (callable(mixed): mixed)|null */\n        $runData['subjects'] = array_values(array_filter(\n          is_array($subjects) ? $subjects : [],\n          function($subjectData) use ($runData): bool {\n            /** @var array $subjectData - PHPStan expects as array_map first parameter (callable(mixed): mixed)|null */\n            return (int)$subjectData['automation_run_id'] === (int)$runData['id'];\n          }\n        ));\n        return AutomationRun::fromArray($runData);\n      },\n      $automationRuns\n    )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(\n      function($runData) use ($subjects): AutomationRun {\n        /** @var array $runData - PHPStan expects as array_map first parameter (callable(mixed): mixed)|null */\n        $runData['subjects'] = array_values(array_filter(\n          is_array($subjects) ? $subjects : [],\n          function($subjectData) use ($runData): bool {\n            /** @var array $subjectData - PHPStan expects as array_map first parameter (callable(mixed): mixed)|null */\n            return (int)$subjectData['automation_run_id'] === (int)$runData['id'];\n          }\n        ));\n        return AutomationRun::fromArray($runData);\n      },\n      $automationRuns\n    )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Engine/Storage/AutomationRunStorage.php",
+        "line": 114
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-rce-009",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "function($row): array {\n        /** @var array{id: string, created_at: string} $row */\n        return [\n          'id' => absint($row['id']),\n          'created_at' => new \\DateTimeImmutable($row['created_at']),\n        ];\n      }",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Engine/Storage/AutomationStorage.php",
+        "line": 83
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 83,
+          "expression": "array_map(\n      function($row): array {\n        /** @var array{id: string, created_at: string} $row */\n        return [\n          'id' => absint($row['id']),\n          'created_at' => new \\DateTimeImmutable($row['created_at']),\n        ];\n      },\n      $data\n    )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(\n      function($row): array {\n        /** @var array{id: string, created_at: string} $row */\n        return [\n          'id' => absint($row['id']),\n          'created_at' => new \\DateTimeImmutable($row['created_at']),\n        ];\n      },\n      $data\n    )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Engine/Storage/AutomationStorage.php",
+        "line": 83
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-rce-010",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$data = $wpdb->get_results(\n      $wpdb->prepare(\n        '\n          SELECT a.*, v.id AS version_id, v.steps\n          FROM %i as a, %i as v\n          WHERE v.automation_id = a.id AND v.id IN (' . implode(',', array_fill(0, count($versionIds), '%d')) . ')\n          ORDER BY v.id DESC\n        ',\n        array_merge(\n          [\n            $this->automationsTable,\n            $this->versionsTable,\n          ],\n          $versionIds\n        )\n      ),\n      ARRAY_A\n    )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Engine/Storage/AutomationStorage.php",
+        "line": 106
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 106,
+          "expression": "$data = $wpdb->get_results(\n      $wpdb->prepare(\n        '\n          SELECT a.*, v.id AS version_id, v.steps\n          FROM %i as a, %i as v\n          WHERE v.automation_id = a.id AND v.id IN (' . implode(',', array_fill(0, count($versionIds), '%d')) . ')\n          ORDER BY v.id DESC\n        ',\n        array_merge(\n          [\n            $this->automationsTable,\n            $this->versionsTable,\n          ],\n          $versionIds\n        )\n      ),\n      ARRAY_A\n    )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 124,
+          "expression": "array_map(\n      function($row): Automation {\n        return Automation::fromArray((array)$row);\n      },\n      $data\n    )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(\n      function($row): Automation {\n        return Automation::fromArray((array)$row);\n      },\n      $data\n    )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Engine/Storage/AutomationStorage.php",
+        "line": 124
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-rce-011",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$data = $wpdb->get_results(\n      // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- The number of replacements is dynamic.\n      $wpdb->prepare(\n        '\n          SELECT a.*, v.id AS version_id, v.steps\n          FROM %i AS a\n          INNER JOIN %i as v ON (v.automation_id = a.id)\n          WHERE v.id = (\n            SELECT MAX(id) FROM %i WHERE automation_id = v.automation_id\n          )\n          ' . $statusFilter . /* phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The status filter uses placeholders. */ '\n          ' . $searchFilter . /* phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The search filter uses placeholders. */ '\n          ' . $orderClause . /* phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The order clause is sanitized. */ '\n          ' . $limitClause, /* phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The limit clause is prepared. */\n        array_merge(\n          [\n            $this->automationsTable,\n            $this->versionsTable,\n            $this->versionsTable,\n          ],\n          $statusParams,\n          $searchParams\n        )\n      ),\n      ARRAY_A\n    )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Engine/Storage/AutomationStorage.php",
+        "line": 198
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 198,
+          "expression": "$data = $wpdb->get_results(\n      // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- The number of replacements is dynamic.\n      $wpdb->prepare(\n        '\n          SELECT a.*, v.id AS version_id, v.steps\n          FROM %i AS a\n          INNER JOIN %i as v ON (v.automation_id = a.id)\n          WHERE v.id = (\n            SELECT MAX(id) FROM %i WHERE automation_id = v.automation_id\n          )\n          ' . $statusFilter . /* phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The status filter uses placeholders. */ '\n          ' . $searchFilter . /* phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The search filter uses placeholders. */ '\n          ' . $orderClause . /* phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The order clause is sanitized. */ '\n          ' . $limitClause, /* phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The limit clause is prepared. */\n        array_merge(\n          [\n            $this->automationsTable,\n            $this->versionsTable,\n            $this->versionsTable,\n          ],\n          $statusParams,\n          $searchParams\n        )\n      ),\n      ARRAY_A\n    )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 224,
+          "expression": "array_map(function ($automationData) {\n      /** @var array $automationData - for PHPStan because it conflicts with expected callable(mixed): mixed)|null */\n      return Automation::fromArray($automationData);\n    }, (array)$data)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(function ($automationData) {\n      /** @var array $automationData - for PHPStan because it conflicts with expected callable(mixed): mixed)|null */\n      return Automation::fromArray($automationData);\n    }, (array)$data)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Engine/Storage/AutomationStorage.php",
+        "line": 224
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-rce-012",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$result = $wpdb->get_col(\n      // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- The number of replacements is dynamic.\n      $wpdb->prepare(\n        '\n          SELECT DISTINCT a.id\n          FROM %i a\n          INNER JOIN %i r ON r.automation_id = a.id\n          INNER JOIN %i s ON s.automation_run_id = r.id\n          WHERE s.hash = %s\n          ' . $statusFilter . /* phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The condition uses placeholders. */ '\n          ' . $inTheLastFilter . /* phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The condition uses placeholders. */ '\n          ORDER BY a.id DESC\n        ',\n        array_merge(\n          [\n            $this->automationsTable,\n            $this->runsTable,\n            $this->subjectsTable,\n            $subject->getHash(),\n          ],\n          $runStatus ?? [],\n          $inTheLastSeconds ? [$inTheLastSeconds] : []\n        )\n      )\n    )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Engine/Storage/AutomationStorage.php",
+        "line": 237
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 237,
+          "expression": "$result = $wpdb->get_col(\n      // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- The number of replacements is dynamic.\n      $wpdb->prepare(\n        '\n          SELECT DISTINCT a.id\n          FROM %i a\n          INNER JOIN %i r ON r.automation_id = a.id\n          INNER JOIN %i s ON s.automation_run_id = r.id\n          WHERE s.hash = %s\n          ' . $statusFilter . /* phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The condition uses placeholders. */ '\n          ' . $inTheLastFilter . /* phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- The condition uses placeholders. */ '\n          ORDER BY a.id DESC\n        ',\n        array_merge(\n          [\n            $this->automationsTable,\n            $this->runsTable,\n            $this->subjectsTable,\n            $subject->getHash(),\n          ],\n          $runStatus ?? [],\n          $inTheLastSeconds ? [$inTheLastSeconds] : []\n        )\n      )\n    )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 262,
+          "expression": "array_map('intval', $result)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map('intval', $result)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Engine/Storage/AutomationStorage.php",
+        "line": 262
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-rce-013",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$data = $wpdb->get_results(\n      $wpdb->prepare(\n        '\n          SELECT a.*, v.id AS version_id, v.steps\n          FROM %i AS a\n          INNER JOIN %i as t ON (t.automation_id = a.id)\n          INNER JOIN %i as v ON (v.automation_id = a.id)\n          WHERE a.status = %s\n          AND t.trigger_key = %s\n          AND v.id = (\n            SELECT MAX(id) FROM %i WHERE automation_id = v.automation_id\n          )\n        ',\n        $this->automationsTable,\n        $this->triggersTable,\n        $this->versionsTable,\n        Automation::STATUS_ACTIVE,\n        $triggerKey,\n        $this->versionsTable\n      ),\n      ARRAY_A\n    )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Engine/Storage/AutomationStorage.php",
+        "line": 322
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 322,
+          "expression": "$data = $wpdb->get_results(\n      $wpdb->prepare(\n        '\n          SELECT a.*, v.id AS version_id, v.steps\n          FROM %i AS a\n          INNER JOIN %i as t ON (t.automation_id = a.id)\n          INNER JOIN %i as v ON (v.automation_id = a.id)\n          WHERE a.status = %s\n          AND t.trigger_key = %s\n          AND v.id = (\n            SELECT MAX(id) FROM %i WHERE automation_id = v.automation_id\n          )\n        ',\n        $this->automationsTable,\n        $this->triggersTable,\n        $this->versionsTable,\n        Automation::STATUS_ACTIVE,\n        $triggerKey,\n        $this->versionsTable\n      ),\n      ARRAY_A\n    )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 344,
+          "expression": "array_map(function ($automationData) {\n      /** @var array $automationData - for PHPStan because it conflicts with expected callable(mixed): mixed)|null */\n      return Automation::fromArray($automationData);\n    }, (array)$data)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(function ($automationData) {\n      /** @var array $automationData - for PHPStan because it conflicts with expected callable(mixed): mixed)|null */\n      return Automation::fromArray($automationData);\n    }, (array)$data)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Automation/Engine/Storage/AutomationStorage.php",
+        "line": 344
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-rce-014",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "function($index, $ip) {\n            if (!filter_var($ip, FILTER_VALIDATE_IP)) {\n              // if invalid or empty, we allow the import but remove the IP\n              return null;\n            }\n            return $ip;\n          }",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Subscribers/ImportExport/Import/Import.php",
+        "line": 264
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 264,
+          "expression": "$data = array_map(\n          function($index, $ip) {\n            if (!filter_var($ip, FILTER_VALIDATE_IP)) {\n              // if invalid or empty, we allow the import but remove the IP\n              return null;\n            }\n            return $ip;\n          },\n          array_keys($data),\n          $data\n        )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$data = array_map(\n          function($index, $ip) {\n            if (!filter_var($ip, FILTER_VALIDATE_IP)) {\n              // if invalid or empty, we allow the import but remove the IP\n              return null;\n            }\n            return $ip;\n          },\n          array_keys($data),\n          $data\n        )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Subscribers/ImportExport/Import/Import.php",
+        "line": 264
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-rce-015",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "function ($segmentId) {\n          return intval($segmentId);\n        }",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Segments/DynamicSegments/FilterDataMapper.php",
+        "line": 256
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 256,
+          "expression": "array_map(function ($segmentId) {\n          return intval($segmentId);\n        }, $data['segments'])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(function ($segmentId) {\n          return intval($segmentId);\n        }, $data['segments'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Segments/DynamicSegments/FilterDataMapper.php",
+        "line": 256
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-rce-016",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "function ($tagId) {\n          return intval($tagId);\n        }",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Segments/DynamicSegments/FilterDataMapper.php",
+        "line": 292
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 292,
+          "expression": "array_map(function ($tagId) {\n          return intval($tagId);\n        }, $data['tags'])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(function ($tagId) {\n          return intval($tagId);\n        }, $data['tags'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Segments/DynamicSegments/FilterDataMapper.php",
+        "line": 292
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "mailpoet-rce-017",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "mailpoet",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "function($formId) {\n          return intval($formId);\n        }",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Segments/DynamicSegments/FilterDataMapper.php",
+        "line": 307
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 307,
+          "expression": "array_map(function($formId) {\n          return intval($formId);\n        }, $data['form_ids'])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(function($formId) {\n          return intval($formId);\n        }, $data['form_ids'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/mailpoet/lib/Segments/DynamicSegments/FilterDataMapper.php",
+        "line": 307
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ]
+}

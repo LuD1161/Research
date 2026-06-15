@@ -1,6 +1,6 @@
 # Attack Surface: header-footer-elementor
 
-> Generated: 2026-06-14T21:21:10Z
+> Generated: 2026-06-15T02:06:23Z
 
 ## Section 1: Entry Points
 

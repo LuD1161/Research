@@ -1,6 +1,6 @@
 # Attack Surface: wordfence
 
-> Generated: 2026-06-14T21:21:12Z
+> Generated: 2026-06-15T02:06:29Z
 
 ## Section 1: Entry Points
 

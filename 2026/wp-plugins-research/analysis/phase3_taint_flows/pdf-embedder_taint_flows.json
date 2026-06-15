@@ -1,0 +1,112 @@
+{
+  "plugin": "pdf-embedder",
+  "php_files_analyzed": 36,
+  "parse_errors": 0,
+  "total_flows": 2,
+  "by_severity": {
+    "critical": 1,
+    "high": 1
+  },
+  "by_vulnerability_class": {
+    "rce": 1,
+    "ssrf": 1
+  },
+  "flows": [
+    {
+      "flow_id": "pdf-embedder-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "pdf-embedder",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$active  = is_multisite() ?\n\t\t\tarray_merge( get_option( 'active_plugins', [] ), array_flip( get_site_option( 'active_sitewide_plugins', [] ) ) ) :\n\t\t\tget_option( 'active_plugins', [] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pdf-embedder/src/Tasks/UsageTracking/SendUsageTask.php",
+        "line": 272
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 272,
+          "expression": "$active  = is_multisite() ?\n\t\t\tarray_merge( get_option( 'active_plugins', [] ), array_flip( get_site_option( 'active_sitewide_plugins', [] ) ) ) :\n\t\t\tget_option( 'active_plugins', [] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 275,
+          "expression": "$plugins = array_intersect_key( get_plugins(), array_flip( $active ) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 277,
+          "expression": "array_map(\n\t\t\tstatic function ( $plugin ) {\n\t\t\t\tif ( isset( $plugin['Version'] ) ) {\n\t\t\t\t\treturn $plugin['Version'];\n\t\t\t\t}\n\n\t\t\t\treturn 'Not Set';\n\t\t\t},\n\t\t\t$plugins\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(\n\t\t\tstatic function ( $plugin ) {\n\t\t\t\tif ( isset( $plugin['Version'] ) ) {\n\t\t\t\t\treturn $plugin['Version'];\n\t\t\t\t}\n\n\t\t\t\treturn 'Not Set';\n\t\t\t},\n\t\t\t$plugins\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pdf-embedder/src/Tasks/UsageTracking/SendUsageTask.php",
+        "line": 277
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pdf-embedder-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pdf-embedder",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "[\n\t\t\t\t'timeout'   => 10,\n\t\t\t\t'cookies'   => is_user_logged_in() ? wp_unslash( $_COOKIE ) : [],\n\t\t\t\t'sslverify' => $sslverify,\n\t\t\t\t'headers'   => [\n\t\t\t\t\t'Cache-Control' => 'no-cache',\n\t\t\t\t\t'X-WP-Nonce'    => wp_create_nonce( 'wp_rest' ),\n\t\t\t\t],\n\t\t\t]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pdf-embedder/src/Tasks/UsageTracking/SendUsageTask.php",
+        "line": 315
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 315,
+          "expression": "$response = wp_remote_get(\n\t\t\t$url,\n\t\t\t[\n\t\t\t\t'timeout'   => 10,\n\t\t\t\t'cookies'   => is_user_logged_in() ? wp_unslash( $_COOKIE ) : [],\n\t\t\t\t'sslverify' => $sslverify,\n\t\t\t\t'headers'   => [\n\t\t\t\t\t'Cache-Control' => 'no-cache',\n\t\t\t\t\t'X-WP-Nonce'    => wp_create_nonce( 'wp_rest' ),\n\t\t\t\t],\n\t\t\t]\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_get(\n\t\t\t$url,\n\t\t\t[\n\t\t\t\t'timeout'   => 10,\n\t\t\t\t'cookies'   => is_user_logged_in() ? wp_unslash( $_COOKIE ) : [],\n\t\t\t\t'sslverify' => $sslverify,\n\t\t\t\t'headers'   => [\n\t\t\t\t\t'Cache-Control' => 'no-cache',\n\t\t\t\t\t'X-WP-Nonce'    => wp_create_nonce( 'wp_rest' ),\n\t\t\t\t],\n\t\t\t]\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pdf-embedder/src/Tasks/UsageTracking/SendUsageTask.php",
+        "line": 315
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ]
+}

@@ -1,0 +1,5013 @@
+{
+  "plugin_slug": "ninja-forms",
+  "priority_score": 371,
+  "metadata": {
+    "php_files": 397,
+    "total_lines": 67650
+  },
+  "attack_surface_summary": "# Attack Surface: ninja-forms\n\n> Generated: 2026-06-15T02:06:24Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 986,
+    "total_sinks": 335,
+    "total_sanitizers": 490,
+    "direct_flows": 238,
+    "functions_with_sources": 344,
+    "functions_with_sinks": 212,
+    "files_analyzed": 397,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "ninja-forms-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "function( $post ) {\n            return array_map( [ self::class, 'flattenPostmeta' ], get_post_meta( $post->ID ) );\n        }",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/blocks/views/includes/DataBuilder/SubmissionsBuilderFactory.php",
+        "line": 26
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 26,
+          "expression": "$submissions = array_map( function( $post ) {\n            return array_map( [ self::class, 'flattenPostmeta' ], get_post_meta( $post->ID ) );\n        }, get_posts( $args ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$submissions = array_map( function( $post ) {\n            return array_map( [ self::class, 'flattenPostmeta' ], get_post_meta( $post->ID ) );\n        }, get_posts( $args ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/blocks/views/includes/DataBuilder/SubmissionsBuilderFactory.php",
+        "line": 26
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$be_data = get_option( 'nf_be_data', [] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Dispatcher.php",
+        "line": 103
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 103,
+          "expression": "$be_data = get_option( 'nf_be_data', [] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 108,
+          "expression": "$response = wp_remote_post(\n            $this->api_url,\n            array(\n                'body' => array(\n                    'slug'          => $slug,\n                    'data'          => wp_json_encode( $data ),\n                    'site_data'     => wp_json_encode( $siteEntity->jsonSerialize()),\n                    'be_data'       => wp_json_encode( $be_data )\n                ),\n            )\n        )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(\n            $this->api_url,\n            array(\n                'body' => array(\n                    'slug'          => $slug,\n                    'data'          => wp_json_encode( $data ),\n                    'site_data'     => wp_json_encode( $siteEntity->jsonSerialize()),\n                    'be_data'       => wp_json_encode( $be_data )\n                ),\n            )\n        )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Dispatcher.php",
+        "line": 108
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$sql = \"SELECT cache FROM `{$wpdb->prefix}nf3_upgrades` WHERE id = \" . intval( $id )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Helper.php",
+        "line": 350
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 350,
+          "expression": "$sql = \"SELECT cache FROM `{$wpdb->prefix}nf3_upgrades` WHERE id = \" . intval( $id )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 351,
+          "expression": "$result = $wpdb->get_results( $sql, 'ARRAY_A' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$result = $wpdb->get_results( $sql, 'ARRAY_A' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Helper.php",
+        "line": 351
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-sqli-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$sql = \"SELECT id FROM `{$wpdb->prefix}nf3_upgrades` WHERE id = \" . intval( $id )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Helper.php",
+        "line": 381
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 381,
+          "expression": "$sql = \"SELECT id FROM `{$wpdb->prefix}nf3_upgrades` WHERE id = \" . intval( $id )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 382,
+          "expression": "$result = $wpdb->get_results( $sql, 'ARRAY_A' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$result = $wpdb->get_results( $sql, 'ARRAY_A' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Helper.php",
+        "line": 382
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-sqli-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$sql = \"DELETE FROM `{$wpdb->prefix}nf3_upgrades` WHERE id = \" . intval( $id )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Helper.php",
+        "line": 469
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 469,
+          "expression": "$sql = \"DELETE FROM `{$wpdb->prefix}nf3_upgrades` WHERE id = \" . intval( $id )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 470,
+          "expression": "$wpdb->query( $sql )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->query( $sql )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Helper.php",
+        "line": 470
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo intval( $form->get_id() );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Widget.php",
+        "line": 95
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 95,
+          "expression": "echo intval( $form->get_id() );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo intval( $form->get_id() );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Widget.php",
+        "line": 95
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-sqli-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$subs = $wpdb->get_col( $wpdb->prepare( $sub_sql, $this->_id ),0 )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Database/Models/Form.php",
+        "line": 87
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 87,
+          "expression": "$subs = $wpdb->get_col( $wpdb->prepare( $sub_sql, $this->_id ),0 )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 92,
+          "expression": "$delete_meta_query = $this->prepare_in( $delete_meta_query, $subs )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 93,
+          "expression": "$meta_result       = $wpdb->query( $delete_meta_query )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$meta_result       = $wpdb->query( $delete_meta_query )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Database/Models/Form.php",
+        "line": 93
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-sqli-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$subs = $wpdb->get_col( $wpdb->prepare( $sub_sql, $this->_id ),0 )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Database/Models/Form.php",
+        "line": 87
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 87,
+          "expression": "$subs = $wpdb->get_col( $wpdb->prepare( $sub_sql, $this->_id ),0 )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 97,
+          "expression": "$delete_post_query = $this->prepare_in( $delete_post_query, $subs )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 98,
+          "expression": "$post_result       = $wpdb->query( $delete_post_query )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$post_result       = $wpdb->query( $delete_post_query )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Database/Models/Form.php",
+        "line": 98
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-sqli-006",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$last_seq_num = $wpdb->get_var( $wpdb->prepare(\n            'SELECT value FROM ' . $wpdb->prefix . 'nf3_form_meta WHERE `key` = \"_seq_num\" AND `parent_id` = %s'\n        , $form_id ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Database/Models/Form.php",
+        "line": 125
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 125,
+          "expression": "$last_seq_num = $wpdb->get_var( $wpdb->prepare(\n            'SELECT value FROM ' . $wpdb->prefix . 'nf3_form_meta WHERE `key` = \"_seq_num\" AND `parent_id` = %s'\n        , $form_id ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 130,
+          "expression": "$wpdb->update( $wpdb->prefix . 'nf3_form_meta', array( 'value' => $last_seq_num + 1,\n                'meta_value' => $last_seq_num + 1, 'meta_key' => '_seq_num' )\n\t            , array( 'key' => '_seq_num', 'parent_id'\n            => $form_id ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->update( $wpdb->prefix . 'nf3_form_meta', array( 'value' => $last_seq_num + 1,\n                'meta_value' => $last_seq_num + 1, 'meta_key' => '_seq_num' )\n\t            , array( 'key' => '_seq_num', 'parent_id'\n            => $form_id ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Database/Models/Form.php",
+        "line": 130
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-sqli-007",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$last_seq_num = $wpdb->get_var( $wpdb->prepare(\n            'SELECT value FROM ' . $wpdb->prefix . 'nf3_form_meta WHERE `key` = \"_seq_num\" AND `parent_id` = %s'\n        , $form_id ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Database/Models/Form.php",
+        "line": 125
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 125,
+          "expression": "$last_seq_num = $wpdb->get_var( $wpdb->prepare(\n            'SELECT value FROM ' . $wpdb->prefix . 'nf3_form_meta WHERE `key` = \"_seq_num\" AND `parent_id` = %s'\n        , $form_id ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 134,
+          "expression": "$wpdb->update( $wpdb->prefix . 'nf3_forms', array( 'seq_num' => $last_seq_num + 1 ), array( 'id' => $form_id ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->update( $wpdb->prefix . 'nf3_forms', array( 'seq_num' => $last_seq_num + 1 ), array( 'id' => $form_id ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Database/Models/Form.php",
+        "line": 134
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo '<option value=\"' . intval( $form_id ) . '\">' . $label . ' - ID: ' . $form_id . '</option>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/AddFormModal.php",
+        "line": 73
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 73,
+          "expression": "echo '<option value=\"' . intval( $form_id ) . '\">' . $label . ' - ID: ' . $form_id . '</option>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<option value=\"' . intval( $form_id ) . '\">' . $label . ' - ID: ' . $form_id . '</option>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/AddFormModal.php",
+        "line": 73
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-xss-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$url = admin_url( 'admin.php?page=nf-processing&action=download_all_subs&form_id=' . absint( $_REQUEST['form_id'] ) . '&redirect=' . $redirect . '&security=' . wp_create_nonce( 'ninja_forms_batch_nonce' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/CPT/DownloadAllSubmissions.php",
+        "line": 176
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 176,
+          "expression": "$url = admin_url( 'admin.php?page=nf-processing&action=download_all_subs&form_id=' . absint( $_REQUEST['form_id'] ) . '&redirect=' . $redirect . '&security=' . wp_create_nonce( 'ninja_forms_batch_nonce' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 177,
+          "expression": "$url = esc_url( apply_filters( 'ninja_forms_download_all_submissions_url', $url, absint( $_REQUEST['form_id'] ) ) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 179,
+          "expression": "echo $url;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $url;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/CPT/DownloadAllSubmissions.php",
+        "line": 179
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "admin_url( 'edit.php?post_status=all&post_type=nf_sub&form_id=' . get_post_meta( $post_id, '_form_id', true ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/CPT/Submission.php",
+        "line": 114
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 114,
+          "expression": "wp_safe_redirect( admin_url( 'edit.php?post_status=all&post_type=nf_sub&form_id=' . get_post_meta( $post_id, '_form_id', true ) ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( admin_url( 'edit.php?post_status=all&post_type=nf_sub&form_id=' . get_post_meta( $post_id, '_form_id', true ) ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/CPT/Submission.php",
+        "line": 114
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$hidden = isset( $_POST['hidden'] ) ? explode( ',', esc_html( $_POST['hidden'] ) ) : array()",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/CPT/Submission.php",
+        "line": 466
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 466,
+          "expression": "$hidden = isset( $_POST['hidden'] ) ? explode( ',', esc_html( $_POST['hidden'] ) ) : array()",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 467,
+          "expression": "$hidden = array_filter( $hidden )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 467,
+          "expression": "$hidden = array_filter( $hidden )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$hidden = array_filter( $hidden )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/CPT/Submission.php",
+        "line": 467
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "function($field) {\n            if( is_numeric($field) ) {\n                $field = absint($field);\n            }\n            return $field;\n        }",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/CPT/Submission.php",
+        "line": 468
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 468,
+          "expression": "$hidden = array_map( function($field) {\n            if( is_numeric($field) ) {\n                $field = absint($field);\n            }\n            return $field;\n        }, $hidden )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$hidden = array_map( function($field) {\n            if( is_numeric($field) ) {\n                $field = absint($field);\n            }\n            return $field;\n        }, $hidden )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/CPT/Submission.php",
+        "line": 468
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-file-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$_FILES[ 'nf_import_form' ][ 'tmp_name' ]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/ImportExport.php",
+        "line": 63
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 63,
+          "expression": "$data = file_get_contents( $_FILES[ 'nf_import_form' ][ 'tmp_name' ] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$data = file_get_contents( $_FILES[ 'nf_import_form' ][ 'tmp_name' ] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/ImportExport.php",
+        "line": 63
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ninja-forms-file-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$_FILES[ 'nf_import_fields' ][ 'tmp_name' ]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/ImportExport.php",
+        "line": 111
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 111,
+          "expression": "$import = file_get_contents( $_FILES[ 'nf_import_fields' ][ 'tmp_name' ] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$import = file_get_contents( $_FILES[ 'nf_import_fields' ][ 'tmp_name' ] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/ImportExport.php",
+        "line": 111
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ninja-forms-rce-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$field_ids = (array) $_REQUEST[ 'nf_export_fields' ]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/ImportExport.php",
+        "line": 138
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 138,
+          "expression": "$field_ids = (array) $_REQUEST[ 'nf_export_fields' ]",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 139,
+          "expression": "$field_ids = array_map('esc_attr', $field_ids)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 139,
+          "expression": "$field_ids = array_map('esc_attr', $field_ids)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$field_ids = array_map('esc_attr', $field_ids)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/ImportExport.php",
+        "line": 139
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-open-002",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$form_id = !empty($_GET[\"form_id\"]) ? \"&form_id=\" . $_GET[\"form_id\"] : \"\"",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/Submissions.php",
+        "line": 95
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 95,
+          "expression": "$form_id = !empty($_GET[\"form_id\"]) ? \"&form_id=\" . $_GET[\"form_id\"] : \"\"",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 96,
+          "expression": "wp_safe_redirect( admin_url( \"admin.php?page=nf-submissions\" . $form_id ), 302, \"Ninja Forms\")",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( admin_url( \"admin.php?page=nf-submissions\" . $form_id ), 302, \"Ninja Forms\")",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/Submissions.php",
+        "line": 96
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-rce-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "WPN_Helper::sanitize_text_field($_GET[ 'begin_date' ])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/Submissions.php",
+        "line": 283
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 283,
+          "expression": "$beg_date_sep = preg_replace('/[0-9]+/', '', WPN_Helper::sanitize_text_field($_GET[ 'begin_date' ]))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$beg_date_sep = preg_replace('/[0-9]+/', '', WPN_Helper::sanitize_text_field($_GET[ 'begin_date' ]))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/Submissions.php",
+        "line": 283
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-rce-006",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "WPN_Helper::sanitize_text_field($_GET[ 'end_date' ])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/Submissions.php",
+        "line": 296
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 296,
+          "expression": "$end_date_sep = preg_replace('/[0-9]+/', '', WPN_Helper::sanitize_text_field($_GET[ 'end_date' ]))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$end_date_sep = preg_replace('/[0-9]+/', '', WPN_Helper::sanitize_text_field($_GET[ 'end_date' ]))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/Submissions.php",
+        "line": 296
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-xss-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$url = admin_url( 'admin.php?page=nf-processing&action=download_all_subs&form_id=' . absint( $_REQUEST['form_id'] ) . '&redirect=' . $redirect . '&security=' . wp_create_nonce( 'ninja_forms_batch_nonce' ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/Submissions.php",
+        "line": 394
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 394,
+          "expression": "$url = admin_url( 'admin.php?page=nf-processing&action=download_all_subs&form_id=' . absint( $_REQUEST['form_id'] ) . '&redirect=' . $redirect . '&security=' . wp_create_nonce( 'ninja_forms_batch_nonce' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 395,
+          "expression": "$url = esc_url( $url )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 397,
+          "expression": "echo $url;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $url;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/Submissions.php",
+        "line": 397
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-file-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$filename = esc_html($_REQUEST['download_file'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/Submissions.php",
+        "line": 458
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 458,
+          "expression": "$filename = esc_html($_REQUEST['download_file'])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 462,
+          "expression": "$file_path = trailingslashit($upload_dir['path']) . $filename . '.csv'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 465,
+          "expression": "$myfile = file_get_contents($file_path)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$myfile = file_get_contents($file_path)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/Submissions.php",
+        "line": 465
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ninja-forms-file-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$filename = esc_html($_REQUEST['download_file'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/Submissions.php",
+        "line": 458
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 458,
+          "expression": "$filename = esc_html($_REQUEST['download_file'])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 462,
+          "expression": "$file_path = trailingslashit($upload_dir['path']) . $filename . '.csv'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 472,
+          "expression": "unlink($file_path)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink($file_path)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/Submissions.php",
+        "line": 472
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ninja-forms-open-003",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$form_name = sanitize_title($form_name)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/Submissions.php",
+        "line": 475
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 475,
+          "expression": "$form_name = sanitize_title($form_name)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 479,
+          "expression": "$filename = apply_filters('ninja_forms_download_all_filename', $form_name . '-all-subs-' . $today)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 482,
+          "expression": "header('Content-Disposition: attachment; filename=\"' . $filename . '.csv\"')",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "header('Content-Disposition: attachment; filename=\"' . $filename . '.csv\"')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/Submissions.php",
+        "line": 482
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ninja-forms-open-004",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$template = sanitize_title( $_GET['form_id'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/Forms.php",
+        "line": 292
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 292,
+          "expression": "$template = sanitize_title( $_GET['form_id'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 299,
+          "expression": "$form = Ninja_Forms::template( $template . '.nff', array(), TRUE )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 304,
+          "expression": "$form = json_decode( html_entity_decode( $form ), true )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 313,
+          "expression": "header( \"Location: \" . admin_url( \"admin.php?page=ninja-forms&form_id=$form_id\" ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "header( \"Location: \" . admin_url( \"admin.php?page=ninja-forms&form_id=$form_id\" ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Admin/Menus/Forms.php",
+        "line": 313
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-obje-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "object_injection",
+      "source": {
+        "expression": "$query = $wpdb->get_row( $wpdb->prepare( \"\n\t\t\tSELECT *\n\t\t\tFROM {$table}\n\t\t\tWHERE {$column} LIKE %s\n\t\t\tORDER BY {$key_column} ASC\n\t\t\tLIMIT 1\n\t\t\", $key ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Libraries/BackgroundProcessing/classes/wp-background-process.php",
+        "line": 275
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 275,
+          "expression": "$query = $wpdb->get_row( $wpdb->prepare( \"\n\t\t\tSELECT *\n\t\t\tFROM {$table}\n\t\t\tWHERE {$column} LIKE %s\n\t\t\tORDER BY {$key_column} ASC\n\t\t\tLIMIT 1\n\t\t\", $key ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 285,
+          "expression": "$batch->data = maybe_unserialize( $query->$value_column )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$batch->data = maybe_unserialize( $query->$value_column )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Libraries/BackgroundProcessing/classes/wp-background-process.php",
+        "line": 285
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ninja-forms-rce-007",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$key = sanitize_text_field( $field_data['type'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Abilities/Utils/FieldUtils.php",
+        "line": 74
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 74,
+          "expression": "$key = sanitize_text_field( $field_data['type'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 80,
+          "expression": "$key = ninja_forms_ensure_field_key_timestamp( $key )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 83,
+          "expression": "$original_key = $key",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 92,
+          "expression": "$key_without_timestamp = preg_replace( '/_\\d{13}$/', '', $original_key )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$key_without_timestamp = preg_replace( '/_\\d{13}$/', '', $original_key )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Abilities/Utils/FieldUtils.php",
+        "line": 92
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-rce-008",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$key = sanitize_text_field( $input['type'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Abilities/Utils/FieldUtils.php",
+        "line": 281
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 281,
+          "expression": "$key = sanitize_text_field( $input['type'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 287,
+          "expression": "$key = ninja_forms_ensure_field_key_timestamp( $key )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 290,
+          "expression": "$original_key = $key",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 299,
+          "expression": "$key_without_timestamp = preg_replace( '/_\\d{13}$/', '', $original_key )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$key_without_timestamp = preg_replace( '/_\\d{13}$/', '', $original_key )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Abilities/Utils/FieldUtils.php",
+        "line": 299
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-file-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$filename = sprintf(\n\t\t'field-export_%s_%s_%s.csv',\n\t\tsanitize_title( $field_label ),\n\t\t$form_id,\n\t\tgmdate( 'Y-m-d_H-i-s' )\n\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Abilities/Utils/FieldUtils.php",
+        "line": 581
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 581,
+          "expression": "$filename = sprintf(\n\t\t'field-export_%s_%s_%s.csv',\n\t\tsanitize_title( $field_label ),\n\t\t$form_id,\n\t\tgmdate( 'Y-m-d_H-i-s' )\n\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 598,
+          "expression": "$file_path = $export_dir . $filename",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 601,
+          "expression": "$fp = fopen( $file_path, 'w' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$fp = fopen( $file_path, 'w' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Abilities/Utils/FieldUtils.php",
+        "line": 601
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-ssrf-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$api_params = array(\n\t\t\t\t'edd_action' => 'get_version',\n\t\t\t\t'item_name'  => isset( $data['item_name'] ) ? $data['item_name'] : false,\n\t\t\t\t'item_id'    => isset( $data['item_id'] ) ? $data['item_id'] : false,\n\t\t\t\t'slug'       => WPN_Helper::sanitize_text_field($_REQUEST['slug']),\n\t\t\t\t'author'     => $data['author'],\n\t\t\t\t'url'        => home_url(),\n\t\t\t\t'beta'       => ! empty( $data['beta'] )\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Integrations/EDD/EDD_SL_Plugin_Updater.php",
+        "line": 475
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 475,
+          "expression": "$api_params = array(\n\t\t\t\t'edd_action' => 'get_version',\n\t\t\t\t'item_name'  => isset( $data['item_name'] ) ? $data['item_name'] : false,\n\t\t\t\t'item_id'    => isset( $data['item_id'] ) ? $data['item_id'] : false,\n\t\t\t\t'slug'       => WPN_Helper::sanitize_text_field($_REQUEST['slug']),\n\t\t\t\t'author'     => $data['author'],\n\t\t\t\t'url'        => home_url(),\n\t\t\t\t'beta'       => ! empty( $data['beta'] )\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 486,
+          "expression": "$request    = wp_remote_post( $this->api_url, array( 'timeout' => 15, 'sslverify' => $verify_ssl, 'body' => $api_params ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$request    = wp_remote_post( $this->api_url, array( 'timeout' => 15, 'sslverify' => $verify_ssl, 'body' => $api_params ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Integrations/EDD/EDD_SL_Plugin_Updater.php",
+        "line": 486
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-obje-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "object_injection",
+      "source": {
+        "expression": "$api_params = array(\n\t\t\t\t'edd_action' => 'get_version',\n\t\t\t\t'item_name'  => isset( $data['item_name'] ) ? $data['item_name'] : false,\n\t\t\t\t'item_id'    => isset( $data['item_id'] ) ? $data['item_id'] : false,\n\t\t\t\t'slug'       => WPN_Helper::sanitize_text_field($_REQUEST['slug']),\n\t\t\t\t'author'     => $data['author'],\n\t\t\t\t'url'        => home_url(),\n\t\t\t\t'beta'       => ! empty( $data['beta'] )\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Integrations/EDD/EDD_SL_Plugin_Updater.php",
+        "line": 475
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 475,
+          "expression": "$api_params = array(\n\t\t\t\t'edd_action' => 'get_version',\n\t\t\t\t'item_name'  => isset( $data['item_name'] ) ? $data['item_name'] : false,\n\t\t\t\t'item_id'    => isset( $data['item_id'] ) ? $data['item_id'] : false,\n\t\t\t\t'slug'       => WPN_Helper::sanitize_text_field($_REQUEST['slug']),\n\t\t\t\t'author'     => $data['author'],\n\t\t\t\t'url'        => home_url(),\n\t\t\t\t'beta'       => ! empty( $data['beta'] )\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 486,
+          "expression": "$request    = wp_remote_post( $this->api_url, array( 'timeout' => 15, 'sslverify' => $verify_ssl, 'body' => $api_params ) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 489,
+          "expression": "$version_info = json_decode( wp_remote_retrieve_body( $request ) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 494,
+          "expression": "$version_info->sections = maybe_unserialize( $version_info->sections )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$version_info->sections = maybe_unserialize( $version_info->sections )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Integrations/EDD/EDD_SL_Plugin_Updater.php",
+        "line": 494
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-xss-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo intval( $id );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Templates/admin-metabox-append-a-form.html.php",
+        "line": 7
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 7,
+          "expression": "echo intval( $id );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo intval( $id );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Templates/admin-metabox-append-a-form.html.php",
+        "line": 7
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-xss-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo intval( $field->get_id() );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Templates/admin-metabox-import-export-favorite-fields-export.html.php",
+        "line": 15
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 15,
+          "expression": "echo intval( $field->get_id() );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo intval( $field->get_id() );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Templates/admin-metabox-import-export-favorite-fields-export.html.php",
+        "line": 15
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-xss-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo intval( $id );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Templates/admin-menu-subs-filter.html.php",
+        "line": 18
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 18,
+          "expression": "echo intval( $id );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo intval( $id );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Templates/admin-menu-subs-filter.html.php",
+        "line": 18
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-xss-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo intval( $form[ 'id' ] );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Templates/admin-metabox-import-export-forms-export.html.php",
+        "line": 30
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 30,
+          "expression": "echo intval( $form[ 'id' ] );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo intval( $form[ 'id' ] );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Templates/admin-metabox-import-export-forms-export.html.php",
+        "line": 30
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-xss-009",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo intval( Ninja_Forms()->get_setting('load_legacy_submissions') ) ? 'edit.php?post_status=all&post_type=nf_sub' : 'admin.php?page=nf-submissions';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Templates/admin-menu-dashboard.html.php",
+        "line": 222
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 222,
+          "expression": "echo intval( Ninja_Forms()->get_setting('load_legacy_submissions') ) ? 'edit.php?post_status=all&post_type=nf_sub' : 'admin.php?page=nf-submissions';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo intval( Ninja_Forms()->get_setting('load_legacy_submissions') ) ? 'edit.php?post_status=all&post_type=nf_sub' : 'admin.php?page=nf-submissions';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Templates/admin-menu-dashboard.html.php",
+        "line": 222
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-ssrf-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "array(\n\t\t\t\t'body' => array(\n\t\t\t\t\t'secret'   => $secret_key,\n\t\t\t\t\t'response' => sanitize_text_field( $field['value'] ),\n\t\t\t\t\t'remoteip' => $_SERVER['REMOTE_ADDR'] ?? '',\n\t\t\t\t),\n\t\t\t\t'timeout' => 30,\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Fields/Hcaptcha.php",
+        "line": 131
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 131,
+          "expression": "$response = wp_remote_post(\n\t\t\tesc_url_raw( $url ),\n\t\t\tarray(\n\t\t\t\t'body' => array(\n\t\t\t\t\t'secret'   => $secret_key,\n\t\t\t\t\t'response' => sanitize_text_field( $field['value'] ),\n\t\t\t\t\t'remoteip' => $_SERVER['REMOTE_ADDR'] ?? '',\n\t\t\t\t),\n\t\t\t\t'timeout' => 30,\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(\n\t\t\tesc_url_raw( $url ),\n\t\t\tarray(\n\t\t\t\t'body' => array(\n\t\t\t\t\t'secret'   => $secret_key,\n\t\t\t\t\t'response' => sanitize_text_field( $field['value'] ),\n\t\t\t\t\t'remoteip' => $_SERVER['REMOTE_ADDR'] ?? '',\n\t\t\t\t),\n\t\t\t\t'timeout' => 30,\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Fields/Hcaptcha.php",
+        "line": 131
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-ssrf-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "array(\n\t\t\t\t'body' => array(\n\t\t\t\t\t'secret'   => $secret_key,\n\t\t\t\t\t'response' => sanitize_text_field( $field['value'] ),\n\t\t\t\t\t'remoteip' => $_SERVER['REMOTE_ADDR'] ?? '',\n\t\t\t\t),\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Fields/Turnstile.php",
+        "line": 113
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 113,
+          "expression": "$response = wp_remote_post(\n\t\t\tesc_url_raw( $url ),\n\t\t\tarray(\n\t\t\t\t'body' => array(\n\t\t\t\t\t'secret'   => $secret_key,\n\t\t\t\t\t'response' => sanitize_text_field( $field['value'] ),\n\t\t\t\t\t'remoteip' => $_SERVER['REMOTE_ADDR'] ?? '',\n\t\t\t\t),\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(\n\t\t\tesc_url_raw( $url ),\n\t\t\tarray(\n\t\t\t\t'body' => array(\n\t\t\t\t\t'secret'   => $secret_key,\n\t\t\t\t\t'response' => sanitize_text_field( $field['value'] ),\n\t\t\t\t\t'remoteip' => $_SERVER['REMOTE_ADDR'] ?? '',\n\t\t\t\t),\n\t\t\t)\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Fields/Turnstile.php",
+        "line": 113
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-sqli-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$form_id = absint( $form_id )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Display/Render.php",
+        "line": 52
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 52,
+          "expression": "$form_id = absint( $form_id )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 112,
+          "expression": "$result = $wpdb->get_row( \"SELECT COUNT(DISTINCT(p.ID)) AS count FROM `$wpdb->posts` AS p\n            LEFT JOIN `$wpdb->postmeta` AS m\n            ON p.ID = m.post_id\n            WHERE m.meta_key = '_form_id'\n            AND m.meta_value = $form_id\n            AND p.post_status = 'publish'\")",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$result = $wpdb->get_row( \"SELECT COUNT(DISTINCT(p.ID)) AS count FROM `$wpdb->posts` AS p\n            LEFT JOIN `$wpdb->postmeta` AS m\n            ON p.ID = m.post_id\n            WHERE m.meta_key = '_form_id'\n            AND m.meta_value = $form_id\n            AND p.post_status = 'publish'\")",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Display/Render.php",
+        "line": 112
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-xss-010",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$form_id = absint( $form_id )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Display/Render.php",
+        "line": 52
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 52,
+          "expression": "$form_id = absint( $form_id )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 120,
+          "expression": "echo do_shortcode( apply_filters( 'nf_sub_limit_reached_msg', $form->get_setting( 'sub_limit_msg' ), $form_id ));",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo do_shortcode( apply_filters( 'nf_sub_limit_reached_msg', $form->get_setting( 'sub_limit_msg' ), $form_id ));",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Display/Render.php",
+        "line": 120
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-xss-011",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$form_id = absint( $form_id )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Display/Render.php",
+        "line": 52
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 52,
+          "expression": "$form_id = absint( $form_id )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 345,
+          "expression": "$instance_id = $form_id",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 354,
+          "expression": "$form_id = $instance_id",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 362,
+          "expression": "$form_id = \"$form_id\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 366,
+          "expression": "echo $form_id;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $form_id;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Display/Render.php",
+        "line": 366
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-rce-009",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "function($item) {\n            return is_string($item) ? sanitize_text_field($item) : $item;\n        }",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Routes/Telemetry.php",
+        "line": 62
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 62,
+          "expression": "$data = array_map(function($item) {\n            return is_string($item) ? sanitize_text_field($item) : $item;\n        }, $data)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$data = array_map(function($item) {\n            return is_string($item) ? sanitize_text_field($item) : $item;\n        }, $data)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/Routes/Telemetry.php",
+        "line": 62
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-sqli-009",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$form_id = absint($_POST[ 'form' ])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/AJAX/Controllers/DeleteAllData.php",
+        "line": 38
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 38,
+          "expression": "$form_id = absint($_POST[ 'form' ])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 46,
+          "expression": "$subs = $wpdb->get_col( $wpdb->prepare( $sub_sql, $form_id ),0 )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 51,
+          "expression": "$delete_meta_query = $this->prepare_in( $delete_meta_query, $subs )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 52,
+          "expression": "$meta_result       = $wpdb->query( $delete_meta_query )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$meta_result       = $wpdb->query( $delete_meta_query )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/AJAX/Controllers/DeleteAllData.php",
+        "line": 52
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ninja-forms-sqli-010",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$form_id = absint($_POST[ 'form' ])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/AJAX/Controllers/DeleteAllData.php",
+        "line": 38
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 38,
+          "expression": "$form_id = absint($_POST[ 'form' ])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 46,
+          "expression": "$subs = $wpdb->get_col( $wpdb->prepare( $sub_sql, $form_id ),0 )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 56,
+          "expression": "$delete_post_query = $this->prepare_in( $delete_post_query, $subs )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 57,
+          "expression": "$post_result       = $wpdb->query( $delete_post_query )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$post_result       = $wpdb->query( $delete_post_query )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/includes/AJAX/Controllers/DeleteAllData.php",
+        "line": 57
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ninja-forms-xss-012",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$plugin = sanitize_text_field( $_GET[ 'nf-deactivated' ] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/lib/NF_AddonChecker.php",
+        "line": 38
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 38,
+          "expression": "$plugin = sanitize_text_field( $_GET[ 'nf-deactivated' ] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 43,
+          "expression": "echo sprintf( esc_html__( '%s was deactivated.', 'ninja-forms' ), '<code>' . $plugin . '</code>');",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo sprintf( esc_html__( '%s was deactivated.', 'ninja-forms' ), '<code>' . $plugin . '</code>');",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/lib/NF_AddonChecker.php",
+        "line": 43
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-xss-013",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$page_title = nfExtractPageTitle( $_REQUEST['title'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/lib/StepProcessing/menu.php",
+        "line": 72
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 72,
+          "expression": "$page_title = nfExtractPageTitle( $_REQUEST['title'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 133,
+          "expression": "echo $page_title",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $page_title",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/lib/StepProcessing/menu.php",
+        "line": 133
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ninja-forms-open-005",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$client_id = sanitize_text_field( $_GET[ 'client_id' ] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/services/oauth.php",
+        "line": 91
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 91,
+          "expression": "$client_id = sanitize_text_field( $_GET[ 'client_id' ] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 96,
+          "expression": "$redirect = add_query_arg( 'client_id', $client_id, $redirect )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 97,
+          "expression": "wp_redirect( $redirect )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_redirect( $redirect )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/services/oauth.php",
+        "line": 97
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ninja-forms-ssrf-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ninja-forms",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$args = [\n      'blocking' => false,\n      'method' => 'DELETE',\n      'body' => [\n        'client_id' => get_option( 'ninja_forms_oauth_client_id' ),\n        'client_secret' => get_option( 'ninja_forms_oauth_client_secret' )\n      ]\n    ]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/services/oauth.php",
+        "line": 117
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 117,
+          "expression": "$args = [\n      'blocking' => false,\n      'method' => 'DELETE',\n      'body' => [\n        'client_id' => get_option( 'ninja_forms_oauth_client_id' ),\n        'client_secret' => get_option( 'ninja_forms_oauth_client_secret' )\n      ]\n    ]",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 125,
+          "expression": "$response = wp_remote_request( $url, $args )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_request( $url, $args )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/ninja-forms/services/oauth.php",
+        "line": 125
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/ninja-forms/blocks/bootstrap.php",
+      "start": {
+        "line": 218,
+        "col": 5,
+        "offset": 9319
+      },
+      "end": {
+        "line": 252,
+        "col": 8,
+        "offset": 10898
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/ninja-forms/blocks/bootstrap.php",
+      "start": {
+        "line": 254,
+        "col": 5,
+        "offset": 10904
+      },
+      "end": {
+        "line": 271,
+        "col": 8,
+        "offset": 11642
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/ninja-forms/blocks/bootstrap.php",
+      "start": {
+        "line": 273,
+        "col": 5,
+        "offset": 11648
+      },
+      "end": {
+        "line": 308,
+        "col": 8,
+        "offset": 13229
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/ninja-forms/blocks/bootstrap.php",
+      "start": {
+        "line": 321,
+        "col": 5,
+        "offset": 13706
+      },
+      "end": {
+        "line": 430,
+        "col": 7,
+        "offset": 18486
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/ninja-forms/blocks/bootstrap.php",
+      "start": {
+        "line": 321,
+        "col": 5,
+        "offset": 13706
+      },
+      "end": {
+        "line": 430,
+        "col": 8,
+        "offset": 18487
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/ninja-forms/blocks/views/includes/Authentication/RateLimiter.php",
+      "start": {
+        "line": 121,
+        "col": 9,
+        "offset": 3677
+      },
+      "end": {
+        "line": 121,
+        "col": 69,
+        "offset": 3737
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/AJAX/Controllers/DeleteAllData.php",
+      "start": {
+        "line": 52,
+        "col": 25,
+        "offset": 1979
+      },
+      "end": {
+        "line": 52,
+        "col": 59,
+        "offset": 2013
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/AJAX/Controllers/DeleteAllData.php",
+      "start": {
+        "line": 57,
+        "col": 26,
+        "offset": 2280
+      },
+      "end": {
+        "line": 57,
+        "col": 60,
+        "offset": 2314
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/AJAX/Controllers/Submission.php",
+      "start": {
+        "line": 356,
+        "col": 23,
+        "offset": 14836
+      },
+      "end": {
+        "line": 361,
+        "col": 44,
+        "offset": 15125
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Abilities/Utils/CacheHelper.php",
+      "start": {
+        "line": 182,
+        "col": 3,
+        "offset": 4723
+      },
+      "end": {
+        "line": 182,
+        "col": 136,
+        "offset": 4856
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Abilities/Utils/FieldUtils.php",
+      "start": {
+        "line": 759,
+        "col": 2,
+        "offset": 28893
+      },
+      "end": {
+        "line": 759,
+        "col": 37,
+        "offset": 28928
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Abilities/Utils/FieldUtils.php",
+      "start": {
+        "line": 805,
+        "col": 3,
+        "offset": 29975
+      },
+      "end": {
+        "line": 805,
+        "col": 27,
+        "offset": 29999
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Abilities/Utils/FieldUtils.php",
+      "start": {
+        "line": 809,
+        "col": 3,
+        "offset": 30057
+      },
+      "end": {
+        "line": 809,
+        "col": 29,
+        "offset": 30083
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Abstracts/Migration.php",
+      "start": {
+        "line": 57,
+        "col": 19,
+        "offset": 1500
+      },
+      "end": {
+        "line": 57,
+        "col": 39,
+        "offset": 1520
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Abstracts/Migration.php",
+      "start": {
+        "line": 162,
+        "col": 9,
+        "offset": 4354
+      },
+      "end": {
+        "line": 162,
+        "col": 60,
+        "offset": 4405
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/ninja-forms/includes/Actions/Recaptcha.php",
+      "start": {
+        "line": 194,
+        "col": 3,
+        "offset": 4086
+      },
+      "end": {
+        "line": 194,
+        "col": 57,
+        "offset": 4140
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Admin/AddFormModal.php",
+      "start": {
+        "line": 61,
+        "col": 30,
+        "offset": 2089
+      },
+      "end": {
+        "line": 62,
+        "col": 52,
+        "offset": 2202
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/ninja-forms/includes/Admin/AllFormsTable.php",
+      "start": {
+        "line": 248,
+        "col": 13,
+        "offset": 7425
+      },
+      "end": {
+        "line": 248,
+        "col": 70,
+        "offset": 7482
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/ninja-forms/includes/Admin/AllFormsTable.php",
+      "start": {
+        "line": 264,
+        "col": 13,
+        "offset": 7999
+      },
+      "end": {
+        "line": 264,
+        "col": 70,
+        "offset": 8056
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/ninja-forms/includes/Admin/AllFormsTable.php",
+      "start": {
+        "line": 290,
+        "col": 13,
+        "offset": 8934
+      },
+      "end": {
+        "line": 290,
+        "col": 70,
+        "offset": 8991
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/ninja-forms/includes/Admin/CPT/Submission.php",
+      "start": {
+        "line": 239,
+        "col": 51,
+        "offset": 9308
+      },
+      "end": {
+        "line": 239,
+        "col": 94,
+        "offset": 9351
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/ninja-forms/includes/Admin/CPT/Submission.php",
+      "start": {
+        "line": 241,
+        "col": 53,
+        "offset": 9434
+      },
+      "end": {
+        "line": 241,
+        "col": 96,
+        "offset": 9477
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/ninja-forms/includes/Admin/Menus/MockData.php",
+      "start": {
+        "line": 25,
+        "col": 9,
+        "offset": 600
+      },
+      "end": {
+        "line": 25,
+        "col": 66,
+        "offset": 657
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/ninja-forms/includes/Admin/Menus/Submissions.php",
+      "start": {
+        "line": 468,
+        "col": 17,
+        "offset": 16537
+      },
+      "end": {
+        "line": 468,
+        "col": 40,
+        "offset": 16560
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Admin/Menus/SystemStatus.php",
+      "start": {
+        "line": 274,
+        "col": 33,
+        "offset": 10337
+      },
+      "end": {
+        "line": 274,
+        "col": 80,
+        "offset": 10384
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/ninja-forms/includes/Admin/Notices.php",
+      "start": {
+        "line": 206,
+        "col": 13,
+        "offset": 9861
+      },
+      "end": {
+        "line": 206,
+        "col": 39,
+        "offset": 9887
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Admin/Processes/ChunkPublish.php",
+      "start": {
+        "line": 266,
+        "col": 19,
+        "offset": 9247
+      },
+      "end": {
+        "line": 266,
+        "col": 39,
+        "offset": 9267
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Admin/Processes/ChunkPublish.php",
+      "start": {
+        "line": 276,
+        "col": 9,
+        "offset": 9735
+      },
+      "end": {
+        "line": 276,
+        "col": 29,
+        "offset": 9755
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Admin/Processes/ChunkPublish.php",
+      "start": {
+        "line": 286,
+        "col": 9,
+        "offset": 10118
+      },
+      "end": {
+        "line": 286,
+        "col": 29,
+        "offset": 10138
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Admin/Processes/ChunkPublish.php",
+      "start": {
+        "line": 291,
+        "col": 13,
+        "offset": 10443
+      },
+      "end": {
+        "line": 291,
+        "col": 33,
+        "offset": 10463
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Admin/Processes/ImportFormTemplate.php",
+      "start": {
+        "line": 63,
+        "col": 20,
+        "offset": 2231
+      },
+      "end": {
+        "line": 63,
+        "col": 46,
+        "offset": 2257
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Admin/UserDataRequests.php",
+      "start": {
+        "line": 281,
+        "col": 16,
+        "offset": 7217
+      },
+      "end": {
+        "line": 281,
+        "col": 54,
+        "offset": 7255
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations.php",
+      "start": {
+        "line": 110,
+        "col": 9,
+        "offset": 3350
+      },
+      "end": {
+        "line": 110,
+        "col": 94,
+        "offset": 3435
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations.php",
+      "start": {
+        "line": 111,
+        "col": 9,
+        "offset": 3445
+      },
+      "end": {
+        "line": 111,
+        "col": 105,
+        "offset": 3541
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations.php",
+      "start": {
+        "line": 112,
+        "col": 9,
+        "offset": 3551
+      },
+      "end": {
+        "line": 112,
+        "col": 113,
+        "offset": 3655
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations.php",
+      "start": {
+        "line": 170,
+        "col": 9,
+        "offset": 5435
+      },
+      "end": {
+        "line": 170,
+        "col": 92,
+        "offset": 5518
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations.php",
+      "start": {
+        "line": 171,
+        "col": 9,
+        "offset": 5528
+      },
+      "end": {
+        "line": 171,
+        "col": 98,
+        "offset": 5617
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations.php",
+      "start": {
+        "line": 174,
+        "col": 9,
+        "offset": 5677
+      },
+      "end": {
+        "line": 174,
+        "col": 106,
+        "offset": 5774
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations.php",
+      "start": {
+        "line": 217,
+        "col": 9,
+        "offset": 6815
+      },
+      "end": {
+        "line": 217,
+        "col": 78,
+        "offset": 6884
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations.php",
+      "start": {
+        "line": 218,
+        "col": 9,
+        "offset": 6894
+      },
+      "end": {
+        "line": 218,
+        "col": 75,
+        "offset": 6960
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations.php",
+      "start": {
+        "line": 219,
+        "col": 9,
+        "offset": 6970
+      },
+      "end": {
+        "line": 219,
+        "col": 81,
+        "offset": 7042
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations.php",
+      "start": {
+        "line": 220,
+        "col": 9,
+        "offset": 7052
+      },
+      "end": {
+        "line": 220,
+        "col": 87,
+        "offset": 7130
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations.php",
+      "start": {
+        "line": 221,
+        "col": 9,
+        "offset": 7140
+      },
+      "end": {
+        "line": 221,
+        "col": 83,
+        "offset": 7214
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations.php",
+      "start": {
+        "line": 240,
+        "col": 9,
+        "offset": 8060
+      },
+      "end": {
+        "line": 240,
+        "col": 97,
+        "offset": 8148
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations/ActionMeta.php",
+      "start": {
+        "line": 60,
+        "col": 13,
+        "offset": 1549
+      },
+      "end": {
+        "line": 60,
+        "col": 35,
+        "offset": 1571
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations/Actions.php",
+      "start": {
+        "line": 63,
+        "col": 13,
+        "offset": 1619
+      },
+      "end": {
+        "line": 63,
+        "col": 35,
+        "offset": 1641
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations/FieldMeta.php",
+      "start": {
+        "line": 57,
+        "col": 13,
+        "offset": 1514
+      },
+      "end": {
+        "line": 57,
+        "col": 35,
+        "offset": 1536
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations/Fields.php",
+      "start": {
+        "line": 71,
+        "col": 13,
+        "offset": 2108
+      },
+      "end": {
+        "line": 71,
+        "col": 35,
+        "offset": 2130
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations/FormMeta.php",
+      "start": {
+        "line": 64,
+        "col": 9,
+        "offset": 1813
+      },
+      "end": {
+        "line": 64,
+        "col": 31,
+        "offset": 1835
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations/Forms.php",
+      "start": {
+        "line": 77,
+        "col": 9,
+        "offset": 2271
+      },
+      "end": {
+        "line": 77,
+        "col": 31,
+        "offset": 2293
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations/ObjectMeta.php",
+      "start": {
+        "line": 54,
+        "col": 13,
+        "offset": 1505
+      },
+      "end": {
+        "line": 54,
+        "col": 35,
+        "offset": 1527
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations/Objects.php",
+      "start": {
+        "line": 54,
+        "col": 13,
+        "offset": 1490
+      },
+      "end": {
+        "line": 54,
+        "col": 35,
+        "offset": 1512
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations/Relationships.php",
+      "start": {
+        "line": 51,
+        "col": 9,
+        "offset": 1432
+      },
+      "end": {
+        "line": 51,
+        "col": 31,
+        "offset": 1454
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Migrations/Upgrades.php",
+      "start": {
+        "line": 53,
+        "col": 13,
+        "offset": 1330
+      },
+      "end": {
+        "line": 53,
+        "col": 35,
+        "offset": 1352
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Models/Form.php",
+      "start": {
+        "line": 93,
+        "col": 28,
+        "offset": 2758
+      },
+      "end": {
+        "line": 93,
+        "col": 62,
+        "offset": 2792
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Models/Form.php",
+      "start": {
+        "line": 98,
+        "col": 29,
+        "offset": 3074
+      },
+      "end": {
+        "line": 98,
+        "col": 63,
+        "offset": 3108
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Database/Models/Form.php",
+      "start": {
+        "line": 300,
+        "col": 20,
+        "offset": 10761
+      },
+      "end": {
+        "line": 300,
+        "col": 46,
+        "offset": 10787
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Display/Render.php",
+      "start": {
+        "line": 112,
+        "col": 23,
+        "offset": 3823
+      },
+      "end": {
+        "line": 117,
+        "col": 44,
+        "offset": 4105
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Exports/SingleSubmissionCPT.php",
+      "start": {
+        "line": 232,
+        "col": 21,
+        "offset": 5730
+      },
+      "end": {
+        "line": 232,
+        "col": 144,
+        "offset": 5853
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Factories/SubmissionAggregateFactory.php",
+      "start": {
+        "line": 84,
+        "col": 15,
+        "offset": 2438
+      },
+      "end": {
+        "line": 84,
+        "col": 46,
+        "offset": 2469
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Factories/SubmissionAggregateFactory.php",
+      "start": {
+        "line": 84,
+        "col": 68,
+        "offset": 2491
+      },
+      "end": {
+        "line": 84,
+        "col": 98,
+        "offset": 2521
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/ninja-forms/includes/Helper.php",
+      "start": {
+        "line": 333,
+        "col": 24,
+        "offset": 10236
+      },
+      "end": {
+        "line": 333,
+        "col": 46,
+        "offset": 10258
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-deser-unserialize-no-allowed-classes",
+      "path": "plugins/src/ninja-forms/includes/Helper.php",
+      "start": {
+        "line": 335,
+        "col": 44,
+        "offset": 10304
+      },
+      "end": {
+        "line": 335,
+        "col": 68,
+        "offset": 10328
+      },
+      "extra": {
+        "message": "unserialize() called without the allowed_classes option set to false (or a whitelist). Without this restriction, all classes available in the autoloader may be instantiated, enabling Object Injection attacks. Use unserialize($data, ['allowed_classes' => false]).\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "deserialization",
+          "cwe": "CWE-502",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Helper.php",
+      "start": {
+        "line": 392,
+        "col": 9,
+        "offset": 12573
+      },
+      "end": {
+        "line": 392,
+        "col": 29,
+        "offset": 12593
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Helper.php",
+      "start": {
+        "line": 470,
+        "col": 9,
+        "offset": 14814
+      },
+      "end": {
+        "line": 470,
+        "col": 29,
+        "offset": 14834
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-rand-security-token",
+      "path": "plugins/src/ninja-forms/includes/Helper.php",
+      "start": {
+        "line": 495,
+        "col": 13,
+        "offset": 15555
+      },
+      "end": {
+        "line": 495,
+        "col": 36,
+        "offset": 15578
+      },
+      "extra": {
+        "message": "rand() is not cryptographically secure and must not be used to generate security tokens, nonces, or passwords. Use wp_generate_password() or random_bytes() instead.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-338",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Helper.php",
+      "start": {
+        "line": 577,
+        "col": 9,
+        "offset": 18010
+      },
+      "end": {
+        "line": 577,
+        "col": 29,
+        "offset": 18030
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/ninja-forms/includes/Integrations/EDD/EDD_SL_Plugin_Updater.php",
+      "start": {
+        "line": 45,
+        "col": 3,
+        "offset": 1314
+      },
+      "end": {
+        "line": 45,
+        "col": 111,
+        "offset": 1422
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/ninja-forms/includes/Integrations/EDD/EDD_SL_Plugin_Updater.php",
+      "start": {
+        "line": 277,
+        "col": 3,
+        "offset": 8814
+      },
+      "end": {
+        "line": 277,
+        "col": 112,
+        "offset": 8923
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/ninja-forms/includes/Integrations/EDD/EDD_SL_Plugin_Updater.php",
+      "start": {
+        "line": 376,
+        "col": 3,
+        "offset": 11903
+      },
+      "end": {
+        "line": 376,
+        "col": 39,
+        "offset": 11939
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/ninja-forms/includes/Integrations/EDD/EDD_SL_Plugin_Updater.php",
+      "start": {
+        "line": 470,
+        "col": 3,
+        "offset": 15005
+      },
+      "end": {
+        "line": 470,
+        "col": 110,
+        "offset": 15112
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/ninja-forms/includes/Libraries/BackgroundProcessing/classes/wp-background-process.php",
+      "start": {
+        "line": 149,
+        "col": 4,
+        "offset": 2622
+      },
+      "end": {
+        "line": 149,
+        "col": 43,
+        "offset": 2661
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/ninja-forms/includes/Libraries/Session/class-wp-session.php",
+      "start": {
+        "line": 160,
+        "col": 9,
+        "offset": 4876
+      },
+      "end": {
+        "line": 160,
+        "col": 54,
+        "offset": 4921
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Libraries/Session/wp-session.php",
+      "start": {
+        "line": 136,
+        "col": 28,
+        "offset": 2788
+      },
+      "end": {
+        "line": 136,
+        "col": 151,
+        "offset": 2911
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/includes/Libraries/Session/wp-session.php",
+      "start": {
+        "line": 159,
+        "col": 13,
+        "offset": 3791
+      },
+      "end": {
+        "line": 159,
+        "col": 96,
+        "offset": 3874
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/ninja-forms/includes/Routes/Submissions.php",
+      "start": {
+        "line": 28,
+        "col": 9,
+        "offset": 783
+      },
+      "end": {
+        "line": 40,
+        "col": 12,
+        "offset": 1369
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/ninja-forms/includes/Routes/Submissions.php",
+      "start": {
+        "line": 42,
+        "col": 9,
+        "offset": 1381
+      },
+      "end": {
+        "line": 54,
+        "col": 12,
+        "offset": 1983
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/ninja-forms/includes/Routes/Submissions.php",
+      "start": {
+        "line": 56,
+        "col": 9,
+        "offset": 1995
+      },
+      "end": {
+        "line": 68,
+        "col": 12,
+        "offset": 2626
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/ninja-forms/includes/Routes/Submissions.php",
+      "start": {
+        "line": 70,
+        "col": 9,
+        "offset": 2638
+      },
+      "end": {
+        "line": 88,
+        "col": 12,
+        "offset": 3544
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/ninja-forms/includes/Routes/Submissions.php",
+      "start": {
+        "line": 90,
+        "col": 9,
+        "offset": 3556
+      },
+      "end": {
+        "line": 108,
+        "col": 12,
+        "offset": 4505
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/ninja-forms/includes/Routes/Submissions.php",
+      "start": {
+        "line": 110,
+        "col": 9,
+        "offset": 4517
+      },
+      "end": {
+        "line": 146,
+        "col": 12,
+        "offset": 6571
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/ninja-forms/includes/Routes/Submissions.php",
+      "start": {
+        "line": 148,
+        "col": 9,
+        "offset": 6583
+      },
+      "end": {
+        "line": 160,
+        "col": 12,
+        "offset": 7236
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/ninja-forms/includes/Routes/Submissions.php",
+      "start": {
+        "line": 165,
+        "col": 9,
+        "offset": 7347
+      },
+      "end": {
+        "line": 178,
+        "col": 12,
+        "offset": 8063
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/ninja-forms/includes/Routes/Submissions.php",
+      "start": {
+        "line": 180,
+        "col": 9,
+        "offset": 8075
+      },
+      "end": {
+        "line": 204,
+        "col": 12,
+        "offset": 9313
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/ninja-forms/includes/Routes/Submissions.php",
+      "start": {
+        "line": 206,
+        "col": 9,
+        "offset": 9325
+      },
+      "end": {
+        "line": 210,
+        "col": 12,
+        "offset": 9606
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/ninja-forms/includes/Routes/Submissions.php",
+      "start": {
+        "line": 212,
+        "col": 9,
+        "offset": 9618
+      },
+      "end": {
+        "line": 230,
+        "col": 12,
+        "offset": 10503
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/ninja-forms/includes/Routes/Telemetry.php",
+      "start": {
+        "line": 20,
+        "col": 13,
+        "offset": 572
+      },
+      "end": {
+        "line": 24,
+        "col": 16,
+        "offset": 826
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/ninja-forms/lib/NF_AddonChecker.php",
+      "start": {
+        "line": 29,
+        "col": 17,
+        "offset": 779
+      },
+      "end": {
+        "line": 29,
+        "col": 85,
+        "offset": 847
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/ninja-forms/ninja-forms.php",
+      "start": {
+        "line": 28,
+        "col": 14,
+        "offset": 914
+      },
+      "end": {
+        "line": 28,
+        "col": 62,
+        "offset": 962
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/ninja-forms/services/oauth.php",
+      "start": {
+        "line": 97,
+        "col": 7,
+        "offset": 2824
+      },
+      "end": {
+        "line": 97,
+        "col": 32,
+        "offset": 2849
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 15,
+    "taint_high": 16,
+    "taint_total": 49,
+    "semgrep_error": 1,
+    "semgrep_warning": 89
+  }
+}

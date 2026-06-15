@@ -1,6 +1,6 @@
 # Attack Surface: mailchimp-for-wp
 
-> Generated: 2026-06-14T21:21:11Z
+> Generated: 2026-06-15T02:06:23Z
 
 ## Section 1: Entry Points
 

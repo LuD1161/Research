@@ -1,0 +1,1012 @@
+{
+  "plugin_slug": "extendify",
+  "priority_score": 113,
+  "metadata": {
+    "php_files": 205,
+    "total_lines": 32146
+  },
+  "attack_surface_summary": "# Attack Surface: extendify\n\n> Generated: 2026-06-15T02:06:21Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 209,
+    "total_sinks": 164,
+    "total_sanitizers": 80,
+    "direct_flows": 167,
+    "functions_with_sources": 109,
+    "functions_with_sinks": 97,
+    "files_analyzed": 205,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "extendify-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "[\n            'headers' => [\n                'Content-Type' => 'application/json',\n                'referer' => get_bloginfo('url'),\n            ],\n            'body' => wp_json_encode([\n                'wpLanguage' => get_locale(),\n                'siteProfile' => get_option('extendify_site_profile', []),\n                'siteId' => get_option('extendify_site_id'),\n                'version' => Config::$version,\n                'title' => get_bloginfo('name'),\n                'wpVersion' => get_bloginfo('version'),\n                'partnerId' => PartnerData::$id,\n                'devbuild' => constant('EXTENDIFY_DEVMODE'),\n            ]),\n        ]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/AutoLaunch/Services/WooCommerceImporter.php",
+        "line": 29
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 29,
+          "expression": "$response = wp_remote_post(Constants::AI_HOST . '/api/plugins/woo/content', [\n            'headers' => [\n                'Content-Type' => 'application/json',\n                'referer' => get_bloginfo('url'),\n            ],\n            'body' => wp_json_encode([\n                'wpLanguage' => get_locale(),\n                'siteProfile' => get_option('extendify_site_profile', []),\n                'siteId' => get_option('extendify_site_id'),\n                'version' => Config::$version,\n                'title' => get_bloginfo('name'),\n                'wpVersion' => get_bloginfo('version'),\n                'partnerId' => PartnerData::$id,\n                'devbuild' => constant('EXTENDIFY_DEVMODE'),\n            ]),\n        ])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(Constants::AI_HOST . '/api/plugins/woo/content', [\n            'headers' => [\n                'Content-Type' => 'application/json',\n                'referer' => get_bloginfo('url'),\n            ],\n            'body' => wp_json_encode([\n                'wpLanguage' => get_locale(),\n                'siteProfile' => get_option('extendify_site_profile', []),\n                'siteId' => get_option('extendify_site_id'),\n                'version' => Config::$version,\n                'title' => get_bloginfo('name'),\n                'wpVersion' => get_bloginfo('version'),\n                'partnerId' => PartnerData::$id,\n                'devbuild' => constant('EXTENDIFY_DEVMODE'),\n            ]),\n        ])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/AutoLaunch/Services/WooCommerceImporter.php",
+        "line": 29
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "extendify-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$filter = sanitize_text_field(wp_unslash($_REQUEST['filter'] ?? 'active'))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/PluginNotifications/NotificationsListTable.php",
+        "line": 96
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 96,
+          "expression": "$filter = sanitize_text_field(wp_unslash($_REQUEST['filter'] ?? 'active'))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 97,
+          "expression": "$items = array_values(Admin::getNotices($filter))",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 109,
+          "expression": "usort($items, function ($a, $b) use ($orderby, $order) {\n            $result = strcmp($a[$orderby] ?? '', $b[$orderby] ?? '');\n            return $order === 'asc' ? $result : -$result;\n        })",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "usort($items, function ($a, $b) use ($orderby, $order) {\n            $result = strcmp($a[$orderby] ?? '', $b[$orderby] ?? '');\n            return $order === 'asc' ? $result : -$result;\n        })",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/PluginNotifications/NotificationsListTable.php",
+        "line": 109
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "extendify-rce-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "extendify",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "wp_unslash($_REQUEST['notification'] ?? [])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/PluginNotifications/NotificationsListTable.php",
+        "line": 136
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 136,
+          "expression": "$ids = array_map('sanitize_text_field', wp_unslash($_REQUEST['notification'] ?? []))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$ids = array_map('sanitize_text_field', wp_unslash($_REQUEST['notification'] ?? []))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/PluginNotifications/NotificationsListTable.php",
+        "line": 136
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "extendify-ssrf-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "[\n            'headers' => [\n                'Content-Type' => 'application/json',\n                'referer' => get_bloginfo('url'),\n            ],\n            'body' => wp_json_encode([\n                'wpLanguage' => get_locale(),\n                'siteProfile' => get_option('extendify_site_profile', []),\n                'siteId' => get_option('extendify_site_id'),\n                'version' => Config::$version,\n                'title' => get_bloginfo('name'),\n                'wpVersion' => get_bloginfo('version'),\n                'partnerId' => PartnerData::$id,\n                'devbuild' => constant('EXTENDIFY_DEVMODE'),\n            ]),\n        ]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Launch/Services/WooCommerceImporter.php",
+        "line": 29
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 29,
+          "expression": "$response = wp_remote_post(Constants::AI_HOST . '/api/plugins/woo/content', [\n            'headers' => [\n                'Content-Type' => 'application/json',\n                'referer' => get_bloginfo('url'),\n            ],\n            'body' => wp_json_encode([\n                'wpLanguage' => get_locale(),\n                'siteProfile' => get_option('extendify_site_profile', []),\n                'siteId' => get_option('extendify_site_id'),\n                'version' => Config::$version,\n                'title' => get_bloginfo('name'),\n                'wpVersion' => get_bloginfo('version'),\n                'partnerId' => PartnerData::$id,\n                'devbuild' => constant('EXTENDIFY_DEVMODE'),\n            ]),\n        ])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(Constants::AI_HOST . '/api/plugins/woo/content', [\n            'headers' => [\n                'Content-Type' => 'application/json',\n                'referer' => get_bloginfo('url'),\n            ],\n            'body' => wp_json_encode([\n                'wpLanguage' => get_locale(),\n                'siteProfile' => get_option('extendify_site_profile', []),\n                'siteId' => get_option('extendify_site_id'),\n                'version' => Config::$version,\n                'title' => get_bloginfo('name'),\n                'wpVersion' => get_bloginfo('version'),\n                'partnerId' => PartnerData::$id,\n                'devbuild' => constant('EXTENDIFY_DEVMODE'),\n            ]),\n        ])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Launch/Services/WooCommerceImporter.php",
+        "line": 29
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "extendify-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$results = $wpdb->get_results(\n            $wpdb->prepare(\n                \"SELECT * FROM $table WHERE user_id = %d ORDER BY id DESC LIMIT 150\",\n                $user_id\n            ),\n            ARRAY_A\n        )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Agent/Controllers/ChatHistoryController.php",
+        "line": 40
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 40,
+          "expression": "$results = $wpdb->get_results(\n            $wpdb->prepare(\n                \"SELECT * FROM $table WHERE user_id = %d ORDER BY id DESC LIMIT 150\",\n                $user_id\n            ),\n            ARRAY_A\n        )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 47,
+          "expression": "array_map(function ($item) {\n            return [\n                'id'        => $item['event_id'],\n                'type'      => $item['type'],\n                'details'   => json_decode($item['details'], true),\n            ];\n        }, $results)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(function ($item) {\n            return [\n                'id'        => $item['event_id'],\n                'type'      => $item['type'],\n                'details'   => json_decode($item['details'], true),\n            ];\n        }, $results)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Agent/Controllers/ChatHistoryController.php",
+        "line": 47
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "extendify-rce-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$toursData = get_option('extendify_assist_tour_progress', [])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/VersionMigrator.php",
+        "line": 75
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 75,
+          "expression": "$toursData = get_option('extendify_assist_tour_progress', [])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 76,
+          "expression": "$state = ($toursData['state']['progress'] ?? null)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 78,
+          "expression": "$state = array_map(function ($progress) use ($normalizeMathBug) {\n                $progress['openedCount'] = $normalizeMathBug($progress['openedCount']);\n                $progress['closedManuallyCount'] = $normalizeMathBug($progress['closedManuallyCount']);\n                $progress['completedCount'] = $normalizeMathBug($progress['completedCount']);\n                return $progress;\n            }, $state)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 78,
+          "expression": "$state = array_map(function ($progress) use ($normalizeMathBug) {\n                $progress['openedCount'] = $normalizeMathBug($progress['openedCount']);\n                $progress['closedManuallyCount'] = $normalizeMathBug($progress['closedManuallyCount']);\n                $progress['completedCount'] = $normalizeMathBug($progress['completedCount']);\n                return $progress;\n            }, $state)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$state = array_map(function ($progress) use ($normalizeMathBug) {\n                $progress['openedCount'] = $normalizeMathBug($progress['openedCount']);\n                $progress['closedManuallyCount'] = $normalizeMathBug($progress['closedManuallyCount']);\n                $progress['completedCount'] = $normalizeMathBug($progress['completedCount']);\n                return $progress;\n            }, $state)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/VersionMigrator.php",
+        "line": 78
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "extendify-rce-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$kbData = get_option('extendify_assist_support_articles', [])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/VersionMigrator.php",
+        "line": 95
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 95,
+          "expression": "$kbData = get_option('extendify_assist_support_articles', [])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 96,
+          "expression": "$state = ($kbData['state']['viewedArticles'] ?? null)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 98,
+          "expression": "$kbData['state']['viewedArticles'] = array_map($normalizeCount, $state)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$kbData['state']['viewedArticles'] = array_map($normalizeCount, $state)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/VersionMigrator.php",
+        "line": 98
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "extendify-rce-006",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$router = get_option(\"extendify_{$key}_router\", [])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/VersionMigrator.php",
+        "line": 104
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 104,
+          "expression": "$router = get_option(\"extendify_{$key}_router\", [])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 105,
+          "expression": "$state = ($router['state']['viewedPages'] ?? null)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 107,
+          "expression": "$router['state']['viewedPages'] = array_map($normalizeCount, $state)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$router['state']['viewedPages'] = array_map($normalizeCount, $state)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/VersionMigrator.php",
+        "line": 107
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "extendify-rce-007",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$hash = substr(get_post_meta($formId, '_hash', true), 0, 7)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/PluginDependencies/Forms/ContactForm7.php",
+        "line": 60
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 60,
+          "expression": "$hash = substr(get_post_meta($formId, '_hash', true), 0, 7)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 64,
+          "expression": "$updatedContent = preg_replace('/\"hash\":\"[a-f0-9]+\"/', '\"hash\":\"' . $hash . '\"', $updatedContent)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$updatedContent = preg_replace('/\"hash\":\"[a-f0-9]+\"/', '\"hash\":\"' . $hash . '\"', $updatedContent)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/PluginDependencies/Forms/ContactForm7.php",
+        "line": 64
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "extendify-rce-008",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "extendify",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$hash = substr(get_post_meta($formId, '_hash', true), 0, 7)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/PluginDependencies/Forms/ContactForm7.php",
+        "line": 60
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 60,
+          "expression": "$hash = substr(get_post_meta($formId, '_hash', true), 0, 7)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 66,
+          "expression": "$updatedContent = preg_replace(\n            '/\\[contact-form-7 id=\"[a-f0-9]+\"/',\n            '[contact-form-7 id=\"' . $hash . '\"',\n            $updatedContent\n        )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$updatedContent = preg_replace(\n            '/\\[contact-form-7 id=\"[a-f0-9]+\"/',\n            '[contact-form-7 id=\"' . $hash . '\"',\n            $updatedContent\n        )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/extendify/app/Shared/Services/PluginDependencies/Forms/ContactForm7.php",
+        "line": 66
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/extendify/app/Agent/Controllers/ChatHistoryController.php",
+      "start": {
+        "line": 68,
+        "col": 14,
+        "offset": 1614
+      },
+      "end": {
+        "line": 68,
+        "col": 57,
+        "offset": 1657
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/extendify/app/Agent/Controllers/ChatHistoryController.php",
+      "start": {
+        "line": 162,
+        "col": 9,
+        "offset": 4486
+      },
+      "end": {
+        "line": 162,
+        "col": 27,
+        "offset": 4504
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/extendify/app/Agent/Controllers/ChatHistoryController.php",
+      "start": {
+        "line": 185,
+        "col": 19,
+        "offset": 5320
+      },
+      "end": {
+        "line": 185,
+        "col": 62,
+        "offset": 5363
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/extendify/app/Agent/Controllers/ChatHistoryController.php",
+      "start": {
+        "line": 193,
+        "col": 13,
+        "offset": 5681
+      },
+      "end": {
+        "line": 193,
+        "col": 31,
+        "offset": 5699
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/extendify/app/Agent/Controllers/ChatHistoryController.php",
+      "start": {
+        "line": 201,
+        "col": 17,
+        "offset": 6011
+      },
+      "end": {
+        "line": 201,
+        "col": 74,
+        "offset": 6068
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/extendify/app/Agent/Controllers/ChatHistoryController.php",
+      "start": {
+        "line": 208,
+        "col": 13,
+        "offset": 6302
+      },
+      "end": {
+        "line": 208,
+        "col": 93,
+        "offset": 6382
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-sqli-variable-in-query",
+      "path": "plugins/src/extendify/app/Agent/Controllers/ChatHistoryController.php",
+      "start": {
+        "line": 214,
+        "col": 13,
+        "offset": 6579
+      },
+      "end": {
+        "line": 214,
+        "col": 68,
+        "offset": 6634
+      },
+      "extra": {
+        "message": "Passing a variable directly to $wpdb query methods without prepare() may allow SQL injection. Use $wpdb->prepare() to safely parameterize queries.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "sql-injection",
+          "cwe": "CWE-89",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/extendify/app/PluginNotifications/Admin.php",
+      "start": {
+        "line": 84,
+        "col": 17,
+        "offset": 2674
+      },
+      "end": {
+        "line": 84,
+        "col": 42,
+        "offset": 2699
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/extendify/app/QuickEdit/Controllers/SaveController.php",
+      "start": {
+        "line": 23,
+        "col": 9,
+        "offset": 542
+      },
+      "end": {
+        "line": 27,
+        "col": 12,
+        "offset": 796
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/extendify/app/QuickEdit/Controllers/SaveController.php",
+      "start": {
+        "line": 29,
+        "col": 9,
+        "offset": 806
+      },
+      "end": {
+        "line": 35,
+        "col": 12,
+        "offset": 1130
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/extendify/app/QuickEdit/Controllers/SiteIdentityController.php",
+      "start": {
+        "line": 18,
+        "col": 9,
+        "offset": 453
+      },
+      "end": {
+        "line": 29,
+        "col": 12,
+        "offset": 974
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/extendify/app/QuickEdit/Controllers/WCProductController.php",
+      "start": {
+        "line": 20,
+        "col": 9,
+        "offset": 465
+      },
+      "end": {
+        "line": 31,
+        "col": 12,
+        "offset": 980
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/extendify/app/QuickEdit/Controllers/WPFormsController.php",
+      "start": {
+        "line": 21,
+        "col": 9,
+        "offset": 524
+      },
+      "end": {
+        "line": 32,
+        "col": 12,
+        "offset": 1046
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-auth-rest-no-permission-callback",
+      "path": "plugins/src/extendify/app/QuickEdit/Controllers/WPNavigationController.php",
+      "start": {
+        "line": 24,
+        "col": 9,
+        "offset": 695
+      },
+      "end": {
+        "line": 28,
+        "col": 12,
+        "offset": 954
+      },
+      "extra": {
+        "message": "REST route registered without a permission_callback. This defaults to open access in older WordPress versions. Always define a permission_callback that verifies user capabilities.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "auth-bypass",
+          "cwe": "CWE-862",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-sha1-password",
+      "path": "plugins/src/extendify/app/Shared/Services/Import/ImageUploader.php",
+      "start": {
+        "line": 112,
+        "col": 9,
+        "offset": 3281
+      },
+      "end": {
+        "line": 112,
+        "col": 34,
+        "offset": 3306
+      },
+      "extra": {
+        "message": "sha1() is a cryptographically weak hash function not suitable for password storage. Use wp_hash_password() or password_hash() with a modern algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-916",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-sha1-password",
+      "path": "plugins/src/extendify/app/Shared/Services/Import/ImageUploader.php",
+      "start": {
+        "line": 170,
+        "col": 9,
+        "offset": 5308
+      },
+      "end": {
+        "line": 177,
+        "col": 11,
+        "offset": 5575
+      },
+      "extra": {
+        "message": "sha1() is a cryptographically weak hash function not suitable for password storage. Use wp_hash_password() or password_hash() with a modern algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-916",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-sha1-password",
+      "path": "plugins/src/extendify/app/Shared/Services/Import/ImageUploader.php",
+      "start": {
+        "line": 231,
+        "col": 9,
+        "offset": 7440
+      },
+      "end": {
+        "line": 237,
+        "col": 12,
+        "offset": 7695
+      },
+      "extra": {
+        "message": "sha1() is a cryptographically weak hash function not suitable for password storage. Use wp_hash_password() or password_hash() with a modern algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-916",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 7,
+    "taint_high": 2,
+    "taint_total": 10,
+    "semgrep_error": 3,
+    "semgrep_warning": 14
+  }
+}

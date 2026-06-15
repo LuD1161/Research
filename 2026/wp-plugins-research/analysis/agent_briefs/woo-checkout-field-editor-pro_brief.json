@@ -1,0 +1,707 @@
+{
+  "plugin_slug": "woo-checkout-field-editor-pro",
+  "priority_score": 12,
+  "metadata": {
+    "php_files": 46,
+    "total_lines": 11116
+  },
+  "attack_surface_summary": "# Attack Surface: woo-checkout-field-editor-pro\n\n> Generated: 2026-06-15T02:06:28Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 232,
+    "total_sinks": 41,
+    "total_sanitizers": 364,
+    "direct_flows": 153,
+    "functions_with_sources": 61,
+    "functions_with_sinks": 20,
+    "files_analyzed": 46,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "woo-checkout-field-editor-pro-ssrf-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woo-checkout-field-editor-pro",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$data = array(\n            'plugin'        => 'wcfe',\n            'reason'        => sanitize_text_field(wp_unslash($_POST['reason'])),\n            'comments'      => isset($_POST['comments']) ? sanitize_textarea_field(wp_unslash($_POST['comments'])) : '',\n            'date'          => gmdate(\"M d, Y h:i:s A\"),\n            'software'      => isset($_SERVER['SERVER_SOFTWARE']) ? sanitize_text_field(wp_unslash($_SERVER['SERVER_SOFTWARE'])) : '',\n            'php_version'   => phpversion(),\n            'mysql_version' => $wpdb->db_version(),\n            'wp_version'    => get_bloginfo('version'),\n            'wc_version'    => (!defined('WC_VERSION')) ? '' : WC_VERSION,\n            'locale'        => get_locale(),\n            'multisite'     => is_multisite() ? 'Yes' : 'No',\n            'plugin_version'=> THWCFD_VERSION\n        )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/includes/class-thwcfd.php",
+        "line": 588
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 588,
+          "expression": "$data = array(\n            'plugin'        => 'wcfe',\n            'reason'        => sanitize_text_field(wp_unslash($_POST['reason'])),\n            'comments'      => isset($_POST['comments']) ? sanitize_textarea_field(wp_unslash($_POST['comments'])) : '',\n            'date'          => gmdate(\"M d, Y h:i:s A\"),\n            'software'      => isset($_SERVER['SERVER_SOFTWARE']) ? sanitize_text_field(wp_unslash($_SERVER['SERVER_SOFTWARE'])) : '',\n            'php_version'   => phpversion(),\n            'mysql_version' => $wpdb->db_version(),\n            'wp_version'    => get_bloginfo('version'),\n            'wc_version'    => (!defined('WC_VERSION')) ? '' : WC_VERSION,\n            'locale'        => get_locale(),\n            'multisite'     => is_multisite() ? 'Yes' : 'No',\n            'plugin_version'=> THWCFD_VERSION\n        )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 603,
+          "expression": "$response = wp_remote_post('https://feedback.themehigh.in/api/add_feedbacks', array(\n            'method'      => 'POST',\n            'timeout'     => 45,\n            'redirection' => 5,\n            'httpversion' => '1.0',\n            'blocking'    => false,\n            'headers'     => array( 'Content-Type' => 'application/json' ),\n            'body'        => json_encode($data),\n            'cookies'     => array()\n                )\n        )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post('https://feedback.themehigh.in/api/add_feedbacks', array(\n            'method'      => 'POST',\n            'timeout'     => 45,\n            'redirection' => 5,\n            'httpversion' => '1.0',\n            'blocking'    => false,\n            'headers'     => array( 'Content-Type' => 'application/json' ),\n            'body'        => json_encode($data),\n            'cookies'     => array()\n                )\n        )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/includes/class-thwcfd.php",
+        "line": 603
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woo-checkout-field-editor-pro-rce-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woo-checkout-field-editor-pro",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$f_names = !empty( $_POST['f_name'] ) ? $_POST['f_name'] : array()",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-general.php",
+        "line": 283
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 283,
+          "expression": "$f_names = !empty( $_POST['f_name'] ) ? $_POST['f_name'] : array()",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 284,
+          "expression": "$f_names = array_map('sanitize_key', $f_names)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 284,
+          "expression": "$f_names = array_map('sanitize_key', $f_names)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$f_names = array_map('sanitize_key', $f_names)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-general.php",
+        "line": 284
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woo-checkout-field-editor-pro-rce-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woo-checkout-field-editor-pro",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$f_order   = !empty( $_POST['f_order'] ) ? $_POST['f_order'] : array()",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-general.php",
+        "line": 290
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 290,
+          "expression": "$f_order   = !empty( $_POST['f_order'] ) ? $_POST['f_order'] : array()",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 291,
+          "expression": "$f_order = array_map('absint', $f_order)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 291,
+          "expression": "$f_order = array_map('absint', $f_order)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$f_order = array_map('absint', $f_order)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-general.php",
+        "line": 291
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woo-checkout-field-editor-pro-rce-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woo-checkout-field-editor-pro",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$f_deleted = !empty( $_POST['f_deleted'] ) ? $_POST['f_deleted'] : array()",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-general.php",
+        "line": 292
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 292,
+          "expression": "$f_deleted = !empty( $_POST['f_deleted'] ) ? $_POST['f_deleted'] : array()",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 293,
+          "expression": "$f_deleted = array_map('absint', $f_deleted)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 293,
+          "expression": "$f_deleted = array_map('absint', $f_deleted)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$f_deleted = array_map('absint', $f_deleted)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-general.php",
+        "line": 293
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woo-checkout-field-editor-pro-rce-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woo-checkout-field-editor-pro",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$f_enabled = !empty( $_POST['f_enabled'] ) ? $_POST['f_enabled'] : array()",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-general.php",
+        "line": 294
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 294,
+          "expression": "$f_enabled = !empty( $_POST['f_enabled'] ) ? $_POST['f_enabled'] : array()",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 295,
+          "expression": "$f_enabled = array_map('absint', $f_enabled)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 295,
+          "expression": "$f_enabled = array_map('absint', $f_enabled)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$f_enabled = array_map('absint', $f_enabled)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-general.php",
+        "line": 295
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woo-checkout-field-editor-pro-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woo-checkout-field-editor-pro",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$url = $this->get_admin_url($current_tab, $this->c_type, sanitize_title($id))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-general.php",
+        "line": 558
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 558,
+          "expression": "$url = $this->get_admin_url($current_tab, $this->c_type, sanitize_title($id))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 559,
+          "expression": "echo '<li><a href=\"'.esc_url($url) .'\" class=\"'. ( $current_section == $id ? 'current' : '' ) .'\">'. esc_html($label) .'</a> '. (end( $array_keys ) == $id ? '' : '|') .' </li>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<li><a href=\"'.esc_url($url) .'\" class=\"'. ( $current_section == $id ? 'current' : '' ) .'\">'. esc_html($label) .'</a> '. (end( $array_keys ) == $id ? '' : '|') .' </li>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-general.php",
+        "line": 559
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woo-checkout-field-editor-pro-rce-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woo-checkout-field-editor-pro",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$f_names = !empty( $_POST['f_name'] ) ? $_POST['f_name'] : array()",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-block-fields.php",
+        "line": 320
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 320,
+          "expression": "$f_names = !empty( $_POST['f_name'] ) ? $_POST['f_name'] : array()",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 321,
+          "expression": "$f_names = array_map('sanitize_key', $f_names)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 321,
+          "expression": "$f_names = array_map('sanitize_key', $f_names)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$f_names = array_map('sanitize_key', $f_names)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-block-fields.php",
+        "line": 321
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woo-checkout-field-editor-pro-rce-006",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woo-checkout-field-editor-pro",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$f_order   = !empty( $_POST['f_order'] ) ? $_POST['f_order'] : array()",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-block-fields.php",
+        "line": 327
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 327,
+          "expression": "$f_order   = !empty( $_POST['f_order'] ) ? $_POST['f_order'] : array()",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 328,
+          "expression": "$f_order = array_map('absint', $f_order)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 328,
+          "expression": "$f_order = array_map('absint', $f_order)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$f_order = array_map('absint', $f_order)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-block-fields.php",
+        "line": 328
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woo-checkout-field-editor-pro-rce-007",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woo-checkout-field-editor-pro",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$f_deleted = !empty( $_POST['f_deleted'] ) ? $_POST['f_deleted'] : array()",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-block-fields.php",
+        "line": 329
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 329,
+          "expression": "$f_deleted = !empty( $_POST['f_deleted'] ) ? $_POST['f_deleted'] : array()",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 330,
+          "expression": "$f_deleted = array_map('absint', $f_deleted)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 330,
+          "expression": "$f_deleted = array_map('absint', $f_deleted)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$f_deleted = array_map('absint', $f_deleted)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-block-fields.php",
+        "line": 330
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woo-checkout-field-editor-pro-rce-008",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woo-checkout-field-editor-pro",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$f_enabled = !empty( $_POST['f_enabled'] ) ? $_POST['f_enabled'] : array()",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-block-fields.php",
+        "line": 331
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 331,
+          "expression": "$f_enabled = !empty( $_POST['f_enabled'] ) ? $_POST['f_enabled'] : array()",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 332,
+          "expression": "$f_enabled = array_map('absint', $f_enabled)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 332,
+          "expression": "$f_enabled = array_map('absint', $f_enabled)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$f_enabled = array_map('absint', $f_enabled)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-block-fields.php",
+        "line": 332
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woo-checkout-field-editor-pro-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woo-checkout-field-editor-pro",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$url = $this->get_admin_url($this->page_id, $this->c_type, sanitize_title($name))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-block-fields.php",
+        "line": 585
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 585,
+          "expression": "$url = $this->get_admin_url($this->page_id, $this->c_type, sanitize_title($name))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 589,
+          "expression": "echo '<li><a href=\"'. esc_url($url) .'\" class=\"'. ($current_section == $name ? 'current' : '') .'\">'. esc_html($title) .'</a></li>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<li><a href=\"'. esc_url($url) .'\" class=\"'. ($current_section == $name ? 'current' : '') .'\">'. esc_html($title) .'</a></li>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/admin/class-thwcfd-admin-settings-block-fields.php",
+        "line": 589
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woo-checkout-field-editor-pro-vari-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "woo-checkout-field-editor-pro",
+      "vulnerability_class": "variable_injection",
+      "source": {
+        "expression": "$post_data = wp_unslash( $_POST['post_data'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/public/class-thwcfd-public-checkout.php",
+        "line": 204
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 204,
+          "expression": "$post_data = wp_unslash( $_POST['post_data'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 207,
+          "expression": "parse_str( $post_data, $post_data_arr )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "parse_str( $post_data, $post_data_arr )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/woo-checkout-field-editor-pro/public/class-thwcfd-public-checkout.php",
+        "line": 207
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [],
+  "stats": {
+    "taint_critical": 0,
+    "taint_high": 0,
+    "taint_total": 12,
+    "semgrep_error": 0,
+    "semgrep_warning": 0
+  }
+}

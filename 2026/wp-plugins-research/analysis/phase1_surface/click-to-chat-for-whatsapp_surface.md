@@ -1,6 +1,6 @@
 # Attack Surface: click-to-chat-for-whatsapp
 
-> Generated: 2026-06-14T21:21:09Z
+> Generated: 2026-06-15T02:06:19Z
 
 ## Section 1: Entry Points
 

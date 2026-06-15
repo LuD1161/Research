@@ -1,0 +1,2582 @@
+{
+  "plugin_slug": "pagelayer",
+  "priority_score": 169,
+  "metadata": {
+    "php_files": 37,
+    "total_lines": 38387
+  },
+  "attack_surface_summary": "# Attack Surface: pagelayer\n\n> Generated: 2026-06-15T02:06:24Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 621,
+    "total_sinks": 145,
+    "total_sanitizers": 364,
+    "direct_flows": 574,
+    "functions_with_sources": 139,
+    "functions_with_sinks": 78,
+    "files_analyzed": 37,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "pagelayer-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$post = get_post( $_REQUEST['post'] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 400
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 400,
+          "expression": "$post = get_post( $_REQUEST['post'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 421,
+          "expression": "$meta_box_url = add_query_arg(\n\t\tarray(\n\t\t\t'post'\t=> $post->ID,\n\t\t\t'action'\t=> 'editpost',\n\t\t),\n\t\t$meta_box_url\n\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 429,
+          "expression": "echo '<style>\n.'.$meta_id.' #adminmenumain, .'.$meta_id.' #wpfooter, .'.$meta_id.' #wpadminbar{\ndisplay:none;\n}\n.'.$meta_id.' #wpcontent{\nmargin:auto;\n}\n</style>\n\t\n<script type=\"text/javascript\">\n\nfunction pagelayer_post_edit(jEle, e){\n\t\n\te.preventDefault();\n\tvar formData = new FormData( jQuery(jEle)[0] );\n\n\tjQuery.ajax({\n\t\turl: \"'.$meta_box_url.'\",\n\t\ttype: \"POST\",\n\t\tdata: formData,\n\t\tprocessData: false,\n\t\tcontentType: false,\n\t\tcache:false,\n\t\tsuccess:function(result){\n\t\t\t//window.location.reload();\t\t\t\t\t\t\n\t\t\talert(\"Post meta has been updated successfully !\");\n\t\t},\n\t\terror:function(result){\t\t\t\t\n\t\t\talert(\"There is an error while updating post meta !\");\n\t\t}\n\t});\n}\n\t\t\n</script>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<style>\n.'.$meta_id.' #adminmenumain, .'.$meta_id.' #wpfooter, .'.$meta_id.' #wpadminbar{\ndisplay:none;\n}\n.'.$meta_id.' #wpcontent{\nmargin:auto;\n}\n</style>\n\t\n<script type=\"text/javascript\">\n\nfunction pagelayer_post_edit(jEle, e){\n\t\n\te.preventDefault();\n\tvar formData = new FormData( jQuery(jEle)[0] );\n\n\tjQuery.ajax({\n\t\turl: \"'.$meta_box_url.'\",\n\t\ttype: \"POST\",\n\t\tdata: formData,\n\t\tprocessData: false,\n\t\tcontentType: false,\n\t\tcache:false,\n\t\tsuccess:function(result){\n\t\t\t//window.location.reload();\t\t\t\t\t\t\n\t\t\talert(\"Post meta has been updated successfully !\");\n\t\t},\n\t\terror:function(result){\t\t\t\t\n\t\t\talert(\"There is an error while updating post meta !\");\n\t\t}\n\t});\n}\n\t\t\n</script>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 429
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$meta_box_value = get_post_meta($font->ID, 'pagelayer_font_link', true)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 868
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 868,
+          "expression": "$meta_box_value = get_post_meta($font->ID, 'pagelayer_font_link', true)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 873,
+          "expression": "echo '<style id=\"'.$font->post_name.'_plf\" >@font-face { font-family: \"'.$font->post_name.'_plf\"'.'; src: url(\"'.$meta_box_value.'\"); font-weight: 100 200 300 400 500 600 700 800 900;}</style>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<style id=\"'.$font->post_name.'_plf\" >@font-face { font-family: \"'.$font->post_name.'_plf\"'.'; src: url(\"'.$meta_box_value.'\"); font-weight: 100 200 300 400 500 600 700 800 900;}</style>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 873
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$pagelayer_recaptch_lang = get_option('pagelayer_google_captcha_lang')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 881
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 881,
+          "expression": "$pagelayer_recaptch_lang = get_option('pagelayer_google_captcha_lang')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 884,
+          "expression": "echo '<script>\nvar pagelayer_ajaxurl = \"'.admin_url( 'admin-ajax.php' ).'?\";\nvar pagelayer_global_nonce = \"'.wp_create_nonce('pagelayer_global').'\";\nvar pagelayer_server_time = '.time().';\nvar pagelayer_is_live = \"'.pagelayer_is_live().'\";\nvar pagelayer_facebook_id = \"'.get_option('pagelayer-fbapp-id').'\";\nvar pagelayer_settings = '.json_encode($pagelayer->settings).';\nvar pagelayer_recaptch_lang = \"'.(!empty($pagelayer_recaptch_lang) ? $pagelayer_recaptch_lang : '').'\";\nvar pagelayer_recaptch_version = \"'.(!empty($pagelayer_recaptch_version) ? $pagelayer_recaptch_version : '').'\";\n</script>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<script>\nvar pagelayer_ajaxurl = \"'.admin_url( 'admin-ajax.php' ).'?\";\nvar pagelayer_global_nonce = \"'.wp_create_nonce('pagelayer_global').'\";\nvar pagelayer_server_time = '.time().';\nvar pagelayer_is_live = \"'.pagelayer_is_live().'\";\nvar pagelayer_facebook_id = \"'.get_option('pagelayer-fbapp-id').'\";\nvar pagelayer_settings = '.json_encode($pagelayer->settings).';\nvar pagelayer_recaptch_lang = \"'.(!empty($pagelayer_recaptch_lang) ? $pagelayer_recaptch_lang : '').'\";\nvar pagelayer_recaptch_version = \"'.(!empty($pagelayer_recaptch_version) ? $pagelayer_recaptch_version : '').'\";\n</script>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 884
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$global_code = wp_unslash( get_option('pagelayer_header_code') )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 1530
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1530,
+          "expression": "$global_code = wp_unslash( get_option('pagelayer_header_code') )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1537,
+          "expression": "echo $global_code.\"\\n\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $global_code.\"\\n\";",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 1537
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$header_code = get_post_meta($post->ID , 'pagelayer_header_code', true)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 1533
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1533,
+          "expression": "$header_code = get_post_meta($post->ID , 'pagelayer_header_code', true)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1541,
+          "expression": "echo $header_code.\"\\n\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $header_code.\"\\n\";",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 1541
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$global_code = wp_unslash( get_option('pagelayer_body_open_code') )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 1551
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1551,
+          "expression": "$global_code = wp_unslash( get_option('pagelayer_body_open_code') )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1558,
+          "expression": "echo $global_code.\"\\n\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $global_code.\"\\n\";",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 1558
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$body_code = get_post_meta($post->ID , 'pagelayer_body_open_code', true)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 1554
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1554,
+          "expression": "$body_code = get_post_meta($post->ID , 'pagelayer_body_open_code', true)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1562,
+          "expression": "echo $body_code.\"\\n\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $body_code.\"\\n\";",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 1562
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$global_code = wp_unslash( get_option('pagelayer_footer_code') )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 1586
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1586,
+          "expression": "$global_code = wp_unslash( get_option('pagelayer_footer_code') )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1593,
+          "expression": "echo $global_code.\"\\n\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $global_code.\"\\n\";",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 1593
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-009",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$footer_code = get_post_meta($post->ID , 'pagelayer_footer_code', true)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 1589
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1589,
+          "expression": "$footer_code = get_post_meta($post->ID , 'pagelayer_footer_code', true)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1597,
+          "expression": "echo $footer_code.\"\\n\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $footer_code.\"\\n\";",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/init.php",
+        "line": 1597
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$captcha_secret = get_option('pagelayer_google_captcha_secret')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/functions.php",
+        "line": 3172
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 3172,
+          "expression": "$captcha_secret = get_option('pagelayer_google_captcha_secret')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 3190,
+          "expression": "$req = wp_remote_post($url, array(\n\t\t\t\t\t'timeout' => 20, \n\t\t\t\t\t'body' => array(\n\t\t\t\t\t\t'secret' => $captcha_secret,\n\t\t\t\t\t\t'response' => $response, \n\t\t\t\t\t\t'remoteip' => $ip\n\t\t\t\t\t)\n\t\t\t\t)\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$req = wp_remote_post($url, array(\n\t\t\t\t\t'timeout' => 20, \n\t\t\t\t\t'body' => array(\n\t\t\t\t\t\t'secret' => $captcha_secret,\n\t\t\t\t\t\t'response' => $response, \n\t\t\t\t\t\t'remoteip' => $ip\n\t\t\t\t\t)\n\t\t\t\t)\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/functions.php",
+        "line": 3190
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-010",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$pagelayer_recaptch_lang = get_option('pagelayer_google_captcha_lang')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/blocks.php",
+        "line": 231
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 231,
+          "expression": "$pagelayer_recaptch_lang = get_option('pagelayer_google_captcha_lang')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 241,
+          "expression": "echo '<script type=\"text/javascript\" id=\"pagelayer-block-global-js\">\npagelayer_ajax_url = \"'.admin_url( 'admin-ajax.php' ).'?\";\npagelayer_url = \"'.PAGELAYER_URL.'\";\npagelayer_ver = \"'.PAGELAYER_VERSION.'\";\npagelayer_global_nonce = \"'.wp_create_nonce('pagelayer_global').'\";\npagelayer_server_time = '.time().';\npagelayer_pro = '.(int)defined('PAGELAYER_PREMIUM').';\npagelayer_is_live = 1;\npagelayer_pro_url = \"'. $pro_url .'\";\npagelayer_pro_txt = \"'. $pro_txt .'\";\npagelayer_facebook_id = \"'.get_option('pagelayer-fbapp-id').'\";\npagelayer_settings = '.json_encode($pagelayer->settings).';\npagelayer_recaptch_lang = \"'.(!empty($pagelayer_recaptch_lang) ? $pagelayer_recaptch_lang : '').'\";\npagelayer_recaptch_version = \"'.(!empty($pagelayer_recaptch_version) ? $pagelayer_recaptch_version : '').'\";\npagelayer_global_colors = '.json_encode($pagelayer->global_colors).';\npagelayer_global_fonts = '.json_encode($pagelayer->global_fonts).';\npagelayer_ajax_nonce = \"'.wp_create_nonce('pagelayer_ajax').'\";\npagelayer_post_permalink = \"'.get_permalink($post->ID).'\";\npagelayer_author = '.json_encode(pagelayer_author_data($post->ID)).';\npagelayer_postID = \"'.$post->ID.'\";\npagelayer_site_logo = '.json_encode(pagelayer_site_logo()).';\npagelayer_recaptch_site_key = \"'.(!empty($pagelayer_recaptch_site_key) ? $pagelayer_recaptch_site_key : '').'\";\npagelayer_global_colors = '.json_encode($pagelayer->global_colors).';\npagelayer_global_fonts = '.json_encode($pagelayer->global_fonts).';\npagelayer_loaded_icons =  '.json_encode(pagelayer_enabled_icons()).';\npagelayer_customizer_url = \"'.admin_url(\"/customize.php?return=\").urlencode($referer).'\";\npagelayerCacheBlockTags = {};\n</script>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<script type=\"text/javascript\" id=\"pagelayer-block-global-js\">\npagelayer_ajax_url = \"'.admin_url( 'admin-ajax.php' ).'?\";\npagelayer_url = \"'.PAGELAYER_URL.'\";\npagelayer_ver = \"'.PAGELAYER_VERSION.'\";\npagelayer_global_nonce = \"'.wp_create_nonce('pagelayer_global').'\";\npagelayer_server_time = '.time().';\npagelayer_pro = '.(int)defined('PAGELAYER_PREMIUM').';\npagelayer_is_live = 1;\npagelayer_pro_url = \"'. $pro_url .'\";\npagelayer_pro_txt = \"'. $pro_txt .'\";\npagelayer_facebook_id = \"'.get_option('pagelayer-fbapp-id').'\";\npagelayer_settings = '.json_encode($pagelayer->settings).';\npagelayer_recaptch_lang = \"'.(!empty($pagelayer_recaptch_lang) ? $pagelayer_recaptch_lang : '').'\";\npagelayer_recaptch_version = \"'.(!empty($pagelayer_recaptch_version) ? $pagelayer_recaptch_version : '').'\";\npagelayer_global_colors = '.json_encode($pagelayer->global_colors).';\npagelayer_global_fonts = '.json_encode($pagelayer->global_fonts).';\npagelayer_ajax_nonce = \"'.wp_create_nonce('pagelayer_ajax').'\";\npagelayer_post_permalink = \"'.get_permalink($post->ID).'\";\npagelayer_author = '.json_encode(pagelayer_author_data($post->ID)).';\npagelayer_postID = \"'.$post->ID.'\";\npagelayer_site_logo = '.json_encode(pagelayer_site_logo()).';\npagelayer_recaptch_site_key = \"'.(!empty($pagelayer_recaptch_site_key) ? $pagelayer_recaptch_site_key : '').'\";\npagelayer_global_colors = '.json_encode($pagelayer->global_colors).';\npagelayer_global_fonts = '.json_encode($pagelayer->global_fonts).';\npagelayer_loaded_icons =  '.json_encode(pagelayer_enabled_icons()).';\npagelayer_customizer_url = \"'.admin_url(\"/customize.php?return=\").urlencode($referer).'\";\npagelayerCacheBlockTags = {};\n</script>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/blocks.php",
+        "line": 241
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-011",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo '\n\t\t</div>\n\t\t<div class=\"pagelayer-iframe-holder\">\n\t\t\t<iframe src=\"'.(pagelayer_shortlink(0).'&pagelayer-iframe=1&'.$_SERVER['QUERY_STRING']).'\" class=\"pagelayer-normalize skip-lazy\" id=\"pagelayer-iframe\"></iframe>\n\t\t</div>\n\t</td>\n</tr>\n</table>\n\n<div class=\"pagelayer-pro-notice\">';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/live-body.php",
+        "line": 161
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 161,
+          "expression": "echo '\n\t\t</div>\n\t\t<div class=\"pagelayer-iframe-holder\">\n\t\t\t<iframe src=\"'.(pagelayer_shortlink(0).'&pagelayer-iframe=1&'.$_SERVER['QUERY_STRING']).'\" class=\"pagelayer-normalize skip-lazy\" id=\"pagelayer-iframe\"></iframe>\n\t\t</div>\n\t</td>\n</tr>\n</table>\n\n<div class=\"pagelayer-pro-notice\">';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '\n\t\t</div>\n\t\t<div class=\"pagelayer-iframe-holder\">\n\t\t\t<iframe src=\"'.(pagelayer_shortlink(0).'&pagelayer-iframe=1&'.$_SERVER['QUERY_STRING']).'\" class=\"pagelayer-normalize skip-lazy\" id=\"pagelayer-iframe\"></iframe>\n\t\t</div>\n\t</td>\n</tr>\n</table>\n\n<div class=\"pagelayer-pro-notice\">';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/live-body.php",
+        "line": 161
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-012",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$support_ept = get_option( 'pl_support_ept')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 385
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 385,
+          "expression": "$support_ept = get_option( 'pl_support_ept')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 743,
+          "expression": "echo in_array($type, $support_ept) ? 'checked' : '';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo in_array($type, $support_ept) ? 'checked' : '';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 743
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-xss-013",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$media_replace = get_option( 'pagelayer_disable_media_replace')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 634
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 634,
+          "expression": "$media_replace = get_option( 'pagelayer_disable_media_replace')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 761,
+          "expression": "echo (!empty($media_replace) ? 'checked' : '');",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo (!empty($media_replace) ? 'checked' : '');",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 761
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-xss-014",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$disable_clone = get_option('pagelayer_disable_clone')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 648
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 648,
+          "expression": "$disable_clone = get_option('pagelayer_disable_clone')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 775,
+          "expression": "echo (!empty($disable_clone) ? 'checked' : '');",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo (!empty($disable_clone) ? 'checked' : '');",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 775
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-xss-015",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$enable_dark_mode = get_option('pagelayer_enable_dark_mode')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 662
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 662,
+          "expression": "$enable_dark_mode = get_option('pagelayer_enable_dark_mode')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 790,
+          "expression": "echo (!empty($enable_dark_mode) ? 'checked' : '');",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo (!empty($enable_dark_mode) ? 'checked' : '');",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 790
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-xss-016",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$enable_jscss_giver = get_option('pagelayer_enable_giver')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 673
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 673,
+          "expression": "$enable_jscss_giver = get_option('pagelayer_enable_giver')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 804,
+          "expression": "echo ((!empty($enable_jscss_giver) && $enable_jscss_giver == 1) ? 'checked' : '');",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ((!empty($enable_jscss_giver) && $enable_jscss_giver == 1) ? 'checked' : '');",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 804
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-xss-017",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$enable_gfont_downloader = get_option('pagelayer_local_gfont')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 685
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 685,
+          "expression": "$enable_gfont_downloader = get_option('pagelayer_local_gfont')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 822,
+          "expression": "echo ((!empty($enable_gfont_downloader) && $enable_gfont_downloader == 1) ? 'checked' : '');",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ((!empty($enable_gfont_downloader) && $enable_gfont_downloader == 1) ? 'checked' : '');",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 822
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-xss-018",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$pagelayer_js_permission = get_option('pagelayer_js_permission')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 693
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 693,
+          "expression": "$pagelayer_js_permission = get_option('pagelayer_js_permission')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 694,
+          "expression": "$pagelayer_js_permission = empty($pagelayer_js_permission) ? array() : $pagelayer_js_permission",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 845,
+          "expression": "echo '<input type=\"checkbox\" name=\"pagelayer_js_permission[]\" value=\"' . esc_attr($val) . '\" ' . (($role == 'administrator' || in_array($role, $pagelayer_js_permission)) ? 'checked' : '') . '>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<input type=\"checkbox\" name=\"pagelayer_js_permission[]\" value=\"' . esc_attr($val) . '\" ' . (($role == 'administrator' || in_array($role, $pagelayer_js_permission)) ? 'checked' : '') . '>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 845
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-xss-019",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo esc_url(get_option($key));",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 953
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 953,
+          "expression": "echo esc_url(get_option($key));",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url(get_option($key));",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 953
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-xss-020",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo '<option '.( get_option('pagelayer_google_captcha_lang', '') == $k ? 'selected=\"selected\"' : '').' value=\"'.esc_attr($k).'\">'.esc_html($v).'</option>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 1110
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1110,
+          "expression": "echo '<option '.( get_option('pagelayer_google_captcha_lang', '') == $k ? 'selected=\"selected\"' : '').' value=\"'.esc_attr($k).'\">'.esc_html($v).'</option>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<option '.( get_option('pagelayer_google_captcha_lang', '') == $k ? 'selected=\"selected\"' : '').' value=\"'.esc_attr($k).'\">'.esc_html($v).'</option>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/settings.php",
+        "line": 1110
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-xss-021",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$val = !empty($_POST) ? @$_POST['sidebar'][$name] : $val",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/website.php",
+        "line": 829
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 829,
+          "expression": "$val = !empty($_POST) ? @$_POST['sidebar'][$name] : $val",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 834,
+          "expression": "echo '\r\n\t<select class=\"pagelayer-show-custom\" name=\"sidebar['.$name.']\">\r\n\t\t<option value=\"Default\" '.($val == 'default' ? 'selected=\"seleted\"' : '').'>Default</option>\r\n\t\t<option value=\"no\" '.($val == 'no' ? 'selected=\"seleted\"' : '').'>No Sidebar</option>\r\n\t\t<option value=\"left\" '.($val == 'left' ? 'selected=\"seleted\"' : '').'>Left Sidebar</option>\r\n\t\t<option value=\"right\" '.($val == 'right' ? 'selected=\"seleted\"' : '').'>Right Sidebar</option>\r\n\t</select>\r\n\t';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '\r\n\t<select class=\"pagelayer-show-custom\" name=\"sidebar['.$name.']\">\r\n\t\t<option value=\"Default\" '.($val == 'default' ? 'selected=\"seleted\"' : '').'>Default</option>\r\n\t\t<option value=\"no\" '.($val == 'no' ? 'selected=\"seleted\"' : '').'>No Sidebar</option>\r\n\t\t<option value=\"left\" '.($val == 'left' ? 'selected=\"seleted\"' : '').'>Left Sidebar</option>\r\n\t\t<option value=\"right\" '.($val == 'right' ? 'selected=\"seleted\"' : '').'>Right Sidebar</option>\r\n\t</select>\r\n\t';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/website.php",
+        "line": 834
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-vari-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "variable_injection",
+      "source": {
+        "expression": "stripslashes($_POST['values'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 199
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 199,
+          "expression": "parse_str(stripslashes($_POST['values']), $data)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "parse_str(stripslashes($_POST['values']), $data)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 199
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-ssrf-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$get_url = PAGELAYER_API.'/library.php?give_id='.sanitize_text_field($_REQUEST['pagelayer_section_id']).(!empty($pagelayer->license['license']) ? '&license='.$pagelayer->license['license'] : '').'&url='.rawurlencode(site_url())",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 742
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 742,
+          "expression": "$get_url = PAGELAYER_API.'/library.php?give_id='.sanitize_text_field($_REQUEST['pagelayer_section_id']).(!empty($pagelayer->license['license']) ? '&license='.$pagelayer->license['license'] : '').'&url='.rawurlencode(site_url())",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 746,
+          "expression": "$get_url = get_softaculous_file($get_url, 1)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 749,
+          "expression": "$fetch = wp_remote_get($get_url, array('timeout' => 60))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$fetch = wp_remote_get($get_url, array('timeout' => 60))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 749
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-ssrf-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$get_url = PAGELAYER_API.'/library.php?give_id='.sanitize_text_field($_REQUEST['pagelayer_section_id']).(!empty($pagelayer->license['license']) ? '&license='.$pagelayer->license['license'] : '').'&url='.rawurlencode(site_url())",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 829
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 829,
+          "expression": "$get_url = PAGELAYER_API.'/library.php?give_id='.sanitize_text_field($_REQUEST['pagelayer_section_id']).(!empty($pagelayer->license['license']) ? '&license='.$pagelayer->license['license'] : '').'&url='.rawurlencode(site_url())",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 833,
+          "expression": "$get_url = get_softaculous_file($get_url, 1)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 836,
+          "expression": "$fetch = wp_remote_get($get_url, array('timeout' => 60))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$fetch = wp_remote_get($get_url, array('timeout' => 60))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 836
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-xss-022",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$sanitized_post = pagelayer_sanitize_posts_data($_POST)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 1290
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1290,
+          "expression": "$sanitized_post = pagelayer_sanitize_posts_data($_POST)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1291,
+          "expression": "echo pagelayer_widget_posts($sanitized_post);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo pagelayer_widget_posts($sanitized_post);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 1291
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-xss-023",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$sanitized_post = pagelayer_sanitize_posts_data($_POST, false)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 1312
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1312,
+          "expression": "$sanitized_post = pagelayer_sanitize_posts_data($_POST, false)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1313,
+          "expression": "echo pagelayer_posts($sanitized_post);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo pagelayer_posts($sanitized_post);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 1313
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-xss-024",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$no_found = $_POST['atts']['no_found']",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 1841
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1841,
+          "expression": "$no_found = $_POST['atts']['no_found']",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1893,
+          "expression": "$content = '<div class=\"pagelayer-product-no-found\">'. $no_found .'</div>'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1896,
+          "expression": "echo $content;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $content;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 1896
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-file-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$conf[$v->post_name] = [\n\t\t\t'type' => get_post_meta($v->ID, 'pagelayer_template_type', true),\n\t\t\t'title' => $v->post_title,\n\t\t\t'conditions' => get_post_meta($v->ID, 'pagelayer_template_conditions', true),\n\t\t]",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 1990
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1990,
+          "expression": "$conf[$v->post_name] = [\n\t\t\t'type' => get_post_meta($v->ID, 'pagelayer_template_type', true),\n\t\t\t'title' => $v->post_title,\n\t\t\t'conditions' => get_post_meta($v->ID, 'pagelayer_template_conditions', true),\n\t\t]",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1998,
+          "expression": "file_put_contents($theme_dir.'/pagelayer.conf', json_encode($conf, JSON_PRETTY_PRINT))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "file_put_contents($theme_dir.'/pagelayer.conf', json_encode($conf, JSON_PRETTY_PRINT))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 1998
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-file-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$pl_content = get_post_meta($singlenav->ID, '_pagelayer_content', true)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 2119
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2119,
+          "expression": "$pl_content = get_post_meta($singlenav->ID, '_pagelayer_content', true)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2121,
+          "expression": "$navmetas['_pagelayer_content'] = pagelayer_export_content($pl_content)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 2124,
+          "expression": "$data[$kk]['post_metas'] = $navmetas",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 2129,
+          "expression": "file_put_contents($theme_dir.'/data/menus/'.$menu->slug, json_encode($data, JSON_PRETTY_PRINT))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "file_put_contents($theme_dir.'/data/menus/'.$menu->slug, json_encode($data, JSON_PRETTY_PRINT))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 2129
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-vari-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "pagelayer",
+      "vulnerability_class": "variable_injection",
+      "source": {
+        "expression": "$_POST['new_cat']",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 2260
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2260,
+          "expression": "parse_str($_POST['new_cat'], $formdata)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "parse_str($_POST['new_cat'], $formdata)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/ajax.php",
+        "line": 2260
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "pagelayer-xss-025",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo '<span class=\"customize-control-title pagelayer-customize-control-title\">' . sanitize_text_field( $this->label );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/customizer-controls.php",
+        "line": 90
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 90,
+          "expression": "echo '<span class=\"customize-control-title pagelayer-customize-control-title\">' . sanitize_text_field( $this->label );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<span class=\"customize-control-title pagelayer-customize-control-title\">' . sanitize_text_field( $this->label );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/customizer-controls.php",
+        "line": 90
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-026",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo '<span class=\"customize-control-title\">' . sanitize_text_field( $this->label ) .'</span>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/customizer-controls.php",
+        "line": 198
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 198,
+          "expression": "echo '<span class=\"customize-control-title\">' . sanitize_text_field( $this->label ) .'</span>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<span class=\"customize-control-title\">' . sanitize_text_field( $this->label ) .'</span>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/customizer-controls.php",
+        "line": 198
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-027",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo '<span class=\"customize-control-title\">' . sanitize_text_field( $this->label ) . '</span>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/customizer-controls.php",
+        "line": 335
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 335,
+          "expression": "echo '<span class=\"customize-control-title\">' . sanitize_text_field( $this->label ) . '</span>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<span class=\"customize-control-title\">' . sanitize_text_field( $this->label ) . '</span>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/customizer-controls.php",
+        "line": 335
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-028",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo '<span class=\"description pagelayer-customize-description\">' . sanitize_text_field( $this->description ) . '</span>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/customizer-controls.php",
+        "line": 338
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 338,
+          "expression": "echo '<span class=\"description pagelayer-customize-description\">' . sanitize_text_field( $this->description ) . '</span>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<span class=\"description pagelayer-customize-description\">' . sanitize_text_field( $this->description ) . '</span>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/customizer-controls.php",
+        "line": 338
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-029",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo get_post_meta( $post_ID, 'pagelayer_header_code', true );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/post_metas.php",
+        "line": 527
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 527,
+          "expression": "echo get_post_meta( $post_ID, 'pagelayer_header_code', true );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo get_post_meta( $post_ID, 'pagelayer_header_code', true );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/post_metas.php",
+        "line": 527
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-030",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo get_post_meta( $post_ID, 'pagelayer_body_open_code', true );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/post_metas.php",
+        "line": 532
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 532,
+          "expression": "echo get_post_meta( $post_ID, 'pagelayer_body_open_code', true );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo get_post_meta( $post_ID, 'pagelayer_body_open_code', true );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/post_metas.php",
+        "line": 532
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-031",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo get_post_meta( $post_ID, 'pagelayer_footer_code', true );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/post_metas.php",
+        "line": 537
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 537,
+          "expression": "echo get_post_meta( $post_ID, 'pagelayer_footer_code', true );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo get_post_meta( $post_ID, 'pagelayer_footer_code', true );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/post_metas.php",
+        "line": 537
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-032",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$type = get_post_meta( $post_id, 'pagelayer_template_type', true )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/template.php",
+        "line": 502
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 502,
+          "expression": "$type = get_post_meta( $post_id, 'pagelayer_template_type', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 505,
+          "expression": "$type = pagelayer_multi_array_search($pagelayer->builder['type'], $type)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 508,
+          "expression": "$type = $type['label']",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 511,
+          "expression": "echo '<span>' . $type . '</span>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<span>' . $type . '</span>';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/template.php",
+        "line": 511
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "pagelayer-xss-033",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "pagelayer",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$pagelayer_recaptch_site_key = get_option('pagelayer_google_captcha')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/live.php",
+        "line": 121
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 121,
+          "expression": "$pagelayer_recaptch_site_key = get_option('pagelayer_google_captcha')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 143,
+          "expression": "echo '\n<script type=\"text/javascript\">\npagelayer_ver = \"'.PAGELAYER_VERSION.'\";\npagelayer_block_prefix = \"'.PAGELAYER_BLOCK_PREFIX.'\";\npagelayer_pro = '.(int)defined('PAGELAYER_PREMIUM').';\npagelayer_pro_url = \"'.PAGELAYER_PRO_PRICE_URL.'\";\npagelayer_pro_txt = \"'.addslashes('This feature is a part of <a href=\"'.$pro_url.'\" target=\"_blank\">'.$pro_txt.'</a>. You will need purchase <a href=\"'.$pro_url.'\" target=\"_blank\">'.$pro_txt.'</a> to use this feature.').'\";\npagelayer_api_url = \"'.PAGELAYER_API.'\";\npagelayer_ajax_url = \"'.admin_url( 'admin-ajax.php' ).'?&\";\npagelayer_post_props = \"'.admin_url( 'admin.php?page=pagelayer_meta_setting&post=' ).$post->ID.'\";\npagelayer_ajax_nonce = \"'.wp_create_nonce('pagelayer_ajax').'\";\npagelayer_media_ajax_nonce = \"'.wp_create_nonce('media-form').'\";\npagelayer_internal_linking_nonce = \"'.wp_create_nonce('internal-linking').'\";\npagelayer_preview_nonce = \"'. wp_create_nonce( 'post_preview_' . $post->ID ).'\";\npagelayer_url = \"'.PAGELAYER_URL.'\";\npagelayer_postID = \"'.$post->ID.'\";\npagelayer_permalink_structure = \"'.(empty(get_option('permalink_structure')) ? 0 : 1).'\";\npagelayer_post_permalink = \"'.get_permalink($post->ID).'\";\npagelayer_tabs = '.json_encode($pagelayer->tabs).';\npagelayer_isDirty = false;\npagelayer_returnURL = \"'.$returnURL.'\";\npagelayer_theme_vars = '.json_encode( pagelayer_template_vars() ).';\npagelayer_revision_obj = '.json_encode( pagelayer_get_post_revision_by_id( $post->ID ) ).';\npagelayer_author = '.json_encode(pagelayer_author_data($post->ID)).';\npagelayer_site_logo = '.json_encode(pagelayer_site_logo()).';\npagelayer_support_FI = \"'. ( current_theme_supports('post-thumbnails') )  .'\";\t\npagelayer_editable = \".'.(!empty($pagelayer->template_editor) ? $pagelayer->template_editor : 'pagelayer-editable-area').'\";\npagelayer_recaptch_site_key = \"'.(!empty($pagelayer_recaptch_site_key) ? $pagelayer_recaptch_site_key : '').'\";\npagelayer_post = '. @json_encode($_post) .';\npagelayer_loaded_icons =  '.json_encode(pagelayer_enabled_icons()).';\npagelayer_social_urls =  '.json_encode(pagelayer_get_social_urls()).';\npagelayer_global_widgets = '.json_encode($pagelayer->global_widgets).';\npagelayer_saved_sections = '.json_encode($pagelayer->saved_sections).';\npagelayer_global_sections = '.json_encode($pagelayer->global_sections).';\npagelayer_brand = \"'.addslashes($pagelayer->BRAND_TEXT).'\";\npagelayer_post_type_features = '.json_encode(@$_wp_post_type_features[$post->post_type]).';\npagelayer_post_categories = '.json_encode(pagelayer_post_cats($post)).';\npagelayer_post_tags = '.json_encode(pagelayer_post_tags($post)).';\npagelayer_shortcodes.pl_post_props.name = \"'.ucfirst($post_type_name).' '. __pl('Settings').'\";\npagelayer_shortcodes.pl_post_props.params.post_author.list = '.json_encode(pagelayer_post_authors_by_type($post->post_type)).';\npagelayer_shortcodes.pl_post_props.pageParent.post_parent.list = '.json_encode(pagelayer_parent_post_prop($post)).';\npagelayer_gmaps_key = \"'.get_option('pagelayer-gmaps-api-key').'\";\npagelayer_ajax_post_data = {};\npagelayer_menus_items_list = '.json_encode($pagelayer_menus_items_list).';\npagelayer_customizer_values = '.json_encode(pagelayer_get_customizer_options()).';\npagelayer_global_colors = '.json_encode($pagelayer->global_colors).';\npagelayer_global_fonts = '.json_encode($pagelayer->global_fonts).';\npagelayer_customizer_url = \"'.admin_url(\"/customize.php?return=\").urlencode($referer).'\";\npagelayer_support_url = \"'.$pagelayer->support .'\";';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '\n<script type=\"text/javascript\">\npagelayer_ver = \"'.PAGELAYER_VERSION.'\";\npagelayer_block_prefix = \"'.PAGELAYER_BLOCK_PREFIX.'\";\npagelayer_pro = '.(int)defined('PAGELAYER_PREMIUM').';\npagelayer_pro_url = \"'.PAGELAYER_PRO_PRICE_URL.'\";\npagelayer_pro_txt = \"'.addslashes('This feature is a part of <a href=\"'.$pro_url.'\" target=\"_blank\">'.$pro_txt.'</a>. You will need purchase <a href=\"'.$pro_url.'\" target=\"_blank\">'.$pro_txt.'</a> to use this feature.').'\";\npagelayer_api_url = \"'.PAGELAYER_API.'\";\npagelayer_ajax_url = \"'.admin_url( 'admin-ajax.php' ).'?&\";\npagelayer_post_props = \"'.admin_url( 'admin.php?page=pagelayer_meta_setting&post=' ).$post->ID.'\";\npagelayer_ajax_nonce = \"'.wp_create_nonce('pagelayer_ajax').'\";\npagelayer_media_ajax_nonce = \"'.wp_create_nonce('media-form').'\";\npagelayer_internal_linking_nonce = \"'.wp_create_nonce('internal-linking').'\";\npagelayer_preview_nonce = \"'. wp_create_nonce( 'post_preview_' . $post->ID ).'\";\npagelayer_url = \"'.PAGELAYER_URL.'\";\npagelayer_postID = \"'.$post->ID.'\";\npagelayer_permalink_structure = \"'.(empty(get_option('permalink_structure')) ? 0 : 1).'\";\npagelayer_post_permalink = \"'.get_permalink($post->ID).'\";\npagelayer_tabs = '.json_encode($pagelayer->tabs).';\npagelayer_isDirty = false;\npagelayer_returnURL = \"'.$returnURL.'\";\npagelayer_theme_vars = '.json_encode( pagelayer_template_vars() ).';\npagelayer_revision_obj = '.json_encode( pagelayer_get_post_revision_by_id( $post->ID ) ).';\npagelayer_author = '.json_encode(pagelayer_author_data($post->ID)).';\npagelayer_site_logo = '.json_encode(pagelayer_site_logo()).';\npagelayer_support_FI = \"'. ( current_theme_supports('post-thumbnails') )  .'\";\t\npagelayer_editable = \".'.(!empty($pagelayer->template_editor) ? $pagelayer->template_editor : 'pagelayer-editable-area').'\";\npagelayer_recaptch_site_key = \"'.(!empty($pagelayer_recaptch_site_key) ? $pagelayer_recaptch_site_key : '').'\";\npagelayer_post = '. @json_encode($_post) .';\npagelayer_loaded_icons =  '.json_encode(pagelayer_enabled_icons()).';\npagelayer_social_urls =  '.json_encode(pagelayer_get_social_urls()).';\npagelayer_global_widgets = '.json_encode($pagelayer->global_widgets).';\npagelayer_saved_sections = '.json_encode($pagelayer->saved_sections).';\npagelayer_global_sections = '.json_encode($pagelayer->global_sections).';\npagelayer_brand = \"'.addslashes($pagelayer->BRAND_TEXT).'\";\npagelayer_post_type_features = '.json_encode(@$_wp_post_type_features[$post->post_type]).';\npagelayer_post_categories = '.json_encode(pagelayer_post_cats($post)).';\npagelayer_post_tags = '.json_encode(pagelayer_post_tags($post)).';\npagelayer_shortcodes.pl_post_props.name = \"'.ucfirst($post_type_name).' '. __pl('Settings').'\";\npagelayer_shortcodes.pl_post_props.params.post_author.list = '.json_encode(pagelayer_post_authors_by_type($post->post_type)).';\npagelayer_shortcodes.pl_post_props.pageParent.post_parent.list = '.json_encode(pagelayer_parent_post_prop($post)).';\npagelayer_gmaps_key = \"'.get_option('pagelayer-gmaps-api-key').'\";\npagelayer_ajax_post_data = {};\npagelayer_menus_items_list = '.json_encode($pagelayer_menus_items_list).';\npagelayer_customizer_values = '.json_encode(pagelayer_get_customizer_options()).';\npagelayer_global_colors = '.json_encode($pagelayer->global_colors).';\npagelayer_global_fonts = '.json_encode($pagelayer->global_fonts).';\npagelayer_customizer_url = \"'.admin_url(\"/customize.php?return=\").urlencode($referer).'\";\npagelayer_support_url = \"'.$pagelayer->support .'\";';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/pagelayer/main/live.php",
+        "line": 143
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/pagelayer/init.php",
+      "start": {
+        "line": 1474,
+        "col": 2,
+        "offset": 45751
+      },
+      "end": {
+        "line": 1474,
+        "col": 54,
+        "offset": 45803
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-redirect-instead-of-safe-redirect",
+      "path": "plugins/src/pagelayer/init.php",
+      "start": {
+        "line": 1615,
+        "col": 3,
+        "offset": 49657
+      },
+      "end": {
+        "line": 1615,
+        "col": 23,
+        "offset": 49677
+      },
+      "extra": {
+        "message": "wp_redirect() does not restrict the redirect target to the current host; consider using wp_safe_redirect() to prevent open redirect vulnerabilities when the URL may be influenced by user input.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "open-redirect",
+          "cwe": "CWE-601",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/pagelayer/main/functions.php",
+      "start": {
+        "line": 2928,
+        "col": 2,
+        "offset": 76687
+      },
+      "end": {
+        "line": 2928,
+        "col": 20,
+        "offset": 76705
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/import.php",
+      "start": {
+        "line": 1068,
+        "col": 2,
+        "offset": 30230
+      },
+      "end": {
+        "line": 1078,
+        "col": 3,
+        "offset": 30468
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-crypto-weak-hash-general",
+      "path": "plugins/src/pagelayer/main/live.php",
+      "start": {
+        "line": 55,
+        "col": 3,
+        "offset": 1734
+      },
+      "end": {
+        "line": 55,
+        "col": 117,
+        "offset": 1848
+      },
+      "extra": {
+        "message": "md5() used for hashing data. If this value is used for authentication, integrity verification, or token generation, md5 is insufficient. Use a stronger algorithm.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "weak-cryptography",
+          "cwe": "CWE-327",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/settings.php",
+      "start": {
+        "line": 372,
+        "col": 2,
+        "offset": 15221
+      },
+      "end": {
+        "line": 388,
+        "col": 3,
+        "offset": 15578
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/settings.php",
+      "start": {
+        "line": 390,
+        "col": 2,
+        "offset": 15584
+      },
+      "end": {
+        "line": 397,
+        "col": 3,
+        "offset": 15790
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/settings.php",
+      "start": {
+        "line": 402,
+        "col": 3,
+        "offset": 16056
+      },
+      "end": {
+        "line": 406,
+        "col": 4,
+        "offset": 16168
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/settings.php",
+      "start": {
+        "line": 409,
+        "col": 2,
+        "offset": 16178
+      },
+      "end": {
+        "line": 416,
+        "col": 3,
+        "offset": 16356
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/settings.php",
+      "start": {
+        "line": 418,
+        "col": 2,
+        "offset": 16362
+      },
+      "end": {
+        "line": 425,
+        "col": 3,
+        "offset": 16566
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/settings.php",
+      "start": {
+        "line": 429,
+        "col": 3,
+        "offset": 16613
+      },
+      "end": {
+        "line": 437,
+        "col": 4,
+        "offset": 16800
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/settings.php",
+      "start": {
+        "line": 439,
+        "col": 3,
+        "offset": 16808
+      },
+      "end": {
+        "line": 447,
+        "col": 4,
+        "offset": 16995
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/settings.php",
+      "start": {
+        "line": 449,
+        "col": 3,
+        "offset": 17003
+      },
+      "end": {
+        "line": 457,
+        "col": 4,
+        "offset": 17199
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/settings.php",
+      "start": {
+        "line": 459,
+        "col": 3,
+        "offset": 17207
+      },
+      "end": {
+        "line": 467,
+        "col": 4,
+        "offset": 17395
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/settings.php",
+      "start": {
+        "line": 469,
+        "col": 3,
+        "offset": 17403
+      },
+      "end": {
+        "line": 477,
+        "col": 4,
+        "offset": 17586
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/settings.php",
+      "start": {
+        "line": 479,
+        "col": 3,
+        "offset": 17594
+      },
+      "end": {
+        "line": 487,
+        "col": 4,
+        "offset": 17798
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/settings.php",
+      "start": {
+        "line": 489,
+        "col": 3,
+        "offset": 17804
+      },
+      "end": {
+        "line": 497,
+        "col": 4,
+        "offset": 18029
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/settings.php",
+      "start": {
+        "line": 499,
+        "col": 3,
+        "offset": 18037
+      },
+      "end": {
+        "line": 507,
+        "col": 4,
+        "offset": 18253
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/settings.php",
+      "start": {
+        "line": 509,
+        "col": 3,
+        "offset": 18261
+      },
+      "end": {
+        "line": 517,
+        "col": 4,
+        "offset": 18512
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/settings.php",
+      "start": {
+        "line": 519,
+        "col": 3,
+        "offset": 18520
+      },
+      "end": {
+        "line": 527,
+        "col": 4,
+        "offset": 18744
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/settings.php",
+      "start": {
+        "line": 530,
+        "col": 3,
+        "offset": 18774
+      },
+      "end": {
+        "line": 544,
+        "col": 4,
+        "offset": 19116
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/settings.php",
+      "start": {
+        "line": 689,
+        "col": 2,
+        "offset": 23646
+      },
+      "end": {
+        "line": 691,
+        "col": 3,
+        "offset": 23792
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/website.php",
+      "start": {
+        "line": 57,
+        "col": 2,
+        "offset": 1469
+      },
+      "end": {
+        "line": 173,
+        "col": 3,
+        "offset": 4866
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "tools.wp_audit_rules.wp-csrf-settings-update-no-nonce",
+      "path": "plugins/src/pagelayer/main/website.php",
+      "start": {
+        "line": 67,
+        "col": 5,
+        "offset": 1784
+      },
+      "end": {
+        "line": 95,
+        "col": 6,
+        "offset": 2602
+      },
+      "extra": {
+        "message": "update_option() or similar settings update called in a request handler without a preceding nonce check. An attacker can forge a request to change plugin settings.\n",
+        "metadata": {
+          "category": "security",
+          "subcategory": "csrf",
+          "cwe": "CWE-352",
+          "confidence": "LOW"
+        },
+        "severity": "WARNING",
+        "fingerprint": "requires login",
+        "lines": "requires login",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "stats": {
+    "taint_critical": 0,
+    "taint_high": 21,
+    "taint_total": 40,
+    "semgrep_error": 0,
+    "semgrep_warning": 24
+  }
+}
