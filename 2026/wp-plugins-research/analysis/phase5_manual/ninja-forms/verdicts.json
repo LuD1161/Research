@@ -1,0 +1,295 @@
+{
+  "plugin": "ninja-forms",
+  "version_analyzed": "latest in repo",
+  "review_date": "2026-06-14",
+  "priority_score": 371,
+  "summary": "Ninja Forms exposes a significant unauthenticated attack surface via wp_ajax_nopriv handlers (nf_ajax_submit, nf_ajax_resume, nf_ajax_get_new_nonce, nf_log_js_error). The 'Just in Time Nonce' pattern and open nonce-refresh endpoint effectively neutralize nonce-based CSRF protection for scripted attacks. Critical findings include stored PHP Object Injection via bare unserialize() on user-submitted data triggered in admin context, stored XSS via unescaped field values in admin submission listings, and SQL queries using is_numeric() instead of intval()/prepare() on unauthenticated user input. REST API routes are properly gated with manage_options.",
+  "verdicts": [
+    {
+      "id": "NF-001",
+      "title": "Stored PHP Object Injection via bare unserialize() on submission field values",
+      "severity": "critical",
+      "cvss_estimate": 8.8,
+      "status": "confirmed",
+      "auth_required": "none",
+      "trigger": "Unauthenticated user submits crafted serialized PHP payload as a fieldset repeater field value. Admin views submissions list page.",
+      "file": "includes/Admin/CPT/Submission.php",
+      "lines": "239, 241",
+      "code_snippet": "$value = implode('<br />', array_column(unserialize($sub->get_field_value($column)), 'value'));",
+      "root_cause": "bare unserialize() without ['allowed_classes' => false] on database-stored field values that originate from unauthenticated form submissions",
+      "impact": "If a suitable POP gadget chain exists in the WordPress or plugin environment, this enables Remote Code Execution. The attack is planted by an unauthenticated user and triggered when any admin views the submissions list.",
+      "exploitation_steps": [
+        "1. Identify a form with a fieldset repeater field",
+        "2. Submit the form via wp_ajax_nopriv_nf_ajax_submit with a serialized PHP object payload in the repeater field value",
+        "3. Wait for an admin to navigate to the submissions list for that form",
+        "4. The bare unserialize() executes __wakeup()/__destruct() on the crafted object"
+      ],
+      "recommendation": "Replace bare unserialize() with unserialize($value, ['allowed_classes' => false]) at lines 239 and 241. The plugin already uses this pattern correctly in SubmissionsBuilder.php and ImportExport.php.",
+      "references": [
+        "CWE-502: Deserialization of Untrusted Data",
+        "OWASP: PHP Object Injection"
+      ]
+    },
+    {
+      "id": "NF-002",
+      "title": "Stored XSS via unescaped field values in admin submissions table",
+      "severity": "high",
+      "cvss_estimate": 7.2,
+      "status": "confirmed",
+      "auth_required": "none",
+      "trigger": "Unauthenticated user submits HTML/JS payload in any text field. Admin views the submissions list.",
+      "file": "includes/Admin/Menus/Submissions.php",
+      "lines": "218-236, 536-543",
+      "code_snippet": "echo $this->custom_columns_field( $sub, $column );\n// custom_columns_field returns:\nreturn $sub->get_field_value( $field_id );",
+      "root_cause": "Raw field values from database are echoed directly without esc_html() or wp_kses() in the admin columns display",
+      "impact": "Stored XSS in admin context. Attacker plants payload via anonymous form submission. When admin views submissions, arbitrary JavaScript executes in admin session (cookie theft, privilege escalation, admin account takeover).",
+      "exploitation_steps": [
+        "1. Submit any Ninja Forms form with payload: <img src=x onerror=alert(document.cookie)>",
+        "2. Admin navigates to Submissions page",
+        "3. JavaScript executes in admin browser context"
+      ],
+      "recommendation": "Apply esc_html() to the return value of custom_columns_field() before echoing, or sanitize in the custom_columns() switch default case.",
+      "references": [
+        "CWE-79: Improper Neutralization of Input During Web Page Generation"
+      ]
+    },
+    {
+      "id": "NF-003",
+      "title": "SQL injection via is_numeric()-only guard on form_id in unauthenticated submission handler",
+      "severity": "high",
+      "cvss_estimate": 7.5,
+      "status": "confirmed",
+      "auth_required": "none",
+      "trigger": "Unauthenticated user submits form data with crafted form_id value that passes is_numeric() but exploits SQL context",
+      "files": [
+        {
+          "file": "includes/AJAX/Controllers/Submission.php",
+          "line": 356,
+          "query": "SELECT COUNT(DISTINCT(p.ID)) AS count FROM ... WHERE m.meta_value = $this->_form_id"
+        },
+        {
+          "file": "includes/Helper.php",
+          "line": 543,
+          "query": "SELECT `maintenance` FROM `{$wpdb->prefix}nf3_upgrades` WHERE `id` = {$form_id}"
+        }
+      ],
+      "root_cause": "User-supplied form_id from $_POST['formData']['id'] is validated only with is_numeric() (line 89), then interpolated directly into SQL without $wpdb->prepare() or intval()/absint(). is_numeric() accepts scientific notation (e.g., '1e2'), hexadecimal on some PHP versions, and floating point, which may produce unexpected SQL behavior.",
+      "impact": "While classic UNION-based injection is blocked (is_numeric rejects spaces), the lack of intval()/prepare() is a defense-in-depth failure. In edge cases or future PHP behavior changes, this could become exploitable. The Helper.php path (form_in_maintenance) is hit BEFORE any form processing, making it the first query executed on every unauthenticated submission.",
+      "recommendation": "Apply intval() or absint() to $this->_form_id immediately after the is_numeric() check at line 89, or use $wpdb->prepare() for both queries.",
+      "references": [
+        "CWE-89: SQL Injection",
+        "PHP is_numeric() edge cases"
+      ]
+    },
+    {
+      "id": "NF-004",
+      "title": "Unauthenticated nonce farming via open get_new_nonce endpoint",
+      "severity": "medium",
+      "cvss_estimate": 5.3,
+      "status": "confirmed",
+      "auth_required": "none",
+      "trigger": "Any HTTP request to admin-ajax.php?action=nf_ajax_get_new_nonce",
+      "file": "includes/AJAX/Controllers/Form.php",
+      "lines": "12-13, 184-196",
+      "code_snippet": "add_action('wp_ajax_nopriv_nf_ajax_get_new_nonce', array($this, 'get_new_nonce'));\n\npublic function get_new_nonce() {\n    $current_time_stamp = time();\n    $new_nonce_name = 'ninja_forms_display_nonce_' . $current_time_stamp;\n    $res = array('new_nonce' => wp_create_nonce($new_nonce_name), 'nonce_ts' => $current_time_stamp);\n    $this->_respond($res);\n}",
+      "root_cause": "No authentication, no rate limiting, no input validation. Any request returns a fresh valid nonce usable for form submission and JS error logging.",
+      "impact": "Combined with the 'Just in Time Nonce' in Submission.php (lines 52-65) that also returns fresh nonces on failure, this means nonces provide zero protection against scripted attacks. An attacker can programmatically obtain nonces and submit forms, log errors, or exercise any nopriv endpoint at will. This is an enabler for NF-001, NF-002, NF-005.",
+      "recommendation": "Consider rate-limiting the nonce refresh endpoint or removing the nopriv registration if form pages already embed nonces.",
+      "references": [
+        "CWE-306: Missing Authentication for Critical Function"
+      ]
+    },
+    {
+      "id": "NF-005",
+      "title": "Unauthenticated log injection and DoS via JS error logger",
+      "severity": "medium",
+      "cvss_estimate": 5.3,
+      "status": "confirmed",
+      "auth_required": "none",
+      "trigger": "Unauthenticated user calls admin-ajax.php?action=nf_log_js_error with nonce from NF-004",
+      "file": "includes/AJAX/Controllers/JSError.php",
+      "lines": "8-22",
+      "code_snippet": "Ninja_Forms()->logger()->emergency( $message . ' in ' . $url . ' on line ' . $lineNumber );",
+      "root_cause": "esc_html() does not strip newlines or control characters. Attacker-controlled message/url/lineNumber are concatenated and logged at EMERGENCY level. The nonce can be obtained via NF-004.",
+      "impact": "Log injection (forge fake log entries via newlines), log flooding to exhaust disk space, false alerts at EMERGENCY severity level.",
+      "recommendation": "Sanitize newlines/control characters from log parameters. Add rate limiting.",
+      "references": [
+        "CWE-117: Improper Output Neutralization for Logs"
+      ]
+    },
+    {
+      "id": "NF-006",
+      "title": "Potential email header injection via merge tags in From Name",
+      "severity": "medium",
+      "cvss_estimate": 5.9,
+      "status": "conditional",
+      "auth_required": "none (conditional on admin config)",
+      "trigger": "Admin configures {field:KEY} merge tag in email action From Name setting. Unauthenticated user submits form with CRLF injection in that field.",
+      "file": "includes/Actions/Email.php",
+      "lines": "252, 291-299",
+      "root_cause": "strip_tags() is applied to field values used in merge tags (safe_value), but strip_tags does NOT remove \\r\\n characters. If merge-tagged field value flows into From Name, CRLF characters can inject additional email headers.",
+      "impact": "Email header injection allowing BCC injection (spam relay), content-type manipulation, or email spoofing. Requires specific admin configuration using merge tags in From Name.",
+      "recommendation": "Sanitize CRLF characters from all values used in email headers, not just the address fields.",
+      "references": [
+        "CWE-93: Improper Neutralization of CRLF Sequences in HTTP Headers"
+      ]
+    },
+    {
+      "id": "NF-007",
+      "title": "Dead validation code in Save action (validateExtraData early return)",
+      "severity": "medium",
+      "cvss_estimate": 5.0,
+      "status": "confirmed",
+      "auth_required": "none",
+      "trigger": "Any form submission with extra data fields",
+      "file": "includes/Actions/Save.php",
+      "lines": "308-325",
+      "code_snippet": "protected function validateExtraData($dataExtra, $form_id): array {\n    return $dataExtra;  // <-- premature return, all validation below is dead code\n    $return = [];\n    // ... unreachable validation logic\n}",
+      "root_cause": "Early return statement makes all extra data validation unreachable. All submitted extra data bypasses validation and is saved unchecked.",
+      "impact": "Any extra data submitted with the form is stored without validation, potentially allowing storage of arbitrary data in the database.",
+      "recommendation": "Remove the premature return statement or restructure the validation logic.",
+      "references": [
+        "CWE-1164: Irrelevant Code"
+      ]
+    },
+    {
+      "id": "NF-008",
+      "title": "maybe_unserialize() without allowed_classes on DB model settings",
+      "severity": "medium",
+      "cvss_estimate": 5.5,
+      "status": "confirmed",
+      "auth_required": "requires prior DB write (secondary vuln)",
+      "trigger": "Attacker who can write to NF meta tables triggers object instantiation when model settings are loaded",
+      "file": "includes/Abstracts/Model.php",
+      "lines": "344, 514, 525",
+      "code_snippet": "$this->_settings[$key] = maybe_unserialize($value);",
+      "root_cause": "WordPress maybe_unserialize() calls bare unserialize() without class restrictions. The danger-key exclusion list ($danger = ['value', 'submitted_value']) is incomplete -- only two keys are guarded.",
+      "impact": "Defense-in-depth gap. If any other vulnerability allows writing to NF meta tables, arbitrary PHP object instantiation is possible. Not directly exploitable standalone.",
+      "recommendation": "Use a custom unserialize wrapper with ['allowed_classes' => false] instead of maybe_unserialize().",
+      "references": [
+        "CWE-502: Deserialization of Untrusted Data"
+      ]
+    },
+    {
+      "id": "NF-009",
+      "title": "Bare unserialize() in WPN_Helper::maybe_unserialize for form import fallback",
+      "severity": "medium",
+      "cvss_estimate": 4.9,
+      "status": "confirmed",
+      "auth_required": "admin (manage_options)",
+      "trigger": "Admin uploads a crafted .nff form export file that fails JSON decode, falling through to unserialize path",
+      "file": "includes/Abstracts/ModelFactory.php",
+      "lines": "182",
+      "helper_file": "includes/Helper.php",
+      "helper_line": "333",
+      "root_cause": "WPN_Helper::maybe_unserialize() calls @unserialize($parsed) and unserialize($original) with no class restrictions",
+      "impact": "PHP Object Injection via admin-uploaded file. Requires manage_options capability, so not privilege escalation from low-priv, but enables RCE for compromised admin accounts.",
+      "recommendation": "Add ['allowed_classes' => false] to the unserialize calls in WPN_Helper::maybe_unserialize().",
+      "references": [
+        "CWE-502: Deserialization of Untrusted Data"
+      ]
+    },
+    {
+      "id": "NF-010",
+      "title": "Path traversal in download_file parameter (admin + nonce gated)",
+      "severity": "low",
+      "cvss_estimate": 3.8,
+      "status": "confirmed",
+      "auth_required": "admin + valid nonce",
+      "trigger": "Admin-level user sends crafted download_file parameter with ../ sequences",
+      "file": "includes/Admin/Menus/Submissions.php",
+      "lines": "458-472",
+      "code_snippet": "$filename = esc_html($_REQUEST['download_file']);\n$file_path = trailingslashit($upload_dir['path']) . $filename . '.csv';\n$myfile = file_get_contents($file_path);\nunlink($file_path);",
+      "root_cause": "esc_html() does not strip ../ sequences. File path is constructed by concatenating user input. The .csv suffix limits exploitability on modern PHP.",
+      "impact": "Authenticated admin could read/delete .csv files outside the expected uploads directory. The .csv suffix constraint and nonce requirement significantly limit practical exploitation.",
+      "recommendation": "Use basename() on the filename parameter to strip directory traversal sequences.",
+      "references": [
+        "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+      ]
+    },
+    {
+      "id": "NF-011",
+      "title": "CSV formula injection in field export",
+      "severity": "low",
+      "cvss_estimate": 3.5,
+      "status": "confirmed",
+      "auth_required": "none to plant, admin to trigger",
+      "trigger": "Unauthenticated user submits field values starting with =, +, -, @. Admin exports submissions to CSV and opens in Excel.",
+      "file": "includes/Abilities/Utils/FieldUtils.php",
+      "lines": "601-609",
+      "root_cause": "fputcsv() does not escape formula-injection characters in cell data",
+      "impact": "Formula injection when CSV opened in Excel. Can execute arbitrary commands on admin's workstation.",
+      "recommendation": "Prefix cell values starting with =, +, -, @ with a single quote or tab character before writing to CSV.",
+      "references": [
+        "CWE-1236: Improper Neutralization of Formula Elements in a CSV File"
+      ]
+    }
+  ],
+  "false_positives_from_brief": [
+    {
+      "flow_id": "ninja-forms-rce-001",
+      "reason": "SubmissionsBuilderFactory.php line 26: get_post_meta + get_posts is reading from the database, not executing commands. No RCE sink. The taint analysis incorrectly flagged array_map as a command execution sink."
+    },
+    {
+      "flow_id": "ninja-forms-xss-001",
+      "reason": "Widget.php line 95: echo intval($form->get_id()) -- intval() ensures output is always an integer. No XSS possible."
+    },
+    {
+      "flow_id": "ninja-forms-xss-005 through xss-009",
+      "reason": "Template files echoing intval() wrapped values. intval() guarantees integer output, making XSS impossible regardless of source."
+    },
+    {
+      "flow_id": "ninja-forms-sqli-001 through sqli-003",
+      "reason": "Helper.php lines 350, 381, 469: All use intval($id) inline in the SQL string. While not using $wpdb->prepare(), intval() effectively prevents SQL injection."
+    },
+    {
+      "flow_id": "ninja-forms-sqli-004 and sqli-005",
+      "reason": "Form.php lines 87-98: prepare_in() constructs IN clause from results of a $wpdb->prepare() query. The sub IDs come from the database (via prepare), not user input."
+    },
+    {
+      "flow_id": "ninja-forms-sqli-006 and sqli-007",
+      "reason": "Form.php lines 125-134: $last_seq_num from DB via prepare(), used in $wpdb->update() which auto-prepares. $form_id passed via prepare() in the SELECT."
+    },
+    {
+      "flow_id": "ninja-forms-rce-002 through rce-003",
+      "reason": "Admin/CPT/Submission.php lines 466-468: $_POST['hidden'] through esc_html() and array_filter/array_map is not an RCE sink. No shell execution."
+    },
+    {
+      "flow_id": "ninja-forms-rce-005 through rce-006",
+      "reason": "Submissions.php lines 283, 296: preg_replace on sanitize_text_field output is not a command execution sink."
+    },
+    {
+      "flow_id": "ninja-forms-rce-007 and rce-008",
+      "reason": "FieldUtils.php: preg_replace on sanitize_text_field output is not a command execution sink."
+    },
+    {
+      "flow_id": "ninja-forms-ssrf-001",
+      "reason": "Dispatcher.php: $api_url is a hardcoded class property, not user-controlled. The body data (from get_option) goes as POST body, not URL."
+    },
+    {
+      "flow_id": "ninja-forms-ssrf-003 and ssrf-004",
+      "reason": "Hcaptcha.php and Turnstile.php: URLs are hardcoded verification endpoints (hcaptcha.com/siteverify, challenges.cloudflare.com/turnstile/v0/siteverify). esc_url_raw() is applied. User data only goes in the POST body."
+    },
+    {
+      "flow_id": "ninja-forms-open-001",
+      "reason": "Submission.php line 114: wp_safe_redirect with admin_url() base. wp_safe_redirect validates against allowed hosts. get_post_meta returns integer form_id."
+    },
+    {
+      "flow_id": "ninja-forms-open-002",
+      "reason": "Submissions.php line 95-96: wp_safe_redirect with admin_url() base. Even with unsanitized form_id GET param, wp_safe_redirect constrains to same-host."
+    }
+  ],
+  "attack_surface_summary": {
+    "unauthenticated_ajax": [
+      "wp_ajax_nopriv_nf_ajax_submit (form submission)",
+      "wp_ajax_nopriv_nf_ajax_resume (PayPal/Stripe resume)",
+      "wp_ajax_nopriv_nf_ajax_get_new_nonce (nonce refresh)",
+      "wp_ajax_nopriv_nf_log_js_error (JS error logging)"
+    ],
+    "rest_api_routes": {
+      "ninja-forms-submissions/*": "All gated by manage_options -- secure",
+      "ninja-forms-views/*": "Token-authenticated or manage_options -- secure"
+    },
+    "nonce_effectiveness": "Effectively zero for scripted attacks. get_new_nonce returns fresh nonces without auth, and the JIT nonce pattern returns fresh nonces in error responses."
+  }
+}

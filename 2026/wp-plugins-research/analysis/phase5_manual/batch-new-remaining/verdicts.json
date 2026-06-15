@@ -1,0 +1,176 @@
+[
+  {
+    "plugin": "yith-woocommerce-wishlist",
+    "verdict": "NEEDS_MORE_INFO",
+    "surface": "wp_ajax_nopriv",
+    "handlers": [
+      "wp_ajax_nopriv_add_to_wishlist",
+      "wp_ajax_nopriv_remove_from_wishlist",
+      "wp_ajax_nopriv_delete_item",
+      "wp_ajax_nopriv_save_title",
+      "wp_ajax_nopriv_load_mobile",
+      "wp_ajax_nopriv_reload_wishlist_and_adding_elem",
+      "wp_ajax_nopriv_load_fragments"
+    ],
+    "files": [
+      "includes/class-yith-wcwl-ajax-handler.php",
+      "plugin-fw/includes/class-yit-ajax.php"
+    ],
+    "analysis": "All main wishlist handlers (add_to_wishlist, remove_from_wishlist, delete_item, save_title, load_mobile, load_fragments) verify a per-action nonce (check_ajax_referer/'add_to_wishlist', 'remove_from_wishlist', etc.) before doing anything. All appear sound. The YITH plugin-fw also registers nopriv handlers for yith_plugin_fw_json_search_posts/products/orders/terms but json_search_products always requires a nonce ('search-posts'); json_search_posts also requires the same nonce when called via nopriv. However the 'search-posts' nonce is an admin-area nonce and should not be available to unauthenticated visitors. No confirmed vulnerability found, but the nopriv exposure of json_search_posts/products warrants dynamic verification that the nonce is not leaked to the frontend.",
+    "confidence": "LOW",
+    "cwe": null
+  },
+  {
+    "plugin": "so-widgets-bundle",
+    "verdict": "CONFIRMED",
+    "surface": "wp_ajax_nopriv",
+    "handler": "wp_ajax_nopriv_sow_carousel_load -> sow_carousel_get_next_posts_page()",
+    "file": "widgets/post-carousel/post-carousel.php",
+    "analysis": "Handler verifies a nonce (_widgets_nonce, action 'widgets_action') before proceeding — this nonce is generated and output on the frontend for every site visitor when a post-carousel widget is present. The nonce check therefore provides CSRF protection but not authentication. After nonce validation, the handler reads a widget instance from the stored widget factory by 'instance_hash' (a hash of widget settings), then renders paginated post queries. There is no capability check. The core security question is: can instance_hash be brute-forced or predicted? The hash is computed from the widget's stored settings so it is not directly attacker-controllable without knowing internal widget state. Posts returned are those with 'publish' status, so information not already public should not be exposed. The exploitability depends on whether the post query arguments can be manipulated via the instance_hash lookup — a stored instance is used, so query args come from saved admin settings, not attacker input. Overall: the handler exposes a public post-pagination endpoint with correct CSRF protection and no write operations. The risk is low but the nopriv surface is confirmed.",
+    "severity": "LOW",
+    "cwe": "CWE-284",
+    "confidence": "MEDIUM",
+    "notes": "No write operations; data returned is publish-status posts. No confirmed high-severity finding."
+  },
+  {
+    "plugin": "template-kit-import",
+    "verdict": "CONFIRMED",
+    "surface": "REST API - permission_callback: __return_true",
+    "route": "/envato-template-kits/v1/fetchPermissions (POST)",
+    "file": "inc/api/class-template-kit-import.php",
+    "analysis": "The 'fetchPermissions' REST route is registered with permission_callback set to __return_true, meaning any unauthenticated request can call it. The callback 'fetch_permissions()' returns { can_use_template_kits: current_user_can('install_themes') }. For unauthenticated callers, current_user_can always returns false so the disclosure is: the endpoint confirms that 'install_themes' capability is false for the current (guest) user. This is a low-value information disclosure. All other plugin routes (fetchInstalledTemplateKits, fetchIndividualTemplates, importSingleTemplate, getSingleTemplateImportData, importElementorTemplateImage) use the plugin-specific permission_callback that checks current_user_can('install_themes'), ensuring those sensitive operations are protected. No write operations are possible through the open route.",
+    "severity": "LOW",
+    "cwe": "CWE-200",
+    "confidence": "HIGH",
+    "notes": "Unauthenticated access returns only { can_use_template_kits: false } for guest users. No sensitive data exposed. Informational finding only."
+  },
+  {
+    "plugin": "breeze",
+    "verdict": "CONFIRMED",
+    "surface": "wp_ajax_nopriv",
+    "handler": "wp_ajax_nopriv_breeze_woocs_currency_get -> breeze_woocs_fetch_currency()",
+    "file": "inc/plugin-incompatibility/class-breeze-woocs-compatibility.php",
+    "analysis": "Handler verifies nonce (wp_verify_nonce, action 'breeze_woocs_nonce') before proceeding. The nonce is required to be POSTed. The handler then reads WooCommerce currency settings via the WOOCS plugin global object. This is a WooCommerce currency compatibility endpoint intended for frontend use. With a valid nonce (obtainable from the frontend for any logged-out user when WOOCS is active), an attacker could retrieve WooCommerce currency details. No write operations; nonce protection is in place. Low risk nopriv surface.",
+    "severity": "LOW",
+    "cwe": "CWE-284",
+    "confidence": "HIGH",
+    "notes": "Only active when WOOCS (WooCommerce currency switcher) plugin is also active. Reads currency info; no write operations."
+  },
+  {
+    "plugin": "chaty",
+    "verdict": "CONFIRMED",
+    "surface": "wp_ajax_nopriv",
+    "handlers": [
+      "wp_ajax_nopriv_chaty_front_form_save_data -> chaty_front_form_save_data()",
+      "wp_ajax_nopriv_update_chaty_view -> update_chaty_view()"
+    ],
+    "file": "includes/class-frontend.php",
+    "analysis": "chaty_front_form_save_data: verifies nonce (wp_verify_nonce, action 'chaty_widget_nonce'+widgetIndex) before writing. On success, sanitizes all inputs (sanitize_text_field, esc_sql) and inserts a lead record into wp_chaty_contact_form_leads. The 'channel' parameter is used to lookup get_option('cht_social_'.$channel) — this allows probing arbitrary WP options by manipulating the 'channel' value if the nonce can be obtained, but get_option returns a plugin-specific serialized array, not sensitive raw option values. Lead data is properly escaped on insert. update_chaty_view: verifies nonce (wp_verify_nonce, action 'update_chaty_view') and only increments a view counter option if valid. Both handlers require frontend-obtainable nonces. The lead form allows any visitor with a valid nonce to write contact data to the DB — this is by design for a chat/contact widget. No high-severity finding confirmed, but the write surface and option-probing via channel param warrant noting.",
+    "severity": "LOW",
+    "cwe": "CWE-284",
+    "confidence": "HIGH",
+    "notes": "Nonce required for both handlers. Lead writes are by design. Option-probing via channel param is low risk (returns plugin config, not secrets)."
+  },
+  {
+    "plugin": "gutenberg",
+    "verdict": "CONFIRMED",
+    "surface": "wp_ajax_nopriv",
+    "handler": "wp_ajax_nopriv_wp_block_form_email_submit -> gutenberg_block_core_form_send_email()",
+    "file": "build/scripts/block-library/form.php",
+    "analysis": "The handler calls check_ajax_referer('wp-block-form') to validate a nonce that is injected into the page script data via the 'script_module_data_@wordpress/block-library/form/view' filter for any page containing a form block. This nonce is therefore available to unauthenticated site visitors. After nonce verification, the handler reads $params['formAction'] directly from POST (no sanitization or validation against server-side registered values) and passes it as the $to argument to wp_mail(). The only transformation is str_replace('mailto:', '', $params['formAction']). An attacker who obtains a valid nonce from any page with a form block can send email to any arbitrary address by specifying an arbitrary formAction, effectively turning the site into an email relay/spam sender. Email content is user-controlled via other POST fields (sanitized with wp_kses_post for values, sanitize_key for keys). NOTE: This feature is behind the 'gutenberg-form-blocks' experiment flag (gutenberg_is_experiment_enabled check), so it is not active on standard installs unless the experiment is explicitly enabled.",
+    "severity": "MEDIUM",
+    "cwe": "CWE-20",
+    "confidence": "HIGH",
+    "notes": "Feature is experimental (requires gutenberg-form-blocks experiment to be enabled). When enabled, any visitor who can load a page with a form block can send email to arbitrary recipients via the site mail server. This constitutes email relay abuse / spam amplification.",
+    "cvss_estimate": "5.3 (CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N)"
+  },
+  {
+    "plugin": "woo-cart-abandonment-recovery",
+    "verdict": "CONFIRMED",
+    "surface": "wp_ajax_nopriv",
+    "handlers": [
+      "wp_ajax_nopriv_cartflows_save_cart_abandonment_data -> save_cart_abandonment_data()",
+      "wp_ajax_nopriv_cartflows_skip_cart_tracking_gdpr -> skip_cart_tracking_gdpr()"
+    ],
+    "files": [
+      "modules/cart-abandonment/classes/class-cartflows-ca-tracking.php",
+      "modules/cart-abandonment/classes/class-cartflows-ca-setting-functions.php"
+    ],
+    "analysis": "save_cart_abandonment_data: calls check_ajax_referer('cartflows_save_cart_abandonment_data', 'security') — nonce required. On success, calls sanitize_post_data() which re-checks the nonce and sanitizes all fields (FILTER_SANITIZE_EMAIL, FILTER_SANITIZE_STRING etc.), then writes to wp_cartflows_ca_cart_abandonment table using $wpdb->update/$wpdb->insert with sanitized data. All fields appear sanitized before DB write. The 'other_fields' column stores serialized billing/shipping address data that comes from POST; it is maybe_serialize()'d and fields are FILTER_SANITIZE_STRING sanitized. Admin display uses esc_html in the reports page. No confirmed stored XSS. skip_cart_tracking_gdpr: handler not visible in search output (function may not exist or is empty). By design, these endpoints allow frontend visitors to record and update their abandoned cart data — appropriate for WooCommerce checkout.",
+    "severity": "LOW",
+    "cwe": "CWE-284",
+    "confidence": "HIGH",
+    "notes": "Nonce protection in place. Data sanitized before DB write. Admin display uses esc_html. By-design frontend write surface for WooCommerce checkout tracking. No high-severity finding confirmed."
+  },
+  {
+    "plugin": "wp-mail-logging",
+    "verdict": "CONFIRMED",
+    "surface": "wp_ajax_nopriv (code comment only)",
+    "file": "src/WPML_LifeCycle.php",
+    "analysis": "The only match for 'wp_ajax_nopriv' in wp-mail-logging is a PHPDoc comment on line 187: '* add_action('wp_ajax_nopriv_actionName', array(&$this, 'functionName'));' — this is example documentation, not actual code. No real nopriv handler is registered. No unauth surface found.",
+    "severity": "NONE",
+    "cwe": null,
+    "confidence": "HIGH",
+    "notes": "False positive — match was in a code comment. Plugin has no unauth ajax or REST surface."
+  },
+  {
+    "plugin": "woo-checkout-field-editor-pro",
+    "verdict": "SKIPPED",
+    "reason": "No wp_ajax_nopriv handlers found. No __return_true permission_callback found. No unauth surface detected."
+  },
+  {
+    "plugin": "amp",
+    "verdict": "SKIPPED",
+    "reason": "No wp_ajax_nopriv handlers found. REST routes found but none use __return_true permission_callback. All require admin capabilities."
+  },
+  {
+    "plugin": "woocommerce-legacy-rest-api",
+    "verdict": "SKIPPED",
+    "reason": "No wp_ajax_nopriv handlers. The legacy v1/v2/v3 API endpoints require consumer_key/consumer_secret OAuth authentication via class-wc-api-authentication.php. Authentication is enforced per-request before any data is accessed."
+  },
+  {
+    "plugin": "ga-google-analytics",
+    "verdict": "SKIPPED",
+    "reason": "No wp_ajax_nopriv handlers found. No __return_true permission_callback found. No unauth surface detected."
+  },
+  {
+    "plugin": "redis-cache",
+    "verdict": "SKIPPED",
+    "reason": "No wp_ajax_nopriv handlers found. No open REST routes found. No unauth surface detected."
+  },
+  {
+    "plugin": "honeypot",
+    "verdict": "SKIPPED",
+    "reason": "No wp_ajax_nopriv handlers found. No open REST routes found. No unauth surface detected."
+  },
+  {
+    "plugin": "nextgen-gallery",
+    "verdict": "SKIPPED",
+    "reason": "No wp_ajax_nopriv handlers found. No __return_true permission_callback found. No unauth surface detected."
+  },
+  {
+    "plugin": "templately",
+    "verdict": "SKIPPED",
+    "reason": "No wp_ajax_nopriv handlers found. No register_rest_route calls found in source. No unauth surface detected."
+  },
+  {
+    "plugin": "megamenu",
+    "verdict": "SKIPPED",
+    "reason": "No wp_ajax_nopriv handlers found. No open REST routes found. No unauth surface detected."
+  },
+  {
+    "plugin": "webp-express",
+    "verdict": "SKIPPED",
+    "reason": "No wp_ajax_nopriv handlers found. No open REST routes found. No unauth surface detected."
+  },
+  {
+    "plugin": "copy-delete-posts",
+    "verdict": "SKIPPED",
+    "reason": "No wp_ajax_nopriv handlers found. No open REST routes found. No unauth surface detected."
+  },
+  {
+    "plugin": "wp-reset",
+    "verdict": "SKIPPED",
+    "reason": "No wp_ajax_nopriv handlers found. No open REST routes found. No unauth surface detected."
+  }
+]

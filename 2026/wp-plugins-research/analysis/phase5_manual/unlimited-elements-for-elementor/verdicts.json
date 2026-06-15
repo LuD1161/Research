@@ -1,0 +1,144 @@
+{
+  "plugin_slug": "unlimited-elements-for-elementor",
+  "review_date": "2026-06-14",
+  "reviewer": "claude-security-review",
+  "overall_risk": "medium",
+  "summary": "The plugin is a large Elementor widget builder with a Twig-based template engine. Most flagged issues are either false positives or limited to admin-only contexts. The eval() calls are safely gated behind alphanumeric validation. The SQL in changelog was already using $wpdb->prepare(). The single nopriv AJAX handler is protected by a nonce that is only ever served in admin/editor pages. Medium-risk issues: (1) save_screenshot action lacks admin permission check; (2) Twig is initialized without SandboxExtension; (3) get_from_sql uses sprintf instead of parameterized queries. No confirmed unauthenticated RCE or SQLi paths were found.",
+  "verdicts": [
+    {
+      "finding_id": "UE-001",
+      "title": "eval() in Widget Registration - False Positive",
+      "severity": "low",
+      "confidence": "unlikely",
+      "vulnerability_class": "rce",
+      "auth_required": false,
+      "description": "Four eval() call sites exist in first-party code: three in Elementor integration (elementor_integrate.class.php:229, 263; helper_provider_core.class.php:198) and one in WPML integration (wpml_integrate.class.php:328). All follow the same pattern: dynamically create an empty PHP class definition 'class UCAddon_{$name} extends UniteCreatorElementorWidget{}'. Before any eval() is reached, $name is validated with isAlphaNumeric() which rejects non-alphanumeric input. Widget names come from the plugin's own DB (admin-managed), not user-submitted HTTP input. No exploitable path exists.",
+      "affected_files": [
+        "provider/core/unlimited_elements/elementor/elementor_integrate.class.php",
+        "provider/core/unlimited_elements/helper_provider_core.class.php",
+        "provider/wpml_integrate.class.php"
+      ],
+      "affected_lines": "elementor_integrate.class.php:229,263; helper_provider_core.class.php:198; wpml_integrate.class.php:328",
+      "exploitation_scenario": "Not exploitable. The $name used in eval() is always alphanumeric-validated and sourced from admin-managed DB records.",
+      "remediation": "Replace eval() with class_alias('UniteCreatorElementorWidget', $className) as noted in the commented-out code. This eliminates eval() entirely.",
+      "is_third_party": false
+    },
+    {
+      "finding_id": "UE-002",
+      "title": "SQL in Changelog Class - False Positive (prepare() Used Correctly)",
+      "severity": "low",
+      "confidence": "unlikely",
+      "vulnerability_class": "sqli",
+      "auth_required": true,
+      "description": "The automated analysis flagged unitecreator_addon_changelog.class.php lines 398-413 as SQL injection. Manual review confirms $wpdb->prepare() IS called before both the SELECT (line 396) and DELETE (line 411) queries. The $ids variable is populated from a prior parameterized query result, not user input. The IN() clause uses %d placeholders via getDBPlaceholders(). The phpcs:ignore comments suppress a false positive from the WordPress PHPCS sniffer that cannot trace prepare() calls across variable assignments. NOT a vulnerability.",
+      "affected_files": [
+        "inc_php/unitecreator_addon_changelog.class.php"
+      ],
+      "affected_lines": "387-413",
+      "exploitation_scenario": "Not exploitable. Both queries use $wpdb->prepare() with proper parameterization.",
+      "remediation": "No fix required for security. The phpcs:ignore comments could be narrowed to specific rules to reduce false positives.",
+      "is_third_party": false
+    },
+    {
+      "finding_id": "UE-003",
+      "title": "maybe_unserialize on User Meta - Low Risk",
+      "severity": "low",
+      "confidence": "unlikely",
+      "vulnerability_class": "object_injection",
+      "auth_required": true,
+      "description": "provider/functions_wordpress.class.php:3774 calls maybe_unserialize() on values from get_user_meta(). This is invoked from the Twig getUserMeta() template function. The data comes from the WordPress DB (not directly from HTTP input). PHP object injection would require: (1) attacker-controlled user_meta (needs a separate write primitive), (2) a POP gadget chain in the codebase, (3) the specific meta key being queried by a template. WordPress itself uses maybe_unserialize() ubiquitously for meta storage; this usage is within that normal pattern.",
+      "affected_files": [
+        "provider/functions_wordpress.class.php"
+      ],
+      "affected_lines": "3748-3777",
+      "exploitation_scenario": "An attacker with user_meta write access plus a known POP gadget chain could trigger deserialization during page render. Requires multiple simultaneous conditions to be exploitable.",
+      "remediation": "Use json_decode() for meta values stored as JSON. If serialized PHP is necessary, consider using wp_unslash() + json_decode() and only fall back to maybe_unserialize() for legacy data.",
+      "is_third_party": false
+    },
+    {
+      "finding_id": "UE-004",
+      "title": "Missing Per-Action Admin Checks on Nopriv AJAX Handler",
+      "severity": "medium",
+      "confidence": "likely",
+      "vulnerability_class": "broken_access_control",
+      "auth_required": false,
+      "description": "The plugin registers a single AJAX action (unlimited-elements_ajax_action) via both wp_ajax_ and wp_ajax_nopriv_ hooks (provider_admin.class.php:302-306). The handler calls verifyNonce() which uses a nonce keyed to the current user ID. The nonce is ONLY output in admin/Elementor editor pages, so anonymous users cannot obtain a valid nonce from the public frontend. However, logged-in Elementor editors (not full admins) who access the editor receive a valid nonce and can then call actions that lack verifyAdminPermission(): get_addon_output_data, save_screenshot, get_addon_bulk_dialog, get_addon_config_html, get_addon_settings_html, get_addon_editor_data, show_preview, get_image_url, check_catalog, get_grid_import_layout_data, get_link_autocomplete, get_users_list_forselect, get_terms_list_forselect, get_posts_list_forselect, get_select2_*, get_post_child_params, dismiss_notice, postpone_notice. User enumeration via get_users_list_forselect is the most concrete impact.",
+      "affected_files": [
+        "provider/provider_admin.class.php",
+        "inc_php/unitecreator_actions.class.php",
+        "provider/provider_functions.class.php"
+      ],
+      "affected_lines": "provider_admin.class.php:302-306; unitecreator_actions.class.php:101-740",
+      "exploitation_scenario": "A logged-in Elementor editor obtains a nonce from the editor page. They call get_users_list_forselect to enumerate all WordPress users (including emails, usernames). They call dismiss_notice to suppress admin security notices. They call save_screenshot to write arbitrary binary data to image files.",
+      "remediation": "For each action that modifies data or leaks sensitive information, add an explicit capability check (e.g., current_user_can('manage_options') or current_user_can('edit_posts')). The nopriv registration should be audited and removed if no action genuinely needs anonymous access.",
+      "is_third_party": false
+    },
+    {
+      "finding_id": "UE-005",
+      "title": "save_screenshot - File Write Without Admin Permission Check",
+      "severity": "medium",
+      "confidence": "possible",
+      "vulnerability_class": "arbitrary_file_write",
+      "auth_required": true,
+      "description": "The save_screenshot AJAX case (unitecreator_actions.class.php:577) has no verifyAdminPermission() call. It accepts base64-encoded image data, decodes it, and writes to a file under $path_images_screenshots. Extension is restricted to 'jpg' or 'png' only (validated via switch-case). An Elementor editor with a valid nonce can call this with any layoutID (validated only by DB record existence) and arbitrary binary payload as base64 content. The .jpg/.png extension restriction prevents direct PHP execution on most servers, but: PHP code embedded in image files can execute via certain server misconfigurations (Apache mod_php with lax AddHandler), the file is served publicly via URL, and with a separate LFI vulnerability the content could be included. Additionally, editors can overwrite preview images for any layout on the site.",
+      "affected_files": [
+        "inc_php/unitecreator_actions.class.php",
+        "inc_php/unitecreator_operations.class.php"
+      ],
+      "affected_lines": "unitecreator_actions.class.php:577-581; unitecreator_operations.class.php:872-903",
+      "exploitation_scenario": "Elementor editor POST to admin-ajax.php: action=unlimited-elements_ajax_action, client_action=save_screenshot, nonce=<valid>, layoutid=<any_valid_id>, ext=jpg, screenshot_data=<base64_encoded_php_webshell_bytes>. File is written as .jpg but may execute as PHP on misconfigured servers or via LFI.",
+      "remediation": "Add HelperProviderUC::verifyAdminPermission() before the save_screenshot action. Also validate the decoded data is a valid image using getimagesizefromstring() before writing to disk.",
+      "is_third_party": false
+    },
+    {
+      "finding_id": "UE-006",
+      "title": "Twig get_from_sql Uses sprintf Without SQL Parameterization",
+      "severity": "medium",
+      "confidence": "possible",
+      "vulnerability_class": "sqli",
+      "auth_required": true,
+      "description": "The Twig ucfunc('get_from_sql', $sqlTemplate, $arg1, $arg2) function (unitecreator_helper.class.php:308-320) uses sprintf($query, $arg1, $arg2) to build the SQL query. The SQL template is admin-written in Twig templates. The $arg1/$arg2 values could be literal strings from the template or could be values derived from widget parameter settings (which are set by editors in the Elementor UI, not end-users). If a template passes a user-controlled parameter to get_from_sql as $arg1 or $arg2 with a %s format specifier in the query, the parameter value would be injected into SQL without any escaping. Malicious catalog-imported widgets could exploit this pattern.",
+      "affected_files": [
+        "inc_php/unitecreator_helper.class.php",
+        "inc_php/unitecreator_template_engine.class.php"
+      ],
+      "affected_lines": "unitecreator_helper.class.php:308-320; unitecreator_template_engine.class.php:1289-1293",
+      "exploitation_scenario": "Admin imports a malicious widget from the plugin's web catalog. The widget template uses: {% set data = ucfunc('get_from_sql', 'SELECT * FROM wp_users WHERE user_login = \\'%s\\'', params.search_term) %}. When a visitor provides a search_term parameter, it is interpolated directly into SQL. With UNION-based injection, the attacker could exfiltrate the wp_users table including password hashes.",
+      "remediation": "Replace sprintf($query, $arg1, $arg2) with $wpdb->prepare($query, $arg1, $arg2) in the getFromSql() function. This provides parameterized query protection regardless of what values are passed.",
+      "is_third_party": false
+    },
+    {
+      "finding_id": "UE-007",
+      "title": "Twig Template Engine Initialized Without Sandbox Extension",
+      "severity": "medium",
+      "confidence": "confirmed",
+      "vulnerability_class": "rce",
+      "auth_required": true,
+      "description": "The Twig environment is initialized in unitecreator_template_engine.class.php:1961-2002 without enabling Twig's SandboxExtension. Twig's sandbox is designed specifically to restrict what untrusted template authors can access. Without it, templates have access to the full Twig function/filter set plus all registered PHP callbacks. The plugin does restrict arrow function callables (validateFilterCallable blocks string callables in filter/map/sort/reduce), but this is insufficient as a sandbox replacement. Widget templates from the external plugin catalog (unlimited-elements.com) are admin-installed but not individually reviewed. If a catalog widget contained malicious Twig code, it could leverage the unsandboxed environment to call arbitrary PHP functions or access sensitive server-side objects.",
+      "affected_files": [
+        "inc_php/unitecreator_template_engine.class.php"
+      ],
+      "affected_lines": "1961-2002",
+      "exploitation_scenario": "Admin installs a malicious widget from the plugin catalog. The widget's Twig template uses the registered ucfunc or getByPHPFunction (PRO) features to call PHP functions like exec() or system(). Since Twig is unsandboxed, the template author has broad access to registered PHP callbacks. The widget renders on the public frontend, triggering code execution for every visitor.",
+      "remediation": "Enable Twig's SandboxExtension with a SecurityPolicy that whitelists ONLY the custom functions and filters the plugin explicitly registers. This is the recommended Twig approach for untrusted or third-party templates: $sandbox = new \\Twig\\Extension\\SandboxExtension($policy, true); $this->twig->addExtension($sandbox);",
+      "is_third_party": false
+    },
+    {
+      "finding_id": "UE-008",
+      "title": "Freemius SDK - Third Party, Track via SDK Version",
+      "severity": "low",
+      "confidence": "possible",
+      "vulnerability_class": "various",
+      "auth_required": true,
+      "description": "The automated taint analysis flagged numerous data flows in provider/freemius/includes/. The Freemius SDK is a widely used third-party licensing library present in thousands of WordPress plugins. Any vulnerabilities in it affect all plugins using the same version and are tracked by the Freemius team independently. These findings are NOT specific to unlimited-elements-for-elementor.",
+      "affected_files": [
+        "provider/freemius/includes/"
+      ],
+      "affected_lines": "various",
+      "exploitation_scenario": "Depends on the specific Freemius SDK version bundled. Check against known Freemius CVEs.",
+      "remediation": "Update the Freemius SDK to the latest version using the official Freemius GitHub repository. Monitor Freemius security advisories.",
+      "is_third_party": true,
+      "third_party_component": "Freemius SDK"
+    }
+  ]
+}

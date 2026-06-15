@@ -1,0 +1,164 @@
+{
+  "plugin": "post-smtp",
+  "version": "3.9.4",
+  "reviewer": "claude-opus-4-6",
+  "review_date": "2026-06-15",
+  "summary": "Post SMTP v3.9.4 was audited for unauthenticated RCE, SQLi, and file operation vulnerabilities. All eval() calls are in vendored libraries (phpseclib3, HTMLPurifier) and unreachable from user input. The mobile REST API auth bypass (CVE-2023-6875) is fixed in this version. No confirmed unauthenticated RCE or SQLi. Several lower-severity issues were found.",
+  "verdicts": [
+    {
+      "id": "POSTSMTP-001",
+      "title": "eval() in vendored libraries (phpseclib3, HTMLPurifier) — not exploitable",
+      "severity": "informational",
+      "confidence": "high",
+      "status": "NOT_VULNERABLE",
+      "cvss_estimate": null,
+      "affected_files": [
+        "Postman/Postman-Mail/libs/vendor_prefixed/phpseclib/phpseclib/phpseclib/Common/Functions/Strings.php:277",
+        "Postman/Postman-Mail/libs/vendor_prefixed/phpseclib/phpseclib/phpseclib/Crypt/Common/SymmetricKey.php:2923",
+        "Postman/Postman-Mail/libs/vendor_prefixed/phpseclib/phpseclib/phpseclib/Math/BigInteger/Engines/PHP/Reductions/EvalBarrett.php:57,65,92,120",
+        "Postman/Postman-Mail/libs/vendor_prefixed/phpseclib/phpseclib/phpseclib/Math/BigInteger/Engines/Engine.php:1032,1039",
+        "includes/libs/HTMLPurifier/HTMLPurifier/ConfigSchema/InterchangeBuilder.php:182",
+        "includes/libs/HTMLPurifier/HTMLPurifier/VarParser/Native.php:30"
+      ],
+      "description": "All 6 eval() call sites are in vendored libraries. phpseclib3 uses eval() for JIT closure generation in crypto operations (Barrett reduction, symmetric cipher setup) with internally-generated code strings. HTMLPurifier's eval() calls are in offline schema-building code (InterchangeBuilder, VarParser/Native) that is never invoked at runtime — the production code path loads from a pre-serialized schema.ser file. No user input can reach any eval() call.",
+      "proof_of_concept": null,
+      "remediation": "No action needed. These are standard patterns in mature vendored libraries."
+    },
+    {
+      "id": "POSTSMTP-002",
+      "title": "Mobile REST API auth bypass (CVE-2023-6875) — fixed in current version",
+      "severity": "informational",
+      "confidence": "high",
+      "status": "NOT_VULNERABLE",
+      "cvss_estimate": null,
+      "affected_files": [
+        "Postman/Mobile/includes/rest-api/v1/rest-api.php",
+        "Postman/Mobile/includes/rest-api/v2/rest-api.php",
+        "Postman/Mobile/includes/functions.php"
+      ],
+      "description": "The mobile REST API routes (get-logs, get-log, resend-email, disconnect-site, connect-app) all use permission_callback => '__return_true' making them unauthenticated at the WP REST layer. Application-layer auth via post_smtp_mobile_validate() checks an FCM token against a stored option. In v3.9.4, the double guard ($device && isset($device[$fcm_token])) correctly rejects requests when no device is registered or the token doesn't match. The connect-app pairing endpoint requires a 128-bit random auth_nonce (30-minute transient). Live testing confirms the fix holds. CVE-2023-6875 (affecting versions < 2.8.7) is resolved.",
+      "proof_of_concept": null,
+      "remediation": "Consider migrating to WordPress REST permission_callback with proper capability checks instead of relying solely on application-layer token validation."
+    },
+    {
+      "id": "POSTSMTP-003",
+      "title": "unserialize() on database-stored email headers — low risk chain dependency",
+      "severity": "low",
+      "confidence": "medium",
+      "status": "UNLIKELY",
+      "cvss_estimate": null,
+      "affected_files": [
+        "Postman/Dashboard/includes/rest-api/v1/class-psd-rest-api.php:236",
+        "Postman/PostmanEmailLogs.php:907"
+      ],
+      "description": "Two locations unserialize email log headers stored in the database: the dashboard REST API (admin-only, manage_options check) and the AJAX resend handler (nonce + capability check). The serialized data originates from wp_mail() headers captured by the plugin. No direct user input reaches unserialize at these call sites. Exploitation would require a separate DB injection vulnerability to plant a malicious serialized object, making this a chain-dependent issue only.",
+      "proof_of_concept": null,
+      "remediation": "Replace unserialize() with json_decode() for header storage/retrieval, or use unserialize() with allowed_classes parameter set to an empty array."
+    },
+    {
+      "id": "POSTSMTP-004",
+      "title": "HTMLPurifier ForbiddenAttributes ['on*'] is a no-op — mitigated by whitelist",
+      "severity": "informational",
+      "confidence": "high",
+      "status": "NOT_VULNERABLE",
+      "cvss_estimate": null,
+      "affected_files": [
+        "Postman/PostmanEmailLogs.php:119"
+      ],
+      "description": "The purify_html() method sets HTML.ForbiddenAttributes to ['on*'], but HTMLPurifier performs exact key lookups, not glob matching. The literal key 'on*' matches no real attribute. However, this is mitigated because HTMLPurifier uses a whitelist approach — event handler attributes (onclick, onerror, onload, etc.) are never defined in any HTMLModule and are therefore stripped regardless. Live testing confirmed: <img onerror=...>, <svg onload=...>, <div onclick=...> are all sanitized. <script> tags are blocked by ForbiddenElements. javascript: URIs are blocked by URI.AllowedSchemes. No XSS vector survives.",
+      "proof_of_concept": "Live HTMLPurifier test results:\n  <img src=x onerror=\"alert(1)\"> -> <img src=\"x\" alt=\"x\" />\n  <svg onload=\"alert(1)\">test</svg> -> test\n  <div onclick=\"alert(1)\">click</div> -> <div>click</div>\n  <script>alert(1)</script> -> (empty)",
+      "remediation": "Fix the config to properly express intent (e.g., enumerate specific forbidden attributes). Also fix the CSS.AllowedProperties override bug: line 114 sets 'border-radius, background' but line 131 overrides to null (allow all). Set URI.DisableExternalResources to true to prevent tracking pixel injection."
+    },
+    {
+      "id": "POSTSMTP-005",
+      "title": "External resource loading in email log viewer (tracking pixels)",
+      "severity": "low",
+      "confidence": "high",
+      "status": "CONFIRMED",
+      "cvss_estimate": "3.1",
+      "affected_files": [
+        "Postman/PostmanEmailLogs.php:103-141"
+      ],
+      "description": "The HTMLPurifier configuration does not set URI.DisableExternalResources, allowing <img src='https://attacker.com/pixel.gif'> and <table background='...'> (converted to CSS background-image) to load external resources when an admin views an email in the log viewer. An attacker who can trigger wp_mail() (e.g., via a contact form) can embed tracking pixels to detect when an admin views the email log, capturing the admin's IP address and User-Agent. The log viewer iframe has no sandbox attribute.",
+      "proof_of_concept": "Live test: <img src=\"https://evil.com/pixel.gif?admin=1\"> passes through HTMLPurifier unchanged. <table background=\"https://evil.com/track\"> is converted to <table style=\"background-image:url(...);\">. Both load external resources when rendered.",
+      "remediation": "Set $config->set('URI.DisableExternalResources', true) in purify_html(). Add sandbox attribute to the log viewer iframe."
+    },
+    {
+      "id": "POSTSMTP-006",
+      "title": "ajax_get_gmail_auth_url() verifies wrong nonce and calls wrong function",
+      "severity": "low",
+      "confidence": "high",
+      "status": "CONFIRMED",
+      "cvss_estimate": null,
+      "affected_files": [
+        "Postman/Wizard/NewWizard.php:2029-2065"
+      ],
+      "description": "The ajax_get_gmail_auth_url() handler verifies the Office365 nonce ('ps_get_office365_auth_url') instead of the Gmail nonce, and calls post_smtp_get_office365_auth_url() instead of the Gmail function. The actual Gmail logic is dead code inside an error branch (after wp_send_json_error which calls wp_die). Security impact is minimal because the endpoint is protected by current_user_can('manage_options'), but the Gmail OAuth flow is completely broken — it initiates an Office365 flow instead.",
+      "proof_of_concept": null,
+      "remediation": "Fix the nonce action string and function call to use Gmail equivalents. Remove the dead code block."
+    },
+    {
+      "id": "POSTSMTP-007",
+      "title": "post_user_feedback AJAX handler lacks capability check",
+      "severity": "low",
+      "confidence": "high",
+      "status": "CONFIRMED",
+      "cvss_estimate": "3.5",
+      "affected_files": [
+        "Postman/PostmanPluginFeedback.php:24-46"
+      ],
+      "description": "The wp_ajax_post_user_feedback handler only checks a nonce (check_ajax_referer) but not current_user_can(). Any authenticated WordPress user, including subscribers, can trigger an HTTP POST to postmansmtp.com/feedback with sanitized deactivation reason data. Impact is low — no sensitive data is leaked and the external endpoint is the vendor's feedback collection URL — but it violates the principle of least privilege.",
+      "proof_of_concept": null,
+      "remediation": "Add current_user_can('manage_options') check before processing the feedback request."
+    },
+    {
+      "id": "POSTSMTP-008",
+      "title": "No SQL injection found — all queries properly parameterized or use internal data",
+      "severity": "informational",
+      "confidence": "high",
+      "status": "NOT_VULNERABLE",
+      "cvss_estimate": null,
+      "affected_files": [],
+      "description": "Comprehensive search of all $wpdb query calls found no SQL injection vulnerabilities. All user-facing queries use $wpdb->prepare(). The ORDER BY in PostmanEmailQueryLog.php uses sanitize_sql_orderby() with backtick wrapping (a logic bug that breaks sorting but does not create an injection vector). Date-interpolated queries in PostmanEmailReportSending.php use strtotime()-derived integer timestamps from server-internal values. The SQL injection fixed in v2.9.10 (email log search) is resolved in v3.9.4.",
+      "proof_of_concept": null,
+      "remediation": null
+    },
+    {
+      "id": "POSTSMTP-009",
+      "title": "exec() in PostmanSmtpDiscovery.php — properly escaped",
+      "severity": "informational",
+      "confidence": "high",
+      "status": "NOT_VULNERABLE",
+      "cvss_estimate": null,
+      "affected_files": [
+        "Postman/Postman-Configuration/PostmanSmtpDiscovery.php:220"
+      ],
+      "description": "The @exec('nslookup.exe -type=MX $hostname.', $output) call on Windows-only PHP installations uses a hostname that is sanitized. The function is only reachable by administrators via the SMTP configuration wizard. Not exploitable.",
+      "proof_of_concept": null,
+      "remediation": null
+    },
+    {
+      "id": "POSTSMTP-010",
+      "title": "MainWP child REST endpoint with MD5-based auth",
+      "severity": "low",
+      "confidence": "medium",
+      "status": "UNLIKELY",
+      "cvss_estimate": null,
+      "affected_files": [
+        "Postman/Extensions/MainWP-Child/includes/rest-api/v1/class-psmwp-rest-api.php"
+      ],
+      "description": "The /psmwp/v1/activate-from-mainwp endpoint uses permission_callback => '__return_true' and authenticates via MD5(mainwp_child_pubkey) comparison. If mainwp-child plugin is not installed, the pubkey option is empty and the endpoint returns 404. If installed, an attacker who discovers the pubkey (e.g., via information disclosure) could toggle Post SMTP options. Requires MainWP Child plugin to be active and pubkey to be leaked.",
+      "proof_of_concept": null,
+      "remediation": "Use HMAC-based authentication instead of plain MD5 hash comparison."
+    }
+  ],
+  "attack_surface_summary": {
+    "eval_calls": "6 in vendored libraries (phpseclib3, HTMLPurifier), none in plugin code, none reachable from user input",
+    "unserialize_calls": "7 total: 2 on DB-stored email headers (admin-only), 1 on WP Mail Bank import data, 4 in vendored libraries on local files",
+    "exec_calls": "1 in PostmanSmtpDiscovery.php (Windows-only, admin-only, escaped), 1 in Google CredentialsLoader (vendored, internal)",
+    "rest_api_public": "7 endpoints with __return_true permission_callback (5 mobile API, 1 mobile v2, 1 MainWP), all use application-layer token auth",
+    "ajax_nopriv": "1 in vendored ActionScheduler (WP_Async_Request), protected by nonce",
+    "sql_injection": "None found",
+    "known_cves_status": "CVE-2023-6875 (mobile API auth bypass) — fixed. CVE in v2.9.9 (SQLi in log search) — fixed."
+  }
+}

@@ -1,0 +1,921 @@
+[
+  {
+    "slug": "woocommerce-pdf-invoices-packing-slips",
+    "has_unauth_surface": true,
+    "nopriv_handlers": ["generate_wpo_wcpdf", "wpo_ips_get_refund_order_ids"],
+    "rest_routes": ["wpo-ips/v1/peppol-endpoint"],
+    "findings": [
+      {
+        "type": "unauthenticated_document_access",
+        "handler": "generate_document_ajax",
+        "file": "woocommerce-pdf-invoices-packing-slips/includes/Main.php",
+        "line": 33,
+        "severity": "medium",
+        "description": "When site admin configures access_type='full' (non-default), the generate_document_ajax handler is accessible without login using only an order_key as the access_key. Allows any party with a valid WooCommerce order_key to download PDF invoices/packing slips. Default mode ('logged_in') requires authentication and nonce.",
+        "exploit_sketch": "POST /wp-admin/admin-ajax.php?action=generate_wpo_wcpdf&document_type=invoice&order_ids=123&access_key=<order_key> — only works when admin has set access_type to 'full'."
+      },
+      {
+        "type": "nonce_required_nopriv_handler",
+        "handler": "get_refund_order_ids_ajax",
+        "file": "woocommerce-pdf-invoices-packing-slips/includes/Main.php",
+        "line": 35,
+        "severity": "info",
+        "description": "Registered as nopriv but immediately validates check_ajax_referer. Nonce is only issued in admin context.",
+        "exploit_sketch": "N/A — nonce check effectively blocks unauthenticated access."
+      }
+    ],
+    "verdict": "CLEAN",
+    "notes": "Default configuration requires login and nonce. 'full' access_type is intentional for email download links using order_key. No exploitable vulnerability in default configuration."
+  },
+  {
+    "slug": "woo-variation-swatches",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "No wp_ajax_nopriv_ handlers and no register_rest_route calls found."
+  },
+  {
+    "slug": "otter-blocks",
+    "has_unauth_surface": true,
+    "nopriv_handlers": [],
+    "rest_routes": [
+      "otter/v1/form/frontend",
+      "otter/v1/form/confirm",
+      "otter/v1/dynamic",
+      "otter/v1/dynamic/preview",
+      "otter/v1/post_styles/{id}",
+      "otter/v1/block_styles/{id}",
+      "otter/v1/widget_styles",
+      "otter/v1/stripe/products",
+      "otter/v1/stripe/prices/{id}",
+      "otter/v1/template-cloud/add-source",
+      "otter/v1/template-cloud/delete-source/{key}",
+      "otter/v1/template-cloud/sync",
+      "otter/v1/regenerate",
+      "otter/v1/openai/key",
+      "otter/v1/openai/prompt",
+      "otter/v1/openai/generate",
+      "otter/v1/onboarding/templates",
+      "otter/v1/atomic-wind/style"
+    ],
+    "findings": [
+      {
+        "type": "unauthenticated_form_submission",
+        "handler": "frontend",
+        "file": "otter-blocks/inc/server/class-form-server.php",
+        "line": 167,
+        "severity": "low",
+        "description": "POST /otter/v1/form/frontend is accessible without login. Nonce is embedded in page HTML/JS and obtainable by any visitor. Without captcha configured, enables email spam abuse via wp_mail.",
+        "exploit_sketch": "1. Visit any page with an Otter form block. 2. Extract nonce from themeisleGutenbergForm JS object. 3. POST to /wp-json/otter/v1/form/frontend with X-WP-Nonce header. If captcha not configured, email is sent."
+      },
+      {
+        "type": "unauthenticated_rest_access",
+        "handler": "confirm_form_submission",
+        "file": "otter-blocks/inc/server/class-form-server.php",
+        "line": 190,
+        "severity": "low",
+        "description": "GET /otter/v1/form/confirm permission_callback calls verify_confirmation_session() which accepts any non-empty string as stripe_checkout param. In free version returns empty response — no data exposed or written, but overly permissive.",
+        "exploit_sketch": "GET /wp-json/otter/v1/form/confirm?stripe_checkout=anything&record_id=1 — grants access but returns empty response by default."
+      },
+      {
+        "type": "unauthenticated_rest_access",
+        "handler": "apply_data",
+        "file": "otter-blocks/inc/server/class-dynamic-content-server.php",
+        "line": 51,
+        "severity": "info",
+        "description": "GET /otter/v1/dynamic and /otter/v1/dynamic/preview accessible without login for published post IDs. Returns post metadata for published posts — already public data.",
+        "exploit_sketch": "GET /wp-json/otter/v1/dynamic/preview?type=postContent&context=<published_post_id>"
+      }
+    ],
+    "verdict": "SUSPICIOUS",
+    "notes": "form/confirm has overly permissive permission_callback (any non-empty string passes). form/frontend enables email spam without captcha. Dynamic content endpoints expose public post data. Stripe/openai/template-cloud routes are properly auth-gated."
+  },
+  {
+    "slug": "coblocks",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [
+      "coblocks/v1/design-endpoint",
+      "coblocks/v1/opentable-search-proxy"
+    ],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "Both REST routes require authentication: design endpoint requires edit_theme_options, OpenTable proxy requires edit_posts."
+  },
+  {
+    "slug": "really-simple-captcha",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "No endpoints. Provides server-side CAPTCHA generation/validation helper functions only."
+  },
+  {
+    "slug": "cmb2",
+    "has_unauth_surface": true,
+    "nopriv_handlers": ["cmb2_oembed_handler"],
+    "rest_routes": [
+      "cmb2/v1/boxes",
+      "cmb2/v1/boxes/{cmb_id}",
+      "cmb2/v1/boxes/{cmb_id}/fields/",
+      "cmb2/v1/boxes/{cmb_id}/fields/{field_id}"
+    ],
+    "findings": [
+      {
+        "type": "ssrf",
+        "handler": "oembed_handler",
+        "file": "cmb2/includes/CMB2_Ajax.php",
+        "line": 63,
+        "severity": "medium",
+        "description": "wp_ajax_nopriv_cmb2_oembed_handler allows unauthenticated users to trigger WordPress's oEmbed fetcher for any URL. Nonce is localized via wp_footer on any frontend page where CMB2 JS is enqueued. esc_url() sanitization does not prevent SSRF to internal services.",
+        "exploit_sketch": "1. Visit any page with a CMB2 frontend form. 2. Extract cmb2_settings.ajax_nonce from JS. 3. POST /wp-admin/admin-ajax.php with action=cmb2_oembed_handler&cmb2_ajax_nonce=<nonce>&oembed_url=http://169.254.169.254/latest/meta-data/ — server makes HTTP GET to supplied URL."
+      },
+      {
+        "type": "unauthenticated_data_exposure",
+        "handler": "get_items_permissions_check",
+        "file": "cmb2/includes/rest-api/CMB2_REST_Controller_Boxes.php",
+        "line": 61,
+        "severity": "medium",
+        "description": "CMB2 REST API defaults to allowing all access via apply_filters('cmb2_api_get_boxes_permissions_check', true). If developer registers a CMB2 box with show_in_rest=true, ALL box field data and values are readable unauthenticated. Risk depends on developer configuration.",
+        "exploit_sketch": "GET /wp-json/cmb2/v1/boxes — lists all REST-enabled boxes. GET /wp-json/cmb2/v1/boxes/{box_id}/fields/{field_id}?object_id=1&object_type=post — returns field value with no auth."
+      }
+    ],
+    "verdict": "SUSPICIOUS",
+    "notes": "oEmbed nopriv handler exposes SSRF — nonce obtainable from any frontend page with CMB2 rendered. REST API has no default auth for boxes configured with show_in_rest=true. Design-level issues rather than implementation bugs."
+  },
+  {
+    "slug": "wp-security-audit-log",
+    "has_unauth_surface": true,
+    "nopriv_handlers": ["wp_async_request"],
+    "rest_routes": [],
+    "findings": [
+      {
+        "type": "internal_async_handler",
+        "handler": "maybe_handle",
+        "file": "wp-security-audit-log/third-party/vendor/classes/wp-async-request.php",
+        "line": 59,
+        "severity": "info",
+        "description": "Generic WP async background processing library registers wp_ajax_nopriv_{identifier}. maybe_handle() immediately calls check_ajax_referer tied to a dynamic identifier never exposed externally.",
+        "exploit_sketch": "N/A — requires a valid nonce tied to a dynamic identifier never exposed externally."
+      }
+    ],
+    "verdict": "CLEAN",
+    "notes": "Nopriv handler is vendor library for internal async background processing. Nonce requirement and dynamic identifier make external exploitation infeasible."
+  },
+  {
+    "slug": "members",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "No wp_ajax_nopriv_ handlers and no register_rest_route calls."
+  },
+  {
+    "slug": "stops-core-theme-and-plugin-updates",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "No wp_ajax_nopriv_ handlers and no register_rest_route calls."
+  },
+  {
+    "slug": "limit-login-attempts",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "No nopriv handlers or REST routes. Operates via hooks on wp-login.php and admin-ajax.php to track failed login attempts."
+  },
+  {
+    "slug": "pdf-embedder",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "No nopriv AJAX handlers. No REST routes. All admin AJAX handlers use authenticated wp_ajax_ prefix."
+  },
+  {
+    "slug": "sticky-header-effects-for-elementor",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "No nopriv AJAX handlers. No REST routes. All AJAX actions require admin authentication."
+  },
+  {
+    "slug": "password-protected",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "No nopriv AJAX. No REST routes. Login form uses wp_validate_redirect() before safe_redirect() to prevent open redirect."
+  },
+  {
+    "slug": "simple-custom-post-order",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "All AJAX handlers registered inside is_admin() block. No nopriv AJAX. No REST routes."
+  },
+  {
+    "slug": "complianz-terms-conditions",
+    "has_unauth_surface": true,
+    "nopriv_handlers": [],
+    "rest_routes": ["complianz_tc/v1/document/"],
+    "findings": [
+      {
+        "type": "info_disclosure",
+        "handler": "cmplz_tc_rest_api_documents",
+        "file": "rest-api/rest-api.php",
+        "line": 47,
+        "severity": "info",
+        "description": "REST endpoint /wp-json/complianz_tc/v1/document/ uses permission_callback: '__return_true'. Returns only admin-configured T&C HTML processed through wp_kses() before storage. No user input influences the response.",
+        "exploit_sketch": "GET /wp-json/complianz_tc/v1/document/ — returns the site's T&C document. No practical exploit."
+      }
+    ],
+    "verdict": "CLEAN",
+    "notes": "Public REST endpoint is by design for Gutenberg block rendering. Output is wp_kses()-sanitized admin content."
+  },
+  {
+    "slug": "pinterest-for-woocommerce",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": ["pinterest-for-woocommerce/v1/*"],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "All REST routes go through VendorAPI::permissions_check() enforcing current_user_can('manage_woocommerce')."
+  },
+  {
+    "slug": "shortpixel-image-optimiser",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "All AJAX handlers are authenticated wp_ajax_ only. No REST routes."
+  },
+  {
+    "slug": "google-analytics-dashboard-for-wp",
+    "has_unauth_surface": true,
+    "nopriv_handlers": [
+      "exactmetrics_popular_posts_get_widget_output",
+      "onboarding_exactmetrics_onboarding_get_errors",
+      "onboarding_exactmetrics_maybe_authenticate",
+      "exactmetrics_is_installed",
+      "exactmetrics_rauthenticate",
+      "exactmetrics_push_mp_token",
+      "exactmetrics_get_plugin_info"
+    ],
+    "rest_routes": [
+      "exactmetrics/v1/popular-posts/themes/(?P<type>[a-zA-Z0-9-]+)",
+      "exactmetrics/v1/terms/(?P<slug>[a-zA-Z0-9-_]+)",
+      "exactmetrics/v1/taxonomy/(?P<slug>[a-zA-Z0-9-_]+)",
+      "exactmetrics/v1/onboarding/settings",
+      "exactmetrics/v1/onboarding/connect-url",
+      "exactmetrics/v1/onboarding/set-license-key",
+      "exactmetrics/v1/onboarding/delete-onboarding-key",
+      "exactmetrics/v1/feedback"
+    ],
+    "findings": [
+      {
+        "type": "option_write_via_hmac_bypass",
+        "handler": "handle_relay_mp_token_push",
+        "file": "includes/admin/api-auth.php",
+        "line": 775,
+        "severity": "medium",
+        "description": "Nopriv AJAX handler exactmetrics_push_mp_token uses HMAC-MD5 with the site's stored OAuth public_key to validate a signature. On sites not yet connected to Google Analytics, get_key() returns empty string ''. hash_hmac('md5', data, '') is trivially computable by an attacker. An unauthenticated attacker can compute the valid HMAC and write an arbitrary measurement_protocol_secret to wp_options (exactmetrics_site_profile). 16-minute timestamp window gives ample time.",
+        "exploit_sketch": "1) Confirm site is unconnected: POST action=exactmetrics_is_installed. 2) Compute signature: hash_hmac('md5', http_build_query(['mp_token'=>'PAYLOAD','timestamp'=>T]), ''). 3) POST /wp-admin/admin-ajax.php action=exactmetrics_push_mp_token&mp_token=PAYLOAD&timestamp=T&signature=COMPUTED — writes arbitrary value to exactmetrics_site_profile option."
+      },
+      {
+        "type": "info_disclosure",
+        "handler": "exactmetrics_is_installed",
+        "file": "includes/admin/api-auth.php",
+        "line": 74,
+        "severity": "low",
+        "description": "Nopriv AJAX handler returns plugin version and whether Pro is active with no auth, nonce, or rate limiting. Enables version fingerprinting.",
+        "exploit_sketch": "POST /wp-admin/admin-ajax.php?action=exactmetrics_is_installed — returns {version: '8.x.x', pro: false/true}"
+      }
+    ],
+    "verdict": "SUSPICIOUS",
+    "notes": "The exactmetrics_push_mp_token handler on unconnected sites uses an empty-string HMAC key, making signature trivially forgeable and allowing unauthenticated writes to wp_options. 7 total nopriv handlers — broad attack surface. All REST routes require edit_posts or admin onboarding key."
+  },
+  {
+    "slug": "gdpr-cookie-compliance",
+    "has_unauth_surface": true,
+    "nopriv_handlers": [
+      "moove_gdpr_get_scripts",
+      "moove_gdpr_localize_scripts",
+      "moove_gdpr_remove_php_cookies"
+    ],
+    "rest_routes": [],
+    "findings": [
+      {
+        "type": "referer_bypass",
+        "handler": "moove_gdpr_get_scripts",
+        "file": "controllers/class-moove-gdpr-controller.php",
+        "line": 541,
+        "severity": "low",
+        "description": "Origin check via HTTP_REFERER header can be bypassed by omitting the Referer header: check is `if ($referer && ...)` so missing Referer skips validation entirely. Endpoint returns admin-configured cookie consent script blocks. Content is intended to be public anyway.",
+        "exploit_sketch": "curl -X POST -d 'action=moove_gdpr_get_scripts&strict=1&thirdparty=1&advanced=1' https://target.com/wp-admin/admin-ajax.php (omit Referer) — returns all configured cookie consent scripts."
+      }
+    ],
+    "verdict": "CLEAN",
+    "notes": "Referer bypass is real but low-impact — returned content is admin-configured HTML/JS scripts already served to browsers. moove_gdpr_remove_php_cookies properly verifies nonce. moove_gdpr_localize_scripts is intentionally public."
+  },
+  {
+    "slug": "eps-301-redirects",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "All AJAX handlers inside is_admin() block with nonce + manage_options checks. No nopriv or REST endpoints."
+  },
+  {
+    "slug": "child-theme-configurator",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "No wp_ajax_nopriv_ hooks or register_rest_route calls found."
+  },
+  {
+    "slug": "wp-crontrol",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "No wp_ajax_nopriv_ hooks or register_rest_route calls found."
+  },
+  {
+    "slug": "wp-maintenance-mode",
+    "has_unauth_surface": true,
+    "nopriv_handlers": ["add_subscriber", "send_contact"],
+    "rest_routes": [],
+    "findings": [
+      {
+        "type": "nonce_ordering_side_channel",
+        "handler": "add_subscriber",
+        "file": "includes/classes/wp-maintenance-mode.php",
+        "line": 1309,
+        "severity": "low",
+        "description": "Nonce verification occurs after email format check. Unauthenticated attacker can probe whether a given email passes format validation vs. triggers 'Security check'. No actual database write possible without a valid nonce.",
+        "exploit_sketch": "POST /wp-admin/admin-ajax.php action=wpmm_add_subscriber email=target@example.com (omit _wpnonce). Response reveals whether email format check passed before nonce check."
+      }
+    ],
+    "verdict": "CLEAN",
+    "notes": "Both nopriv handlers verify nonces before any write operations and sanitize all inputs. Minor nonce ordering issue creates trivial side-channel but no exploitation path."
+  },
+  {
+    "slug": "je-elementor-kit",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "Plugin could not be downloaded from WordPress repository. Skipped."
+  },
+  {
+    "slug": "surerank",
+    "has_unauth_surface": true,
+    "nopriv_handlers": ["ajax_ping", "maybe_handle"],
+    "rest_routes": [
+      "surerank/v1/angie/toggle-sitemap",
+      "surerank/v1/admin/posts",
+      "surerank/v1/schemas/variables",
+      "surerank/v1/schemas/generator",
+      "nps-survey/v1/rating",
+      "nps-survey/v1/dismiss-nps-survey",
+      "surerank/v1/post/settings",
+      "surerank/v1/robots-txt",
+      "surerank/v1/onboarding",
+      "surerank/v1/sitemap/generate-cache",
+      "surerank/v1/admin/global-settings",
+      "surerank/v1/ai/auth",
+      "surerank/v1/google-search-console/revoke-auth"
+    ],
+    "findings": [
+      {
+        "type": "info",
+        "handler": "ajax_ping",
+        "file": "inc/functions/compat.php",
+        "line": 235,
+        "severity": "info",
+        "description": "wp_ajax_nopriv_surerank_compat_ping responds with {ok: true, timestamp: N}. No sensitive data, no state modification. Intentional loopback probe.",
+        "exploit_sketch": "GET /wp-admin/admin-ajax.php?action=surerank_compat_ping — confirms SureRank is installed."
+      }
+    ],
+    "verdict": "CLEAN",
+    "notes": "All surerank/v1 REST routes require validate_permission() with manage_options capability. Only unauthenticated AJAX surface is an intentional ping. NPS routes guarded by manage_options with a bypassable filter (off by default)."
+  },
+  {
+    "slug": "blocksy-companion",
+    "has_unauth_surface": true,
+    "nopriv_handlers": [
+      "implement_user_registration",
+      "implement_user_login",
+      "implement_user_lostpassword",
+      "blocksy_companion_load_cookies_consent_scripts",
+      "blocksy_companion_get_trending_posts",
+      "newsletter_subscribe_process_ajax_subscribe"
+    ],
+    "rest_routes": [],
+    "findings": [
+      {
+        "type": "missing_nonce_spam_subscription",
+        "handler": "newsletter_subscribe_process_ajax_subscribe",
+        "file": "framework/extensions/newsletter-subscribe/extension.php",
+        "line": 350,
+        "severity": "medium",
+        "description": "No nonce verification on the newsletter subscribe AJAX handler. Any unauthenticated visitor can POST EMAIL/GROUP/FNAME/DOUBLE_OPTIN to trigger a subscription against the configured email provider (Mailchimp, etc.). Inputs are sanitized but absent rate-limiting this is an open spam/list-poisoning endpoint.",
+        "exploit_sketch": "POST /wp-admin/admin-ajax.php action=blc_newsletter_subscribe_process_ajax_subscribe&EMAIL=victim@example.com&GROUP=<list_id>&FNAME=Spam — subscribes arbitrary addresses to mailing list without consent or rate control."
+      },
+      {
+        "type": "login_page_disclosure",
+        "handler": "implement_user_login",
+        "file": "framework/features/account-auth.php",
+        "line": 302,
+        "severity": "low",
+        "description": "Nopriv login handler performs no nonce check before returning rendered login page HTML. No auth bypass but leaks full login form markup to unauthenticated callers.",
+        "exploit_sketch": "POST /wp-admin/admin-ajax.php action=blc_implement_user_login — returns full login page HTML."
+      }
+    ],
+    "verdict": "SUSPICIOUS",
+    "notes": "Primary concern is newsletter_subscribe_process_ajax_subscribe — fully unauthenticated with no nonce, enabling spam subscription of arbitrary email addresses to the mailing list. No SQLi, SSRF, file write, or object injection."
+  },
+  {
+    "slug": "admin-menu-editor",
+    "has_unauth_surface": true,
+    "nopriv_handlers": [
+      "ws_ame_dismiss_pv_usage_notice",
+      "ws-ame-rui-search-users"
+    ],
+    "rest_routes": [],
+    "findings": [
+      {
+        "type": "broken_access_control_property_name_mismatch",
+        "handler": "checkAuthorization (v2 Action framework)",
+        "file": "includes/ajax-wrapper-v2/src/Action.php",
+        "line": 153,
+        "severity": "high",
+        "description": "Property name mismatch in Action::checkAuthorization(): constructor stores values as $this->requiredCapability and $this->permissionCheckCallback, but checkAuthorization() reads $this->requiredCap and $this->permissionCallback. These are always null, so all capability and permission callback checks are silently bypassed for every v2 action. Only nonce verification remains.",
+        "exploit_sketch": "Any v2 action registered with ->requiredCap() or ->permissionCallback() has those checks completely bypassed. Only nonce prevents exploitation."
+      },
+      {
+        "type": "user_enumeration",
+        "handler": "ws-ame-rui-search-users",
+        "file": "ajax-wrapper/AjaxWrapper.php",
+        "line": 77,
+        "severity": "high",
+        "description": "wp_ajax_nopriv_ hook registered for user search handler. Permission callback (userCanSearchUsers) is broken due to property name mismatch in Action.php and never invoked. Only nonce protects the handler. On success, calls get_users() returning user_login and display_name across all multisite blogs.",
+        "exploit_sketch": "Obtain or leak nonce 'ws-ame-rui-search-users'. POST to /wp-admin/admin-ajax.php?action=ws-ame-rui-search-users with term=* and the nonce to enumerate all WordPress usernames and display names as an unauthenticated user."
+      },
+      {
+        "type": "unauthenticated_option_write",
+        "handler": "ws_ame_dismiss_pv_usage_notice",
+        "file": "ajax-wrapper/AjaxWrapper.php",
+        "line": 87,
+        "severity": "medium",
+        "description": "wp_ajax_nopriv_ hook without mustBeLoggedIn=true. Permission callback broken by same property name mismatch. Handler calls update_site_option(HIDE_USAGE_NOTICE_FLAG, true). Only nonce verification remains.",
+        "exploit_sketch": "Obtain or leak nonce 'ws_ame_dismiss_pv_usage_notice'. POST to admin-ajax.php to write a site option as unauthenticated user."
+      }
+    ],
+    "verdict": "SUSPICIOUS",
+    "notes": "Critical property name mismatch bug in Action::checkAuthorization() silently bypasses all capability and permission callback guards for v2 actions. Two nopriv endpoints exposed — user enumeration across all multisite blogs if nonce is leaked. No REST routes."
+  },
+  {
+    "slug": "contact-form-7-honeypot",
+    "has_unauth_surface": true,
+    "nopriv_handlers": ["fetch_app_settings"],
+    "rest_routes": [
+      "cf7apps/v1/get-menu-items",
+      "cf7apps/v1/get-apps",
+      "cf7apps/v1/save-app-settings",
+      "cf7apps/v1/get-app-settings",
+      "cf7apps/v1/get-cf7-forms",
+      "cf7apps/v1/has-migrated",
+      "cf7apps/v1/migrate",
+      "cf7apps/v1/get-cf7-entries",
+      "cf7apps/v1/delete-cf7-entries",
+      "cf7apps/v1/get-all-cf7-forms",
+      "cf7apps/v1/spam-count"
+    ],
+    "findings": [
+      {
+        "type": "unauthenticated_redirect_enumeration",
+        "handler": "fetch_app_settings",
+        "file": "includes/apps/cf7-redirection/cf7-redirection.php",
+        "line": 353,
+        "severity": "low",
+        "description": "wp_ajax_nopriv_cf7apps_fetch_settings handler accepts POST with no nonce verification. formId is cast with intval() (safe). Unauthenticated users can enumerate admin-configured redirect destinations (including external URLs) for any CF7 form by iterating integer form IDs.",
+        "exploit_sketch": "POST /wp-admin/admin-ajax.php with action=cf7apps_fetch_settings&formId=1 (iterate IDs) — enumerates all configured redirect URLs with no credentials or nonce."
+      }
+    ],
+    "verdict": "SUSPICIOUS",
+    "notes": "Unauthenticated fetch_app_settings AJAX handler leaks admin-configured redirect URLs via integer form ID enumeration with no nonce. REST API routes all use authenticate permission_callback and are properly protected."
+  },
+  {
+    "slug": "under-construction-page",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "Only authenticated wp_ajax_ hooks found. No nopriv handlers or REST routes."
+  },
+  {
+    "slug": "hello-dolly",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "No endpoints. Plugin only adds a lyric display to the admin dashboard."
+  },
+  {
+    "slug": "easy-table-of-contents",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "All AJAX hooks use authenticated wp_ajax_ only. No REST routes."
+  },
+  {
+    "slug": "contact-form-cfdb7",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "No AJAX or REST hooks found. Purely form-storage plugin with no dynamic endpoints."
+  },
+  {
+    "slug": "woocommerce-services",
+    "has_unauth_surface": true,
+    "nopriv_handlers": [],
+    "rest_routes": [
+      "jetpack/v4/verify_registration",
+      "jetpack/v4/remote_authorize",
+      "jetpack/v4/connection",
+      "jetpack/v4/verify_xmlrpc_error"
+    ],
+    "findings": [
+      {
+        "type": "info_disclosure",
+        "handler": "connection_status",
+        "file": "vendor/automattic/jetpack-connection/src/class-rest-connector.php",
+        "line": 134,
+        "severity": "info",
+        "description": "GET /wp-json/jetpack/v4/connection uses permission_callback: __return_true. Returns Jetpack connection state: isActive, isRegistered, isUserConnected, hasConnectedOwner, isPublic, offlineMode details.",
+        "exploit_sketch": "GET /wp-json/jetpack/v4/connection — reveals Jetpack/WooCommerce Services connection status."
+      },
+      {
+        "type": "server_to_server_endpoint",
+        "handler": "remote_authorize",
+        "file": "vendor/automattic/jetpack-connection/src/class-rest-connector.php",
+        "line": 80,
+        "severity": "info",
+        "description": "POST /wp-json/jetpack/v4/remote_authorize uses permission_callback: __return_true. Designed for WordPress.com servers — internally validates token/secret from WordPress.com, so unauthenticated abuse is blocked by Jetpack's own token validation.",
+        "exploit_sketch": "Not practically exploitable without valid WordPress.com secrets."
+      }
+    ],
+    "verdict": "CLEAN",
+    "notes": "Jetpack-bundled REST endpoints with __return_true are intentional server-to-server hooks. /connection status leaks minimal config info. All destructive routes require capability checks."
+  },
+  {
+    "slug": "disable-gutenberg",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "Plugin only removes existing Gutenberg REST routes. Adds no new unauthenticated endpoints."
+  },
+  {
+    "slug": "gosmtp",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "AJAX handlers registered only with authenticated wp_ajax_ prefix. No nopriv or REST endpoints."
+  },
+  {
+    "slug": "ml-slider",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [
+      "metaslider/v1/slideshow/all",
+      "metaslider/v1/slideshow/list",
+      "metaslider/v1/slideshow/single",
+      "metaslider/v1/slideshow/save",
+      "metaslider/v1/slideshow/delete",
+      "metaslider/v1/slideshow/import",
+      "metaslider/v1/themes/all",
+      "metaslider/v1/settings/user/save"
+    ],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "All REST routes require valid WP REST nonce (X-WP-Nonce) plus current_user_can() via can_access(). No unauthenticated access."
+  },
+  {
+    "slug": "extendify",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [
+      "extendify-quick-edit/v1/wc-product",
+      "extendify-quick-edit/v1/save",
+      "extendify-quick-edit/v1/site-identity",
+      "extendify-quick-edit/v1/navigation",
+      "extendify-quick-edit/v1/wp-forms"
+    ],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "All REST routes use checkPermission() requiring valid X-WP-Nonce AND current_user_can(). No unauthenticated access."
+  },
+  {
+    "slug": "pojo-accessibility",
+    "has_unauth_surface": true,
+    "nopriv_handlers": [],
+    "rest_routes": ["ea11y/v1/analytics/events"],
+    "findings": [
+      {
+        "type": "unauthenticated_db_write",
+        "handler": "EA11y\\Modules\\Analytics\\Rest\\Events::POST",
+        "file": "modules/analytics/rest/events.php",
+        "line": 18,
+        "severity": "low",
+        "description": "POST /wp-json/ea11y/v1/analytics/events/ has permission_callback that returns true unconditionally. Any unauthenticated visitor can POST JSON arrays of events to write records into the ea11y_analytics database table. Event names validated against allowlist of 18 values. 'value' field sanitized via sanitize_text_field() before wpdb->insert() (parameterized). No SQLi. Can pollute/flood analytics table or potentially trigger stored XSS if admin view renders value field unsafely.",
+        "exploit_sketch": "POST /wp-json/ea11y/v1/analytics/events/ with body: [{\"event\":\"widget-open\",\"value\":\"<any text up to 255 chars>\"}] — writes arbitrary analytics rows to DB."
+      }
+    ],
+    "verdict": "SUSPICIOUS",
+    "notes": "Intentionally unauthenticated analytics tracking endpoint for accessibility widget. Event type is allowlisted so no SQLi. Main risk is DB pollution / analytics manipulation. Stored XSS in admin dashboard warrants deeper review of how the value field is rendered."
+  },
+  {
+    "slug": "meta-box",
+    "has_unauth_surface": true,
+    "nopriv_handlers": [
+      "rwmb_get_terms",
+      "rwmb_get_posts",
+      "rwmb_get_users"
+    ],
+    "rest_routes": [],
+    "findings": [
+      {
+        "type": "conditional_user_enumeration",
+        "handler": "RWMB_User_Field::ajax_get_users",
+        "file": "inc/fields/user.php",
+        "line": 10,
+        "severity": "medium",
+        "description": "wp_ajax_nopriv_rwmb_get_users registers ajax_get_users() for unauthenticated callers. Handler calls check_ajax_referer('query') requiring a valid WP nonce output in field JS. In default config, meta-box fields only render in wp-admin so nonce is inaccessible to unauthenticated users. However, if the site uses MB Frontend Form or any extension rendering meta-box fields on public pages, unauthenticated users can obtain the nonce and call this endpoint. Returns user_login, user_nicename, display_name for all users — user enumeration.",
+        "exploit_sketch": "1. Visit frontend page with MB user-type field (requires MB Frontend Form or similar). 2. Extract _wpnonce from JS ajax_data. 3. POST /wp-admin/admin-ajax.php with action=rwmb_get_users&_wpnonce=<nonce>&field[type]=user&term=<search> — returns paginated user list including logins and display names."
+      },
+      {
+        "type": "conditional_info_disclosure",
+        "handler": "RWMB_Post_Field::ajax_get_posts",
+        "file": "inc/fields/post.php",
+        "line": 10,
+        "severity": "low",
+        "description": "Same nonce requirement as rwmb_get_users. If nonce obtainable via frontend field rendering, returns post titles and IDs. Private posts filtered by current_user_can('read_post').",
+        "exploit_sketch": "Same nonce acquisition path. POST action=rwmb_get_posts — returns publicly readable post titles/IDs."
+      }
+    ],
+    "verdict": "SUSPICIOUS",
+    "notes": "Three nopriv AJAX handlers protected by check_ajax_referer('query'). User enumeration via rwmb_get_users becomes exploitable when MB Frontend Form or similar renders fields on public pages — a common configuration."
+  },
+  {
+    "slug": "taxonomy-terms-order",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "Single AJAX hook registered only with authenticated wp_ajax_. No nopriv or REST endpoints."
+  },
+  {
+    "slug": "webp-converter-for-media",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [
+      "/webp-converter/v1/images-stats",
+      "/webp-converter/v1/paths",
+      "/webp-converter/v1/regenerate",
+      "/webp-converter/v1/regenerate-attachment",
+      "/webp-converter/v1/cron-conversion"
+    ],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "All REST routes enforce authentication: four require valid WP REST nonce plus manage_options; cron-conversion requires server-side uniqid token with 60-second expiry."
+  },
+  {
+    "slug": "siteorigin-panels",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "No nopriv AJAX hooks and no REST routes. All AJAX handlers are authenticated and verify nonce plus current_user_can()."
+  },
+  {
+    "slug": "backwpup",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [
+      "backwpup/v1/getblock",
+      "backwpup/v1/updatejob",
+      "backwpup/v1/startbackup",
+      "backwpup/v1/backups",
+      "backwpup/v1/chatbot-context",
+      "mcp-adapter/*"
+    ],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "All REST routes use proper permission callbacks requiring current_user_can('backwpup'). Chatbot GET uses hash_equals check against stored transient. No unauthenticated surfaces."
+  },
+  {
+    "slug": "facebook-for-woocommerce",
+    "has_unauth_surface": true,
+    "nopriv_handlers": [
+      "wc_facebook_update_signals_state",
+      "facebook_release_signals",
+      "wc_facebook_opt_out_of_sync",
+      "wc_banner_close_action",
+      "wc_facebook_sync_all_products",
+      "wc_banner_post_update_close_action",
+      "wc_banner_post_update__master_sync_off_close_action"
+    ],
+    "rest_routes": [
+      "wc-facebook/v1/webhook",
+      "wc-facebook/v1/settings/update",
+      "wc-facebook/v1/settings/uninstall",
+      "wc-facebook/v1/whatsapp-settings/*",
+      "fb_api/offers"
+    ],
+    "findings": [
+      {
+        "type": "unauthenticated_capi_event_injection",
+        "handler": "ReleaseSignalsAjax::handle",
+        "file": "includes/Events/ReleaseSignalsAjax.php",
+        "line": 62,
+        "severity": "medium",
+        "description": "Unauthenticated endpoint facebook_release_signals accepts POST JSON body with events array and sends them to Facebook CAPI. Requires only the wc_facebook_signals_state cookie (trivially set by any visitor). Event names are allowlisted but event_source_url, referrer_url, user_data, custom_data, etc. are attacker-controlled. Any visitor can inject arbitrary CAPI events (Purchase, AddToCart, etc.) polluting the merchant's Facebook analytics/conversion data.",
+        "exploit_sketch": "Set wc_facebook_signals_state cookie to any value, then POST to admin-ajax.php?action=facebook_release_signals with JSON body {\"events\":[{\"event_name\":\"Purchase\",\"custom_data\":{\"value\":999,\"currency\":\"USD\"}}]} — injects fake Purchase event into merchant's Facebook CAPI stream."
+      },
+      {
+        "type": "jwt_gated_unauthenticated_rest",
+        "handler": "OfferManagementEndpointBase::execute_static",
+        "file": "includes/OfferManagement/OfferManagementEndpointBase.php",
+        "line": 90,
+        "severity": "info",
+        "description": "REST route fb_api/offers uses permission_callback '__return_true' but validates a signed JWT from Meta against Meta public keys. Not exploitable without a valid Meta-signed JWT.",
+        "exploit_sketch": "N/A — requires valid JWT from Meta infrastructure."
+      }
+    ],
+    "verdict": "SUSPICIOUS",
+    "notes": "ReleaseSignalsAjax allows unauthenticated CAPI event injection with attacker-controlled conversion data fields, trivially bypassing the cookie barrier. Most other nopriv handlers require admin capability + nonce via is_legit_ajax_call(). REST webhook and settings routes require manage_woocommerce."
+  },
+  {
+    "slug": "official-facebook-pixel",
+    "has_unauth_surface": true,
+    "nopriv_handlers": [
+      "edd_add_to_cart (hooked at priority 5 by FacebookWordpressEasyDigitalDownloads)"
+    ],
+    "rest_routes": [],
+    "findings": [
+      {
+        "type": "info",
+        "handler": "FacebookWordpressEasyDigitalDownloads::injectAddToCartEventAjax",
+        "file": "integration/class-facebookwordpresseasydigitaldownloads.php",
+        "line": 139,
+        "severity": "info",
+        "description": "Plugin hooks into existing EDD nopriv AJAX action edd_add_to_cart at priority 5. Verifies EDD nonce before processing. facebook_event_id flows only into Facebook SDK object, not into SQL or HTML output.",
+        "exploit_sketch": "Not exploitable. Nonce check blocks unauthenticated misuse."
+      }
+    ],
+    "verdict": "CLEAN",
+    "notes": "Nopriv hook is for existing EDD add-to-cart action and verifies an EDD nonce. No exploitable vulnerability."
+  },
+  {
+    "slug": "intuitive-custom-post-order",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "No nopriv AJAX handlers and no REST routes. All AJAX handlers are admin-only."
+  },
+  {
+    "slug": "cookieadmin",
+    "has_unauth_surface": true,
+    "nopriv_handlers": ["cookieadmin_ajax_handler"],
+    "rest_routes": [],
+    "findings": [
+      {
+        "type": "info",
+        "handler": "cookieadmin_ajax_handler",
+        "file": "includes/functions.php",
+        "line": 144,
+        "severity": "info",
+        "description": "Single nopriv AJAX handler uses gated dispatcher. general_actions contains only categorize_cookies, gated by nonce check (cookieadmin_js_nonce). Sanitizes input with sanitize_key() and sanitize_text_field(), then does CSV file lookups only. No SQL queries, no file writes, no unserialize.",
+        "exploit_sketch": "Not exploitable. All dispatched actions require valid nonces."
+      }
+    ],
+    "verdict": "CLEAN",
+    "notes": "Nopriv handler uses properly gated dispatcher. All action categories require valid nonces. No injection vectors."
+  },
+  {
+    "slug": "custom-fonts",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [
+      "bsf-custom-fonts/v1/admin/settings/",
+      "custom-fonts/v1/get-tracking-status",
+      "custom-fonts/v1/update-tracking-status"
+    ],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "No nopriv AJAX handlers. All REST routes require edit_theme_options or manage_options capability."
+  },
+  {
+    "slug": "post-smtp",
+    "has_unauth_surface": true,
+    "nopriv_handlers": ["maybe_handle (WP_Async_Request via action-scheduler vendor lib)"],
+    "rest_routes": [
+      "post-smtp/v1/connect-app (__return_true)",
+      "post-smtp/v1/get-logs (__return_true)",
+      "post-smtp/v1/disconnect-site (__return_true)",
+      "post-smtp/v1/get-log (__return_true)",
+      "post-smtp/v1/resend-email (__return_true)",
+      "post-smtp/v2/get-logs (__return_true)",
+      "post-smtp/v2/validate-license (__return_true)",
+      "psmwp/v1/activate-from-mainwp (__return_true)",
+      "psd/v1/get-logs (requires manage_options)",
+      "psd/v1/get-details (requires manage_options)",
+      "psd/v1/resend-email (requires manage_options)"
+    ],
+    "findings": [
+      {
+        "type": "email_log_exposure",
+        "handler": "get_logs (Post_SMTP_Mobile_Rest_API)",
+        "file": "Postman/Mobile/includes/rest-api/v1/rest-api.php",
+        "line": 37,
+        "severity": "high",
+        "description": "REST route post-smtp/v1/get-logs uses permission_callback '__return_true'. Authentication inside handler validates only an fcm_token header against a stored wp_option. If the mobile app is connected and the token is known or leaked, full email logs (recipients, subjects, bodies) are returned to unauthenticated callers.",
+        "exploit_sketch": "GET /wp-json/post-smtp/v1/get-logs with header 'fcm_token: <token>' returns full email log to unauthenticated attacker with valid token."
+      },
+      {
+        "type": "unauthenticated_email_relay",
+        "handler": "resend_email (Post_SMTP_Mobile_Rest_API)",
+        "file": "Postman/Mobile/includes/rest-api/v1/rest-api.php",
+        "line": 55,
+        "severity": "high",
+        "description": "REST route post-smtp/v1/resend-email uses permission_callback '__return_true'. With a valid fcm_token, unauthenticated attacker can trigger arbitrary email resend (wp_mail) to any previously logged recipient without WordPress authentication.",
+        "exploit_sketch": "POST /wp-json/post-smtp/v1/resend-email with header 'fcm_token: <valid_token>' and body 'id=<log_id>' triggers wp_mail() to stored recipient without WP auth."
+      },
+      {
+        "type": "mobile_pairing_hijack",
+        "handler": "connect_app (Post_SMTP_Mobile_Rest_API)",
+        "file": "Postman/Mobile/includes/rest-api/v1/rest-api.php",
+        "line": 31,
+        "severity": "medium",
+        "description": "REST route post-smtp/v1/connect-app uses permission_callback '__return_true'. Validates auth_key against 'post_smtp_auth_nonce' transient (32-byte hex, 30-minute TTL generated when admin scans QR code). If nonce is active and obtainable, attacker can register their own fcm_token and server_url into site options without authentication.",
+        "exploit_sketch": "POST /wp-json/post-smtp/v1/connect-app with header 'auth_key: <nonce_value>' — hijacks mobile app pairing to attacker-controlled FCM token."
+      },
+      {
+        "type": "mobile_pairing_dos",
+        "handler": "disconnect_site (Post_SMTP_Mobile_Rest_API)",
+        "file": "Postman/Mobile/includes/rest-api/v1/rest-api.php",
+        "line": 43,
+        "severity": "medium",
+        "description": "REST route post-smtp/v1/disconnect-site uses permission_callback '__return_true'. With a valid fcm_token, deletes post_smtp_mobile_app_connection and post_smtp_server_url options — denial-of-service against mobile integration.",
+        "exploit_sketch": "POST /wp-json/post-smtp/v1/disconnect-site with header 'fcm_token: <valid_token>' removes mobile pairing options without WP auth."
+      }
+    ],
+    "verdict": "VULN",
+    "notes": "Multiple REST API routes in mobile app feature use permission_callback '__return_true' and rely solely on an internal fcm_token header. If mobile app is connected and token known/leaked, unauthenticated attackers can read full email logs (including message bodies), trigger email resends, hijack mobile pairing, or disconnect the integration. HIGH severity. The psd/v1/* routes are properly authenticated."
+  },
+  {
+    "slug": "header-footer-code-manager",
+    "has_unauth_surface": false,
+    "nopriv_handlers": [],
+    "rest_routes": [],
+    "findings": [],
+    "verdict": "SKIP",
+    "notes": "No nopriv hooks, no REST routes. Single AJAX handler (hfcm-request) is authenticated-only, checks manage_options, and uses check_admin_referer for all operations."
+  }
+]

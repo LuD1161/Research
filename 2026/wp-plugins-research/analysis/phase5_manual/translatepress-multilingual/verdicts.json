@@ -1,0 +1,123 @@
+[
+  {
+    "id": "TRP-01",
+    "title": "Unauthenticated AJAX handler exposes translation data (nopriv)",
+    "file": "includes/class-editor-api-regular-strings.php",
+    "lines": "35-68",
+    "hook": "wp_ajax_nopriv_trp_get_translations_regular",
+    "cwe": "CWE-284",
+    "severity": "LOW",
+    "verdict": "CONFIRMED_LOW_RISK",
+    "exploitable_by": "unauthenticated",
+    "summary": "get_translations() is bound to wp_ajax_nopriv_trp_get_translations_regular, so any anonymous visitor can call it. The handler is nonce-gated (check_ajax_referer('get_translations','security')) and the language is validated against settings['translation-languages'], so arbitrary language injection is not possible. Originals supplied in $_POST['originals'] are sanitized via trp_sanitize_string() and URL-filtering before reaching the DB query (get_string_rows), which uses prepared statements. The call to process_strings() (machine-translation) is additionally gated by current_user_can('manage_options'). The real risk is information exposure: any anonymous user who can obtain a valid get_translations nonce (embedded in page HTML when the editor is active) can enumerate all stored translation strings for any configured language. However, nonce exposure requires the editor to be active/open, which itself requires login. Risk is LOW.",
+    "notes": "The nonce token is generated server-side and embedded into the editor UI. An anonymous user who somehow obtains this nonce (e.g. from cached HTML, CSRF-bypass, shared session) could read all translations. This is a read-only info-disclosure, not an injection or privilege escalation."
+  },
+  {
+    "id": "TRP-02",
+    "title": "SQL injection via unsanitized table name in get_similar_string_translation (class-translation-memory.php)",
+    "file": "includes/class-translation-memory.php",
+    "lines": "44-50",
+    "cwe": "CWE-89",
+    "severity": "LOW",
+    "verdict": "FALSE_POSITIVE",
+    "exploitable_by": "N/A",
+    "summary": "The SQL query at line 45-47 interpolates $table_name directly with string concatenation before calling $wpdb->prepare(). The table_name is derived from get_table_name() or get_gettext_table_name() in class-query.php (lines 945-963), both of which validate the language_code with trp_is_valid_language_code() (regex: only [A-Za-z0-9-_] allowed). Furthermore, the AJAX callback ajax_get_similar_string_translation() checks current_user_can('manage_options') before proceeding and validates the language against settings['translation-languages']. The $_POST['original_string'] is passed as a prepared statement placeholder (%s), not interpolated. The $number is (int) cast. The table name itself cannot be attacker-controlled to contain SQL-significant characters. No exploitable SQLi.",
+    "notes": "The pattern is still bad coding practice (table name interpolation), but the language validation regex and the whitelist check against configured languages closes the injection path. The $wpdb->prepare() properly handles the string parameters."
+  },
+  {
+    "id": "TRP-03",
+    "title": "LFI via $_GET['step'] in class-onboarding.php init_step()",
+    "file": "includes/class-onboarding.php",
+    "lines": "60-66",
+    "cwe": "CWE-22",
+    "severity": "NONE",
+    "verdict": "FALSE_POSITIVE",
+    "exploitable_by": "N/A",
+    "summary": "The $_GET['step'] value is passed through sanitize_text_field() (strips tags, control chars, extra whitespace) and then used as a key lookup in the hardcoded $this->steps associative array (lines 13-22). Only if the resulting key exists in that array is the filename constructed as 'includes/onboarding/class-' . $step . '.php'. Since the key must match one of the 8 hardcoded values (welcome, install, license, languages, switcher, autotranslation, addons, finish), there is no path traversal possible — the step variable is used as an array index, not directly as a filename. The include_once only runs for valid step keys. Additionally, this code runs only inside admin_init with current_user_can('manage_options') check at line 39. No exploitable LFI.",
+    "notes": "The protection is the whitelist array lookup at line 61: $step_class = (isset($this->steps[$step])) ? $this->steps[$step] : null. If $step_class is null, the include is skipped entirely (line 63-65 checks $step_class first). The sanitize_text_field is defense-in-depth."
+  },
+  {
+    "id": "TRP-04",
+    "title": "Unparameterized table name in SHOW TABLES / SELECT query (class-plugin-optin.php)",
+    "file": "includes/class-plugin-optin.php",
+    "lines": "100-103",
+    "cwe": "CWE-89",
+    "severity": "LOW",
+    "verdict": "CONFIRMED_LOW_RISK",
+    "exploitable_by": "admin (settings control)",
+    "summary": "At line 100, $dictionary_table_name is constructed from $trp_settings['default-language'] and $trp_settings['translation-languages'][1], then interpolated raw into SQL at line 102 (both a SHOW TABLES LIKE and SELECT COUNT queries). These settings values come from get_option('trp_settings'), which is admin-controlled. An admin who can write arbitrary values to trp_settings could inject SQL. However: (1) this code path executes only inside process_optin_actions(), which requires a valid manage_options capability check (nonce verified at line 79); (2) the attacker must already be a WP admin to set malicious settings. This is an admin-to-admin SQLi, which is below WordPress's security model threshold. No practical risk unless combined with a separate settings-write vulnerability available to lower-privilege users.",
+    "notes": "The table name is not validated with trp_is_valid_language_code() here, unlike in class-query.php. If a lower-privilege user could write to trp_settings (e.g. via another bug), this would become a meaningful SQLi. Worth fixing by using $wpdb->prepare() or esc_sql()."
+  },
+  {
+    "id": "TRP-05",
+    "title": "maybe_unserialize on remote API response (class-edd-sl-plugin-updater.php)",
+    "file": "includes/class-edd-sl-plugin-updater.php",
+    "lines": "418, 424, 483",
+    "cwe": "CWE-502",
+    "severity": "MEDIUM",
+    "verdict": "CONFIRMED_MEDIUM_RISK",
+    "exploitable_by": "MITM attacker or compromised update server",
+    "summary": "Lines 418 and 424 call maybe_unserialize() on $request->sections and $request->banners, where $request is the decoded JSON body from a wp_remote_post() call to $this->api_url (the plugin update server). Line 483 repeats the same pattern. The call at line 475 uses 'sslverify' => $verify_ssl which at line 720 is hardcoded to false for at least one code path, disabling TLS certificate verification. PHP object deserialization via maybe_unserialize can enable PHP Object Injection (POI) if a suitable POP gadget chain exists in the loaded codebase. The attack requires either (a) a network MITM (feasible with sslverify=false), or (b) compromise of the update server (translatepress.com). The WordPress environment, including loaded plugins, may provide gadget chains. Severity is MEDIUM because exploitation requires privileged network position or server compromise.",
+    "notes": "maybe_unserialize() calls unserialize() only if the string starts with 'a:' or 'O:' etc. (serialization prefix). A MITM attacker controlling the HTTP response body could craft a serialized PHP object payload that triggers object injection when any magic method (__destruct, __wakeup, __toString) is invoked on the resulting object, if gadgets exist in scope. The sslverify=false flag at line 720 makes MITM significantly easier. This is a known class of vulnerability in many WordPress updater libraries."
+  },
+  {
+    "id": "TRP-06",
+    "title": "SQL injection in string-translation helper via unparameterized table names",
+    "file": "includes/string-translation/class-string-translation-helper.php",
+    "lines": "240-370",
+    "cwe": "CWE-89",
+    "severity": "NONE",
+    "verdict": "FALSE_POSITIVE",
+    "exploitable_by": "N/A",
+    "summary": "The $original_table and $original_meta_table are passed as parameters to get_originals_results(). Callers in class-string-translation-api-regular.php (line 28-29) and class-string-translation-api-gettext.php source these exclusively from $trp_query->get_table_name_for_original_strings() and $trp_query->get_table_name_for_original_meta(), which are hardcoded to return $wpdb->prefix . 'trp_originals' and $wpdb->prefix . 'trp_original_meta' respectively (class-query.php lines 878-910). These are not attacker-influenced. The per-language table names used in joins are obtained from get_table_name($language) which validates with trp_is_valid_language_code(). The search term $sanitized_args['s'] uses sanitize_text_field and then esc_sql/wpdb->esc_like within the query, though not via $wpdb->prepare() for the LIKE clauses — this is a weak pattern but esc_sql provides SQL escaping. The AJAX endpoint itself requires current_user_can('manage_options'). No exploitable SQLi.",
+    "notes": "The inline esc_sql() + string concatenation pattern for LIKE queries (lines 274, 297) is not ideal and may theoretically miss edge cases, but in practice esc_sql handles standard SQL metacharacters for MySQL string contexts. The table names are fully hardcoded from the caller side."
+  },
+  {
+    "id": "TRP-07",
+    "title": "call_user_func with user-controlled action key (class-upgrade.php)",
+    "file": "includes/class-upgrade.php",
+    "lines": "504-539",
+    "cwe": "CWE-94",
+    "severity": "NONE",
+    "verdict": "FALSE_POSITIVE",
+    "exploitable_by": "N/A",
+    "summary": "At line 504, $_REQUEST['trp_updb_action'] is validated against the keys of $updates_needed array (returned by get_updates_details()). The callback is then retrieved as $update_details['callback'] from this same array (line 525+539), not from user input. The user-supplied action key only selects which pre-registered callback to call; the callback itself comes from a server-side whitelist of PHP callables (all pointing to $this or $this->trp_query methods). An attacker cannot supply an arbitrary function name. Additionally, the handler requires current_user_can('manage_options') and a valid nonce. The trp_updates_details filter could be abused if another plugin registers a callback there, but that is a filter-hook trust boundary issue, not a direct vuln here. No exploitable RCE via call_user_func.",
+    "notes": "$_REQUEST['trp_updb_lang'] is validated at line 507 via in_array check against $this->settings['translation-languages']. The critical protection for call_user_func is that the callback is never derived from user input — it comes from $updates_needed[$action]['callback'] where $updates_needed is a server-side constant. Note the trp_updates_details filter could hypothetically be used by a malicious plugin to register a dangerous callback, but this is an installation-level trust issue."
+  },
+  {
+    "id": "TRP-08",
+    "title": "File upload handler in onboarding install step (class-install.php)",
+    "file": "includes/onboarding/class-install.php",
+    "lines": "19-84",
+    "cwe": "CWE-434",
+    "severity": "NONE",
+    "verdict": "FALSE_POSITIVE",
+    "exploitable_by": "N/A",
+    "summary": "The file upload handler at lines 19-84 handles plugin ZIP installation via wp_handle_upload() followed by Plugin_Upgrader->install(). The handler correctly: (1) verifies nonce (line 27-31, wp_verify_nonce against 'trp_onboarding_install'); (2) access is restricted to manage_options via run_onboarding_admin() at line 39 in class-onboarding.php which calls current_user_can('manage_options'); (3) only proceeds during admin_init on the trp-onboarding page. The use of wp_handle_upload() with ['test_form' => false] is the standard WordPress plugin installer pattern also used by core. Plugin_Upgrader is a WordPress core class. The plugin path returned by $upgrader->plugin_info() is then passed to activate_plugin() — this is identical to how WP Admin uploads plugins. No additional vulnerability; this is the same attack surface as WP Admin > Plugins > Add New. An attacker would need to already be a WP administrator to reach this code.",
+    "notes": "No type restriction on the ZIP upload beyond what wp_handle_upload provides. However, the entire code path requires manage_options capability, which is equivalent to WP admin. Authenticated admin arbitrary file upload is within WordPress's accepted threat model."
+  },
+  {
+    "id": "TRP-09",
+    "title": "Reflected XSS via $_GET['trp-edit-translation'] in language switcher output",
+    "file": "includes/class-language-switcher.php",
+    "lines": "306, 315, 358",
+    "cwe": "CWE-79",
+    "severity": "NONE",
+    "verdict": "FALSE_POSITIVE",
+    "exploitable_by": "N/A",
+    "summary": "At lines 306, 315, and 358, the code evaluates isset($_GET['trp-edit-translation']) and compares its value to 'preview'. If true, it outputs the static string: data-trp-unpreviewable=\"trp-unpreviewable\". The value of $_GET['trp-edit-translation'] is never echoed — only used in a comparison. The output is a hardcoded string attribute. This is not an XSS vulnerability; there is no user-controlled data reflected in the HTML output from these lines.",
+    "notes": "The taint analysis flagged these lines because $_GET data is read nearby, but no unsanitized value flows into echo/print. The conditional operator only produces one of two hardcoded string literals."
+  },
+  {
+    "id": "TRP-10",
+    "title": "preg_replace with admin-controlled patterns (do-not-translate-certain-paths.php)",
+    "file": "includes/advanced-settings/do-not-translate-certain-paths.php",
+    "lines": "160, 292, 554",
+    "cwe": "CWE-1336",
+    "severity": "NONE",
+    "verdict": "FALSE_POSITIVE",
+    "exploitable_by": "N/A",
+    "summary": "Multiple preg_replace() calls at lines 160, 292, and 554 construct regex patterns using values from $settings['url-slugs'][$current_lang] (a language URL slug). The pattern is built as a string: \"/$replace/i\" or similar. Language slugs come from admin settings and are validated via trp_is_valid_language_code() which only allows [A-Za-z0-9-_]. These characters cannot form a malicious regex, and crucially cannot inject the deprecated /e modifier (which was removed in PHP 7.0+). The preg_replace patterns do not accept the 'e' flag and cannot achieve code execution. The paths themselves (from trp_advanced_settings['translateable_content']['paths']) are stored as option values (admin-controlled) and used as plain string comparison targets in trp_return_exclude_include_url(), not as regex patterns. Only 3 specific language-slug-derived patterns use preg_replace; these are safe.",
+    "notes": "In PHP 7+ the /e modifier in preg_replace was removed, eliminating the historical preg_replace RCE vector. The language code validation further prevents exotic regex construction. Low-value finding even for pre-PHP7."
+  }
+]

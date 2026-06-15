@@ -1,0 +1,113 @@
+{
+  "plugin_slug": "metform",
+  "review_date": "2026-06-14",
+  "reviewer": "claude-security-audit",
+  "overall_risk": "medium",
+  "findings": [
+    {
+      "id": "MF-001",
+      "title": "Unauthenticated File Upload via REST API",
+      "severity": "high",
+      "cvss_estimate": "8.1",
+      "cwe": "CWE-434",
+      "location": "core/entries/api.php:20, core/entries/action.php:1310-1390",
+      "auth_required": false,
+      "description": "The REST endpoint POST /wp-json/metform/v1/entries/{id}/ (handled by post_insert()) calls Action::submit() with user-supplied file data. The base Api class registers all routes with 'permission_callback' => '__return_true', meaning no WordPress authentication is enforced at the REST layer. The submit() function itself only verifies a form nonce (form_nonce field), which is embedded in the publicly rendered form HTML and is therefore available to any anonymous visitor. File uploads proceed via wp_handle_upload() with WordPress default MIME filtering, plus the plugin adds .iges/.igs/.stp/.step/.heic/.heif to allowed types. Filenames are randomized (wp_hash + original extension). The file upload therefore executes for any unauthenticated user who can obtain a valid form nonce, which is trivially available by loading the form page. Importantly, wp_handle_upload() enforces MIME type checking, so PHP files should be blocked — however the risk is that bulk file uploads with non-default allowed types (e.g. .stp treated as text/plain) can be deposited into the WordPress uploads directory by anonymous users.",
+      "exploitability": "Any anonymous user can submit a form with file attachments as long as they harvest a valid form_nonce from the publicly rendered form. No authentication credential is needed. PHP execution is blocked by wp_handle_upload MIME checks, so RCE via direct upload is not straightforward, but denial-of-service via disk exhaustion or upload of misleading file types is feasible. The nonce check with 'form_nonce' action is the only gate — the nonce is public.",
+      "recommendation": "Enforce authentication for file upload forms at the form settings level (the plugin already has a 'require_login' form setting — make it the only option for file-upload-capable forms, or add a server-side check). Consider rate limiting upload requests per IP. Review whether the extra MIME types (.stp/.step as text/plain) can be exploited via content-type confusion on the serving web server.",
+      "verdict": "true_positive"
+    },
+    {
+      "id": "MF-002",
+      "title": "REST API Base Class Uses __return_true — Individual Endpoints Rely on Ad-hoc Auth Checks",
+      "severity": "medium",
+      "cvss_estimate": "5.3",
+      "cwe": "CWE-285",
+      "location": "base/api.php:25-28",
+      "auth_required": false,
+      "description": "The base Api class registers every route with 'permission_callback' => '__return_true', delegating all authorization to individual method implementations. Audit of the two concrete classes (core/entries/api.php and core/forms/api.php) shows that most admin-only methods do call current_user_can('manage_options') at the top, returning null/void on failure. However, several endpoints have no auth checks: (1) get_views() in entries/api.php returns raw request parameters — effectively a no-op information leak but callable by anyone; (2) post_views() in forms/api.php increments the form view counter for any arbitrary form_id supplied without any authentication — allows anonymous inflation of view counts; (3) get_builder() in forms/api.php returns Elementor builder editor HTML for any form without checking authentication. The pattern of ad-hoc checks rather than a centralized permission_callback means any new method added without an explicit check will be publicly accessible.",
+      "exploitability": "Low-to-medium. post_views() allows anonymous actors to artificially inflate view statistics for any form. get_builder() leaking editor HTML to unauthenticated callers could expose form structure. These are not directly exploitable for code execution but represent broken access control.",
+      "recommendation": "Replace '__return_true' in the base Api class with a default permission_callback that requires authentication (e.g., 'is_user_logged_in') or 'manage_options' for admin routes. Methods that genuinely need public access (form submission) should override this. This defense-in-depth approach prevents future methods from accidentally being public.",
+      "verdict": "true_positive"
+    },
+    {
+      "id": "MF-003",
+      "title": "Active Debug File Write (file_put_contents) in HubSpot Integration",
+      "severity": "medium",
+      "cvss_estimate": "5.0",
+      "cwe": "CWE-200",
+      "location": "core/integrations/crm/hubspot/hubspot.php:140-147",
+      "auth_required": true,
+      "description": "Two active (not commented-out) debug file write statements exist in the HubSpot send() method: (1) file_put_contents('debug.json', json_encode($response)) — writes the full wp_remote_post() response (including HTTP headers, body, and potentially error details from HubSpot) to a relative path 'debug.json'. In a typical web server configuration this would write to the WordPress root or the PHP process working directory; (2) In the catch block: fopen('debug.txt', 'w') + fwrite() — writes exception details. The relative paths mean the actual write location is unpredictable and server-dependent. If written to the webroot, debug.json would be publicly accessible and contain HubSpot API response data including potential access token echoing. This code executes every time a form with HubSpot integration is submitted.",
+      "exploitability": "Requires HubSpot integration to be configured on a form. The files are written server-side. If the PHP working directory maps to a web-accessible path, any visitor can read debug.json to obtain HubSpot API response data. The exploitability also depends on server configuration (open_basedir, working directory). The fopen/fwrite in the catch block additionally leaks exception stack traces.",
+      "recommendation": "Remove both debug file write blocks entirely — they are clearly leftover development artifacts. If logging is needed, use WordPress's WP_DEBUG_LOG facility (error_log()) with an absolute path to a non-web-accessible location. Never write to relative paths in plugin code.",
+      "verdict": "true_positive"
+    },
+    {
+      "id": "MF-004",
+      "title": "Weak PRNG (rand/mt_rand) for CAPTCHA Image Generation",
+      "severity": "low",
+      "cvss_estimate": "3.1",
+      "cwe": "CWE-338",
+      "location": "widgets/simple-captcha/generate-captcha.php:49-51, 79",
+      "auth_required": false,
+      "description": "The captcha character string is generated by generate_string() using mt_rand() (line 79), and background/decoration colors/positions use rand() (lines 49-51 and elsewhere). PHP's mt_rand() is a Mersenne Twister PRNG which is not cryptographically secure. The captcha token is stored in $_SESSION['mf_captcha_text']. This is a weak captcha implementation for two independent reasons: (1) mt_rand is predictable if an attacker can observe several outputs and reconstruct the PRNG state; (2) simple image CAPTCHAs of this style are defeated by off-the-shelf OCR tools regardless of the PRNG quality. The automated scanner flagged rand() use, which is accurate but the deeper issue is OCR bypass.",
+      "exploitability": "PRNG state recovery from observed outputs is theoretically possible but requires significant oracle access. In practice, the captcha is more easily bypassed via OCR. Both attack paths allow an attacker to automate form spam submissions that bypass the captcha gate.",
+      "recommendation": "Use random_int() instead of rand()/mt_rand() for any security-sensitive token generation. More importantly, replace the homegrown PHP image captcha with Google reCAPTCHA v3 or hCaptcha, which the plugin already supports. The simple-captcha widget should be marked as deprecated or removed.",
+      "verdict": "true_positive"
+    },
+    {
+      "id": "MF-005",
+      "title": "Settings Save Handler Merges Unsanitized POST Data into Plugin Options",
+      "severity": "medium",
+      "cvss_estimate": "4.9",
+      "cwe": "CWE-20",
+      "location": "core/admin/base.php:40-75",
+      "auth_required": true,
+      "description": "The mf_setting_data_save() handler correctly requires manage_options capability and verifies a WP REST nonce (HTTP_X_WP_NONCE / 'wp_rest' action). Authentication is properly enforced. However, the handler performs array_merge($settings, $request) where $request is the raw $_POST['form_data'] array with no per-field sanitization or validation. An administrator can store arbitrary values into the metform_option__settings option. While exploitability is limited to authenticated admins (which is the intended audience for settings), the lack of sanitization means: (1) stored XSS is possible if any setting value is later echoed without escaping; (2) an admin could store data that triggers unexpected behavior in integrations (e.g., injecting a malicious HubSpot API endpoint URL). This is not a privilege-escalation path but is a code quality/defense-in-depth concern.",
+      "exploitability": "Requires manage_options capability (Administrator role). In multi-site or sites with multiple admins, a malicious admin could poison settings to affect other admins' views or integration behavior. In practice this is within the expected trust boundary of WordPress administrators.",
+      "recommendation": "Apply sanitize_text_field() or appropriate sanitization per known setting key. Use an allowlist of valid setting keys rather than blindly merging all POST data into the stored option. Audit all locations where stored settings are echoed to ensure esc_html()/esc_attr()/esc_url() is used consistently.",
+      "verdict": "true_positive"
+    },
+    {
+      "id": "MF-006",
+      "title": "No unserialize() Calls Found",
+      "severity": "info",
+      "cvss_estimate": "0.0",
+      "cwe": "CWE-502",
+      "location": "N/A",
+      "auth_required": false,
+      "description": "A comprehensive grep for unserialize() and maybe_unserialize() across the plugin returned no matches. The plugin does not use PHP object deserialization on any user-controlled data.",
+      "exploitability": "Not applicable.",
+      "recommendation": "No action needed.",
+      "verdict": "false_positive"
+    },
+    {
+      "id": "MF-007",
+      "title": "SQL Queries via $wpdb Use Prepared Statements Correctly",
+      "severity": "info",
+      "cvss_estimate": "0.0",
+      "cwe": "CWE-89",
+      "location": "core/entries/action.php:1517-1531, core/entries/export.php:23",
+      "auth_required": false,
+      "description": "All identified $wpdb usages use $wpdb->prepare() with parameterized placeholders (%s, %d). Table name prefixes are constructed via $wpdb->prefix (safe). No direct string interpolation of user-controlled variables into SQL was found. The export query in export.php takes $form_id which should be an integer; it is passed as %d in prepare().",
+      "exploitability": "Not applicable — no SQL injection vectors identified.",
+      "recommendation": "Maintain use of $wpdb->prepare() for all queries. Ensure $form_id is cast to integer before use in queries as an additional safeguard.",
+      "verdict": "false_positive"
+    },
+    {
+      "id": "MF-008",
+      "title": "get_post_meta -> echo Taint Flows with Proper Escaping (False Positive Confirmation)",
+      "severity": "info",
+      "cvss_estimate": "0.0",
+      "cwe": "CWE-79",
+      "location": "Various widget files",
+      "auth_required": false,
+      "description": "The automated scanner identified several taint flows from get_post_meta() to echo with esc_attr() or esc_url() sanitization. Manual review confirms these are false positives: esc_attr() is appropriate for HTML attribute contexts and esc_url() is appropriate for URL contexts. The escaping functions are correctly applied before output.",
+      "exploitability": "Not exploitable given correct context-appropriate escaping.",
+      "recommendation": "No action needed for these specific flows. Continue using context-appropriate escaping throughout the codebase.",
+      "verdict": "false_positive"
+    }
+  ],
+  "summary": "MetForm presents a medium overall risk profile. The most significant finding (MF-001) is that file uploads are accessible to unauthenticated users who can obtain a form nonce from the public form page — while PHP execution is blocked by WordPress MIME checks, anonymous users can upload files of various types (including .stp/.step/.iges/.heic) without any authentication. MF-002 identifies a structural weakness: the REST API base class grants public access to all endpoints and relies on individual methods to enforce auth, with several methods missing checks (notably post_views() and get_builder()). MF-003 is a clear shipped-debug-code issue where HubSpot integration writes API responses to relative-path files on every form submission, potentially exposing data if the working directory is web-accessible. MF-004 confirms the weak PRNG/homegrown captcha concern — bypass is achievable via OCR independently of the PRNG issue. MF-005 confirms the settings handler is properly auth-gated (true for manage_options admins) but merges unsanitized POST data into plugin options. No deserialization vulnerabilities or SQL injection were found. Priority remediation order: MF-003 (remove debug writes immediately), MF-001 (add auth gate for file upload forms), MF-002 (centralize permission_callback), MF-004 (deprecate simple captcha widget)."
+}
