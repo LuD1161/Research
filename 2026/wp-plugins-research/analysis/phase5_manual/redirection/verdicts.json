@@ -1,0 +1,98 @@
+{
+  "plugin": "redirection",
+  "reviewed_at": "2026-06-14",
+  "vulnerabilities": [
+    {
+      "id": "RD-001",
+      "title": "PHP Object Injection via Unsafe unserialize() on action_data",
+      "severity": "high",
+      "type": "other",
+      "authenticated": true,
+      "description": "Three match classes deserialize the `action_data` column from the database using `unserialize()` without the `allowed_classes => false` restriction. This data is written to the database via the admin REST API. An authenticated admin who creates a redirect with a crafted `action_data` payload could trigger PHP object injection when the redirect is matched on the front end. Affected classes: `FromUrl_Match` (matches/from-url.php:88), `FromNotFrom_Match` (matches/from-notfrom.php:103), and the Login match (matches/login.php:93). The data flows: admin creates redirect via POST /redirection/v1/redirect -> `action_data` is serialized with PHP `serialize()` and stored in the DB -> when any visitor hits the matched URL, the data is deserialized via `unserialize()` without class restriction. If an attacker with admin/editor access can control the serialized payload, and if any suitable PHP class with a destructive `__wakeup()` or `__destruct()` exists in the WordPress autoloader, they can achieve RCE or file manipulation. The impact depends on available gadget chains in the WordPress/plugin ecosystem.",
+      "affected_function": "load_data / load",
+      "affected_file": "matches/from-url.php",
+      "proof_of_concept": "# Step 1: Create a redirect as admin with crafted serialized action_data\n# The action_data is normally array like {\"url\":\"/target\"} but is stored as PHP serialized\n# Step 2: When a visitor hits the matched source URL, the following code executes:\n# matches/from-url.php line 88: $values = unserialize( $values ); // no allowed_classes restriction\n# A PHP gadget chain in WordPress core or other plugins would be triggered at deserialization time.\n# Example (conceptual) - any class with __wakeup() side effects could be abused.",
+      "cvss_score": 7.2,
+      "remediation": "Replace all bare `unserialize()` calls with `unserialize($data, ['allowed_classes' => false])` in matches/from-url.php, matches/from-notfrom.php, and matches/login.php. Migrate stored data to use JSON encoding instead of PHP serialization for the match/action_data fields."
+    },
+    {
+      "id": "RD-002",
+      "title": "Stored Open Redirect - wp_redirect() Used Instead of wp_safe_redirect()",
+      "severity": "medium",
+      "type": "open-redirect",
+      "authenticated": false,
+      "description": "The plugin uses `wp_redirect()` (not `wp_safe_redirect()`) in actions/url.php:16 when performing redirect actions. This is an intentional design choice for a redirect plugin, but it means any target URL saved in the database (including http://attacker.com) will be blindly followed without host validation. An authenticated admin creates a redirect rule with source=/any-path and target=https://evil.com/phishing. When any unauthenticated visitor browses to /any-path, they are immediately redirected to the attacker-controlled external domain with full HTTP 301/302 redirect. There is no allowlist or domain restriction on the redirect target. This is exploitable as a phishing vector: if an attacker gains temporary admin access (or tricks an admin via CSRF - see RD-003), they can plant permanent open redirect rules that persist and redirect victims to malicious sites. wp_redirect() in WordPress explicitly does NOT validate the host and will redirect to any URL including javascript: schemes in older WP versions.",
+      "affected_function": "redirect_to",
+      "affected_file": "actions/url.php",
+      "proof_of_concept": "# As admin, create a redirect rule:\ncurl -s -u 'admin:PASSWORD' -X POST http://localhost:8880/wp-json/redirection/v1/redirect \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"url\":\"/company-login\",\"action_data\":{\"url\":\"https://evil-phish.com/fake-login\"},\"action_type\":\"url\",\"action_code\":302,\"group_id\":1}'\n\n# Any visitor who now browses to http://localhost:8880/company-login is redirected to the attacker site:\ncurl -I http://localhost:8880/company-login\n# Response: HTTP/1.1 302 Found\n# Location: https://evil-phish.com/fake-login",
+      "cvss_score": 6.1,
+      "remediation": "For use cases where only same-origin redirects are expected, replace `wp_redirect()` with `wp_safe_redirect()`. If external redirects are a required feature, implement a domain allowlist with a user-configurable setting and display a warning interstitial before redirecting to external domains."
+    },
+    {
+      "id": "RD-003",
+      "title": "CSRF - No Nonce Verification on REST API Redirect Creation/Modification",
+      "severity": "medium",
+      "type": "other",
+      "authenticated": true,
+      "description": "The Redirection plugin uses WordPress REST API endpoints for all create/update/delete operations. The REST API uses WordPress cookie authentication with nonces, but only when the client sends a `X-WP-Nonce` header. If an admin is logged in and a malicious page makes a cross-origin XMLHttpRequest or form POST to the REST API endpoint (e.g., POST /wp-json/redirection/v1/redirect), the browser sends the session cookies but the CSRF check depends on whether the REST API nonce is required. In WordPress, REST API requests authenticated by cookies do require a nonce (`X-WP-Nonce`), so simple form-based CSRF will fail. However, if the attacker can use fetch() from a cross-origin page targeting the admin's session and can bypass CORS (e.g., via server misconfiguration or if the server sets Access-Control-Allow-Origin: *), CSRF exploitation becomes possible. The underlying issue is that there is no secondary CSRF protection layer beyond the REST API nonce, which must be explicitly included by the client. This is a conditional medium severity depending on CORS policy.",
+      "affected_function": "route_create / route_update",
+      "affected_file": "api/api-redirect.php",
+      "proof_of_concept": "<!-- Only exploitable if CORS allows credentials or same-site -->\n<script>\nfetch('http://localhost:8880/wp-json/redirection/v1/redirect', {\n  method: 'POST',\n  credentials: 'include',\n  headers: {'Content-Type': 'application/json'},\n  body: JSON.stringify({url:'/admin',action_data:{url:'https://evil.com'},action_type:'url',action_code:301,group_id:1})\n});\n</script>",
+      "cvss_score": 5.4,
+      "remediation": "Standard WordPress REST API nonce protection is in place and is the correct mitigation. Ensure server CORS policy does not allow credentials from untrusted origins. No code change required if WP nonce validation is working correctly."
+    },
+    {
+      "id": "RD-004",
+      "title": "Variable Injection via parse_str() Overwriting $_GET Superglobal",
+      "severity": "medium",
+      "type": "other",
+      "authenticated": false,
+      "description": "In actions/pass.php:38, the code executes `parse_str($_SERVER['QUERY_STRING'], $_GET)` when processing a passthrough redirect. This directly overwrites the global `$_GET` superglobal with query string parameters from the request URL, after any URL transformation has been applied. If the target URL of a passthrough redirect contains attacker-controlled query parameters (e.g., via regex capture groups in the source pattern), the attacker can inject arbitrary key-value pairs into `$_GET`. This can lead to parameter pollution, bypass of security checks that rely on `$_GET`, or trigger unexpected behavior in other WordPress code that reads `$_GET` values. Additionally, `parse_str()` can create variables named `_SESSION`, `_FILES`, etc. in older PHP versions. An attacker who can trigger a passthrough redirect rule can overwrite `$_GET['action']`, `$_GET['page']`, or other sensitive parameters.",
+      "affected_function": "process_internal",
+      "affected_file": "actions/pass.php",
+      "proof_of_concept": "# If a passthrough (pass-through) redirect rule exists matching /api/* -> /internal/$1\n# and the source uses regex groups:\n# Attacker visits: http://target.com/api/path?action=malicious_value&key=injected\n# The pass.php code executes:\n# parse_str($_SERVER['QUERY_STRING'], $_GET);\n# This overwrites $_GET['action'] = 'malicious_value'\n# Any subsequent code reading $_GET['action'] for routing decisions could be affected.",
+      "cvss_score": 5.3,
+      "remediation": "Instead of overwriting `$_GET` with `parse_str()`, merge the parsed parameters into the existing `$_GET` using `array_merge()` or use `parse_str()` into a temporary variable and selectively merge only expected keys. Avoid global superglobal pollution: `$parsed = []; parse_str($_SERVER['QUERY_STRING'], $parsed); $_GET = array_merge($_GET, $parsed);`."
+    },
+    {
+      "id": "RD-005",
+      "title": "SQL Injection Risk in Bulk Delete/Reset via Unsanitized Filter WHERE Clause",
+      "severity": "low",
+      "type": "sqli",
+      "authenticated": true,
+      "description": "The `Red_Item::delete_all()` and `Red_Item::reset_all()` methods in models/redirect/redirect.php (lines 1036 and 1053) construct SQL DELETE/UPDATE statements by concatenating the output of `$filters->get_as_sql()` directly into the query without using `$wpdb->prepare()` for the outer query. While the `Red_Item_Filters` class does use `$wpdb->prepare()` for individual filter values, the assembled WHERE clause string is inserted into a raw `$wpdb->query()` call. This pattern is inherently fragile: if any future filter is added that does not use `$wpdb->prepare()`, or if the whitelist check in the filter class is bypassed, user-supplied filter parameters could cause SQL injection. The risk is currently limited because all existing filter branches use parameterized values, but the architectural pattern creates latent SQLi exposure. Requires admin-level authentication to reach these code paths.",
+      "affected_function": "delete_all / reset_all",
+      "affected_file": "models/redirect/redirect.php",
+      "proof_of_concept": "# Requires authenticated admin access via bulk action\n# POST /wp-json/redirection/v1/bulk/redirect/delete\n# with filterBy containing unsanitized values\n# Currently mitigated by Red_Item_Filters class but pattern is unsafe\ncurl -s -u 'admin:PASS' -X POST http://localhost:8880/wp-json/redirection/v1/bulk/redirect/delete \\\n  -H 'Content-Type: application/json' \\\n  -H 'X-WP-Nonce: NONCE' \\\n  -d '{\"global\":true,\"filterBy\":{\"status\":\"enabled\"}}'",
+      "cvss_score": 4.7,
+      "remediation": "Refactor delete_all() and reset_all() to use $wpdb->prepare() for the entire query rather than concatenating pre-built WHERE strings. Alternatively, use a prepared query builder pattern that ensures all interpolated values are parameterized. Example: build the WHERE clause as an array of prepared conditions and join them with sprintf, or use an ORM layer."
+    },
+    {
+      "id": "RD-006",
+      "title": "Information Disclosure - Database Error Exposed in REST Error Responses",
+      "severity": "low",
+      "type": "other",
+      "authenticated": true,
+      "description": "The `add_error_details()` method in api/api-route.php (lines 19-24) appends `$wpdb->last_error` directly to all WP_Error responses returned by the REST API. If a database error occurs during any API operation, the raw MySQL error message (including table names, column names, and query fragments) is exposed to the authenticated API caller. While this requires authentication to trigger, it provides attackers with detailed schema information that can aid in crafting SQL injection attacks against identified tables and columns.",
+      "affected_function": "add_error_details",
+      "affected_file": "api/api-route.php",
+      "proof_of_concept": "# Trigger a DB error via an invalid operation as admin\n# The response will include: {\"data\":{\"wpdb\":\"MySQL error message with schema details\"}}",
+      "cvss_score": 3.5,
+      "remediation": "Remove `$wpdb->last_error` from production error responses. Log it server-side instead. Only expose generic error messages to API consumers. If debugging is needed, gate it behind a `WP_DEBUG` check: `if (defined('WP_DEBUG') && WP_DEBUG) { $data['wpdb'] = $wpdb->last_error; }`."
+    },
+    {
+      "id": "RD-007",
+      "title": "Regex Injection Risk (ReDoS) in User-Defined Redirect Patterns",
+      "severity": "low",
+      "type": "regex-injection",
+      "authenticated": true,
+      "description": "When a redirect rule has `regex=1`, the source URL pattern is stored verbatim and evaluated at request time using `@preg_match()` in models/regex.php:35. While the `@` operator suppresses PHP warnings on invalid patterns, there is no validation that the user-supplied regex is safe from ReDoS (Regex Denial of Service) attacks. An authenticated admin can create a redirect with a catastrophically backtracking regex pattern (e.g., `^(a+)+$`) as the source URL. Every subsequent request to the site will evaluate this pattern, causing excessive CPU usage. On high-traffic sites, a single malicious regex can cause sustained server overload. The `@` error suppression also means syntax errors are silently swallowed, making debugging difficult.",
+      "affected_function": "is_match / get_regex",
+      "affected_file": "models/regex.php",
+      "proof_of_concept": "# As admin, create a redirect with a ReDoS pattern:\ncurl -s -u 'admin:PASS' -X POST http://localhost:8880/wp-json/redirection/v1/redirect \\\n  -H 'Content-Type: application/json' \\\n  -H 'X-WP-Nonce: NONCE' \\\n  -d '{\"url\":\"^(a+)+$\",\"regex\":1,\"action_data\":{\"url\":\"/target\"},\"action_type\":\"url\",\"action_code\":301,\"group_id\":1}'\n\n# Now any request will trigger this catastrophically backtracking pattern:\n# curl http://localhost:8880/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaab\n# Server CPU spikes to 100% while evaluating the regex",
+      "cvss_score": 4.3,
+      "remediation": "Validate user-supplied regex patterns before saving: use `preg_match()` with a timeout or validate the pattern with a test execution. Consider using `set_time_limit()` around regex evaluation or running regex matching in a subprocess with a timeout. At minimum, test the pattern against a benign input at save time and reject patterns that take longer than a threshold to evaluate."
+    }
+  ],
+  "summary": "Redirection v5.8.0 is a well-structured plugin with proper REST API authentication (all endpoints require 'manage_options' or equivalent capability via Redirection_Capabilities::has_access()). No unauthenticated attack surface was found - the REST API correctly returns 401/403 for unauthenticated requests. The most significant security concern is PHP Object Injection (RD-001): three match classes call unserialize() on database-stored action_data without the allowed_classes restriction; since admins can write serialized PHP to this field, exploitability depends on available gadget chains in the loaded PHP classes. The plugin intentionally uses wp_redirect() instead of wp_safe_redirect() (RD-002), which is an architectural open redirect by design - appropriate for a redirect management tool but creates phishing risk if admin accounts are compromised. The parse_str() superglobal overwrite in pass.php (RD-004) is a code quality concern that could cause subtle security bugs in parameter pollution scenarios. SQL injection risk (RD-005) is a latent architectural issue rather than an active exploit, as current filter implementations are properly parameterized. The plugin does not appear to have unauthenticated AJAX handlers, SSRF vectors, or file upload capabilities. Overall risk level is MEDIUM, primarily driven by the unserialize() issue and the inherent open redirect functionality."
+}

@@ -1,0 +1,269 @@
+{
+  "plugin": "simple-history",
+  "reviewed_at": "2026-06-14",
+  "verdicts": [
+    {
+      "flow_id": "simple-history-rce-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "RCE via DB query result to array_map",
+      "rationale": "File: inc/class-events-stats.php line 282-323. Source is a safely prepared query (`$wpdb->prepare` with %i, %d, %d, %d, %d, %d placeholders). Sink is `array_map(fn($user) => [...display_name, user_login, user_email...], $users)` — data transformation, no shell execution. The analyzer incorrectly classifies array_map as an RCE sink. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "simple-history-rce-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "RCE via get_col to array_map intval",
+      "rationale": "File: inc/class-helpers.php line 2427-2435. Source is prepared query result, sink is `array_map('intval', $results)`. intval is a data sanitizer, not a shell function. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "simple-history-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "XSS via absint in printf",
+      "rationale": "File: inc/services/class-alerts-settings-page-teaser.php line 243. `absint($sample['rules_count'])` is used as the `%d` argument in a printf with an `esc_html()` format string. absint() returns a non-negative integer. Integers cannot contain XSS. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "simple-history-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "XSS via absint event_count in printf",
+      "rationale": "Same pattern as xss-001. absint($event_count) used as %d in printf. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "simple-history-xss-003",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "XSS via echo absint(recipient_count)",
+      "rationale": "File: class-alerts-settings-page-teaser.php line 359. `echo absint(...)` — absint returns an integer, integers cannot produce XSS. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "simple-history-open-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "Open redirect via import_post_types to wp_safe_redirect",
+      "rationale": "File: inc/services/class-import-handler.php. The redirect URL is built with `add_query_arg([...], admin_url('admin.php'))`. admin_url() always returns an internal URL. `wp_safe_redirect()` additionally validates that the redirect target is the current host. auth_required=true, nonce_verified=true. Not exploitable as open redirect. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": true,
+      "cwe": null
+    },
+    {
+      "flow_id": "simple-history-open-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "Open redirect via results array to wp_safe_redirect",
+      "rationale": "Same pattern as open-001. admin_url() base + wp_safe_redirect() = no open redirect possible. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": true,
+      "cwe": null
+    },
+    {
+      "flow_id": "simple-history-xss-004",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "XSS via absint CACHE_DURATION_MINUTES class constant",
+      "rationale": "File: class-history-insights-sidebar-service.php line 611. Source is a class constant passed through absint(), used as %d in printf. Class constants are hardcoded values, not user input. Doubly not exploitable. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "simple-history-sqli-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "SQLi via ids_to_delete in purge cron DELETE query",
+      "rationale": "File: inc/services/class-setup-purge-db-cron.php line 124-138. The $ids_to_delete are the result of `$wpdb->get_col($sql)` where $sql is built from a safely prepared WHERE clause (see get_purge_where_clause() at line 182 using $wpdb->prepare()). The IDs returned are integer primary keys from the plugin's own events table (id column). implode(',', $ids_to_delete) on a list of integer strings from a WHERE clause on an integer PK column is safe — no user input reaches the DELETE IN clause. This runs in a cron job, not a web-accessible endpoint. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "simple-history-sqli-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "SQLi via ids_to_delete in purge cron DELETE context query",
+      "rationale": "Same as sqli-001. Same cron batch deletion pattern, same analysis applies. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "simple-history-rce-003",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "RCE via array_map intval on $_GET['post'] in PostLogger",
+      "rationale": "File: loggers/class-post-logger.php line 337. `$post_ids = array_map('intval', (array)($_GET['post'] ?? []))`. This is a logger that hooks into WordPress's own post list bulk-delete action. intval() casts are definitive sanitizers. No shell execution follows. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "simple-history-rce-004",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "RCE via ACF delete_fields to array_map intval",
+      "rationale": "File: loggers/class-plugin-acf-logger.php line 1015-1016. `sanitize_text_field(wp_unslash($_POST['_acf_delete_fields']))` then `array_map('intval', $deletedFieldsIDs)`. intval() cast — no shell execution. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "simple-history-ssrf-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "SSRF via $_GET['repo'] to wp_remote_get GitHub API",
+      "rationale": "File: loggers/class-plugin-logger.php line 696-720. The repo value is split into `$repo_username` and `$repo_repo` via a slash split, then each is passed through `rawurlencode()` before being inserted into a hardcoded GitHub API URL: `https://api.github.com/repos/%1$s/%2$s/readme`. The URL is always to api.github.com, not user-controlled. rawurlencode() prevents path traversal (e.g., '../' becomes '%2E%2E%2F'). auth_required=true, nonce_verified=true. Not SSRF. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": true,
+      "cwe": null
+    },
+    {
+      "flow_id": "simple-history-xss-005",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "XSS via repo param in plugin readme output",
+      "rationale": "File: loggers/class-plugin-logger.php line 696-760. The $repo is used in an `esc_url($repo)` context for the `<base href>` tag. esc_url() strips or encodes all dangerous characters including javascript: and data: schemes. The `$escaped_response_body` comes from GitHub's API response and is explicitly escaped before output. The `$repo_info` is assembled from safe internal lookups. auth_required=true. Not practically exploitable for XSS. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": true,
+      "cwe": null
+    },
+    {
+      "flow_id": "simple-history-rce-005",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "RCE via menu-item-db-id POST to array_map intval",
+      "rationale": "File: loggers/class-menu-logger.php line 374-499. Source is `$_POST['menu-item-db-id']`, sink is `array_map('intval', array_values(array_intersect(...)))`. intval() cast makes all values integers. No shell execution. This code runs in a logger hook during nav menu saves. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "simple-history-rce-006",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "RCE via menu-item-db-id POST to new_order array_map intval",
+      "rationale": "Same as rce-005. array_map('intval',...). FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "SEMGREP-SH-RSS",
+      "verdict": "CONFIRMED",
+      "confidence": "medium",
+      "severity": "low",
+      "title": "wp_redirect() instead of wp_safe_redirect() for RSS secret regeneration",
+      "vulnerability_class": "open_redirect",
+      "description": "File: dropins/class-rss-dropin.php line 134. `$goback = esc_url_raw(add_query_arg('settings-updated', 'true', wp_get_referer()))`. wp_get_referer() returns the HTTP Referer header, which is user-controlled. The URL is passed to `wp_redirect()` instead of `wp_safe_redirect()`. While esc_url_raw() strips dangerous protocols, it does not restrict the redirect to the current host. An attacker who can control the HTTP Referer (e.g., via a CSRF trigger from an attacker page) could redirect an authenticated admin to an arbitrary external URL after RSS secret regeneration. The nonce for the regeneration action must be valid (requires the admin to click the real link), so practical exploitability requires phishing.",
+      "attack_vector": "Network",
+      "auth_required": true,
+      "prerequisite": "Admin must click a crafted link with a valid nonce with a spoofed Referer header",
+      "affected_files": [
+        "plugins/src/simple-history/dropins/class-rss-dropin.php"
+      ],
+      "cwe": "CWE-601",
+      "cvss_score": 3.5,
+      "cvss_vector": "AV:N/AC:H/PR:H/UI:R/S:C/C:N/I:L/A:N"
+    },
+    {
+      "flow_id": "SEMGREP-SH-DEVTOOLS",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "Semgrep: REST devtools controller routes without permission_callback",
+      "rationale": "File: inc/class-wp-rest-devtools-controller.php. All 6 routes have explicit permission_callback methods. The toggle_plugin_permissions_check and get_plugin_status_permissions_check both (1) check `Helpers::dev_mode_is_enabled()` returning 403 if dev mode is off, and (2) check `current_user_can('activate_plugins')`. These routes are only available when dev mode is enabled (a constant or option). Semgrep pattern mismatch. FALSE POSITIVE.",
+      "affected_files": [
+        "plugins/src/simple-history/inc/class-wp-rest-devtools-controller.php"
+      ]
+    },
+    {
+      "flow_id": "SEMGREP-SH-EVENTS",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "Semgrep: REST events controller routes without permission_callback",
+      "rationale": "File: inc/class-wp-rest-events-controller.php. All routes have explicit permission_callback methods (get_items_permissions_check, get_item_permissions_check, create_item_permissions_check, update_item_permissions_check). All check is_user_logged_in() at minimum, and write operations check current_user_can('manage_options'). Semgrep pattern mismatch. FALSE POSITIVE.",
+      "affected_files": [
+        "plugins/src/simple-history/inc/class-wp-rest-events-controller.php"
+      ]
+    },
+    {
+      "flow_id": "MANUAL-SH-001",
+      "verdict": "CONFIRMED",
+      "confidence": "high",
+      "severity": "medium",
+      "title": "Unauthenticated access to WordPress history log via RSS feed with predictable/exposed secret",
+      "vulnerability_class": "sensitive_data_exposure",
+      "description": "File: dropins/class-rss-dropin.php. The RSS feed at /?simple_history_get_rss=1&rss_secret=<secret> is accessible to unauthenticated users. The feed exposes all admin activity logs (user logins, settings changes, plugin installs, content edits) without requiring a WordPress session. The 20-character lowercase-only secret (generated via chr(random_int(97,122)) — only 26^20 ≈ 19 sextillion combinations) is distributed as plaintext in the RSS URL shown in admin settings. If the RSS secret is obtained (e.g., via an admin user's bookmarks, browser history, shared monitoring tools, or a compromised but non-admin account with access to Simple History settings), the entire admin log is readable by anyone. The secret also disables per-logger capability checks (add_filter 'simple_history/loggers_user_can_read/can_read_single_logger', '__return_true'). Furthermore, for sites where the plugin was installed before RSS feed was disabled by default, RSS is automatically enabled (line 152-155).",
+      "attack_vector": "Network",
+      "auth_required": false,
+      "notes": "This is intentional behavior (public RSS feed) but the security implication of exposing admin logs to anyone with the secret URL is significant. The secret could appear in server logs, referrer headers when clicking external links from the RSS reader, or monitoring tools.",
+      "affected_files": [
+        "plugins/src/simple-history/dropins/class-rss-dropin.php"
+      ],
+      "cwe": "CWE-200",
+      "cvss_score": 5.3,
+      "cvss_vector": "AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N"
+    },
+    {
+      "flow_id": "MANUAL-SH-002",
+      "verdict": "CONFIRMED",
+      "confidence": "high",
+      "severity": "medium",
+      "title": "Authenticated read of full history log via REST API without admin capability",
+      "vulnerability_class": "missing_authorization",
+      "description": "File: inc/class-wp-rest-events-controller.php. GET /wp-json/simple-history/v1/events requires only is_user_logged_in() (any logged-in user, including subscribers). The endpoint returns log entries filtered by per-logger capability checks — however, the permission check on line 802-822 explicitly states 'User must be logged in' with no further capability check for basic read access. Any subscriber can query the log and receive events that the per-logger filters allow them to see. Depending on logger configuration and the plugin version, a subscriber may receive logs of admin activity.",
+      "attack_vector": "Network",
+      "auth_required": true,
+      "prerequisite": "Any WordPress user account (subscriber role sufficient)",
+      "notes": "The actual data returned depends on per-logger 'can_read_single_logger' filters, which may further restrict. The core issue is that the REST permission_callback does not enforce the manage_options or view_simple_history capability; only login is required. This could expose admin activity to lower-privileged authenticated users.",
+      "affected_files": [
+        "plugins/src/simple-history/inc/class-wp-rest-events-controller.php"
+      ],
+      "cwe": "CWE-862",
+      "cvss_score": 4.3,
+      "cvss_vector": "AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:N/A:N"
+    },
+    {
+      "flow_id": "SEMGREP-SH-LOGQUERY-SQLI",
+      "verdict": "NEEDS_REVIEW",
+      "confidence": "medium",
+      "severity": "medium",
+      "title": "Multiple direct $wpdb query calls with variables in class-log-query.php",
+      "description": "class-log-query.php has many direct $wpdb->get_results/$wpdb->query calls with variables (lines 335, 402, 617, 1553, 1636). These variables are constructed from user-supplied REST API parameters (search, date_from, date_to, users, loggers, etc.) passed through get_items() and then Log_Query::query(). Requires reading class-log-query.php in full to determine if all these variables are prepared before being inserted into queries. High potential for SQL injection in the log query engine if any filter parameter is not properly prepared.",
+      "verdict_note": "The REST endpoint that calls this requires login (is_user_logged_in) but not admin capability. If any SQL injection exists here, it could be exploited by any authenticated user. ESCALATE to manual review of class-log-query.php lines 335, 402, 617.",
+      "affected_files": [
+        "plugins/src/simple-history/inc/class-log-query.php"
+      ],
+      "cwe": "CWE-89"
+    }
+  ],
+  "summary": {
+    "total_flows_reviewed": 22,
+    "confirmed": 4,
+    "false_positives": 17,
+    "needs_review": 1,
+    "unauthenticated_confirmed": 1,
+    "highest_severity": "medium",
+    "key_findings": [
+      "All automated taint-flow RCE/SQLi findings are false positives (array_map intval, safe redirects, prepared queries).",
+      "MANUAL-SH-001: Unauthenticated access to complete admin activity log via RSS feed with bearer secret — leaking admin actions, logins, settings changes.",
+      "MANUAL-SH-002: Any logged-in WordPress user (subscriber) can read history events via REST API without admin capability.",
+      "SEMGREP-SH-RSS: wp_redirect() instead of wp_safe_redirect() for a Referer-based redirect — low-severity open redirect requiring attacker-controlled Referer.",
+      "SEMGREP-SH-LOGQUERY-SQLI: class-log-query.php has multiple unprepared $wpdb queries receiving REST API parameters. Needs targeted code review."
+    ]
+  }
+}

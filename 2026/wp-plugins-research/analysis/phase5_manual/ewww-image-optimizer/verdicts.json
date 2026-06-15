@@ -1,0 +1,342 @@
+{
+  "plugin": "ewww-image-optimizer",
+  "reviewed_at": "2026-06-14",
+  "reviewer": "manual-phase5",
+  "summary": "No exploitable unauthenticated vulnerabilities found. The single nopriv AJAX endpoint (background process queue) requires a server-generated nonce not exposed to external users. All exec() calls in unique.php properly use ewww_image_optimizer_escapeshellarg(). Most taint-flow false positives arise from the scanner marking array_filter/array_map(absint) as sinks (they are not). Authenticated-only issues (XSS via intval output in wp_json_encode, unserialize from DB options) are real but low exploitability.",
+  "verdicts": [
+    {
+      "flow_id": "ewww-image-optimizer-rce-001",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "DB IDs passed through array_map(absint) — not a sink",
+      "description": "The scanner flagged array_map('absint', $selected_ids) as an RCE sink. absint() casts every element to a non-negative integer, which is completely safe. These integer IDs are later used as attachment IDs passed to WordPress APIs, not as shell arguments. No shell command is constructed from these values in the traced code path.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive due to scanner treating array_map() as a generic sink."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-rce-002",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "DB IDs through array_map(absint) — same as rce-001",
+      "description": "Identical pattern to rce-001. IDs are cast to integers via absint, eliminating injection risk.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-rce-003",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "webp_images processed via sanitize_text_field — no exec call in chain",
+      "description": "The flow reaches sanitize_text_field(), which is the endpoint of the chain. No exec/system call is made directly from this input. The scanner incorrectly flagged it as RCE. Auth and nonce are both verified (auth_required: true, nonce_verified: true per brief).",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-file-001",
+      "verdict": "needs_further_review",
+      "severity_adjusted": "medium",
+      "confidence": "medium",
+      "title": "Authenticated: rename() on user-supplied image path",
+      "description": "After nonce + auth verification, a WebP image path from $_REQUEST['webp_images'] (sanitized via sanitize_text_field) is used in rename(). sanitize_text_field() does not prevent path traversal sequences like '../'. However, this requires an authenticated admin user and a valid nonce, reducing real-world risk significantly.",
+      "auth_required": true,
+      "exploitable": false,
+      "cve_potential": false,
+      "notes": "Auth + nonce required. Real risk is negligible for unauthenticated access; could be low-severity authenticated path traversal."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-rce-004",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "get_option bulk attachments through absint — not a sink",
+      "description": "Option value read from DB, then every element cast to absint. Same false positive pattern as rce-001.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive. Option value is controlled by admin, not by HTTP request."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-rce-005",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "Same as rce-004 pattern",
+      "description": "Identical issue — DB option through absint, no shell command in taint chain.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-ssrf-001",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "SSRF false positive: URL is internal admin-ajax hardcoded",
+      "description": "The URL in question is admin_ajax_url (WordPress's own admin-ajax.php). The scanner flagged $_COOKIE being forwarded. This is standard WordPress async request pattern (WP Background Processing). The endpoint URL is not attacker-controllable, and the body is a fixed test string. No SSRF is possible.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive. Server-to-self request for background processing."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-ssrf-002",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "DB-sourced image path used in wp_remote_post to configured backup URL",
+      "description": "The URL ($url) for wp_remote_post comes from the plugin's backup restore configuration, not from the tainted $image['path']. The taint tracker incorrectly propagated taint across the entire function scope. The $image['backup'] hash (used in POST body) is from the DB and is not an SSRF attack vector since it's the POST body content, not the URL.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive. The request URL is not derived from user input."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-file-002",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "medium",
+      "title": "file_put_contents to path from DB restore operation",
+      "description": "The path is $image['path'] from the plugin's own image database (a path the plugin already knows about and has stored itself). The content written is the API response body for image restoration. This is intentional plugin behavior. No unauthenticated HTTP entry point leads to this code path.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive for unauthenticated attack. Would require compromising the plugin's DB records."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-file-003",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "unlink() on DB-stored image path — intentional image management",
+      "description": "The plugin unlinks a WebP file derived from a path stored in its own image database. This is standard cleanup behavior. Not exploitable without DB write access.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-ssrf-003",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "SSRF false positive: async dispatch to own admin-ajax URL",
+      "description": "Same as ssrf-001. Standard WordPress background processing self-request pattern. URL is admin_url('admin-ajax.php'), not user-controlled.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-xss-001",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "echo intval() cannot produce XSS",
+      "description": "intval() always produces an integer. Echoing an integer cannot produce XSS. The scanner incorrectly flagged this.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-rce-006",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "array_map(intval) — integer cast, not an RCE sink",
+      "description": "Casting $_REQUEST['doaction'] elements to integers via intval() is not an RCE risk. These IDs are not subsequently passed to exec/system.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-rce-007",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "Same as rce-006",
+      "description": "Identical to rce-006.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-xss-002",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "wp_json_encode of integer ID in JSON response — no XSS",
+      "description": "The ID is cast to integer via intval(). wp_json_encode safely encodes values. No XSS possible.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-xss-003",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "Same as xss-002",
+      "description": "Identical pattern.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-obje-001",
+      "verdict": "confirmed",
+      "severity_adjusted": "low",
+      "confidence": "medium",
+      "title": "Authenticated: unserialize() on option value — potential object injection",
+      "description": "The plugin calls unserialize($attachments) on a value read from get_option('ewww_image_optimizer_bulk_flag_attachments') without specifying allowed_classes. However, this option is only writable by admin users. To exploit this, an attacker would need to have already compromised the DB or have admin access to set the option to a malicious serialized payload. No unauthenticated path exists to this code.",
+      "auth_required": true,
+      "exploitable": false,
+      "cve_potential": false,
+      "notes": "Low severity. Requires DB write access or admin compromise first."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-xss-004",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "Echo of ternary boolean string 'true'/'false' — no XSS",
+      "description": "The code echoes a hardcoded string literal 'true' or 'false' based on a boolean option value. No user-controlled data reaches this output.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive. Output is a PHP boolean expression, not user-controlled."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-sqli-001",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "DB read into $wpdb->update — both use parameterized queries",
+      "description": "The SELECT uses $wpdb->prepare(). The UPDATE also passes format arrays ('%s', '%d') making it parameterized. The taint analysis incorrectly flagged this because the 'data' column content (from maybe_unserialize) is stored back — but $wpdb->update handles the escaping. No SQL injection is possible.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive. $wpdb->update() with format parameters is safe."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-sqli-002",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "Same as sqli-001 — $wpdb->insert with format arrays",
+      "description": "Same analysis as sqli-001. $wpdb->insert() with format arrays ('%s', '%s') is parameterized and safe.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-xss-005",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "wp_json_encode of integer ID — no XSS",
+      "description": "intval() cast + wp_json_encode. No XSS vector.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-obje-002",
+      "verdict": "confirmed",
+      "severity_adjusted": "low",
+      "confidence": "medium",
+      "title": "Authenticated: unserialize() on bulk_ngg_attachments option",
+      "description": "Same as obje-001. unserialize() without allowed_classes on a DB option. Only admin-writable. Not a unauthenticated concern.",
+      "auth_required": true,
+      "exploitable": false,
+      "cve_potential": false,
+      "notes": "Same severity as obje-001."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-xss-006",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "wp_json_encode of intval() ID in JSON — no XSS",
+      "description": "Identical to xss-002/xss-005 pattern.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-rce-008",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "preg_replace with esc_html() is not an RCE sink",
+      "description": "The scanner flagged preg_replace() as an RCE sink. The replacement subject is the output of esc_html() which HTML-encodes all special characters. No e-modifier is used in the regex. preg_replace with a simple pattern and esc_html'd subject is not an RCE vector.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-rce-009",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "array_map(intval) — integer cast, not RCE",
+      "description": "Same as rce-006.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-rce-010",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "array_map(intval) — same as rce-009",
+      "description": "Same pattern.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-obje-003",
+      "verdict": "confirmed",
+      "severity_adjusted": "low",
+      "confidence": "medium",
+      "title": "Authenticated: unserialize() on bulk_ngg_attachments in NextGen class",
+      "description": "Third occurrence of the same pattern. unserialize() on a DB option without allowed_classes. Only admin can write this option.",
+      "auth_required": true,
+      "exploitable": false,
+      "cve_potential": false,
+      "notes": "Same as obje-001 and obje-002."
+    },
+    {
+      "flow_id": "ewww-image-optimizer-open-001",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "wp_safe_redirect() is not an open redirect",
+      "description": "The code uses wp_safe_redirect() which validates that the redirect stays on the same host. The doaction values are cast to intval(). No open redirect possible.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    }
+  ],
+  "unauthenticated_attack_surface": {
+    "nopriv_handlers": [
+      {
+        "action": "wp_ewwwio_image_optimize (background process via class-async-request.php)",
+        "handler": "EWWW\\Async_Request::maybe_handle → EWWW\\Background_Process::maybe_handle",
+        "nonce_check": "check_ajax_referer($this->identifier, 'nonce') — nonce created server-side during dispatch, never exposed to browser",
+        "verdict": "not_exploitable",
+        "notes": "Nonce is generated and consumed internally during server-to-server background job dispatch. An external attacker cannot obtain it."
+      }
+    ],
+    "real_unauthenticated_vulns": []
+  },
+  "command_injection_review": {
+    "exec_calls_found": true,
+    "location": "plugins/src/ewww-image-optimizer/unique.php",
+    "uses_escapeshellarg": true,
+    "function": "ewww_image_optimizer_escapeshellarg() wraps PHP escapeshellarg() for non-ASCII safety",
+    "verdict": "safe",
+    "notes": "All exec() calls in unique.php construct $cmd using ewww_image_optimizer_escapeshellarg() for file path arguments. Tool binary paths come from server-side configuration (get_path()), not from user input. No command injection vector found."
+  },
+  "overall_verdict": "clean",
+  "reportable_findings": []
+}

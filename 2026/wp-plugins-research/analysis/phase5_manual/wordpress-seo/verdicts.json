@@ -1,0 +1,121 @@
+{
+  "plugin": "wordpress-seo",
+  "version_audited": "27.8",
+  "audit_date": "2026-06-14",
+  "auditor": "phase5-manual-review",
+  "summary": {
+    "total_findings": 8,
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 6,
+    "informational": 2,
+    "critical_unauth": 0
+  },
+  "verdicts": [
+    {
+      "flow_id": "wordpress-seo-lfi-001",
+      "title": "Potential Local File Inclusion via tools.php ?tool= parameter",
+      "verdict": "FALSE_POSITIVE",
+      "severity_claimed": "critical",
+      "severity_actual": "N/A",
+      "auth_required": true,
+      "confidence": "high",
+      "details": "The taint analysis flagged `require_once WPSEO_PATH . 'admin/views/tool-' . $tool_page . '.php'` as LFI. However the code immediately preceding it (lines 79-87 of tools.php) validates $tool_page against a strict allowlist: `$tool_pages = ['bulk-editor', 'import-export', 'file-editor']`. The `in_array($tool_page, $tool_pages, true)` check with strict comparison prevents injection. Additionally, the file begins with `if (!defined('WPSEO_VERSION')) { exit(); }` ensuring it only loads from within WordPress. This is NOT exploitable.",
+      "code_reference": "plugins/src/wordpress-seo/wordpress-seo/admin/pages/tools.php:79-86"
+    },
+    {
+      "flow_id": "wordpress-seo-sqli-001",
+      "title": "SQL Injection via meta_ids array used in DELETE - WPSEO_Meta::clean_up()",
+      "verdict": "FALSE_POSITIVE",
+      "severity_claimed": "critical",
+      "severity_actual": "N/A",
+      "auth_required": true,
+      "confidence": "high",
+      "details": "The DELETE query at line 897 uses meta_ids fetched from $wpdb->get_col() in a prior SELECT query. The concern would only be valid if $meta_ids could contain attacker-controlled data. The meta_ids are integer primary keys returned by a server-side SELECT on the postmeta table; they are not influenced by user input. The taint analysis incorrectly traced database-origin data as tainted. This is an internal orphan cleanup method called only from WPSEO_Meta::clean_up(), which itself is called only from the private upgrade_15() routine in class-upgrade.php (line 179) during plugin upgrade - an admin-only operation. NOT exploitable.",
+      "code_reference": "plugins/src/wordpress-seo/wordpress-seo/inc/class-wpseo-meta.php:891-898"
+    },
+    {
+      "flow_id": "wordpress-seo-sqli-002",
+      "title": "SQL Injection via orphan IDs array in indexable-cleanup-repository.php",
+      "verdict": "FALSE_POSITIVE",
+      "severity_claimed": "critical",
+      "severity_actual": "N/A",
+      "auth_required": true,
+      "confidence": "high",
+      "details": "The DELETE statement at line 495 uses `$orphans` (integer IDs from a preceding SELECT). The SELECT query at line 475-484 is parameterized via $wpdb->prepare() and returns object_id values which are database integer primary keys. These are not influenced by user-controlled input. The cleanup methods are called exclusively from Cleanup_Integration::run_cleanup() via action hooks (wpseo_start_cleanup_indexables and wpseo_cleanup_cron) - internal scheduled/admin-triggered operations. NOT unauthenticated and NOT exploitable.",
+      "code_reference": "plugins/src/wordpress-seo/wordpress-seo/src/repositories/indexable-cleanup-repository.php:488-495"
+    },
+    {
+      "flow_id": "wordpress-seo-sqli-003",
+      "title": "SQL Injection via user orphan IDs in indexable-cleanup-repository.php",
+      "verdict": "FALSE_POSITIVE",
+      "severity_claimed": "critical",
+      "severity_actual": "N/A",
+      "auth_required": true,
+      "confidence": "high",
+      "details": "Same pattern as sqli-002. $orphans are integer object_ids from a prepared SELECT. The DELETE only accepts these internal DB-derived integers. Called from admin cron/upgrade paths. NOT exploitable.",
+      "code_reference": "plugins/src/wordpress-seo/wordpress-seo/src/repositories/indexable-cleanup-repository.php:526-533"
+    },
+    {
+      "flow_id": "wordpress-seo-sqli-004",
+      "title": "SQL Injection via $orphans in generic cleanup delete - indexable-cleanup-repository.php",
+      "verdict": "FALSE_POSITIVE",
+      "severity_claimed": "critical",
+      "severity_actual": "N/A",
+      "auth_required": true,
+      "confidence": "high",
+      "details": "Same as sqli-002/003. $orphans sourced from prepared SELECT, used in internal cron/admin cleanup. NOT exploitable.",
+      "code_reference": "plugins/src/wordpress-seo/wordpress-seo/src/repositories/indexable-cleanup-repository.php:617-624"
+    },
+    {
+      "flow_id": "wordpress-seo-obje-001",
+      "title": "Object Injection via maybe_unserialize on options table value - class-upgrade.php",
+      "verdict": "FALSE_POSITIVE",
+      "severity_claimed": "critical",
+      "severity_actual": "N/A",
+      "auth_required": true,
+      "confidence": "high",
+      "details": "The maybe_unserialize at line 1366 operates on data from $wpdb->options (a prepared SELECT). To exploit, an attacker would need to pre-poison the wp_options table with a malicious serialized payload, which requires database write access or admin-level access to inject options. The code runs only during plugin upgrade routines. NOT unauthenticated.",
+      "code_reference": "plugins/src/wordpress-seo/wordpress-seo/inc/class-upgrade.php:1357-1366"
+    },
+    {
+      "flow_id": "yoast-rest-statistics-endpoint",
+      "title": "REST API /yoast/v1/statistics requires 'read' capability (subscriber-level)",
+      "verdict": "INFORMATIONAL",
+      "severity_claimed": "medium",
+      "severity_actual": "low",
+      "auth_required": true,
+      "confidence": "high",
+      "details": "The /yoast/v1/statistics endpoint uses `current_user_can('read')` as permission_callback, meaning any logged-in subscriber can access SEO statistics. The data exposed is aggregate post counts by SEO score. Information disclosure only - no PII or sensitive data. The /yoast/v1/file_size endpoint correctly requires 'manage_options'. Verified live against http://localhost:8880/wp-json/yoast/v1/statistics - returns 401 without auth.",
+      "code_reference": "plugins/src/wordpress-seo/wordpress-seo/admin/endpoints/class-endpoint-statistics.php:32,71"
+    },
+    {
+      "flow_id": "yoast-xss-admin-ajax",
+      "title": "XSS flows in admin AJAX (xss-001, xss-002, xss-003) - authenticated admin context",
+      "verdict": "FALSE_POSITIVE",
+      "severity_claimed": "medium",
+      "severity_actual": "N/A",
+      "auth_required": true,
+      "confidence": "high",
+      "details": "Flows wordpress-seo-xss-001/002/003 in admin/ajax.php are marked auth_required=true and nonce_verified=true by the scanner itself. The output is JSON-encoded via WPSEO_Utils::format_json_encode(), which provides safe encoding for JSON context. The sink (wp_die with JSON) is not a DOM XSS vector since a JSON response consumed by JavaScript does not inject into the DOM without explicit innerHTML assignment. The XSS label from the taint engine is a false classification - JSON output is not an HTML sink. Not exploitable.",
+      "code_reference": "plugins/src/wordpress-seo/wordpress-seo/admin/ajax.php:302-311"
+    }
+  ],
+  "priority_findings_checked": {
+    "unauth_rest_api_access_to_seo_metadata": {
+      "verdict": "NOT FOUND",
+      "notes": "All /yoast/v1/* REST endpoints tested live - all require at minimum 'read' capability (authenticated user). No unauthenticated data disclosure confirmed."
+    },
+    "sql_injection_in_sitemap_queries": {
+      "verdict": "NOT FOUND",
+      "notes": "Sitemap query parameter flows (flow open-002) reach wp_safe_redirect which restricts to same-host URLs. The ?sitemap= query var feeds into home_url() construction and wp_safe_redirect() - open redirect limited to same origin. SQL injection in cleanup/upgrade SQL is not user-controlled."
+    },
+    "stored_xss_via_meta_descriptions": {
+      "verdict": "NOT FOUND",
+      "notes": "Meta description storage goes through WPSEO sanitization (sanitize_text_field, wp_strip_all_tags). Admin AJAX XSS flows are false positives as described. Unauth stored XSS path not found."
+    },
+    "unauth_sitemap_manipulation": {
+      "verdict": "NOT FOUND",
+      "notes": "Sitemap is generated and served from cached XML, not directly modifiable by unauthenticated requests."
+    }
+  }
+}

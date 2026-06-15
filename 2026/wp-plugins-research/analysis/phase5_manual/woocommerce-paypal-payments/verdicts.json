@@ -1,0 +1,85 @@
+{
+  "plugin": "woocommerce-paypal-payments",
+  "reviewed_at": "2026-06-14",
+  "reviewer_notes": "Reviewed all taint flows from briefing plus manually audited all nopriv AJAX handlers (Apple Pay validate/create_order/update_shipping_contact/update_shipping_method) and REST endpoints (ShippingCallbackEndpoint, IncomingWebhookEndpoint, store-sync agentic endpoints). Key findings: (1) ShippingCallbackEndpoint at /wp-json/paypal/v1/shipping-callback has verify_request() that unconditionally returns true — fully unauthenticated. Allows an unauthenticated attacker to invoke WooCommerce Store API cart updates. (2) SandboxAuthService skips JWT signature verification, allowing forged tokens when the merchant uses PayPal Sandbox mode. (3) Apple Pay nopriv handlers all require a valid WooCommerce checkout nonce — nonce is embedded in the page HTML, so user must visit checkout page first; exploitability limited. (4) RCE taint flow from HTTP_HOST is a false positive — the value is appended as a query param in an outbound HTTP request, not executed.",
+  "verdicts": [
+    {
+      "flow_id": "woocommerce-paypal-payments-rce-001",
+      "severity_reported": "critical",
+      "vulnerability_class": "rce",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source is $_SERVER['HTTP_HOST'] at SdkClientToken.php:76. After stripping 'www.' prefix, the value is appended as a query string parameter to a PayPal API URL: 'v1/oauth2/token?...&domains[]=' . $domain. This is an outbound HTTP request using wp_remote_post() to the PayPal API host (hardcoded as $this->host). The attacker can influence the 'domains[]' parameter sent to PayPal's own API, not any local code execution. There is no eval(), system(), shell_exec(), or similar sink here — only an HTTP request. At absolute worst this could cause an unexpected domain to be included in a PayPal token request, but this requires the attacker to control the HTTP_HOST header and only affects the token's allowed domains for PayPal JS SDK. Not RCE, not exploitable for command execution.",
+      "auth_required": false,
+      "exploitable": false,
+      "affected_file": "modules/ppcp-api-client/src/Authentication/SdkClientToken.php",
+      "affected_line": 76
+    },
+    {
+      "flow_id": "woocommerce-paypal-payments-open-001",
+      "severity_reported": "low",
+      "vulnerability_class": "open_redirect",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source is $_SERVER['REQUEST_URI'] processed through esc_url_raw(wp_unslash(...)) and remove_query_arg('cancelled', ...). Sink is wp_safe_redirect(home_url($clean_url)). wp_safe_redirect() enforces that the redirect URL is same-origin (same host) by design — it calls wp_validate_redirect() which limits redirect targets to allowed hosts. Since home_url() prepends the site's own host, an attacker controlling REQUEST_URI cannot redirect to an arbitrary external host. Even if an attacker could inject a malformed URL, wp_safe_redirect() would block off-site redirects. Not exploitable as open redirect.",
+      "auth_required": true,
+      "exploitable": false,
+      "affected_file": "modules/ppcp-local-alternative-payment-methods/src/LocalAlternativePaymentMethodsModule.php",
+      "affected_line": 240
+    },
+    {
+      "flow_id": "woocommerce-paypal-payments-MANUAL-001",
+      "severity_reported": "medium",
+      "vulnerability_class": "missing_authentication",
+      "verdict": "CONFIRMED",
+      "confidence": "high",
+      "reasoning": "ShippingCallbackEndpoint registers the REST route /wp-json/paypal/v1/shipping-callback with 'permission_callback' => [$this, 'verify_request']. The verify_request() method at line 36-38 unconditionally returns true with no authentication, nonce, or signature check of any kind. This endpoint is always registered when WCGatewayModule bootstraps (rest_api_init hook at WCGatewayModule.php:390). The handle_request() method accepts arbitrary POST data: (1) it reads 'cart_token' from the request and passes it as the 'cart-token' HTTP header to WooCommerce Store API's /wc/store/v1/cart/update-customer endpoint; (2) it reads shipping_address from POST data and updates the WooCommerce Store API cart customer address. An unauthenticated attacker who knows or can brute-force a valid WooCommerce cart token can update the shipping address of any active cart session. This is an authenticated action being performed without authentication — a cart hijacking / data manipulation vulnerability. The impact is data corruption/manipulation (changing another user's cart shipping address), not RCE. Severity: MEDIUM — requires a valid cart token, which is a random value but may be predictable or obtained via other means.",
+      "auth_required": false,
+      "exploitable": true,
+      "cve_type": "missing_authentication",
+      "affected_file": "modules/ppcp-wc-gateway/src/Endpoint/ShippingCallbackEndpoint.php",
+      "affected_line": 36,
+      "poc_sketch": "POST /wp-json/paypal/v1/shipping-callback HTTP/1.1\nHost: target.com\nContent-Type: application/json\n\n{\"id\":\"req1\",\"cart_token\":\"<valid_wc_cart_token>\",\"purchase_units\":[{\"reference_id\":\"default\"}],\"shipping_address\":{\"country_code\":\"US\",\"admin_area_1\":\"CA\",\"admin_area_2\":\"Los Angeles\",\"postal_code\":\"90001\"}}"
+    },
+    {
+      "flow_id": "woocommerce-paypal-payments-MANUAL-002",
+      "severity_reported": "high",
+      "vulnerability_class": "missing_authentication",
+      "verdict": "CONFIRMED",
+      "confidence": "high",
+      "reasoning": "SandboxAuthService (modules/ppcp-store-sync/src/Auth/SandboxAuthService.php) is used for ALL agentic commerce REST endpoints (POST /wp-json/wc/v3/agentic/merchant-cart, PUT .../merchant-cart/{cart_id}, POST .../merchant-cart/{cart_id}/checkout, GET .../merchant-cart/{cart_id}) when the merchant has PayPal Sandbox mode enabled (is_sandbox() returns true) AND the constant PPCP_AGENTIC_FULL_AUTH is not defined. In get_token(): the JWT is split on '.', the payload (second segment) is base64-decoded and JSON-decoded, but the SIGNATURE IS NEVER VERIFIED. Only verify_claims() checks that iss == 'paypal.com'. An attacker can forge a JWT by base64-encoding the header {\"alg\":\"none\"} and payload {\"iss\":\"paypal.com\",\"scope\":[\"cart\"]} with any signature or no signature at all — this JWT will pass authentication. This grants full access to create carts, replace carts, and most critically trigger checkout (POST .../checkout) which calls AgenticCheckoutProcessor to create a WC order and capture a PayPal payment. However, impact on sandbox stores is limited since no real money flows in sandbox. On production stores, JwtAuthService is used instead which properly verifies the signature against PayPal's JWKs. The vulnerability only affects sandbox-configured stores.",
+      "auth_required": false,
+      "exploitable": true,
+      "cve_type": "authentication_bypass",
+      "affected_file": "modules/ppcp-store-sync/src/Auth/SandboxAuthService.php",
+      "affected_line": 29,
+      "affected_condition": "Only exploitable when merchant is configured for PayPal Sandbox (is_sandbox() returns true) and PPCP_AGENTIC_FULL_AUTH constant is not defined",
+      "poc_sketch": "Craft JWT: base64url({\"alg\":\"none\"}) + '.' + base64url({\"iss\":\"paypal.com\",\"scope\":[\"cart\"]}) + '.' + '' . Send to POST /wp-json/wc/v3/agentic/merchant-cart with Authorization: Bearer <crafted_jwt>"
+    },
+    {
+      "flow_id": "woocommerce-paypal-payments-MANUAL-003",
+      "severity_reported": "info",
+      "vulnerability_class": "missing_authentication",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Apple Pay nopriv AJAX handlers (wp_ajax_nopriv_ppcp_validate, wp_ajax_nopriv_ppcp_create_order, wp_ajax_nopriv_ppcp_update_shipping_contact, wp_ajax_nopriv_ppcp_update_shipping_method) are all accessible without WP authentication (intended for guest checkout). However, all four handlers verify a WooCommerce checkout nonce ('woocommerce-process_checkout' action) from $_POST['woocommerce-process-checkout-nonce'] before processing any request data. The nonce is generated by wp_nonce_field() and embedded in the Apple Pay button HTML on the checkout/cart/product page. An unauthenticated attacker cannot forge this nonce without first loading the page as a legitimate visitor — which is the intended Apple Pay checkout flow. The create_wc_order handler has a phpcs:disable comment at line 173, but the actual nonce check is performed inside order_data() at line 214 of ApplePayDataObjectHttp.php. When nonce is invalid, order_data() returns early without populating data or setting errors; however process_checkout() is still called with empty address data, which WooCommerce's own validation then rejects. No exploitable path exists for order creation without a valid nonce.",
+      "auth_required": false,
+      "exploitable": false,
+      "affected_file": "modules/ppcp-applepay/src/Assets/ApplePayButton.php",
+      "affected_line": 64
+    },
+    {
+      "flow_id": "woocommerce-paypal-payments-MANUAL-004",
+      "severity_reported": "info",
+      "vulnerability_class": "missing_authentication",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "IncomingWebhookEndpoint at /wp-json/paypal/v1/incoming has a configurable verify_request mechanism. When $this->verify_request (bool) is true (default), it uses the PayPal Webhook verification API (webhook_endpoint->verify_current_request_for_webhook()) to cryptographically verify the request signature against PayPal's stored webhook. When $this->verify_request is false (development/test mode), the endpoint is open — but this is a deliberate developer configuration, not a default insecure state. Even when open, the endpoint only processes incoming PayPal webhook events (order status updates, subscription events), which an attacker could potentially forge to trigger order status changes. However, in default production configuration, PayPal signature verification is enabled. Marking as FALSE_POSITIVE for the default production case; note a misconfigured (verify_request=false) deployment is a valid security concern but configuration-dependent.",
+      "auth_required": false,
+      "exploitable": false,
+      "affected_file": "modules/ppcp-webhooks/src/IncomingWebhookEndpoint.php",
+      "affected_line": 125,
+      "note": "If deployed with verify_request=false, webhook spoofing becomes possible — orders could be marked as paid without real payment."
+    }
+  ]
+}

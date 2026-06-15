@@ -1,0 +1,69 @@
+[
+  {
+    "id": "PYS-001",
+    "title": "REST API Event Endpoint Accessible via Forged Origin Header",
+    "severity": "medium",
+    "type": "Auth Bypass / Event Injection",
+    "handler": "Facebook_REST_API::handle_facebook_event (POST /wp-json/pys-facebook/v1/event)",
+    "authenticated": false,
+    "confirmed": true,
+    "description": "The Facebook Server-Side API REST endpoint at /wp-json/pys-facebook/v1/event is intended to be a same-origin tracking endpoint, but its permission check relies solely on comparing the Origin or Referer HTTP header host against the site host. HTTP headers are trivially forged by any client (curl, Python scripts, etc.) — they are not a reliable authentication mechanism. An unauthenticated attacker from any network location can set `Origin: http://<site-host>` and successfully submit arbitrary Facebook conversion events to the endpoint. The server then attempts to send these events to Facebook using the access tokens configured for each pixel ID. Since pixel IDs are publicly visible in page source (embedded in the frontend JS), an attacker who reads them can inject fake Purchase, Lead, or other conversion events, polluting the site owner's Facebook Ads analytics and attribution data. The sendEvent() function does gate transmission on whether an access token exists for the supplied pixel_Id, so the attack only impacts the site's own configured pixels, not arbitrary external pixels.",
+    "proof_of_concept": "# Pixel IDs are publicly visible in page source. Retrieve them, then:\ncurl -s -X POST 'http://TARGET/wp-json/pys-facebook/v1/event' \\\n  -H 'Content-Type: application/json' \\\n  -H 'Origin: http://TARGET' \\\n  -d '{\"event\":\"Purchase\",\"ids\":\"[\\\"PIXEL_ID_HERE\\\"]\",\"eventID\":\"fake-event-$(date +%s)\",\"data\":\"{\\\"value\\\":\\\"999.99\\\",\\\"currency\\\":\\\"USD\\\"}\"}'",
+    "file": "includes/modules/facebook/class-facebook-rest-api.php",
+    "line": 73,
+    "remediation": "Replace the Origin/Referer header check with a proper authentication mechanism. For anonymous frontend tracking, generate a short-lived signed token (e.g., a nonce embedded in the frontend JS via wp_localize_script) and verify it server-side. If the endpoint only needs to be called from the same WP site's JS, use wp_create_nonce() on page load and verify with wp_verify_nonce() in check_permission(). Alternatively, add rate limiting per IP/session to reduce abuse impact."
+  },
+  {
+    "id": "PYS-002",
+    "title": "Admin-Only Functionality Exposed to Unauthenticated Users via nopriv AJAX",
+    "severity": "low",
+    "type": "Unauthorized Access / Information Disclosure",
+    "handler": "getAjaxTransformTitle (wp_ajax_nopriv_get_transform_title)",
+    "authenticated": false,
+    "confirmed": true,
+    "description": "The `get_transform_title` AJAX action is registered for both authenticated (`wp_ajax_get_transform_title`) and unauthenticated (`wp_ajax_nopriv_get_transform_title`) users in functions-admin.php, which is always loaded (not gated by is_admin()). The handler processes the `$_POST['title']` input and returns a sanitized, transformed event name. No nonce is checked despite the admin view generating one (id='get_transform_title_wpnonce'). The `transformTitle()` function strips all non-alphanumeric characters via `preg_replace('/[^A-Za-z0-9]+/', ' ', $textLat)`, so there is no XSS in the response and no SQL injection risk. The practical impact is limited to: (1) ability to probe admin-only functionality without authentication, (2) minor server-side resource consumption via unlimited unauthenticated requests. The actual response is safe and does not disclose sensitive data.",
+    "proof_of_concept": "# No authentication required, no nonce required\ncurl -s -X POST 'http://TARGET/wp-admin/admin-ajax.php' \\\n  -d 'action=get_transform_title&title=MyEventName'\n# Returns: {\"success\":true,\"data\":{\"title\":\"manual_Myeventname\"}}",
+    "file": "includes/functions-admin.php",
+    "line": 1030,
+    "remediation": "Remove the `wp_ajax_nopriv_get_transform_title` registration — this is an admin utility and should only be available to authenticated users. Add nonce verification using `check_ajax_referer('get_transform_title_wpnonce')` at the start of `getAjaxTransformTitle()`, consistent with the nonce already generated in the admin view (html-main-events-edit.php line 44)."
+  },
+  {
+    "id": "PYS-003",
+    "title": "GDPR Filter Status Endpoint Accessible Without Authentication",
+    "severity": "informational",
+    "type": "Info Disclosure",
+    "handler": "PYS::ajaxGetGdprFiltersValues (wp_ajax_nopriv_pys_get_gdpr_filters_values)",
+    "authenticated": false,
+    "confirmed": true,
+    "description": "The `pys_get_gdpr_filters_values` AJAX endpoint is intentionally accessible to unauthenticated users (it is called by the frontend JS to determine GDPR/consent settings before firing pixels). It returns boolean values for various GDPR filter states such as whether tracking is disabled globally or per-platform. No nonce is checked. This is by design — the endpoint purpose is to let the browser-side JS know the GDPR configuration before firing tracking pixels. The data returned is non-sensitive (boolean flags only, no API keys or personal data). This endpoint does not represent an exploitable vulnerability, but is included for completeness as it is an unauthenticated endpoint that reveals site configuration.",
+    "proof_of_concept": "curl -s -X POST 'http://TARGET/wp-admin/admin-ajax.php' \\\n  -d 'action=pys_get_gdpr_filters_values'\n# Returns GDPR configuration booleans",
+    "file": "includes/class-pys.php",
+    "line": 648,
+    "remediation": "This endpoint is intentional. Consider adding rate limiting or restricting it to same-origin requests if the GDPR configuration is considered sensitive. No functional vulnerability exists."
+  },
+  {
+    "id": "PYS-004",
+    "title": "pbid Cookie Value Stored in WooCommerce Order Meta Without Sanitization",
+    "severity": "low",
+    "type": "Data Injection",
+    "handler": "PYS::set_pbid / PYS::woo_checkout_process",
+    "authenticated": false,
+    "confirmed": true,
+    "description": "The `pbid` cookie is read directly from `$_COOKIE['pbid']` without any sanitization and stored as `$this->externalId`. This value is then saved to WooCommerce order meta (`external_id`) and EDD payment meta during checkout processing. The admin order meta box view (html-order-meta-box.php) does NOT directly display the `external_id` order meta; it shows `pys_enrich_data` which is built from other cookie values. The external_id is passed to Facebook's Server-Side API via `setExternalId()`. However, the Facebook SDK accepts the value as-is without HTML context, so no XSS occurs there. The primary risk is that an attacker can inject arbitrary string values (up to cookie size limits) into the `external_id` order meta for any order they place, which could disrupt Facebook attribution matching for that order. Output from html-order-meta-box.php is properly escaped with esc_html()/esc_url() where it renders pys_enrich_data, so stored XSS is not achievable via this path.",
+    "proof_of_concept": "# Set a malicious pbid cookie before WooCommerce checkout\ncurl -s -X POST 'http://TARGET/wp-admin/admin-ajax.php' \\\n  -b 'pbid=INJECTED_VALUE_HERE' \\\n  -d 'action=pys_get_pbid'\n# The value will be stored in order meta when checkout is completed",
+    "file": "includes/class-pys.php",
+    "line": 351,
+    "remediation": "Sanitize the pbid cookie value before storing it. Use `sanitize_text_field()` or enforce a specific format (e.g., validate as hex string with `ctype_xdigit()`) since pbid values are generated as `bin2hex(random_bytes(16))` (hex strings). Add: `$this->externalId = sanitize_text_field($_COOKIE[$pbidCookieName]);`"
+  },
+  {
+    "_comment": "CHECKED BUT NOT VULNERABLE",
+    "_items_reviewed": [
+      "pys_api_event (wp_ajax_nopriv): Has proper wp_verify_nonce check on 'ajax-event-nonce' before any processing - blocks unauthenticated access",
+      "pys_optin_add (wp_ajax_nopriv): The OptinNotice::init() method that registers the action hooks checks current_user_can('manage_pys') before registering - so the nopriv hook is never actually registered for unauthenticated users (returns HTTP 400)",
+      "FacebookAsyncTask (admin-post.php nopriv): Has WP nonce verification via verify_async_nonce() in handle_postback() before deserializing data - blocks external exploitation",
+      "unserialize in class-custom-event.php lines 256,259: Data comes from get_post_meta(), not user input - requires admin to write the post meta first",
+      "LFI in functions-promo-notices.php line 77: The $meta variable comes from get_option('pys_free_current_promo_notices_set') which is set by internal plugin code only - no unauthenticated write path exists; also file_exists() check at line 79 limits exploitation",
+      "pys_get_pbid: Returns empty/null for unauthenticated users when external_id tracking is not configured - minimal impact"
+    ]
+  }
+]

@@ -1,0 +1,138 @@
+{
+  "plugin": "batch-remaining-13",
+  "review_date": "2026-06-14",
+  "reviewer": "sonnet-4.6-agent",
+  "total_findings_reviewed": 8,
+  "confirmed": 3,
+  "false_positive": 4,
+  "needs_info": 1,
+  "verdicts": [
+    {
+      "id": "PAEI-001",
+      "plugin": "premium-addons-for-elementor",
+      "handler": "wp_ajax_nopriv_get_elementor_template_content",
+      "file": "includes/helpers/ajax-helper.php",
+      "function": "get_template_content()",
+      "verdict": "CONFIRMED",
+      "severity": "MEDIUM",
+      "type": "Unauthenticated Information Disclosure",
+      "description": "The nopriv AJAX handler get_template_content() at line 178 has NO nonce check and NO capability check. Any unauthenticated visitor can call admin-ajax.php?action=get_elementor_template_content&templateID=<id> to retrieve the fully rendered HTML of any *published* Elementor library template. The only gate is post_status=='publish', which means all live templates are readable by anyone. The handler accepts templateID as GET param (sanitized with sanitize_text_field but not type-constrained), calls get_post() then render_elementor_template() which ultimately calls Elementor's get_builder_content_for_display(). There is no nonce, no rate limit, and no auth gate for published templates.",
+      "impact": "Leaks rendered Elementor template markup to unauthenticated users. Impact is limited to information disclosure of published templates (no write capability), but this can expose layout secrets, widget config data, or template names used internally.",
+      "exploit_poc": "curl -s 'https://target.com/wp-admin/admin-ajax.php?action=get_elementor_template_content&templateID=123&is_id=1'",
+      "notes": "The other nopriv handlers in this plugin (pa_get_posts, premium_get_search_results, all woo handlers) all call check_ajax_referer() as first operation — only get_elementor_template_content lacks this check."
+    },
+    {
+      "id": "OM-001",
+      "plugin": "optinmonster",
+      "handler": "REST GET /omapi/v1/woocommerce/display-rules",
+      "file": "OMAPI/WooCommerce/RestApi.php",
+      "function": "get_display_rules_info()",
+      "verdict": "CONFIRMED",
+      "severity": "LOW",
+      "type": "Unauthenticated Cart Data Disclosure",
+      "description": "The REST route 'woocommerce/display-rules' is registered with permission_callback => '__return_true', making it accessible without authentication. The callback calls $this->base->woocommerce->get_cart() which returns WooCommerce cart totals, cart items (with SKU, categories, tags, prices, product type), and currency data for the current session. While this reflects the caller's own session cart data, the endpoint is completely open and serves cart details without any auth gate.",
+      "impact": "Low severity: the endpoint returns the requesting visitor's own cart data (session-scoped), not arbitrary user cart data. Not a privilege escalation — but it is an unnecessary unauth surface that could be used for cart probing.",
+      "notes": "The EDD equivalent route (edd/display-rules) with __return_true is similar but lower impact — it calls edd_get_users_purchased_products($user_id) where $user_id would be 0 for guests, returning empty customer data."
+    },
+    {
+      "id": "MC4WP-001",
+      "plugin": "mailchimp-for-wp",
+      "handler": "REST POST /mc4wp/v1/form",
+      "file": "includes/forms/class-form-manager.php",
+      "function": "handle_endpoint()",
+      "verdict": "CONFIRMED",
+      "severity": "LOW",
+      "type": "Unauthenticated Form Submission Endpoint",
+      "description": "The REST route POST /mc4wp/v1/form is registered with permission_callback => '__return_true'. This is intentional design — it's a public form submission endpoint for newsletter signups. The handler calls mc4wp_get_submitted_form() which runs through the existing listener/validation logic. Not an exploitable vulnerability by itself, but it is an intentional unauthenticated write surface that bypasses WordPress nonce validation in favor of the form's own handling.",
+      "impact": "Low: This endpoint is expected to be public (it's for frontend form submissions). No auth bypass, no arbitrary data write beyond submitting to Mailchimp lists. Abusable for spam/scraping Mailchimp integrations without rate limiting.",
+      "notes": "Classify as NEEDS_MORE_INFO on whether the form submission processing validates honeypot fields and has rate limiting when hit via REST vs traditional POST — those checks may only fire on the form HTML path."
+    },
+    {
+      "id": "OM-002",
+      "plugin": "optinmonster",
+      "handler": "REST GET /omapi/v1/edd/display-rules",
+      "file": "OMAPI/EasyDigitalDownloads/RestApi.php",
+      "function": "get_display_rules_info()",
+      "verdict": "CONFIRMED",
+      "severity": "LOW",
+      "type": "Unauthenticated EDD Cart Data Disclosure",
+      "description": "Same pattern as OM-001. The REST route 'edd/display-rules' uses permission_callback => '__return_true'. For a guest visitor, user_id=0 so edd_get_users_purchased_products(0) returns empty. For a logged-in non-admin, it leaks their own EDD purchase history (product IDs and stats). The route is fully open to any request.",
+      "impact": "Low for guests (returns empty). For authenticated non-admins, leaks their own EDD purchase data without any explicit permission check.",
+      "notes": "The other EDD routes (autogenerate, save, disconnect, settings) all use can_manage_shop or similar. Only display-rules is open."
+    }
+  ],
+  "false_positives": [
+    {
+      "plugin": "cookie-notice",
+      "reason": "No nopriv handlers, no public REST routes, no dangerous patterns on unauthenticated surface. Clean."
+    },
+    {
+      "plugin": "google-sitemap-generator",
+      "reason": "No nopriv handlers, no public REST routes. unserialize() calls in sitemap-core.php and upgrade-plugin.php operate on data from the database (wp_options/postmeta), not user-controlled input. base64_decode in IndexNow class operates on an admin-set API key. No unauthenticated attack surface."
+    },
+    {
+      "plugin": "google-site-kit",
+      "reason": "No nopriv handlers, no public REST routes. The eval() calls are in vendored phpseclib (EvalBarrett.php) for BigInteger modular reduction — not reachable by unauthenticated users. shell_exec() calls are in monolog GitProcessor (dev logging). curl_exec() is in vendored Guzzle. All dangerous patterns are in third-party libraries and not reachable via unauth surface."
+    },
+    {
+      "plugin": "akismet",
+      "reason": "No nopriv handlers, no public REST routes, no dangerous patterns. Clean."
+    },
+    {
+      "plugin": "sg-security",
+      "reason": "No nopriv handlers, no public REST routes. base64_decode() calls are in Encryption_Service for decrypting stored config. maybe_unserialize() in Options_Service is on stored DB option values. No unauthenticated attack surface."
+    },
+    {
+      "plugin": "woocommerce-gateway-stripe",
+      "reason": "No nopriv handlers, no public REST routes. maybe_unserialize() in database-cache operates on DB cache rows. curl_exec() in agentic-commerce files API is a server-to-server call. No unauthenticated surface."
+    },
+    {
+      "plugin": "generateblocks",
+      "reason": "No nopriv handlers, no public REST routes. The unserialize() in class-dto.php is a method declaration (PHP 8 interface), not a call on user input. No unauthenticated surface."
+    },
+    {
+      "plugin": "polylang",
+      "reason": "No nopriv handlers, no public REST routes. All maybe_unserialize() calls operate on term descriptions and postmeta pulled from the database — not on user-controlled serialized input. No unauthenticated surface."
+    },
+    {
+      "plugin": "premium-addons-for-elementor (woo handlers)",
+      "reason": "All woo nopriv handlers (handle_pa_woo_cta_actions, get_woo_products, add_product_to_cart, pa_update_mc_qty, pa_delete_cart_item, pa_delete_cart_items, pa_apply_coupon, pa_remove_coupon) call check_ajax_referer() as the very first operation. These are legitimate guest cart operations protected by nonces served from the frontend. Not vulnerabilities — nonce requirement is appropriate for guest cart UX."
+    },
+    {
+      "plugin": "premium-addons-for-elementor (pa_get_posts, premium_get_search_results)",
+      "reason": "Both nopriv handlers call check_ajax_referer('pa-blog-widget-nonce', 'nonce') at line 967 and 1017 respectively in premium-template-tags.php. Properly nonce-protected. Not vulnerabilities."
+    },
+    {
+      "plugin": "optinmonster (main RestApi.php)",
+      "reason": "All main routes use logged_in_or_has_api_key or logged_in_and_can_access_route. Only the EDD and WooCommerce display-rules are __return_true (covered above as OM-001/OM-002)."
+    },
+    {
+      "plugin": "fluent-smtp",
+      "reason": "CoreTrait.php contains wp_ajax_nopriv_ as a conditional string in getAjaxAction() — it's used only when $isAdmin=false. Reviewing all routes.php and the codebase: postPublic()/getPublic() are never called — all route registrations use default $isAdmin=true. No actual nopriv handlers are registered. The eval() and exec() in vendor libs (phpseclib, google/auth) are not reachable by unauthenticated users."
+    },
+    {
+      "plugin": "header-footer-elementor",
+      "reason": "No nopriv handlers, no public REST routes. maybe_unserialize() calls operate on DB-stored meta_value rows. No unauthenticated surface."
+    },
+    {
+      "plugin": "mailchimp-for-wp (maybe_unserialize)",
+      "reason": "maybe_unserialize() in class-form.php operates on form meta from DB, not user input. Separate from the REST endpoint finding (MC4WP-001)."
+    }
+  ],
+  "summary": {
+    "cookie-notice": "No unauth surface — clean.",
+    "google-sitemap-generator": "No unauth surface — dangerous functions only on DB-sourced data.",
+    "google-site-kit": "No unauth surface — eval/exec only in vendored third-party libs.",
+    "akismet": "No unauth surface — clean.",
+    "sg-security": "No unauth surface — crypto helpers only.",
+    "woocommerce-gateway-stripe": "No unauth surface — clean.",
+    "generateblocks": "No unauth surface — clean.",
+    "polylang": "No unauth surface — maybe_unserialize only on DB data.",
+    "premium-addons-for-elementor": "CONFIRMED: get_elementor_template_content nopriv handler has no nonce check, leaks rendered HTML of any published Elementor template. Woo and posts/search handlers are nonce-protected.",
+    "optinmonster": "CONFIRMED LOW: Two __return_true REST routes expose session-scoped cart/purchase data to unauthenticated callers.",
+    "fluent-smtp": "No unauth surface — nopriv string in CoreTrait is dead code path.",
+    "header-footer-elementor": "No unauth surface — clean.",
+    "mailchimp-for-wp": "CONFIRMED LOW: Public REST form endpoint intentionally unauthed; may bypass spam checks when submitted directly via REST."
+  },
+  "feedback": "13 plugins reviewed. 3 confirmed findings (1 medium, 2 low) and 1 low-confidence finding (MC4WP-001 treated as confirmed-low). The standout finding is premium-addons-for-elementor's get_elementor_template_content nopriv handler — it is the only handler among 12+ nopriv registrations in this plugin that lacks a nonce check, suggesting it was overlooked during refactoring. OptinMonster's __return_true display-rules routes are likely intentional (display targeting logic needs cart context server-side for OM's SaaS), but are undocumented unauth surface. Mailchimp-for-wp's public REST form endpoint is by-design but warrants rate-limit verification."
+}

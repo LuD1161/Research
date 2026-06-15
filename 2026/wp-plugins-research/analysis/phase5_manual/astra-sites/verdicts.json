@@ -1,0 +1,66 @@
+{
+  "plugin": "astra-sites",
+  "reviewed_by": "manual-security-agent",
+  "review_date": "2026-06-14",
+  "summary": "No unauthenticated vulnerabilities found. All AJAX handlers and REST API endpoints require both a valid nonce and an appropriate capability (manage_options, edit_posts, manage_ast_block_templates, or customize). The single nopriv AJAX handler (WP Background Processing library) requires a server-generated nonce and only processes queue items pushed by authenticated admins. Several low-severity authenticated issues identified.",
+  "unauthenticated_vulns": [],
+  "authenticated_vulns": [
+    {
+      "id": "astra-sites-csrf-001",
+      "severity": "low",
+      "confidence": "medium",
+      "vulnerability_class": "missing_nonce_check",
+      "title": "Missing nonce check in get_all_sites, get_all_categories, get_all_categories_and_tags AJAX handlers",
+      "description": "The three AJAX handlers wp_ajax_astra-sites-get-all-sites, wp_ajax_astra-sites-get-all-categories, and wp_ajax_astra-sites-get-all-categories-and-tags in class-astra-sites-batch-processing.php check capability (customize) but do NOT call check_ajax_referer(). This allows CSRF for any user with the 'customize' capability. However, the handlers only return read-only data from server-side JSON files (the template/block library cache), so the actual impact is information disclosure of template metadata — not a write operation. No sensitive user data is exposed.",
+      "affected_file": "inc/importers/batch-processing/class-astra-sites-batch-processing.php",
+      "affected_lines": [1024, 1044, 1062],
+      "exploitable_without_auth": false,
+      "minimum_capability": "customize",
+      "impact": "read-only disclosure of cached template library data (non-sensitive)",
+      "cvss_estimate": "3.1",
+      "recommendation": "Add check_ajax_referer('astra-sites', '_ajax_nonce') at the start of each handler"
+    },
+    {
+      "id": "astra-sites-info-001",
+      "severity": "low",
+      "confidence": "high",
+      "vulnerability_class": "sensitive_data_exposure",
+      "title": "Auth token exposed to administrator via check_auth_status AJAX handler",
+      "description": "The wp_ajax_ast_block_templates_check_auth_status handler in plugin.php reads zip_ai_settings['auth_token'] from the options table and returns it in the JSON response. While this is gated behind manage_ast_block_templates (admins only), an admin CSRF could cause the token to be exfiltrated if admin makes a request. In practice admins can already read options directly, so this is extremely low risk.",
+      "affected_file": "inc/lib/gutenberg-templates/inc/importer/plugin.php",
+      "affected_lines": [844, 863],
+      "exploitable_without_auth": false,
+      "minimum_capability": "manage_ast_block_templates (administrator)",
+      "impact": "Exposes ZipWP auth token to admins — minimal since admins have DB access anyway",
+      "cvss_estimate": "2.0",
+      "recommendation": "Avoid returning full auth_token in AJAX response; return only is_authenticated boolean"
+    },
+    {
+      "id": "astra-sites-lfi-001-fp",
+      "severity": "informational",
+      "confidence": "high",
+      "vulnerability_class": "false_positive",
+      "title": "Taint flow astra-sites-lfi-001 is a false positive",
+      "description": "The automated analysis flagged require_once $plugin_main_file at line 1228 of class-astra-sites-importer.php as a local file inclusion via user input. Manual review confirms the $plugin_main_file value is either constructed from hardcoded plugin paths (e.g., 'wpforms-lite/wpforms.php', 'cartflows/cartflows.php') passed by internal callers, or from $plugin_file passed as a literal string constant — never from user-controlled $_POST/$_GET data. No exploitable LFI exists.",
+      "affected_file": "inc/classes/class-astra-sites-importer.php",
+      "affected_lines": [1228],
+      "exploitable_without_auth": false,
+      "recommendation": "No action required; document as false positive"
+    }
+  ],
+  "nopriv_handler_analysis": {
+    "handler": "wp_ajax_nopriv_{prefix}_image_process / {prefix}_background_process",
+    "file": "inc/lib/starter-templates-importer/importer/helpers/wp-async-request.php",
+    "verdict": "safe",
+    "explanation": "The nopriv handler is the standard WP Background Processing library pattern. It calls check_ajax_referer($this->identifier, 'nonce') before executing. The nonce is generated server-side via wp_create_nonce() and passed internally via wp_remote_post() with the current user cookies. An unauthenticated attacker cannot generate a valid nonce for this identifier. Additionally, the background process handler checks is_process_running() and is_queue_empty() before the nonce check — an empty queue causes immediate wp_die(). Queue items are only added by authenticated admin users, so even if nonce were bypassed, there would be nothing exploitable to process."
+  },
+  "ssrf_analysis": {
+    "verdict": "mitigated",
+    "explanation": "The api_request() handler accepts a $url parameter from POST but prepends it to the hardcoded API domain (websitedemos.net) making it a path extension, not a free URL. The constructed URL is then validated against an allowlist via astra_sites_is_valid_url(). The download_and_validate_import_data() private method also calls astra_sites_is_valid_url() which validates against websitedemos.net and a small set of trusted CDN hosts. The template_importer() in template-kit-importer.php validates via Plugin::is_valid_url() which only allows AST_BLOCK_TEMPLATES_LIBRARY_URL. No SSRF is possible."
+  },
+  "rest_api_analysis": {
+    "verdict": "properly_secured",
+    "total_routes_checked": 35,
+    "permission_callback_pattern": "All routes use get_item_permissions_check() or equivalent which verifies current_user_can('manage_options') or current_user_can('manage_ast_block_templates'). No routes use __return_true or have missing permission_callback."
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "plugin": "gtranslate",
+  "reviewed_at": "2026-06-14",
+  "reviewer": "phase5-manual",
+  "verdicts": [
+    {
+      "flow_id": "gtranslate-xss-001",
+      "severity_reported": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "XSS via language switcher output - shortcodes and widget",
+      "reasoning": "All output in render_shortcode, render_single_item, and get_widget_code is properly escaped using esc_attr(), esc_html(), esc_url(), and wp_kses_post(). The widget settings are passed through json_encode() into a <script> block. While PHP json_encode() without JSON_HEX_TAG does not encode < and > characters, it does encode the forward slash in '</' to '<\/' which prevents premature script tag closure. The custom_css field is also sanitized via wp_kses_post() before being json_encoded. No unescaped user-controlled data reaches HTML output in the frontend.",
+      "auth_required": false,
+      "exploitable": false,
+      "exploit_notes": "N/A - all output paths are properly escaped",
+      "cvss_estimate": "N/A"
+    },
+    {
+      "flow_id": "gtranslate-redirect-001",
+      "severity_reported": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "Open redirect in url_addon/gtranslate.php via gurl parameter",
+      "reasoning": "When the pro_version URL proxy is active and glang equals the main language, a redirect is issued to $page_url = '/' . $_GET['gurl']. Since the URL always begins with '/', it cannot point to an external domain. The rawurlencode() applied per path segment also prevents injection of protocol-relative URLs. The constructed page_url can only redirect to a path on the same origin. Additionally, the url_addon/gtranslate.php file returns HTTP 403 when accessed directly and is only triggered via WP routing when a valid language-prefixed URL is matched.",
+      "auth_required": false,
+      "exploitable": false,
+      "exploit_notes": "Cannot produce an external Location header - page_url always starts with '/'",
+      "cvss_estimate": "N/A"
+    },
+    {
+      "flow_id": "gtranslate-redirect-002",
+      "severity_reported": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "Open redirect via gt_auto_switch_to debug parameter",
+      "reasoning": "The $_GET['gt_auto_switch_to'] parameter (lines 2371-2372) overrides the Accept-Language detection for debugging. However, the resulting $accept_language value is checked via in_array($accept_language, $allowed_languages) before any redirect is issued (line 2379). The allowed_languages list is composed of admin-configured valid language codes from a fixed set. Additionally, the redirect target is always home_url() . '/' . $accept_language . '/' which is fully server-controlled and cannot be an external URL. This parameter is also gated by pro_version/enterprise_version AND detect_browser_language settings, and requires the request path to equal the site root.",
+      "auth_required": false,
+      "exploitable": false,
+      "exploit_notes": "in_array() check constrains value to valid predefined language codes; redirect target is always internal",
+      "cvss_estimate": "N/A"
+    },
+    {
+      "flow_id": "gtranslate-nopriv-001",
+      "severity_reported": "info",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "Unauthenticated AJAX handlers (wp_ajax_nopriv_)",
+      "reasoning": "No wp_ajax_nopriv_ hooks were found anywhere in the plugin codebase. The plugin does not register any nopriv AJAX endpoints.",
+      "auth_required": false,
+      "exploitable": false,
+      "exploit_notes": "N/A - no nopriv AJAX handlers exist",
+      "cvss_estimate": "N/A"
+    },
+    {
+      "flow_id": "gtranslate-rest-001",
+      "severity_reported": "info",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "Unauthenticated REST API endpoints",
+      "reasoning": "No register_rest_route() calls were found in the plugin. The only REST-related code is a rest_prepare_post and rest_prepare_category filter (lines 2355-2356) that adds translation hints to existing WP REST API responses, but does not register new endpoints or bypass authentication.",
+      "auth_required": false,
+      "exploitable": false,
+      "exploit_notes": "N/A - no custom REST routes registered",
+      "cvss_estimate": "N/A"
+    },
+    {
+      "flow_id": "gtranslate-injection-001",
+      "severity_reported": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "Unauth translation injection / modification",
+      "reasoning": "GTranslate uses Google Translate via a CDN proxy (gtranslate.net). Translations are fetched in real-time from the CDN and not cached server-side by the plugin. There is no mechanism for unauthenticated users to inject or modify translation content stored in the WordPress database. The plugin settings (languages, API config) are admin-only and protected by check_admin_referer() with nonce validation.",
+      "auth_required": false,
+      "exploitable": false,
+      "exploit_notes": "N/A",
+      "cvss_estimate": "N/A"
+    },
+    {
+      "flow_id": "gtranslate-urlparam-001",
+      "severity_reported": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "URL parameter injection via REQUEST_URI in script attributes",
+      "reasoning": "The REQUEST_URI is used in add_script_attributes() (line 248) as data-gt-orig-url attribute, but it is escaped with esc_attr() (line 252) before output. No other URL parameters are reflected into HTML output without escaping. The lang/gl/language parameters in the URL do not correspond to any query parameters that GTranslate reads for HTML output.",
+      "auth_required": false,
+      "exploitable": false,
+      "exploit_notes": "esc_attr() applied to REQUEST_URI - injection not possible",
+      "cvss_estimate": "N/A"
+    },
+    {
+      "flow_id": "gtranslate-debug-file-001",
+      "severity_reported": "low",
+      "verdict": "NEEDS_INVESTIGATION",
+      "confidence": "medium",
+      "title": "debug.txt file publicly accessible when debug mode enabled",
+      "reasoning": "The file /wp-content/plugins/gtranslate/url_addon/debug.txt is publicly accessible (HTTP 200 confirmed in test environment). When email_translation_debug or the $debug flag in config.php is enabled, sensitive curl verbose output, translated email content, and HTTP headers are written to this file. The plugin shows admin notices warning about this but does not prevent public access by default. In the test environment the file was empty (0 bytes), so no exploitation occurred. However, the lack of .htaccess protection is a security concern when debug is enabled.",
+      "auth_required": false,
+      "exploitable": true,
+      "exploit_notes": "Only exploitable when debug mode is explicitly enabled by admin. In normal operation (debug=false) the file is empty. An attacker could read translated WooCommerce email content and HTTP headers. Mitigation: add .htaccess rule to block access to debug.txt.",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:N (2.6 Low) - conditional on admin enabling debug"
+    },
+    {
+      "flow_id": "gtranslate-http-host-001",
+      "severity_reported": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "medium",
+      "title": "HTTP_X_GT_LANG header manipulation in allowed_redirect_hosts",
+      "reasoning": "In enterprise_version mode (line 2735), the HTTP_X_GT_LANG request header is used to add a hostname to the allowed_redirect_hosts filter. An attacker sending X-GT-Lang: evil.com would add 'evil.com.{hostname}' to the whitelist. However, this only expands wp_safe_redirect() permissions and does not itself cause a redirect. A separate vulnerability would be needed to exploit the expanded whitelist. Additionally, this code path requires enterprise_version to be enabled. The header value is used in HTTP Host forwarding to the trusted CDN but not in the actual curl target URL.",
+      "auth_required": false,
+      "exploitable": false,
+      "exploit_notes": "Requires enterprise_version + a separate exploitable wp_safe_redirect() call with attacker-controlled URL to chain into open redirect",
+      "cvss_estimate": "N/A standalone"
+    }
+  ],
+  "summary": {
+    "total_flows_reviewed": 9,
+    "confirmed": 0,
+    "false_positives": 8,
+    "needs_more_investigation": 1,
+    "critical_confirmed": 0,
+    "high_confirmed": 0,
+    "key_findings": [
+      "No wp_ajax_nopriv_ handlers found - AJAX attack surface does not exist",
+      "No register_rest_route() calls - no custom REST endpoints",
+      "All shortcode/widget HTML output is properly escaped with esc_attr(), esc_html(), esc_url(), wp_kses_post()",
+      "url_addon/gtranslate.php redirect cannot target external domains - page_url always starts with '/'",
+      "gt_auto_switch_to debug parameter is constrained by in_array() check against predefined language codes",
+      "json_encode() without JSON_HEX_TAG: mitigated because '</' is encoded to '<\\/' preventing </script> injection",
+      "debug.txt is publicly accessible (0 bytes in test env) but only contains sensitive data when debug mode explicitly enabled by admin",
+      "HTTP_X_GT_LANG header manipulation only expands allowed_redirect_hosts in enterprise mode; not independently exploitable",
+      "Plugin v3.1.1 shows strong security awareness: nonce checks on settings, sanitize_text_field/intval/in_array validation on all admin inputs"
+    ]
+  }
+}

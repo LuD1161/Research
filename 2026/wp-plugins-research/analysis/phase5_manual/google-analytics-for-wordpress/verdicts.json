@@ -1,0 +1,85 @@
+{
+  "plugin": "google-analytics-for-wordpress",
+  "reviewed_at": "2026-06-14",
+  "reviewer": "phase5-manual",
+  "verdicts": [
+    {
+      "flow_id": "monsterinsights-nopriv-001",
+      "severity_reported": "high",
+      "verdict": "CONFIRMED",
+      "confidence": "high",
+      "title": "Unauthenticated Write to wp_options via monsterinsights_push_mp_token with Empty-Key HMAC Bypass",
+      "reasoning": "The handler handle_relay_mp_token_push() is registered as wp_ajax_nopriv and has no nonce or authentication check. It validates a request via HMAC-MD5 signed with the site's stored 'public key' (the auth profile's 'key' field). When the site is not yet connected to MonsterInsights (i.e., no auth profile set), get_key() returns an empty string ''. hash_hmac('md5', data, '') computes a valid, deterministic HMAC from an empty secret. An attacker can trivially compute this signature and write an arbitrary measurement_protocol_secret into the site's wp_options (monsterinsights_site_profile). Confirmed live: sent POST with mp_token=ATTACKER_TOKEN, timestamp=<current>, signature=<hmac-md5 with empty key> and received {\"success\":true}. Subsequent call to monsterinsights_get_plugin_info showed has_mp_secret changed from false to true. The write target is monsterinsights_site_profile in wp_options, modified via set_measurement_protocol_secret().",
+      "auth_required": false,
+      "exploitable": true,
+      "exploit_notes": "Prerequisites: Target site must NOT yet be connected to MonsterInsights (auth profile empty — common on fresh or post-install setups). Steps: 1) Compute HMAC: TIMESTAMP=$(date +%s); MP_TOKEN='attacker_value'; SIG=$(echo -n \"mp_token=${MP_TOKEN}&timestamp=${TIMESTAMP}\" | openssl dgst -md5 -hmac '' | awk '{print $2}'). 2) POST to target: curl -s 'http://TARGET/wp-admin/admin-ajax.php' -d \"action=monsterinsights_push_mp_token&mp_token=${MP_TOKEN}&timestamp=${TIMESTAMP}&signature=${SIG}\". 3) Response is {\"success\":true}. Impact: Attacker controls the GA4 Measurement Protocol secret stored in wp_options. This does not grant admin access, but allows the attacker to supply a malicious MP secret, potentially poisoning Measurement Protocol server-side event attribution if the plugin uses this value to send signed events to Google Analytics. The 1000-second timestamp expiry window is easy to satisfy. On a connected site, this attack is blocked because the real HMAC key is non-empty and unknown to the attacker.",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N — 5.3 Medium (scoped: unconnected sites only)"
+    },
+    {
+      "flow_id": "monsterinsights-nopriv-002",
+      "severity_reported": "medium",
+      "verdict": "CONFIRMED",
+      "confidence": "high",
+      "title": "Unauthenticated Version and Plugin Edition Disclosure via monsterinsights_is_installed",
+      "reasoning": "The is_installed() callback is registered under wp_ajax_nopriv_monsterinsights_is_installed with no authentication, nonce, or rate limiting. It directly returns the exact plugin version (e.g., '10.2.2') and whether the site is running the Pro or Lite edition. Confirmed live: POST to admin-ajax.php with action=monsterinsights_is_installed returns {\"success\":true,\"data\":{\"version\":\"10.2.2\",\"pro\":false}}. While this endpoint is designed for the MonsterInsights relay service to check compatibility, there is no caller verification, meaning any external party can fingerprint the site.",
+      "auth_required": false,
+      "exploitable": true,
+      "exploit_notes": "curl -s 'http://TARGET/wp-admin/admin-ajax.php' -d 'action=monsterinsights_is_installed'. Returns exact version and pro/lite status. Use case for attackers: precision targeting for known CVEs against specific version ranges, or determining whether Pro features (and their attack surface) are present.",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N — 5.3 Medium"
+    },
+    {
+      "flow_id": "monsterinsights-nopriv-003",
+      "severity_reported": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "monsterinsights_get_plugin_info — Auth Bypass via Empty Key Only Affects Already-Disclosed Data",
+      "reasoning": "The handler monsterinsights_handle_get_plugin_info() authenticates callers by comparing a supplied 'key' parameter to the stored site key using hash_equals(). When the site is NOT connected (profile key is ''), hash_equals('','') evaluates to true, bypassing the check. However, the data returned in this state (v4:'', has_mp_secret:false, plugin_version:'10.2.2') is already fully disclosed by the unauthenticated monsterinsights_is_installed endpoint. When the site IS connected (key is non-empty), the check correctly enforces authentication — an attacker without the correct key receives a 401 error. The only new information in this unconnected state is has_mp_secret, which is false (nothing stored). Therefore, while there is a logic flaw in the empty-key comparison, the practical information exposure is negligible because no sensitive credentials exist on an unconnected site, and the plugin version is already exposed elsewhere.",
+      "auth_required": false,
+      "exploitable": false,
+      "exploit_notes": "The empty-key hash_equals bypass is a code quality issue. No actionable sensitive data is accessible that isn't already exposed by other endpoints. If the site is connected, the endpoint is properly secured. Recommendation: add an explicit check for empty($site_key) before hash_equals to reject unauthenticated callers unconditionally.",
+      "cvss_estimate": "N/A — no exploitable impact beyond already-disclosed version information"
+    },
+    {
+      "flow_id": "monsterinsights-nopriv-004",
+      "severity_reported": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "onboarding_monsterinsights_maybe_authenticate — Nonce Properly Blocks Unauthenticated Auth Initiation",
+      "reasoning": "The onboarding_maybe_authenticate() handler is registered under wp_ajax_nopriv but immediately calls wp_verify_nonce($_REQUEST['nonce'], 'onboarding'). WordPress nonces for the action 'onboarding' are generated server-side tied to the logged-in user's session. An unauthenticated request always fails nonce verification. Confirmed live: POST with no nonce or with nonce='invalid' both return {\"success\":false,\"data\":{\"message\":\"Nonce not valid\"}}. The nonce 'onboarding' is never exposed in publicly accessible pages or REST endpoints. Additionally, even if somehow bypassed, the handler only constructs an OAuth redirect URL (does not write to DB) and checks for existing auth state before proceeding. No auth bypass is achievable.",
+      "auth_required": false,
+      "exploitable": false,
+      "exploit_notes": "Nonce verification is solid. The nopriv registration appears intentional to allow the relay server or onboarding flow to call back before the user is fully logged into the AJAX context, but the nonce gate ensures only holders of a valid session nonce can proceed.",
+      "cvss_estimate": "N/A — no vulnerability"
+    },
+    {
+      "flow_id": "monsterinsights-nopriv-005",
+      "severity_reported": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "monsterinsights_rauthenticate — TT Validation Prevents Unauthorized OAuth Completion",
+      "reasoning": "The rauthenticate() handler validates a 'transaction token' (TT) stored in wp_options (monsterinsights_site_tt). The TT is a sha512 hash of a random 128-char password mixed with AUTH_SALT and uniqid(), making it cryptographically unpredictable. The handler returns success only if the supplied TT matches. On success, it only calls wp_send_json_success() — it does NOT write any authentication profile to the database. The actual OAuth credential write happens in authenticate_listener() (hooked to admin_init), which requires current_user_can('monsterinsights_save_settings'). The architecture means: rauthenticate is a server-to-relay confirmation that the TT is valid; the relay then redirects the admin user (who must be logged in) back to a WP admin URL where authenticate_listener writes the credentials. An attacker without a valid TT gets an 'Invalid TT' error. Confirmed live: random TT values are rejected correctly.",
+      "auth_required": false,
+      "exploitable": false,
+      "exploit_notes": "The TT functions as a CSRF token / relay handshake token. Without pre-knowledge of the stored TT (which requires DB read access), an attacker cannot forge a successful rauthenticate response. Even a successful rauthenticate response to the relay only enables subsequent credential write if the admin is actively logged in and following the redirect flow.",
+      "cvss_estimate": "N/A — no vulnerability"
+    }
+  ],
+  "summary": {
+    "total_flows_reviewed": 5,
+    "confirmed": 2,
+    "false_positives": 3,
+    "needs_more_investigation": 0,
+    "critical_confirmed": 0,
+    "high_confirmed": 0,
+    "medium_confirmed": 2,
+    "key_findings": [
+      "CONFIRMED MEDIUM: monsterinsights_push_mp_token allows unauthenticated write to wp_options (measurement_protocol_secret) on sites that have not yet connected to MonsterInsights. The HMAC verification uses an empty key (hash_hmac with '' secret) when no auth profile is set, making it trivially bypassable. An attacker can inject an arbitrary GA4 Measurement Protocol secret.",
+      "CONFIRMED MEDIUM: monsterinsights_is_installed discloses exact plugin version and Pro/Lite edition to unauthenticated callers with no rate limiting or authentication.",
+      "FALSE POSITIVE: monsterinsights_get_plugin_info has a logic flaw (hash_equals with empty strings bypasses auth on unconnected sites) but exposes no actionable sensitive data that isn't already disclosed by monsterinsights_is_installed.",
+      "FALSE POSITIVE: onboarding_monsterinsights_maybe_authenticate is properly protected by wp_verify_nonce despite being nopriv-registered.",
+      "FALSE POSITIVE: monsterinsights_rauthenticate is a relay handshake validator protected by an unpredictable TT. It writes no data to DB on its own.",
+      "No code execution, license key disclosure, or full authentication bypass paths were found in the nopriv handlers.",
+      "The push_mp_token vulnerability is scoped to pre-connection sites. The real-world exploitation window exists during the common period between plugin installation and first OAuth connection, which can be days on staging or misconfigured sites."
+    ]
+  }
+}

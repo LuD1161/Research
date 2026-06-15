@@ -1,0 +1,30 @@
+[
+  {
+    "id": "RKM-INFO-001",
+    "title": "No exploitable unauthenticated vulnerabilities found",
+    "severity": "informational",
+    "type": "Analysis Summary",
+    "handler": "N/A",
+    "authenticated": false,
+    "confirmed": true,
+    "description": "A thorough manual review of the seo-by-rank-math plugin found no exploitable unauthenticated attack vectors. All flagged items from automated scanning were false positives or properly mitigated. Checked: (1) rank_math_overlay_thumb nopriv AJAX handler - requires valid HMAC-like hash (md5(id+type+wp_salt('nonce'))) which is unforgeable without server salt; type is whitelist-validated; image path uses realpath() preventing traversal. (2) All REST API routes have proper permission_callback functions. The semgrep 'no permission_callback' findings were false positives - every route examined has capability checks. (3) CMB2 oembed nopriv AJAX handler verifies nonce before processing. (4) Schema shortcode LFI - sanitize_file_name() strips path separators, confining includes to the plugin's own shortcode/ directory. (5) pingContentAI REST endpoint requires valid API key + username matching stored encrypted credentials - legitimate server-to-server webhook. (6) disconnectSite REST endpoint requires valid API key token matching stored encrypted credentials.",
+    "proof_of_concept": "curl -s http://localhost:8880/wp-admin/admin-ajax.php?action=rank_math_overlay_thumb&id=1&type=play&hash=invalid_hash_returns_empty_die",
+    "file": "includes/class-thumbnail-overlay.php",
+    "line": 46,
+    "remediation": "No remediation required. Current security controls are effective."
+  },
+  {
+    "id": "RKM-LOW-001",
+    "title": "MD5 Used for Thumbnail Hash Instead of Cryptographically Strong HMAC",
+    "severity": "low",
+    "type": "Weak Cryptography",
+    "handler": "generate_overlay_thumbnail / is_secret_valid",
+    "authenticated": false,
+    "confirmed": true,
+    "description": "The overlay thumbnail AJAX endpoint uses MD5 to create a hash-based access token: md5($id . $type . wp_salt('nonce')). While the wp_salt('nonce') makes the hash unforgeable without server-side knowledge, MD5 is a cryptographically weak algorithm and should not be used for security-sensitive tokens. The wp_salt value provides sufficient entropy to prevent brute force, but best practice recommends using hash_hmac('sha256', ...) instead. This is not currently exploitable because: (1) attackers cannot guess the wp_salt value, (2) the hash is used as an all-or-nothing gate. The risk is theoretical: if MD5 weaknesses were somehow leveraged in a multi-step attack scenario.",
+    "proof_of_concept": "# This is NOT currently exploitable - shown for documentation only\n# An attacker would need to know wp_salt('nonce') to compute the hash:\n# hash = md5(attachment_id + overlay_type + wp_salt)\n# e.g., md5('15play' + secret_salt)\n# Without wp_salt, brute force against MD5 is the only vector, infeasible given wp_salt entropy",
+    "file": "includes/class-thumbnail-overlay.php",
+    "line": 278,
+    "remediation": "Replace md5() with hash_hmac('sha256', $id . $type, wp_salt('nonce')) for better cryptographic strength. Also add a timing-safe comparison using hash_equals() instead of ===."
+  }
+]

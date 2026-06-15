@@ -1,0 +1,164 @@
+{
+  "plugin": "essential-addons-for-elementor-lite",
+  "reviewed_at": "2026-06-14",
+  "reviewer": "phase5-manual",
+  "verdicts": [
+    {
+      "id": "EAEL-001",
+      "title": "Unauthenticated Nonce Vending via eael_get_token",
+      "severity": "medium",
+      "cvss_score": 5.3,
+      "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
+      "vulnerability_class": "authentication_bypass",
+      "auth_required": false,
+      "confirmed_exploitable": true,
+      "status": "confirmed",
+      "description": "The AJAX handler `eael_get_token` (action=eael_get_token) is registered as `wp_ajax_nopriv_eael_get_token`, allowing ANY unauthenticated user to freely obtain a valid `essential-addons-elementor` nonce via a single POST request to wp-admin/admin-ajax.php. This nonce is then accepted by multiple other AJAX handlers (both nopriv and auth-required) that use `check_ajax_referer('essential-addons-elementor', ...)` or `wp_verify_nonce(..., 'essential-addons-elementor')` as their only protection. The design flaw is that the same nonce used for CSRF protection in forms is also freely vended to anonymous users on demand.",
+      "affected_handlers": [
+        "eael_get_token (issues nonce - nopriv, confirmed)",
+        "eael_product_quickview_popup (consumes nonce - nopriv, confirmed)",
+        "woo_checkout_update_order_review (consumes nonce - nopriv, confirmed)",
+        "eael_woo_pagination_product_ajax (consumes nonce - nopriv)",
+        "eael_woo_pagination_ajax (consumes nonce - nopriv)",
+        "facebook_feed_render_items (consumes nonce - nopriv)",
+        "eael_checkout_cart_qty_update (consumes nonce - nopriv)",
+        "eael_product_add_to_cart (consumes nonce - nopriv)",
+        "log_user_in / register_user (consumes nonce via init hook - nopriv)"
+      ],
+      "proof_of_concept": [
+        "Step 1: GET nonce: POST /wp-admin/admin-ajax.php with body: action=eael_get_token",
+        "Response: {\"success\":true,\"data\":{\"nonce\":\"4f7a916372\"}}",
+        "Step 2: Use nonce on quickview: POST /wp-admin/admin-ajax.php with body: action=eael_product_quickview_popup&security=<NONCE>&product_id=25&widget_id=test&page_id=1",
+        "Response: {\"success\":true,\"data\":\"<full product HTML>\"} - confirmed live",
+        "Step 3: Use nonce on checkout update: POST /wp-admin/admin-ajax.php with body: action=woo_checkout_update_order_review&security=<NONCE>",
+        "Response: {\"order_review\":\"<checkout HTML>\"} - confirmed live"
+      ],
+      "impact": "Limited: All handlers consuming the nonce are already registered as nopriv (accessible without auth). The nonce bypass does not grant access to privileged operations — `save_settings` and `clear_cache_files` properly check `manage_options` even after nonce validation. The main security impact is: (1) Automated scripted calls to nopriv handlers without visiting the site page, bypassing intended bot-mitigation nonce check; (2) On sites with Login/Register widget active AND registration open AND no CAPTCHA configured, an attacker can automate user registration using the free nonce without having to render the widget page; (3) The `woo_checkout_update_order_review` handler passes `$_POST['post_data']` unsanitized to `do_action('woocommerce_checkout_update_order_review', ...)` which could trigger WC hooks on arbitrary data.",
+      "notes": "Draft/private products are properly blocked in quickview_popup by the product->is_visible() and post_status checks added in a security fix. The nonce bypass is primarily a CSRF token circumvention for nopriv endpoints that represent low-risk operations (product data, cart operations). The risk escalates if: (a) Login/Register widget is deployed with no CAPTCHA and registration is open; (b) WooCommerce has hooks on checkout_update_order_review that have their own vulnerabilities.",
+      "files": [
+        "/includes/Traits/Ajax_Handler.php#L67-68 (eael_get_token registration)",
+        "/includes/Traits/Ajax_Handler.php#L1642-1648 (eael_get_token implementation)",
+        "/includes/Traits/Ajax_Handler.php#L986-1027 (eael_product_quickview_popup)",
+        "/includes/Traits/Ajax_Handler.php#L948-976 (woo_checkout_update_order_review)",
+        "/includes/Traits/Ajax_Handler.php#L120 (load_more dual-nonce check)",
+        "/includes/Traits/Helper.php#L321-360 (eael_checkout_cart_qty_update)"
+      ],
+      "remediation": "1. Restrict eael_get_token to authenticated users only (remove wp_ajax_nopriv_eael_get_token). 2. Alternatively, use action-specific nonces for sensitive operations rather than a single site-wide nonce. 3. For the login/register form, use a per-page nonce embedded in the page render rather than a dynamically fetchable one. 4. In woo_checkout_update_order_review, sanitize $_POST['post_data'] before passing to the WC action hook."
+    },
+    {
+      "id": "EAEL-002",
+      "title": "eael_lr_send_otp / eael_lr_verify_otp - OTP Handlers (Unauthenticated) - Not Account Takeover",
+      "severity": "info",
+      "cvss_score": 0.0,
+      "vulnerability_class": "false_positive",
+      "auth_required": false,
+      "confirmed_exploitable": false,
+      "status": "not_vulnerable",
+      "description": "The OTP send/verify handlers (wp_ajax_nopriv_eael_lr_send_otp and wp_ajax_nopriv_eael_lr_verify_otp) are correctly protected. They require a nonce for 'eael_lr_otp' action (check_ajax_referer('eael_lr_otp', '_eael_otp_nonce')), which is a DIFFERENT nonce action from 'essential-addons-elementor'. This nonce is embedded in the HTML of pages with Login/Register widgets and cannot be obtained via eael_get_token. Additionally: (1) OTP brute force is rate-limited to 5 attempts then session is deleted; (2) OTP codes are 6-digit (1-in-1,000,000 range, effectively 1-in-200,000 per attempt); (3) OTP sessions are bound to a server-side token stored in transients; (4) OTP codes are stored as HMAC-SHA256 hashes bound to the session token.",
+      "impact": "None. The OTP flow does not allow account takeover.",
+      "files": [
+        "/includes/Traits/Login_Registration.php#L2278-2380 (OTP send and verify)",
+        "/includes/Elements/Login_Register.php#L7956 (nonce embedded in page HTML)"
+      ]
+    },
+    {
+      "id": "EAEL-003",
+      "title": "eael_product_quickview_popup - Draft/Private Product Information Disclosure",
+      "severity": "info",
+      "cvss_score": 0.0,
+      "vulnerability_class": "false_positive",
+      "auth_required": false,
+      "confirmed_exploitable": false,
+      "status": "not_vulnerable",
+      "description": "The quickview popup handler checks product visibility via $product->is_visible() and additionally checks post_status and post_password_required before rendering. Testing confirms draft products return 'Product not found or not accessible'. Security fix was applied correctly in the source.",
+      "proof_of_concept": [
+        "POST action=eael_product_quickview_popup&security=<NONCE>&product_id=<DRAFT_PRODUCT_ID> returns {\"success\":false,\"data\":\"Product not found or not accessible\"}"
+      ],
+      "impact": "None. Draft and private product data is properly blocked.",
+      "files": [
+        "/includes/Traits/Ajax_Handler.php#L1002-1016 (product visibility and status checks)"
+      ]
+    },
+    {
+      "id": "EAEL-004",
+      "title": "load_more Handler - Class Parameter / Template Path Traversal",
+      "severity": "info",
+      "cvss_score": 0.0,
+      "vulnerability_class": "false_positive",
+      "auth_required": false,
+      "confirmed_exploitable": false,
+      "status": "not_vulnerable",
+      "description": "The $class parameter from $_REQUEST['class'] is sanitized via sanitize_text_field and used ONLY for string comparison checks (not for class instantiation or dynamic method calls). The template_info path is protected by a realpath() boundary check at line 323: `if (!$file_path || 0 !== strpos($file_path, realpath($dir_path)))` which prevents path traversal. The template_name request parameter passes through sanitize_file_name() + realpath() before use.",
+      "impact": "None. No file inclusion or code execution possible through these parameters.",
+      "files": [
+        "/includes/Traits/Ajax_Handler.php#L160 (class parameter - comparison only)",
+        "/includes/Traits/Ajax_Handler.php#L316-325 (template path with realpath boundary check)"
+      ]
+    },
+    {
+      "id": "EAEL-005",
+      "title": "woo_checkout_update_order_review - Unsanitized post_data to WC Action Hook",
+      "severity": "low",
+      "cvss_score": 3.5,
+      "cvss_vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N",
+      "vulnerability_class": "input_validation",
+      "auth_required": false,
+      "confirmed_exploitable": false,
+      "status": "needs_investigation",
+      "description": "In woo_checkout_update_order_review (accessible without authentication via nonce from eael_get_token), the $_POST['post_data'] value is passed without sanitization to do_action('woocommerce_checkout_update_order_review', $_POST['post_data']). Additionally, $_POST['shippingData'] is passed through wc_clean() then used to set session shipping methods. The WooCommerce action hook's behavior depends on what third-party plugins hook into 'woocommerce_checkout_update_order_review'. If any hooked plugin processes the unsanitized post_data without its own sanitization, this could be exploited.",
+      "impact": "Potentially: session shipping method manipulation (attacker's own session), triggering side-effects in WC or third-party plugin hooks. Without specific vulnerable hooks, impact is low.",
+      "notes": "Combined with EAEL-001 (free nonce), an unauthenticated user can call this endpoint. The WooCommerce core handler for checkout_update_order_review sanitizes its own inputs. Risk is elevated by presence of third-party WC plugins.",
+      "files": [
+        "/includes/Traits/Ajax_Handler.php#L948-976 (woo_checkout_update_order_review)",
+        "Lines 951-963 (unsanitized $_POST['post_data'] and $_POST['orderReviewData'])"
+      ]
+    },
+    {
+      "id": "EAEL-006",
+      "title": "Unauthenticated Registration Nonce Bypass (Requires Active Widget + Open Registration + No CAPTCHA)",
+      "severity": "medium",
+      "cvss_score": 5.0,
+      "cvss_vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N",
+      "vulnerability_class": "authentication_bypass",
+      "auth_required": false,
+      "confirmed_exploitable": false,
+      "status": "conditional",
+      "description": "The login (log_user_in) and registration (register_user) form handlers verify the 'essential-addons-elementor' nonce, which can be freely obtained from eael_get_token by any unauthenticated user. This means: (1) On sites with an active Login/Register Elementor widget, WordPress user registration open (users_can_register = 1), and no CAPTCHA/Turnstile configured: an attacker can automate bulk user registration by fetching nonces from eael_get_token and submitting registration POSTs programmatically without rendering the widget page. (2) For login: nonce bypass alone is insufficient as valid credentials are still required AND widget settings must exist for the specified page_id/widget_id. The registration security hardening (empty settings check at line 524) prevents using arbitrary page_id/widget_id - must use a real widget page.",
+      "conditions_required": [
+        "Login/Register Elementor widget is deployed on a published page",
+        "WordPress option users_can_register = 1",
+        "Widget configured without CAPTCHA or Turnstile",
+        "Attacker must know the page_id and widget_id of the widget (obtainable by viewing page source)"
+      ],
+      "impact": "On sites meeting all conditions: automated bulk user account creation bypassing intended nonce bot-mitigation. Cannot bypass CAPTCHA checks (those are checked after settings load). Cannot escalate to admin - registration respects $settings['register_role'] which defaults to subscriber.",
+      "files": [
+        "/includes/Traits/Login_Registration.php#L467-536 (register_user with nonce check at L481)",
+        "/includes/Traits/Ajax_Handler.php#L1642-1648 (free nonce from eael_get_token)"
+      ]
+    },
+    {
+      "id": "EAEL-007",
+      "title": "SQLi Investigation - load_more Args Parameter",
+      "severity": "info",
+      "cvss_score": 0.0,
+      "vulnerability_class": "false_positive",
+      "auth_required": false,
+      "confirmed_exploitable": false,
+      "status": "not_vulnerable",
+      "description": "The args parameter in load_more is processed through wp_parse_str() which populates a PHP array. The values are then used as WP_Query arguments, which uses $wpdb->prepare() internally and parameterized queries. Explicit type enforcement (absint, intval, sanitize_key) is applied to sensitive fields. The post_status override at line 95 forces 'publish' preventing access to non-public content.",
+      "files": [
+        "/includes/Traits/Ajax_Handler.php#L84-400 (ajax_load_more handler)"
+      ]
+    }
+  ],
+  "summary": {
+    "total_issues": 7,
+    "confirmed_exploitable": 1,
+    "conditional": 1,
+    "needs_investigation": 1,
+    "false_positives": 4,
+    "highest_severity": "medium",
+    "key_finding": "eael_get_token freely vends 'essential-addons-elementor' nonces to unauthenticated users (EAEL-001). This nonce is confirmed to bypass nonce checks on eael_product_quickview_popup and woo_checkout_update_order_review. All handlers consuming this nonce are already registered as nopriv, so the practical impact is limited to: (a) automated scripted access to these endpoints, (b) potential bot-registration on sites with Login/Register widget and open registration (EAEL-006), (c) unsanitized WC hook triggers via checkout update (EAEL-005). No account takeover, SQLi, RCE, or privileged operation bypass was confirmed.",
+    "false_positive_notes": "OTP handlers (eael_lr_send_otp/verify_otp) are properly protected with a separate nonce action. Draft/private product access is blocked. Template path traversal is blocked. The automated taint analysis false positives (RCE-001/002 etc.) were from intval/array_filter operations flagged as RCE sinks - these are not exploitable."
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "plugin": "elementskit-lite",
+  "reviewed_at": "2026-06-14",
+  "reviewer": "phase5-manual",
+  "verdicts": [
+    {
+      "flow_id": "elementskit-lite-nopriv-001",
+      "severity_reported": "high",
+      "verdict": "CONFIRMED",
+      "confidence": "high",
+      "title": "Unauthenticated Content Rendering and Nonce Leak via ekit_widgetarea_content AJAX Handler",
+      "file": "modules/controls/widget-area-utils.php",
+      "line": 15,
+      "handler": "wp_ajax_nopriv_ekit_widgetarea_content",
+      "auth_required": false,
+      "reasoning": "The ekit_widgetarea_content AJAX handler is registered for both authenticated (wp_ajax_) and unauthenticated (wp_ajax_nopriv_) users. It checks a nonce with action 'ekit_pro', but this nonce is generated and injected into all frontend pages that load ElementsKit widgets via wp_localize_script in Enqueue_Scripts::enqueue_scripts() (widgets/init/enqueue-scripts.php line 101). The nonce is output as part of the ekit_config JavaScript object accessible to any visitor on any page using ElementsKit widgets. Since WordPress nonces for anonymous users (uid=0) are deterministic within a time window, any unauthenticated visitor can extract this nonce from page source and use it to call the AJAX endpoint. The handler then renders the Elementor frontend content of ANY post with 'publish' status via \\ElementsKit_Lite\\Utils::render_elementor_content(), which calls \\Elementor\\Plugin::instance()->frontend->get_builder_content_for_display(). This allows an unauthenticated attacker to render and view the full HTML output of any published Elementor-built page or post by iterating post IDs.",
+      "exploitable": true,
+      "exploit_notes": "Step 1: Visit any page on the target site that uses ElementsKit widgets (e.g., homepage, landing page). Step 2: Extract the nonce from the page source: look for `var ekit_config = {\"ajaxurl\":\"...\",\"nonce\":\"<10-char-nonce>\"}` in the HTML. Step 3: Send a POST request to /wp-admin/admin-ajax.php with body: action=ekit_widgetarea_content&post_id=<ID>&nonce=<nonce>. Step 4: The response contains the full rendered Elementor HTML of the target post. Iterate post_id from 1 upward to enumerate all published content. Note: This could expose private data embedded in Elementor widgets such as contact information, API keys in HTML comments, hidden form fields, draft-like published posts, etc.",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N - Score: 5.3 (Medium-High)",
+      "rce_possible": false,
+      "rce_notes": "render_elementor_content only calls Elementor's standard frontend renderer get_builder_content_for_display(). No eval(), exec(), shell_exec(), or arbitrary PHP execution is triggered. The widget-builder module CAN write arbitrary PHP files to the uploads directory, but that path requires manage_options capability (admin). No path from this nopriv endpoint to RCE was found."
+    },
+    {
+      "flow_id": "elementskit-lite-nopriv-002",
+      "severity_reported": "high",
+      "verdict": "CONFIRMED",
+      "confidence": "high",
+      "title": "Unauthenticated Elementor Content Rendering via Megamenu REST API Endpoint",
+      "file": "modules/megamenu/api.php",
+      "line": 38,
+      "handler": "GET /wp-json/elementskit/v1/megamenu/megamenu_content/?id={post_id}",
+      "auth_required": false,
+      "reasoning": "The Megamenu_Api class extends Handler_Api, which registers REST routes with 'permission_callback' => '__return_true' (no authentication required by default). The get_megamenu_content() method (called when action=megamenu_content via GET request) performs NO capability check, NO nonce check, and NO authentication check. It only validates that the post_status is 'publish' and that the post is not password-protected. It then calls \\ElementsKit_Lite\\Utils::render_elementor_content($menu_item_id), rendering the full Elementor content of any published, non-password-protected post. This is a ZERO-authentication content disclosure endpoint that does not even require knowing a nonce.",
+      "exploitable": true,
+      "exploit_notes": "curl -s 'http://target.com/wp-json/elementskit/v1/megamenu/megamenu_content/?id=5' returns the full rendered Elementor HTML of post ID 5 if it is published. No credentials or nonce required. Enumerate all post IDs to extract all published Elementor content. This is MORE severe than flow-001 because it requires NO pre-knowledge of any nonce.",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N - Score: 5.3 (Medium-High)",
+      "rce_possible": false,
+      "rce_notes": "Same as flow-001: only Elementor's standard frontend renderer is called. No arbitrary code execution path."
+    },
+    {
+      "flow_id": "elementskit-lite-nopriv-003",
+      "severity_reported": "medium",
+      "verdict": "CONFIRMED",
+      "confidence": "high",
+      "title": "Unauthenticated Post and Taxonomy Enumeration via ajaxselect2 REST API Endpoints",
+      "file": "modules/controls/ajax-select2-api.php",
+      "lines": [87, 107, 130, 154, 178],
+      "handlers": [
+        "GET /wp-json/elementskit/v1/ajaxselect2/singular_list",
+        "GET /wp-json/elementskit/v1/ajaxselect2/taxonomy_list",
+        "GET /wp-json/elementskit/v1/ajaxselect2/category",
+        "GET /wp-json/elementskit/v1/ajaxselect2/product_list",
+        "GET /wp-json/elementskit/v1/ajaxselect2/product_cat"
+      ],
+      "auth_required": false,
+      "reasoning": "The Controls_Ajax_Select2_Api class has five methods (get_singular_list, get_taxonomy_list, get_category, get_product_list, get_product_cat) that perform NO capability or authentication check before returning post/term data. The REST route uses '__return_true' permission_callback. Contrast with get_post_list and get_page_list which DO check 'edit_posts' capability. These endpoints return ID and title of all published posts, products, and taxonomy terms. Live testing confirmed: GET /wp-json/elementskit/v1/ajaxselect2/singular_list returns all published post IDs and titles to unauthenticated attackers. Additionally, a stored XSS payload was observed in the taxonomy_list response (unescaped '<script>alert(document.cookie)</script>' in a category name), though exploitability depends on rendering context.",
+      "exploitable": true,
+      "exploit_notes": "curl -s 'http://target.com/wp-json/elementskit/v1/ajaxselect2/singular_list' enumerates all published post IDs and titles. curl -s 'http://target.com/wp-json/elementskit/v1/ajaxselect2/product_list' enumerates all WooCommerce products. curl -s 'http://target.com/wp-json/elementskit/v1/ajaxselect2/taxonomy_list?taxonomy=category' enumerates all categories. These can be combined with flow-001 or flow-002 to enumerate and then read all content without authentication. Note: The test environment also showed a raw '<script>' tag in the taxonomy_list response for a category named with an XSS payload - the response does NOT HTML-encode this, which may indicate a reflected/stored XSS issue in admin contexts where this data is displayed.",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N - Score: 5.3 (Medium)",
+      "rce_possible": false
+    },
+    {
+      "flow_id": "elementskit-lite-rce-investigation",
+      "severity_reported": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "title": "RCE via Widget Builder PHP File Write - Requires Admin",
+      "file": "modules/widget-builder/controls/widget-writer.php",
+      "auth_required": true,
+      "reasoning": "The widget-builder module writes user-supplied markup to PHP files in the uploads directory (wp-content/uploads/elementskit/custom_widgets/{id}/widget.php) via Widget_Writer::finish_backing(). The markup is inserted directly into a PHP class's render() method. If arbitrary PHP could be written here, it would constitute RCE. However, the POST endpoint (/wp-json/elementskit/v1/widget-builder/push/{id}) checks 'manage_options' capability in Common::post_push() before writing any file. No path from the nopriv ekit_widgetarea_content endpoint or the unauthenticated megamenu endpoint leads to triggering widget file creation. The apply_escaping() method in Widget_Writer attempts to add escaping to the generated PHP, but does not prevent PHP code injection since it only uses regex pattern matching on markup, not on raw PHP. However, the manage_options gate prevents unauthenticated exploitation.",
+      "exploitable": false,
+      "exploit_notes": "Would be exploitable if the manage_options check could be bypassed (e.g., via privilege escalation), but no bypass was found in this plugin. The widget-builder REST endpoint at /wp-json/elementskit/v1/widget-builder/push/{id} verifies current_user_can('manage_options') before any file write operation.",
+      "cvss_estimate": "N/A (requires admin)",
+      "rce_possible": false,
+      "admin_rce_possible": true,
+      "admin_rce_notes": "An admin can craft a widget with arbitrary PHP in the markup field and it will be written to a .php file and included. This is admin-level code execution which is by-design in WordPress (admins can install plugins). Not a security boundary violation."
+    }
+  ],
+  "summary": {
+    "total_flows_reviewed": 4,
+    "confirmed": 3,
+    "false_positives": 1,
+    "needs_more_investigation": 0,
+    "critical_confirmed": 0,
+    "high_confirmed": 2,
+    "medium_confirmed": 1,
+    "rce_achieved": false,
+    "rce_assessment": "NOT CONFIRMED. The ekit_widgetarea_content handler calls Elementor's get_builder_content_for_display() which is a standard rendering function with no arbitrary PHP execution. The widget-builder can write PHP files but requires manage_options. No eval/exec/shell_exec/passthru/popen calls were found in any nopriv code paths. The do_shortcode calls in accordion/tab widgets are limited to the content stored in Elementor's post data, which requires edit access to modify.",
+    "key_findings": [
+      "ekit_widgetarea_content AJAX handler is nopriv but DOES require a nonce ('ekit_pro'). The nonce is leaked via wp_localize_script to all visitors on Elementor-powered pages. An unauthenticated attacker can extract this nonce and render any published post's Elementor content.",
+      "The Megamenu REST API GET /wp-json/elementskit/v1/megamenu/megamenu_content/?id={id} requires ZERO authentication and renders any published Elementor post. This is a cleaner attack vector than the AJAX endpoint as it requires no nonce extraction step.",
+      "Five ajaxselect2 REST API endpoints (singular_list, taxonomy_list, category, product_list, product_cat) are accessible without authentication and enumerate all published posts, products and taxonomy terms. Confirmed live: returns all post IDs and titles.",
+      "RCE is NOT achievable via unauthenticated paths. The render_elementor_content function uses Elementor's standard frontend renderer. No dangerous PHP functions (eval/exec/shell_exec) appear in any nopriv attack surface.",
+      "The widget-builder module writes arbitrary PHP files to uploads/, but this requires manage_options (admin). This is a post-auth admin capability, not a security boundary violation in WordPress context.",
+      "Confirmed LIVE on test instance: GET /wp-json/elementskit/v1/ajaxselect2/singular_list returns {\"results\":[{\"id\":25,\"text\":\"Test Variable Product\"},{\"id\":16,\"text\":\"Shop\"},...]} with zero authentication.",
+      "Taxonomy names with HTML/JS content are returned unescaped in taxonomy_list endpoint response, potentially indicating stored XSS in admin UI (observed category named '<script>alert(document.cookie)</script>' returned raw in JSON response)."
+    ],
+    "nopriv_ajax_hooks_found": [
+      "wp_ajax_nopriv_ekit_widgetarea_content -> Widget_Area_Utils::ekit_widgetarea_content() [requires ekit_pro nonce, renders any published post]"
+    ],
+    "unauthenticated_rest_endpoints_found": [
+      "GET /wp-json/elementskit/v1/megamenu/megamenu_content/?id={id} [ZERO auth, renders Elementor content]",
+      "GET /wp-json/elementskit/v1/ajaxselect2/singular_list [ZERO auth, enumerates all published posts]",
+      "GET /wp-json/elementskit/v1/ajaxselect2/taxonomy_list [ZERO auth, enumerates taxonomy terms]",
+      "GET /wp-json/elementskit/v1/ajaxselect2/category [ZERO auth, enumerates categories]",
+      "GET /wp-json/elementskit/v1/ajaxselect2/product_list [ZERO auth, enumerates products]",
+      "GET /wp-json/elementskit/v1/ajaxselect2/product_cat [ZERO auth, enumerates product categories]"
+    ],
+    "nonce_action": "ekit_pro",
+    "nonce_where_generated": "widgets/init/enqueue-scripts.php line 101, wp_localize_script for 'elementskit-elementor' script, hook: elementor/frontend/after_enqueue_scripts",
+    "nonce_where_used": "modules/controls/widget-area-utils.php line 17, wp_verify_nonce($_POST['nonce'], 'ekit_pro')",
+    "nonce_exposure": "Exposed to ALL visitors on any page where ElementsKit widgets are present via JavaScript global ekit_config.nonce"
+  }
+}

@@ -1,0 +1,228 @@
+{
+  "plugin": "wp-super-cache",
+  "analysis_date": "2026-06-14",
+  "analyst": "manual-phase5",
+  "priority_areas_checked": [
+    "unauth cache poisoning",
+    "path traversal in cache file paths",
+    "arbitrary file write via cache",
+    "unauth cache clearing",
+    "REST API auth",
+    "header injection"
+  ],
+  "verdicts": [
+    {
+      "finding_id": "WPSC-001",
+      "title": "Cache Deletion via GET['uri'] Path Traversal — Admin-Only, Nonce-Protected",
+      "vulnerability_class": "path_traversal",
+      "original_flow_ids": ["wp-super-cache-xss-004", "wp-super-cache-file-003"],
+      "files": [
+        "wp-cache.php"
+      ],
+      "lines": [2589, 2590, 2591, 2596],
+      "verdict": "false_positive",
+      "confirmed_exploitable": false,
+      "auth_required": true,
+      "auth_level": "Superadmin / setup_network capability + valid CSRF nonce",
+      "unauthenticated": false,
+      "severity": "none",
+      "analysis": "The code block decoding $_GET['uri'] and calling rmdir() is inside wp_cache_manager(), which is registered via add_options_page() requiring manage_options, and the action block is gated by global $valid_nonce which is only set to true inside wp_cache_manager_updates() after wpsupercache_site_admin() check (current_user_can('setup_network')) AND wp_verify_nonce() passes. An unauthenticated user cannot reach this code path. Additionally, wpsc_deep_replace() uses a recursive loop (runs until no more substitutions), correctly defeating '....//'-style bypass attempts. The realpath() call canonicalizes the path, and wp_cache_confirm_delete() validates the resolved path must be inside $cache_path. No unauthenticated path traversal or arbitrary deletion.",
+      "exploit_steps": null,
+      "bypass_analysis": "wpsc_deep_replace loops until stable — not bypassable with overlapping sequences like '....//'. realpath() resolves symlinks. wp_cache_confirm_delete() validates final path against $cache_path.",
+      "cve_reference": null
+    },
+    {
+      "finding_id": "WPSC-002",
+      "title": "index.html Deletion via POST['new_direct_page'] — Single-Pass Filter Bypass, But Admin-Only",
+      "vulnerability_class": "path_traversal",
+      "original_flow_ids": ["wp-super-cache-file-002"],
+      "files": [
+        "wp-cache.php"
+      ],
+      "lines": [1552, 1553, 1555, 1560],
+      "verdict": "confirmed_low",
+      "confirmed_exploitable": false,
+      "auth_required": true,
+      "auth_level": "Superadmin / setup_network + valid CSRF nonce",
+      "unauthenticated": false,
+      "severity": "low",
+      "analysis": "The str_replace('..', '') at line 1553 is a SINGLE-PASS replacement — it does NOT loop. Input '....//etc/' becomes '../etc/' after one pass (the outer '..' is removed, leaving the inner '../'). This means an authenticated admin could traverse above ABSPATH. However: (1) the function is gated by wp_cache_manager_updates() which requires wpsupercache_site_admin() + valid nonce, making this admin-only; (2) the unlink() only deletes a file named 'index.html' at the traversed path; (3) even if an admin triggered this, deleting an index.html in an arbitrary directory is limited impact. The filter bypass is a real code defect but only meaningful in an authenticated context and limited to index.html deletion.",
+      "bypass_analysis": "str_replace('..', '') with input '....//foo/': outer '..' removed yields '../foo/' — single-pass bypass works. Contrasted with wpsc_deep_replace() which loops, this is a real bypass.",
+      "exploit_steps": [
+        "1. Authenticate as superadmin",
+        "2. POST to wp-admin/options-general.php?page=wpsupercache with valid _wpnonce",
+        "3. Include new_direct_page = '....//../../<target_dir>/'",
+        "4. Deletes <ABSPATH>/../<target_dir>/index.html"
+      ],
+      "impact": "Authenticated admin can delete arbitrary index.html files above WordPress root — limited impact, not unauthenticated",
+      "cve_reference": null
+    },
+    {
+      "finding_id": "WPSC-003",
+      "title": "REST API Routes — All Have Permission Callbacks, Semgrep False Positives",
+      "vulnerability_class": "auth_bypass",
+      "original_flow_ids": [],
+      "semgrep_rule": "wp-auth-rest-no-permission-callback",
+      "files": [
+        "rest/load.php"
+      ],
+      "verdict": "false_positive",
+      "confirmed_exploitable": false,
+      "auth_required": true,
+      "auth_level": "setup_network (Superadmin)",
+      "unauthenticated": false,
+      "severity": "none",
+      "analysis": "All 8 REST routes registered in WP_Super_Cache_Router::register_routes() explicitly define permission_callback pointing to get_item_permissions_check, update_item_permissions_check, create_item_permissions_check, or delete_item_permissions_check — all of which resolve to wpsupercache_site_admin() -> current_user_can('setup_network'). The Semgrep finding claiming 'no permission_callback' is factually incorrect for this code version. No unauthenticated REST endpoint exists.",
+      "exploit_steps": null,
+      "cve_reference": null
+    },
+    {
+      "finding_id": "WPSC-004",
+      "title": ".htaccess Write via DOCUMENT_ROOT — Admin-Only + Server Misconfiguration Dependency",
+      "vulnerability_class": "file_write",
+      "original_flow_ids": ["wp-super-cache-file-004", "wp-super-cache-file-005", "wp-super-cache-file-006", "wp-super-cache-file-007"],
+      "files": [
+        "wp-cache.php"
+      ],
+      "lines": [4228, 4230, 4264, 4265, 4291, 4302],
+      "verdict": "not_exploitable",
+      "confirmed_exploitable": false,
+      "auth_required": true,
+      "auth_level": "Superadmin + valid nonce",
+      "unauthenticated": false,
+      "severity": "none",
+      "analysis": "The update_mod_rewrite_rules() function is called only from wp_cache_manager_updates() which runs at admin_init and requires wpsupercache_site_admin() + nonce. $DOCUMENT_ROOT is a server-set variable not typically controllable by users in Apache/Nginx+PHP-FPM deployments. Backup file writes include '<?php die(); ?>' prepended, preventing direct PHP execution. The .htaccess writes themselves are the intended plugin functionality (adding WP Super Cache mod_rewrite rules). No unauthenticated path exists.",
+      "exploit_steps": null,
+      "cve_reference": null
+    },
+    {
+      "finding_id": "WPSC-005",
+      "title": "Cache Directory Deletion via post_id — Authenticated WordPress Hooks Only",
+      "vulnerability_class": "file_inclusion",
+      "original_flow_ids": ["wp-super-cache-file-001"],
+      "files": [
+        "wp-cache-phase2.php"
+      ],
+      "lines": [3274, 3284, 3289],
+      "verdict": "false_positive",
+      "confirmed_exploitable": false,
+      "auth_required": true,
+      "auth_level": "edit_posts / delete_posts capability (Editor+) via WordPress hooks",
+      "unauthenticated": false,
+      "severity": "none",
+      "analysis": "wp_cache_post_id_gc($post_id) is called from wp_cache_post_change($post_id) which is registered to edit_post, delete_post, and publish_post WordPress action hooks — all of which require authenticated users with appropriate capabilities. The $post_id is cast to intval() at line 3274, eliminating string injection. The cache directory path is derived from get_permalink($post_id) (a database lookup, not user input). No unauthenticated trigger path exists for these hooks. This is a false positive from the static analyzer treating post_id as user-controlled.",
+      "exploit_steps": null,
+      "cve_reference": null
+    },
+    {
+      "finding_id": "WPSC-006",
+      "title": "Header Injection via SERVER_PROTOCOL — Theoretical, CGI/SAPI Dependency",
+      "vulnerability_class": "header_injection",
+      "original_flow_ids": ["wp-super-cache-open-001"],
+      "files": [
+        "wp-cache-phase2.php"
+      ],
+      "lines": [323],
+      "verdict": "not_exploitable",
+      "confirmed_exploitable": false,
+      "auth_required": false,
+      "unauthenticated": true,
+      "severity": "informational",
+      "analysis": "Line 323 calls header($_SERVER['SERVER_PROTOCOL'] . ' 304 Not Modified') inside wp_cache_serve_cache_file(). This is reachable on every cached page request when $wp_supercache_304=1 and If-Modified-Since matches. $_SERVER['SERVER_PROTOCOL'] is set by the web server from the HTTP request version line (e.g., 'HTTP/1.1'). In standard Apache 2.4 or Nginx + PHP-FPM deployments, the HTTP version field is parsed at the HTTP layer and only valid protocol strings are accepted; malformed versions are rejected before reaching PHP. Injection would require a non-standard CGI SAPI deployment that passes raw HTTP version strings to PHP. PHP's header() function in PHP 7.4+ also applies sapi_header_op sanitation. This is a theoretical risk with a non-standard deployment dependency, not a confirmed vulnerability in typical WP hosting.",
+      "exploit_steps": null,
+      "prerequisite": "Non-standard CGI SAPI that passes raw HTTP version tokens to PHP without normalization",
+      "cve_reference": null
+    },
+    {
+      "finding_id": "WPSC-007",
+      "title": "XSS in Cache Statistics — Options Table Source, Admin-Only Page",
+      "vulnerability_class": "xss",
+      "original_flow_ids": [
+        "wp-super-cache-xss-005",
+        "wp-super-cache-xss-006",
+        "wp-super-cache-xss-007",
+        "wp-super-cache-xss-008",
+        "wp-super-cache-xss-009"
+      ],
+      "files": [
+        "wp-cache.php"
+      ],
+      "lines": [2663, 2668, 2669, 2670, 2677, 2683],
+      "verdict": "false_positive",
+      "confirmed_exploitable": false,
+      "auth_required": true,
+      "auth_level": "Superadmin (settings page)",
+      "unauthenticated": false,
+      "severity": "none",
+      "analysis": "The $cache_stats comes from get_option('supercache_stats') — a database option not directly user-controlled without admin access. The output is inside the WP Super Cache settings admin page requiring manage_options. For this to be a stored XSS vector, an attacker would need to poison the supercache_stats option, which requires admin/database-level access. In WordPress's security model, administrators who can write options can already run arbitrary code. Not a meaningful vulnerability.",
+      "exploit_steps": null,
+      "cve_reference": null
+    },
+    {
+      "finding_id": "WPSC-008",
+      "title": "XSS via DEBUG_IP from REMOTE_ADDR — Admin Debug Page",
+      "vulnerability_class": "xss",
+      "original_flow_ids": ["wp-super-cache-xss-010"],
+      "files": [
+        "partials/debug.php"
+      ],
+      "lines": [51],
+      "verdict": "false_positive",
+      "confirmed_exploitable": false,
+      "auth_required": true,
+      "auth_level": "Superadmin",
+      "unauthenticated": false,
+      "severity": "none",
+      "analysis": "$_SERVER['REMOTE_ADDR'] is reflected unescaped into an admin-only debug page. In standard setups, REMOTE_ADDR is the connecting IP address, not attacker-controlled via HTTP headers. Behind a reverse proxy, X-Forwarded-For might influence this, but: (1) the page requires superadmin auth; (2) REMOTE_ADDR on well-configured servers reflects the last-hop IP. This is code quality concern, not a real XSS vulnerability in practice.",
+      "exploit_steps": null,
+      "cve_reference": null
+    },
+    {
+      "finding_id": "WPSC-009",
+      "title": "SQL Injection in wp-cache.php Line 4042 — Admin-Only Path",
+      "vulnerability_class": "sql_injection",
+      "original_flow_ids": [],
+      "semgrep_rule": "wp-sqli-variable-in-query",
+      "files": [
+        "wp-cache.php"
+      ],
+      "lines": [4042],
+      "verdict": "not_exploitable",
+      "confirmed_exploitable": false,
+      "auth_required": true,
+      "auth_level": "Superadmin",
+      "unauthenticated": false,
+      "severity": "low",
+      "analysis": "Line 4042 passes a variable directly to a $wpdb query method without prepare(). This is within the admin settings page requiring superadmin. While the code quality issue is real (admin SQLi), WordPress's security model treats administrators as trusted. Not an unauthenticated or privilege-escalation issue.",
+      "exploit_steps": null,
+      "cve_reference": null
+    },
+    {
+      "finding_id": "WPSC-010",
+      "title": "Cache Poisoning — No Unauthenticated Cache Write Vector Found",
+      "vulnerability_class": "cache_poisoning",
+      "original_flow_ids": [],
+      "verdict": "not_exploitable",
+      "confirmed_exploitable": false,
+      "auth_required": false,
+      "unauthenticated": false,
+      "severity": "none",
+      "analysis": "The priority concern was whether an unauthenticated user could cause the plugin to serve attacker-controlled cached content. The cache writing logic in wp-cache-phase2.php writes cache based on the current page request URL and response content — this is the normal caching function. A cache poisoning attack would require injecting malicious content into the cached response, which would require controlling the site's HTTP response content (which is not within plugin scope) or exploiting a separate application vulnerability. No cache poisoning vector specific to this plugin was found that is unauthenticated.",
+      "exploit_steps": null,
+      "cve_reference": null
+    }
+  ],
+  "summary": {
+    "total_findings": 10,
+    "confirmed_critical": 0,
+    "confirmed_high": 0,
+    "confirmed_medium": 0,
+    "confirmed_low": 1,
+    "false_positives": 7,
+    "not_exploitable": 2,
+    "unauthenticated_exploitable": 0,
+    "most_critical_finding": "WPSC-002 — Single-pass path traversal filter bypass (str_replace vs recursive wpsc_deep_replace) enabling authenticated admin to delete arbitrary index.html files; not unauthenticated",
+    "overall_risk": "low",
+    "notes": "No unauthenticated vulnerabilities confirmed. All REST API routes have proper permission callbacks (Semgrep false positives). The path traversal findings are admin-only and nonce-protected. The SERVER_PROTOCOL header injection is theoretical with a non-standard CGI deployment dependency. The single-pass str_replace('..','') bypass at line 1553 is a real code defect but gated behind superadmin + CSRF nonce. WP Super Cache has strong authentication controls throughout; the main risk class of 'unauth cache clearing/poisoning/file write' was not confirmed exploitable."
+  }
+}

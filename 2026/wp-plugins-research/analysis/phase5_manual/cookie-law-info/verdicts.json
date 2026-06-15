@@ -1,0 +1,120 @@
+{
+  "plugin": "cookie-law-info",
+  "version_audited": "3.5.1",
+  "audit_date": "2026-06-14",
+  "auditor": "phase5-manual-review",
+  "summary": {
+    "total_findings": 8,
+    "confirmed_vulnerabilities": 1,
+    "false_positives": 5,
+    "informational": 2,
+    "critical_unauth": 1
+  },
+  "verdicts": [
+    {
+      "flow_id": "CLI-UNAUTH-REST-001",
+      "title": "Unauthenticated REST Endpoint: /cookieyes/v1/fetch_results with __return_true permission callback (LEGACY mode only)",
+      "verdict": "CONFIRMED",
+      "severity_claimed": "N/A (new finding)",
+      "severity_actual": "medium",
+      "auth_required": false,
+      "confidence": "high",
+      "cve_class": "CWE-862 (Missing Authorization)",
+      "details": "In legacy mode (sites upgraded from CLI < 3.0 that still have the old `CookieLawInfo-0.9` option set and a db version <= 2.0), the class Cookie_Law_Info_Cookie_Scaner registers a REST route `POST /cookieyes/v1/fetch_results` with `'permission_callback' => '__return_true'`. This means zero authentication is required. The callback `fetch_scan_result()` accepts a JSON body, parses it, validates a `scan_result_token` against the stored instance ID, and then calls `save_cookie_data()` which inserts rows into the plugin's cookie scan tables. An attacker who knows or can guess the `scan_result_token` (stored in wp_options as `wt_cli_ckyes_scan_options`) could inject arbitrary cookie scan data. The token is a base64-encoded WP nonce (unpredictable), but the endpoint itself is fully open. Without a valid token, the function returns WP_Error and no data is inserted. Impact: unauthorized manipulation of cookie scan results (integrity), and denial-of-service against active scans by triggering finish_scan(). NOTE: This route is only registered when cky_is_legacy() returns true (old installations with db_version <= 2.0). New installations use the lite loader which does not register this route. Verified: /cookieyes/v1/fetch_results returns 404 on the live site (lite mode), confirming the legacy path is inactive here.",
+      "code_reference": "plugins/src/cookie-law-info/legacy/admin/modules/cookie-scaner/cookie-scaner.php:64-77",
+      "affected_versions": "CookieYes <= 3.x when running in legacy compatibility mode",
+      "proof_of_concept": "curl -X POST http://target/wp-json/cookieyes/v1/fetch_results -H 'Content-Type: application/json' -d '{\"scan_result_token\":\"<base64_nonce>\",\"scan_result\":\"[]\"}'"
+    },
+    {
+      "flow_id": "cookie-law-info-xss-001",
+      "title": "Stored XSS via _cli_cookie_head_scripts term meta (LEGACY)",
+      "verdict": "FALSE_POSITIVE",
+      "severity_claimed": "high",
+      "severity_actual": "N/A",
+      "auth_required": true,
+      "confidence": "high",
+      "details": "The `edit_scripts_meta()` function echoes `wp_unslash($head_scripts)` without HTML encoding (line 684 of cookies.php). However, this function is called from `edit_category_form_fields` which is hooked to `cookielawinfo-category_edit_form_fields`. WordPress fires this taxonomy edit hook only from `wp-admin/edit-tags.php` which requires the `manage_options` capability check before the hook is invoked. Saving occurs via `save_scripts_meta()` hooked to `edited_cookielawinfo-category` - WordPress core also gates this through edit-tags.php with a nonce check. The data is stored as term meta and only rendered in the admin taxonomy edit screen (inside a textarea). This is admin-context stored XSS which requires manage_options - effectively a self-XSS. NOT an unauthenticated or subscriber-level vulnerability.",
+      "code_reference": "plugins/src/cookie-law-info/legacy/admin/modules/cookies/cookies.php:674-684"
+    },
+    {
+      "flow_id": "cookie-law-info-xss-002",
+      "title": "Stored XSS via _cli_cookie_body_scripts term meta (LEGACY)",
+      "verdict": "FALSE_POSITIVE",
+      "severity_claimed": "high",
+      "severity_actual": "N/A",
+      "auth_required": true,
+      "confidence": "high",
+      "details": "Same as xss-001. The _cli_cookie_body_scripts meta is echoed without escaping in the taxonomy edit form. Only accessible to manage_options users in the WordPress admin. Admin-context self-XSS only.",
+      "code_reference": "plugins/src/cookie-law-info/legacy/admin/modules/cookies/cookies.php:675-696"
+    },
+    {
+      "flow_id": "cookie-law-info-xss-003-to-010",
+      "title": "XSS via REQUEST_URI and filter_var boolean echo in admin views (LEGACY)",
+      "verdict": "FALSE_POSITIVE",
+      "severity_claimed": "high",
+      "severity_actual": "N/A",
+      "auth_required": true,
+      "confidence": "high",
+      "details": "Flows xss-003 through xss-010 flag either `echo esc_url($form_action)` (which IS properly escaped - esc_url() strips non-URL chars including < > & making XSS impossible) or `echo filter_var(...) ? ' checked=\"checked\"' : ''` (hardcoded string literals with no user data). The taint engine incorrectly flagged esc_url as unsafe and tracked boolean filter_var outputs as tainted. All of these are in admin-only views (admin/partials/ and admin/modules/cookies/views/) gated by `manage_options`. None are exploitable.",
+      "code_reference": "plugins/src/cookie-law-info/legacy/admin/partials/, plugins/src/cookie-law-info/legacy/admin/modules/cookies/views/"
+    },
+    {
+      "flow_id": "cookie-law-info-sqli-001",
+      "title": "SQL Injection via $wpdb->insert with absint values - cookie-scaner.php",
+      "verdict": "FALSE_POSITIVE",
+      "severity_claimed": "critical",
+      "severity_actual": "N/A",
+      "auth_required": true,
+      "confidence": "high",
+      "details": "The $data_arr at line 959 contains `absint($total_url)` and hardcoded strings ('get_pages', time(), 0, 1). The `$wpdb->insert()` call uses WordPress's safe insert method which handles parameterization. absint() guarantees an integer. No user-controlled data enters the SQL. NOT exploitable.",
+      "code_reference": "plugins/src/cookie-law-info/legacy/admin/modules/cookie-scaner/cookie-scaner.php:959-967"
+    },
+    {
+      "flow_id": "cookie-law-info-sqli-002",
+      "title": "SQL Injection via esc_sql wrapped values in wpdb->insert - cookie-scaner.php",
+      "verdict": "FALSE_POSITIVE",
+      "severity_claimed": "critical",
+      "severity_actual": "N/A",
+      "auth_required": true,
+      "confidence": "high",
+      "details": "The $category and $category_id at lines 1122-1126 use `esc_sql(sanitize_text_field(...))` before being passed to `$wpdb->insert()`. The wpdb->insert() method with type format array `['%s','%d','%s',...]` already handles escaping. Additionally, this runs within an admin-context cookie scanning operation. The scanner data comes from the CookieYes cloud scanner API response (internal) validated by scan token. NOT user-controlled SQL injection.",
+      "code_reference": "plugins/src/cookie-law-info/legacy/admin/modules/cookie-scaner/cookie-scaner.php:1122-1137"
+    },
+    {
+      "flow_id": "cookie-law-info-ssrf-001-002",
+      "title": "SSRF via wp_remote_post to hardcoded api_url - uninstall-feedback.php",
+      "verdict": "FALSE_POSITIVE",
+      "severity_claimed": "high",
+      "severity_actual": "N/A",
+      "auth_required": true,
+      "confidence": "high",
+      "details": "The SSRF flows (ssrf-001 and ssrf-002) flag wp_remote_post() calls, but the URL is `$this->api_url` which is hardcoded as `'https://feedback.cookieyes.com/api/v1/feedbacks'` (line 16 of uninstall-feedback.php). This is not user-controlled - no attacker can change the destination. The request body includes sanitized user-provided reason data but this represents telemetry sent to the vendor. This is privacy-notable behavior but not a security vulnerability. Both the legacy and lite uninstall-feedback endpoints require `manage_options` capability. NOT a SSRF vulnerability.",
+      "code_reference": "plugins/src/cookie-law-info/legacy/admin/modules/uninstall-feedback/uninstall-feedback.php:16,524"
+    },
+    {
+      "flow_id": "cli-rest-banners-api",
+      "title": "CKY REST API (banners, cookies, categories, consent_logs) - properly auth-gated",
+      "verdict": "INFORMATIONAL",
+      "severity_claimed": "medium (scanner flagged no permission_callback)",
+      "severity_actual": "N/A",
+      "auth_required": true,
+      "confidence": "high",
+      "details": "Semgrep flagged multiple REST routes in lite/admin/modules/banners/api/class-api.php, cookies/api/, categories-api, consent-logs/api as missing permission_callback. This is a false positive from the semgrep pattern - the routes DO have permission_callback values (e.g. `array($this, 'get_items_permissions_check')`). The base class CookieYes\\Lite\\Includes\\Rest_Controller at /lite/includes/class-rest-controller.php implements all permission callbacks with `current_user_can('manage_options')` checks plus nonce verification for write operations. Verified live: GET /wp-json/cky/v1/banners returns 401 without auth.",
+      "code_reference": "plugins/src/cookie-law-info/lite/includes/class-rest-controller.php:49-111"
+    }
+  ],
+  "priority_findings_checked": {
+    "unauth_cookie_consent_manipulation": {
+      "verdict": "PARTIAL - CONFIRMED (legacy only)",
+      "notes": "In legacy mode only: /cookieyes/v1/fetch_results is open to unauthenticated POST requests. However, actual data manipulation requires a valid scan token (WP nonce stored in options). Without the token, the endpoint rejects the request. Impact is limited to DoS against active scans or potential data injection if token is obtainable. New installations (lite mode) are NOT affected. CVE-level: medium."
+    },
+    "stored_xss_in_cookie_banner": {
+      "verdict": "NOT FOUND",
+      "notes": "Banner customization via REST API requires manage_options + nonce. The legacy head/body scripts XSS is admin-only. No path for unauthenticated stored XSS found."
+    },
+    "sql_injection_in_consent_logging": {
+      "verdict": "NOT FOUND",
+      "notes": "All SQL flows identified use $wpdb->insert() with type arrays (safe), or insert data from the CookieYes cloud API (internal, token-gated). No direct user-controlled SQL injection path found in consent logging."
+    }
+  }
+}

@@ -1,0 +1,197 @@
+{
+  "plugin": "broken-link-checker",
+  "analysis_date": "2026-06-14",
+  "analyst": "manual-phase5",
+  "priority_areas_checked": [
+    "unauth SSRF via URL fetching",
+    "SQL injection in link storage",
+    "stored XSS via malicious link text",
+    "REST endpoint auth bypass",
+    "hub endpoint auth",
+    "webhook endpoints"
+  ],
+  "verdicts": [
+    {
+      "finding_id": "BLC-001",
+      "title": "REST Endpoint Permission Callbacks — False Positives",
+      "vulnerability_class": "auth_bypass",
+      "original_flow_ids": [],
+      "semgrep_rule": "wp-auth-rest-no-permission-callback",
+      "files": [
+        "app/rest-endpoints/scan/class-controller.php",
+        "app/rest-endpoints/avatars/class-controller.php",
+        "app/rest-endpoints/settings/class-controller.php"
+      ],
+      "verdict": "false_positive",
+      "confirmed_exploitable": false,
+      "auth_required": true,
+      "auth_level": "manage_options (Administrator)",
+      "unauthenticated": false,
+      "severity": "none",
+      "analysis": "All three REST endpoints properly define permission_callback. The scan controller uses get_scan_permissions() -> current_user_can('manage_options'), avatars uses get_avatar_permissions() -> current_user_can('manage_options'), and settings uses get_settings_permissions()/save_settings_permissions() -> current_user_can('manage_options'). The automated scanner's claim of missing permission_callback is factually incorrect for this version of the plugin.",
+      "exploit_steps": null,
+      "cve_reference": null
+    },
+    {
+      "finding_id": "BLC-002",
+      "title": "Second-Order SQL — any-post.php Unparameterized Query with DB-Sourced IDs",
+      "vulnerability_class": "sql_injection",
+      "original_flow_ids": ["broken-link-checker-sqli-001", "broken-link-checker-sqli-002"],
+      "files": [
+        "legacy/includes/any-post.php"
+      ],
+      "lines": [167, 169, 174],
+      "verdict": "false_positive",
+      "confirmed_exploitable": false,
+      "auth_required": true,
+      "auth_level": "delete_posts (Editor+)",
+      "unauthenticated": false,
+      "severity": "none",
+      "analysis": "The pattern at line 167 builds a raw SQL IN clause by imploding $current_instance_ids without prepare(). However, $current_instance_ids is sourced from wp_list_pluck() on a previous parameterized SELECT result — these are integer IDs from the blc_instances table, not user-supplied strings. The data would need to be pre-poisoned in the database. Additionally, the function is hooked to delete_post and trashed_post WordPress actions, which require delete_posts capability (Editor or higher). No unauthenticated attack path exists. The vulnerability class is theoretically a second-order injection but practically non-exploitable.",
+      "exploit_steps": null,
+      "cve_reference": null
+    },
+    {
+      "finding_id": "BLC-003",
+      "title": "Hub Endpoints (edit-link, unlink-link, nofollow-link) — WPMUDEV Dashboard Authentication",
+      "vulnerability_class": "auth_bypass",
+      "original_flow_ids": ["broken-link-checker-xss-003", "broken-link-checker-xss-004", "broken-link-checker-xss-005"],
+      "files": [
+        "app/hub-endpoints/unlink-link/class-controller.php",
+        "app/hub-endpoints/edit-link/class-controller.php",
+        "app/hub-endpoints/nofollow-link/class-controller.php"
+      ],
+      "verdict": "false_positive",
+      "confirmed_exploitable": false,
+      "auth_required": true,
+      "auth_level": "WPMUDEV Hub HMAC authentication (server-to-server)",
+      "unauthenticated": false,
+      "severity": "none",
+      "analysis": "These endpoints are registered via the wdp_register_hub_action filter, which belongs to the WPMUDEV Dashboard plugin. The Hub authentication uses HMAC-signed server-to-server requests from wpmudev.com; they cannot be triggered by arbitrary unauthenticated web requests. The XSS/RCE false-positives in the taint analysis are due to the analyzer not understanding the Hub authentication mechanism. The endpoints perform content modifications (edit/unlink/nofollow links in post content), which would be high-impact if Hub auth were bypassed, but that is outside this plugin's scope.",
+      "exploit_steps": null,
+      "cve_reference": null
+    },
+    {
+      "finding_id": "BLC-004",
+      "title": "Unauthenticated Webhook — User Review Endpoint (State Mutation Without Auth)",
+      "vulnerability_class": "missing_auth",
+      "original_flow_ids": [],
+      "semgrep_rule": "wp-redirect-instead-of-safe-redirect",
+      "files": [
+        "app/webhooks/user-review/class-controller.php"
+      ],
+      "verdict": "confirmed_low",
+      "confirmed_exploitable": true,
+      "auth_required": false,
+      "unauthenticated": true,
+      "severity": "low",
+      "cvss_estimate": "3.1",
+      "analysis": "The user-review webhook at the URL slug 'broken-link-checker-review/user-review' is fully public (no is_user_logged_in, no nonce check). Any visitor who supplies a valid ?token= can trigger: (1) Recipients::flag_recipient_reviewed($user_id) which permanently sets wpmudev_blc_reviewed user meta and a site-wide option, suppressing the plugin review nag. The redirect target is hardcoded to wordpress.org/support/... so there is no open redirect. Impact is limited to suppressing a review prompt. Token is computed as base64(md5(email) . '_' . key) — not easily guessable without knowing the key. NOT a critical vulnerability.",
+      "exploit_steps": [
+        "1. Obtain or guess a recipient's activation token (token = base64_encode(md5(email) . '_' . recipient_key))",
+        "2. Send GET request to: http://target.com/broken-link-checker-review/user-review?token=<token>",
+        "3. Plugin marks the user as having reviewed, suppresses review nag permanently"
+      ],
+      "impact": "Suppresses plugin review prompt; trivial state mutation",
+      "cve_reference": null
+    },
+    {
+      "finding_id": "BLC-005",
+      "title": "Unauthenticated Webhook — Recipient Activation/Cancellation",
+      "vulnerability_class": "missing_auth",
+      "original_flow_ids": ["broken-link-checker-rce-002"],
+      "files": [
+        "app/webhooks/recipient-activation/class-controller.php",
+        "app/users/recipients/class-model.php"
+      ],
+      "verdict": "confirmed_low",
+      "confirmed_exploitable": true,
+      "auth_required": false,
+      "unauthenticated": true,
+      "severity": "low",
+      "cvss_estimate": "4.3",
+      "analysis": "Two webhook actions (activate and cancel) are registered at 'broken-link-checker-activation/blc-activate-recipient' with no authentication requirement. With a valid activation_code, an unauthenticated attacker can: (1) activate an email recipient in the broken link scan notification schedule, or (2) cancel/remove an email recipient, disrupting notifications. Token = base64(md5(email) . '_' . key). For registered WordPress users, the key contains 32 random bytes from bin2hex(random_bytes(32)), making brute-force infeasible. For externally added email recipients, key entropy depends on what the admin UI generates. The main real-world risk is an attacker who intercepts an activation email performing a cancel action to unsubscribe an admin from broken-link notifications.",
+      "exploit_steps": [
+        "1. Intercept or guess a recipient's activation_code token",
+        "2. For cancel: GET http://target.com/broken-link-checker-activation/blc-activate-recipient?action=cancel&activation_code=<token>",
+        "3. Email recipient is removed from broken-link scan notification schedule without any admin action"
+      ],
+      "impact": "Unsubscribe admins from broken-link notifications; add unauthorized email recipients",
+      "cve_reference": null
+    },
+    {
+      "finding_id": "BLC-006",
+      "title": "XSS in Email Scan Report — Email-Only Context",
+      "vulnerability_class": "xss",
+      "original_flow_ids": ["broken-link-checker-xss-001", "broken-link-checker-xss-002"],
+      "files": [
+        "app/emails/scan-report/class-view.php"
+      ],
+      "lines": [150, 151],
+      "verdict": "false_positive",
+      "confirmed_exploitable": false,
+      "auth_required": false,
+      "unauthenticated": false,
+      "severity": "none",
+      "analysis": "The echo $origin_post_edit_url and echo $origin_post_title at lines 150/151 are inside the email view template, rendered when generating an HTML email. This is not rendered in a web browser response to a user — it is the body of an outgoing email. $origin_post_edit_url passes through admin_url() which returns a safe admin URL. $origin_post_title comes from get_the_title() which can contain HTML but is an email body, not a web page. No web XSS vector exists here.",
+      "exploit_steps": null,
+      "cve_reference": null
+    },
+    {
+      "finding_id": "BLC-007",
+      "title": "XSS in Legacy Admin Pages — Authenticated Admin-Only",
+      "vulnerability_class": "xss",
+      "original_flow_ids": [
+        "broken-link-checker-xss-006",
+        "broken-link-checker-xss-007",
+        "broken-link-checker-xss-008",
+        "broken-link-checker-xss-009",
+        "broken-link-checker-xss-010",
+        "broken-link-checker-xss-011",
+        "broken-link-checker-xss-012",
+        "broken-link-checker-xss-013"
+      ],
+      "files": [
+        "legacy/init.php",
+        "legacy/core/init.php",
+        "legacy/core/core.php"
+      ],
+      "verdict": "confirmed_low",
+      "confirmed_exploitable": true,
+      "auth_required": true,
+      "auth_level": "Administrator (manage_options)",
+      "unauthenticated": false,
+      "severity": "low",
+      "analysis": "Multiple echo statements in admin pages output values without esc_html(). These are all inside WordPress admin pages requiring manage_options capability. As admin-to-admin XSS, WordPress's security model generally considers this acceptable (admins can already install plugins). These are code quality issues rather than high-severity vulnerabilities. The filter_id echo at line 1973 from $_GET['filter_id'] is a reflected XSS in the admin, but requires an admin to be tricked into clicking a crafted link — low severity in WordPress context.",
+      "exploit_steps": null,
+      "impact": "Admin-context XSS only; no privilege escalation",
+      "cve_reference": null
+    },
+    {
+      "finding_id": "BLC-008",
+      "title": "SSRF via Broken Link Checking — No Unauthenticated Trigger Found",
+      "vulnerability_class": "ssrf",
+      "original_flow_ids": [],
+      "verdict": "not_exploitable",
+      "confirmed_exploitable": false,
+      "auth_required": true,
+      "unauthenticated": false,
+      "severity": "none",
+      "analysis": "The primary attack surface concern was whether an unauthenticated user could trigger the URL fetching mechanism (broken link checks). Investigation of REST endpoints (all require manage_options), cron jobs (no unauthenticated schedule manipulation found), and webhooks shows no unauthenticated path to trigger URL fetching. The plugin fetches URLs only via authenticated admin actions or server-side cron triggered by WordPress's authenticated admin-initiated scheduling. No SSRF via unauthenticated path confirmed.",
+      "exploit_steps": null,
+      "cve_reference": null
+    }
+  ],
+  "summary": {
+    "total_findings": 8,
+    "confirmed_critical": 0,
+    "confirmed_high": 0,
+    "confirmed_medium": 0,
+    "confirmed_low": 3,
+    "false_positives": 5,
+    "unauthenticated_exploitable": 2,
+    "most_critical_finding": "BLC-005 — Unauthenticated webhook allows cancelling admin email notifications for broken link scanning (requires token interception)",
+    "overall_risk": "low",
+    "notes": "No unauthenticated SSRF, SQL injection, or RCE found. Two unauthenticated webhook endpoints exist but have low impact (notification suppression/manipulation). All REST API endpoints and hub endpoints are properly authenticated. The plugin's new (app/) architecture has good security posture; the legacy/ code has admin-only XSS issues that are low-priority."
+  }
+}

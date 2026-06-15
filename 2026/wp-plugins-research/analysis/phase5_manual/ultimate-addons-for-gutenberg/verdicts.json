@@ -1,0 +1,359 @@
+{
+  "plugin": "ultimate-addons-for-gutenberg",
+  "reviewed_at": "2026-06-14",
+  "reviewer": "manual-phase5",
+  "summary": "One real but low-severity confirmed finding: the uagb_process_forms nopriv AJAX handler performs nonce verification but the nonce is embedded in public frontend pages (visible to unauthenticated visitors), making the effective access level unauthenticated. The form submission email 'From:' header uses sanitize_email() on user-supplied data — this is safe because sanitize_email() strips CRLF and injection characters. The email subject comes from block attributes (DB) not from the POST body, so no email header injection from the form submission itself. The gf_shortcode and cf7_shortcode nopriv handlers also have nonces embedded in page JS. All other taint flows are false positives: XSS flows terminate in wp_json_encode or wp_send_json which encode data safely; SSRF flows use wp_safe_remote_post (host-validating) or send to hardcoded BSF/Google URLs; RCE flows reach array_filter/array_map callbacks (not shell commands).",
+  "verdicts": [
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-rce-001",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "array_map() callback on DOM data — not an RCE sink",
+      "description": "The scanner flagged array_map() with an anonymous function as an RCE sink. The callback processes DOMElement nodes from parsed HTML content. No exec/system/shell call is made. The missing_sanitizer field 'escapeshellarg() not used' is nonsensical here — no shell command is constructed.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive. array_map() is not an RCE sink."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-xss-001",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "absint($_POST['page_number']) in wp_send_json_success — no XSS",
+      "description": "page_number is cast to absint() (always a non-negative integer). The result is passed to post_grid_callback() and then returned via wp_send_json_success(). wp_send_json_success() JSON-encodes all output, preventing any XSS. The nonce is verified (nonce_verified: true per brief).",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive. absint + wp_send_json_success is safe."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-ssrf-001",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "captcha_response sent as query param to hardcoded Google reCAPTCHA URL — no SSRF",
+      "description": "The user-supplied captcha_response token (sanitize_text_field applied) is passed as a query argument value to a hardcoded https://www.google.com/recaptcha/api/siteverify URL via wp_safe_remote_get(). wp_safe_remote_get() performs host-validation (rejects redirects to disallowed hosts). The URL is hardcoded, not user-controllable. There is no SSRF here — the attacker controls only the query parameter value, not the destination URL.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive. URL is hardcoded. User data is only in the query string value."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-xss-002",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "page_number via sanitize_text_field into wp_send_json_success — no XSS",
+      "description": "sanitize_text_field() sanitizes the input, and wp_send_json_success() JSON-encodes the output. No XSS vector.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-xss-003",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "Same as xss-002 (duplicate chain variant)",
+      "description": "Identical pattern, duplicate of xss-002.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-xss-004",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "Same as xss-002/xss-003 (another duplicate chain variant)",
+      "description": "Same pattern.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-xss-005",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "sanitize_text_field + json_decode + wp_send_json_success — no XSS",
+      "description": "Input is sanitized with sanitize_text_field(), then json_decoded, then echoed via wp_send_json_success() which JSON-encodes output. Requires auth + nonce anyway.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-xss-006",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "DB option value via wp_send_json_success — no XSS",
+      "description": "Option from DB is JSON-encoded via wp_send_json_success(). Requires auth + nonce.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-xss-007",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "esc_url(get_page_link($intval)) in JS redirect — not exploitable",
+      "description": "The page ID is intval()-cast from an admin option. get_page_link() returns a URL for that post ID, and esc_url() escapes it. Even if an attacker could control the DB option value (requires admin), esc_url() prevents XSS in the URL context.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive. Requires admin to set the option, and esc_url() prevents XSS."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-ssrf-002",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "User data sent to hardcoded BSF metrics endpoint — no SSRF",
+      "description": "Sanitized user data is posted to a hardcoded URL (https://metrics.brainstormforce.com/...). The URL is not user-controllable. wp_remote_post() to a hardcoded domain is not SSRF.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive. Destination URL is hardcoded, not user-supplied."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-rce-002",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "sanitize_title() + preg_replace() on font name — not RCE",
+      "description": "Font name is processed with sanitize_title() and then preg_replace() to strip whitespace. No shell command is constructed. The scanner incorrectly flagged preg_replace() as an RCE sink (this would only be valid with the /e modifier in PHP <7, which is not used here).",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-xss-008",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "DB option in wp_send_json_success — no XSS, auth required",
+      "description": "get_option() result in wp_send_json_success(). Requires auth + nonce.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-rce-003",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "array_filter() on DB option for analytics — not RCE",
+      "description": "array_filter() with an anonymous function on a DB-stored analytics event array. No shell command. No user HTTP input reaches this code path.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-xss-009",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "Block attributes JSON-encoded via wp_json_encode into script tag — no XSS",
+      "description": "wp_json_encode() safely encodes all values including quotes and angle brackets for safe inclusion in JSON contexts. The block attributes come from block editor settings (DB), not from direct HTTP requests to this code path.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive. wp_json_encode() is safe for JSON output."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-xss-010",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "echo intval(get_post_meta(...)) — no XSS",
+      "description": "intval() always produces an integer. Echoing an integer cannot produce XSS.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-xss-011",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "echo intval($popup_timer) — no XSS",
+      "description": "intval() cast. Cannot produce XSS.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-xss-012",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "get_site_transient data via wp_send_json_success — no exploitable XSS",
+      "description": "The $new_version value is further sanitized with sanitize_text_field() and esc_html() before inclusion in messages. wp_send_json_success() JSON-encodes the output. No XSS.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-xss-013",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "Module name via sprintf in wp_send_json — data is sanitize_text_field'd",
+      "description": "The $module input comes from the AJAX POST data and is processed via sanitize_text_field(). It is passed via sprintf() into a translated string and then returned via wp_send_json_success() which JSON-encodes everything. No XSS vector. Note: despite the brief showing auth_required: false, this handler is only hooked to wp_ajax_ (authenticated) not wp_ajax_nopriv_ based on code review of ajax-base.php.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-xss-014",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "Same as xss-013 (error message variant)",
+      "description": "Identical to xss-013.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-xss-015",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "Same as xss-013 (enable message variant)",
+      "description": "Identical to xss-013.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-xss-016",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "Same as xss-013 (unable to enable variant)",
+      "description": "Identical to xss-013.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-ssrf-003",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "Deactivation survey data posted to BSF API — no SSRF, auth + nonce required",
+      "description": "User-provided feedback data (sanitize_text_field applied) is sent via wp_safe_remote_post() to $target_url. The $target_url is defined in the class as a hardcoded BSF API endpoint, not from user input. Auth + nonce required.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive. Destination URL is hardcoded."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-xss-017",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "API error message from BSF response in wp_send_json_error — no XSS",
+      "description": "The error message comes from the API response body, which is then returned via wp_send_json_error() (JSON-encoded). No XSS. Auth + nonce required.",
+      "auth_required": true,
+      "exploitable": false,
+      "notes": "False positive."
+    },
+    {
+      "flow_id": "ultimate-addons-for-gutenberg-ssrf-004",
+      "verdict": "false_positive",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "title": "NPS survey data to BSF API — no SSRF",
+      "description": "Sanitized survey data posted via wp_safe_remote_post() to a BSF metrics URL. The API endpoint URL is constructed from a hardcoded base URL. User data influences query parameters via apply_filters but the base URL is hardcoded. wp_safe_remote_post() validates host. Nonce verified.",
+      "auth_required": false,
+      "exploitable": false,
+      "notes": "False positive."
+    }
+  ],
+  "unauthenticated_attack_surface": {
+    "nopriv_handlers": [
+      {
+        "action": "wp_ajax_nopriv_uagb_process_forms",
+        "handler": "UAGB_Forms::process_forms()",
+        "file": "blocks-config/forms/class-uagb-forms.php",
+        "nonce_check": "check_ajax_referer('uagb_forms_ajax_nonce', 'nonce')",
+        "nonce_exposure": "Nonce generated via wp_create_nonce() and localized into 'uagb-forms-js' script on any public page containing a uagb/forms block. Any site visitor can retrieve it from page HTML.",
+        "verdict": "low_severity_confirmed",
+        "description": "This handler processes form submissions and sends email. It is accessible to unauthenticated visitors who can obtain the nonce from page source. The email flow: (1) sender address = sanitize_email($form_data['Email']) — safe. (2) recipient/CC/BCC come from block attributes (DB), validated via is_email(). (3) Subject comes from block attributes (DB), not from POST. (4) Body is built from $form_data keys/values with esc_html() applied. No email header injection is possible because sanitize_email() strips CRLF and special chars, and the subject is not user-controlled. The attack surface is: unauthenticated form spam / email to configured admin address. This is the intended behavior — the concern is whether a completely unauthenticated user can spam emails, which they can if they can read the page nonce."
+      },
+      {
+        "action": "wp_ajax_nopriv_uagb_gf_shortcode",
+        "handler": "UAGB_Init_Blocks::gf_shortcode()",
+        "file": "classes/class-uagb-init-blocks.php",
+        "nonce_check": "check_ajax_referer('uagb_ajax_nonce', 'nonce')",
+        "nonce_exposure": "uagb_ajax_nonce is localized in class-uagb-init-blocks.php line 1130 into frontend JS",
+        "verdict": "informational",
+        "description": "Renders a Gravity Forms shortcode by ID (intval'd). Renders arbitrary GF form for any integer ID. This could be used to enumerate/render forms but is not a security vulnerability on its own — form rendering is read-only."
+      },
+      {
+        "action": "wp_ajax_nopriv_uagb_cf7_shortcode",
+        "handler": "UAGB_Init_Blocks::cf7_shortcode()",
+        "file": "classes/class-uagb-init-blocks.php",
+        "nonce_check": "check_ajax_referer('uagb_ajax_nonce', 'nonce')",
+        "nonce_exposure": "Same as gf_shortcode",
+        "verdict": "informational",
+        "description": "Renders a CF7 shortcode by ID. Same analysis as gf_shortcode — read-only form render."
+      },
+      {
+        "action": "wp_ajax_nopriv_uagb_post_pagination",
+        "handler": "UAGB_Post::post_pagination()",
+        "file": "blocks-config/post/class-uagb-post.php",
+        "nonce_check": "check_ajax_referer('uagb_ajax_nonce', 'nonce')",
+        "verdict": "informational",
+        "description": "Renders paginated post lists. absint() on page_number, WP_Query for posts. No injection risk."
+      },
+      {
+        "action": "wp_ajax_nopriv_uagb_post_pagination_grid",
+        "handler": "UAGB_Post::post_grid_pagination_ajax_callback()",
+        "file": "blocks-config/post/class-uagb-post.php",
+        "nonce_check": "check_ajax_referer('uagb_grid_ajax_nonce', 'nonce')",
+        "verdict": "informational",
+        "description": "Grid pagination. Nonce-protected. Input sanitized via absint. No injection."
+      },
+      {
+        "action": "wp_ajax_nopriv_uagb_get_posts",
+        "handler": "UAGB_Post::masonry_pagination()",
+        "file": "blocks-config/post/class-uagb-post.php",
+        "nonce_check": "check_ajax_referer('uagb_masonry_ajax_nonce', 'nonce')",
+        "verdict": "informational",
+        "description": "Masonry pagination. Nonce-protected. No injection risk."
+      },
+      {
+        "action": "wp_ajax_nopriv_uag_load_image_gallery_masonry",
+        "handler": "Spectra_Image_Gallery::render_masonry_pagination()",
+        "file": "blocks-config/image-gallery/class-spectra-image-gallery.php",
+        "nonce_check": "check_ajax_referer('uagb_image_gallery_masonry_ajax_nonce', 'nonce')",
+        "verdict": "informational",
+        "description": "Gallery masonry pagination. Nonce-protected. sanitize_text_field on page_number. No injection."
+      },
+      {
+        "action": "wp_ajax_nopriv_uag_load_image_gallery_grid_pagination",
+        "handler": "Spectra_Image_Gallery::render_grid_pagination()",
+        "file": "blocks-config/image-gallery/class-spectra-image-gallery.php",
+        "nonce_check": "check_ajax_referer('uagb_image_gallery_grid_pagination_ajax_nonce', 'nonce')",
+        "verdict": "informational",
+        "description": "Gallery grid pagination. Nonce-protected. sanitize_text_field on page_number. No injection."
+      }
+    ]
+  },
+  "reportable_findings": [
+    {
+      "id": "UAG-2026-001",
+      "title": "Low: Unauthenticated Form Email Spam via Nonce Exposure in uagb_process_forms",
+      "severity": "low",
+      "cvss_estimate": "3.5",
+      "type": "broken_access_control",
+      "affected_handler": "wp_ajax_nopriv_uagb_process_forms",
+      "description": "The uagb_process_forms AJAX handler is registered for unauthenticated users (nopriv) and is protected only by a nonce. However, the nonce (uagb_forms_ajax_nonce) is localized into the uagb-forms-js script on any public page containing a Spectra Forms block, meaning any site visitor (including bots) can retrieve it from the page source and submit arbitrary form data to trigger email sending. The email recipient is fixed by the block configuration (not user-controllable), and the body content is esc_html() escaped. The primary risk is unauthenticated email spam to the site admin and any configured recipients.",
+      "prerequisites": "Site must have at least one published page/post containing a Spectra (uagb/forms) block.",
+      "impact": "Unauthenticated users can trigger email sending to configured recipients with arbitrary body content (HTML-escaped). No code execution, no data exfiltration, no email header injection.",
+      "proof_of_concept": "1. Browse to any page with a Spectra Forms block. 2. In page source, find uagb_forms_data.uagb_forms_ajax_nonce value. 3. POST to /wp-admin/admin-ajax.php with action=uagb_process_forms, nonce=<obtained_nonce>, post_id=<post_id>, block_id=<block_id>, form_data=<json>.",
+      "remediation": "The nopriv handler is intentional for public-facing forms. To reduce spam, implement server-side rate limiting, require CAPTCHA (the plugin already supports this via reCAPTCHA — ensure it is configured), or validate honeypot fields server-side.",
+      "false_positive_risk": "low — this is a design decision; the behavior is intentional but represents a potential abuse vector."
+    }
+  ]
+}
