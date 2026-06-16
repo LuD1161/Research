@@ -1,0 +1,260 @@
+{
+  "plugin_slug": "popup-builder",
+  "priority_score": 14,
+  "metadata": {
+    "php_files": 89,
+    "total_lines": 29433
+  },
+  "attack_surface_summary": "# Attack Surface: popup-builder\n\n> Generated: 2026-06-16T18:36:25Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 863,
+    "total_sinks": 289,
+    "total_sanitizers": 846,
+    "direct_flows": 686,
+    "functions_with_sources": 190,
+    "functions_with_sinks": 128,
+    "files_analyzed": 89,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "popup-builder-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "popup-builder",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$m = isset( $_GET['m'] ) ? (int) sanitize_text_field( wp_unslash( $_GET['m'] ) ) : 0",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/popup-builder/com/libs/ListTable.php",
+        "line": 564
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 564,
+          "expression": "$m = isset( $_GET['m'] ) ? (int) sanitize_text_field( wp_unslash( $_GET['m'] ) ) : 0",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 577,
+          "expression": "printf( \"<option %s value='%s'>%s</option>\\n\",\r\n\t\t\t\tselected( $m, $year . $month, false ),\r\n\t\t\t\tesc_attr( $arc_row->year . $month ),\r\n\t\t\t\t/* translators: 1: month name, 2: 4-digit year */\r\n\t\t\t\tsprintf( esc_html__( '%1$s %2$d', 'popup-builder' ), esc_html($wp_locale->get_month( $month )), esc_html($year) )\r\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf( \"<option %s value='%s'>%s</option>\\n\",\r\n\t\t\t\tselected( $m, $year . $month, false ),\r\n\t\t\t\tesc_attr( $arc_row->year . $month ),\r\n\t\t\t\t/* translators: 1: month name, 2: 4-digit year */\r\n\t\t\t\tsprintf( esc_html__( '%1$s %2$d', 'popup-builder' ), esc_html($wp_locale->get_month( $month )), esc_html($year) )\r\n\t\t\t)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/popup-builder/com/libs/ListTable.php",
+        "line": 577
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "popup-builder-lfi-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "popup-builder",
+      "vulnerability_class": "local_file_inclusion",
+      "source": {
+        "expression": "$allPopupData = $_POST['allPopupData']",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/popup-builder/com/classes/Ajax.php",
+        "line": 182
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 182,
+          "expression": "$allPopupData = $_POST['allPopupData']",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 187,
+          "expression": "$popupData = SGPopup::parsePopupDataFromData($allPopupData)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 190,
+          "expression": "$popupType = $popupData['sgpb-type']",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 191,
+          "expression": "$popupClassName = SGPopup::getPopupClassNameFormType($popupType)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 195,
+          "expression": "require_once($popupClassPath.$popupClassName.'.php')",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "require_once($popupClassPath.$popupClassName.'.php')",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/popup-builder/com/classes/Ajax.php",
+        "line": 195
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "popup-builder-ssrf-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "popup-builder",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$url = isset($_POST['iframeUrl']) ? esc_url_raw(  wp_unslash( $_POST['iframeUrl'] ) ) : ''",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/popup-builder/com/classes/Ajax.php",
+        "line": 818
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 818,
+          "expression": "$url = isset($_POST['iframeUrl']) ? esc_url_raw(  wp_unslash( $_POST['iframeUrl'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 821,
+          "expression": "$remoteGet = wp_remote_get($url)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$remoteGet = wp_remote_get($url)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/popup-builder/com/classes/Ajax.php",
+        "line": 821
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "popup-builder-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "popup-builder",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$status  = get_option( 'sgpb-license-status-' . $key )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/popup-builder/public/views/license.php",
+        "line": 17
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 17,
+          "expression": "$status  = get_option( 'sgpb-license-status-' . $key )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 20,
+          "expression": "echo ( $status !== false && $status == 'valid' ) ? 'active' : 'inactive'",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ( $status !== false && $status == 'valid' ) ? 'active' : 'inactive'",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/popup-builder/public/views/license.php",
+        "line": 20
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [],
+  "stats": {
+    "taint_critical": 0,
+    "taint_high": 2,
+    "taint_total": 4,
+    "semgrep_error": 0,
+    "semgrep_warning": 0
+  }
+}

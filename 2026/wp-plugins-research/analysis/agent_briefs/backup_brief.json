@@ -1,0 +1,125 @@
+{
+  "plugin_slug": "backup",
+  "priority_score": 12,
+  "metadata": {
+    "php_files": 732,
+    "total_lines": 114201
+  },
+  "attack_surface_summary": "# Attack Surface: backup\n\n> Generated: 2026-06-16T18:36:21Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 825,
+    "total_sinks": 556,
+    "total_sanitizers": 756,
+    "direct_flows": 94,
+    "functions_with_sources": 73,
+    "functions_with_sinks": 328,
+    "files_analyzed": 732,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "backup-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "backup",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$queue_id = isset($_REQUEST['id']) ? Wordpress::sanitizeTextField(Wordpress::getUnslash($_REQUEST['id'])) : ''",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/backup/src/JetBackup/Restore/restore.template.php",
+        "line": 26
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 26,
+          "expression": "$queue_id = isset($_REQUEST['id']) ? Wordpress::sanitizeTextField(Wordpress::getUnslash($_REQUEST['id'])) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 53,
+          "expression": "echo $queue_id;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $queue_id;",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/backup/src/JetBackup/Restore/restore.template.php",
+        "line": 53
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "backup-path-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "backup",
+      "vulnerability_class": "path_traversal",
+      "source": {
+        "expression": "$address = $_ENV['SSH_AUTH_SOCK']",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/backup/src/JetBackup/3rdparty/phpseclib3/System/SSH/Agent.php",
+        "line": 127
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 127,
+          "expression": "$address = $_ENV['SSH_AUTH_SOCK']",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 144,
+          "expression": "$this->fsock = fopen($address, 'r+b')",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$this->fsock = fopen($address, 'r+b')",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/backup/src/JetBackup/3rdparty/phpseclib3/System/SSH/Agent.php",
+        "line": 144
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [],
+  "stats": {
+    "taint_critical": 0,
+    "taint_high": 2,
+    "taint_total": 2,
+    "semgrep_error": 0,
+    "semgrep_warning": 0
+  }
+}

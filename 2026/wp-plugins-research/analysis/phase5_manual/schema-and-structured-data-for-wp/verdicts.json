@@ -1,0 +1,370 @@
+{
+  "plugin_slug": "schema-and-structured-data-for-wp",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "claude-opus-4-6",
+  "summary": "60 taint flows reviewed across XSS, SSRF, and path traversal categories. The vast majority are false positives due to: (1) ternary comparisons that output only constant strings like 'checked', 'selected', 'saswp_hide'; (2) proper escaping with esc_attr/esc_url/esc_html at sinks; (3) wp_json_encode in JSON-LD script contexts; (4) WordPress core functions like wp_get_attachment_image that handle escaping internally. Two low-severity stored XSS findings in admin-only contexts were identified but not confirmed as exploitable due to requiring admin privileges on both the write and read paths.",
+  "confirmed_count": 0,
+  "rejected_count": 60,
+  "verdicts": [
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Source is intval($_GET['post_id']) which produces an integer. The value passes through saswp_post_specific_schema() which builds HTML using esc_attr/esc_html throughout. The function is AJAX-handler gated with nonce + current_user_can checks. Admin-only context, integer input."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Source uses sanitize_text_field() on $_GET['item']. Flows into saswp_post_specific_schema() which applies esc_attr/esc_html on all output. Admin-only AJAX handler with nonce verification."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The sink 'echo ($location == 1 ? \"checked\" : \"\")' is a ternary that outputs only constant strings. No user data reaches the output regardless of $location's value."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The sink 'echo ($location == 1 ? \"\" : \"saswp_hide\")' is a ternary outputting only constant strings. No user data in output."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-005",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sink uses esc_attr() on the value: 'echo isset($schema_options[\"enable_custom_field\"]) ? esc_attr($schema_options[\"enable_custom_field\"]):\"0\"'. Properly escaped."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-006",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant strings ('saswp_hide' or ''). No user data in output."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-007",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant strings ('saswp_hide' or ''). No user data in output."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-008",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sink uses both esc_attr() for the name attribute and esc_html() for textarea content. Properly escaped."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-009",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sink uses esc_attr() for option value and esc_html() for display text. The taxonomy_term value is only used in a comparison for 'selected' attribute (constant string output)."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-010",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sink uses esc_url() for the img src attribute. esc_url() properly sanitizes URLs including encoding quotes and preventing javascript: URIs."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-011",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant strings ('saswp_hide' or ''). No user data in output."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-012",
+      "verdict": "false_positive",
+      "confidence": "medium",
+      "reasoning": "The saswp_post_specific_schema() function builds form HTML using esc_attr/esc_html throughout for user-controllable values. While one sprintf() call at line 544 passes $media_thumbnail without esc_attr(), this is in an admin metabox context requiring manage_options capability. WordPress considers administrators trusted (they have unfiltered_html by default). The metabox is rendered on the post edit screen for the custom post type 'saswp'."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-013",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "AJAX handler with nonce verification and current_user_can() check. post_id is intval(). schema_type is sanitize_text_field(). Output from saswp_post_specific_schema() uses esc_attr/esc_html throughout."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-ssrf-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The wp_remote_post() target URL is hardcoded to 'http://magazine3.company/wp-json/api/central/email/subscribe'. User input ($name, $email, $website) is only passed as POST body parameters, all sanitized with sanitize_text_field(). No SSRF - user cannot control the request target."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-014",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Output uses wp_json_encode() which properly JSON-encodes all string values. This is a JSON AJAX response, not HTML context. Content-Type would be application/json. No XSS vector."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-ssrf-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The URL comes from get_option('saswp-file-upload_url') which is set via wp_handle_upload() returning the WordPress upload directory URL. The URL is always a local uploads path from the same WordPress installation. Protected by current_user_can() check. The option is set through WordPress register_setting sanitize callback which requires admin access."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-015",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Output uses wp_json_encode() for a download/export response with Content-Type: application/json and Content-Disposition: attachment headers. This is a file download, not rendered HTML. Protected by current_user_can() and nonce."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-016",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sink uses esc_url() on the admin_url() output. esc_url() properly sanitizes the URL."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-path-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The fopen() URL comes from get_option('saswp_rv_csv_upload_url') which is set only via wp_handle_upload() in the settings sanitize callback (admin-only). The URL is always a WordPress uploads directory URL. Protected by current_user_can() check at line 336."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-ssrf-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The wp_remote_get() URL is hardcoded to 'https://www.google.com/recaptcha/api/siteverify'. The $secret_key comes from get_option() (admin-configured) and $captcha from $_POST, both urlencode()d as query parameters. No SSRF - domain is hardcoded to google.com."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-017",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The saswp_get_rating_html_by_value_column() function only generates static HTML span tags with CSS class names based on numeric comparisons. The $rating_val is never inserted as raw text into HTML. Only constant class names ('str-ic', 'half-str', 'df-clr') are output."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-018",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The $term->slug from get_term() is passed through esc_url() as part of an image src attribute. esc_url() properly handles the encoding."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-019",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Both href and link text are properly escaped with esc_url() and esc_html() respectively."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-020",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Both href (via esc_url(get_permalink())) and link text (via esc_html()) are properly escaped."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-021",
+      "verdict": "false_positive",
+      "confidence": "medium",
+      "reasoning": "The video_url is sanitized with esc_url() which encodes double quotes as %22, preventing attribute breakout. The esc_url() function also blocks javascript: and data: protocols. While esc_attr() would be more appropriate for an HTML attribute context, esc_url() provides sufficient protection here. Nonce-protected AJAX handler."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-022",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Output uses wp_json_encode() for a JSON AJAX response. collection_id is intval(). Admin-only with nonce + current_user_can."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-023",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Output uses wp_json_encode() for a JSON AJAX response. platform_id is intval(). Admin-only with nonce + current_user_can."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-024",
+      "verdict": "false_positive",
+      "confidence": "medium",
+      "reasoning": "wp_json_encode($reviews_list) output placed in HTML value attribute without esc_attr(). While the JSON quotes could theoretically break out of the HTML attribute, this is in an admin-only page protected by current_user_can() and nonce. The data source (post meta) can only be set by admins. WordPress considers admins trusted (unfiltered_html capability). Not exploitable by lower-privileged users."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-025",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sink uses esc_attr() for option value and esc_html() for display text. Comparison with constant keys only outputs 'selected' or ''. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-026",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "intval() applied to post_meta value before echo. Output is always an integer. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-027",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant string 'checked' or ''. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-028",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "intval() applied to post_meta value before echo. Output is always an integer. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-029",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant string 'checked' or ''. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-030",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant string 'checked' or ''. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-031",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant string 'checked' or ''. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-032",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant strings 'selected' or ''. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-033",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant strings 'selected' or ''. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-034",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant string 'checked' or ''. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-035",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant string 'checked' or ''. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-036",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant string 'checked' or ''. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-037",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "intval() applied to post_meta value before echo. Output is always an integer. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-038",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant string 'checked' or ''. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-039",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant string 'checked' or ''. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-040",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "intval() applied to post_meta value before echo. Output is always an integer. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-041",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant string 'checked' or ''. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-042",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sink uses esc_attr() on the value. Properly escaped. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-043",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sink uses esc_url() on the image URL. Properly escaped. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-044",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sink uses esc_url() on the image URL. Properly escaped. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-045",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant string 'checked' or ''. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-046",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sink uses esc_attr() on the value. Properly escaped. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-047",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sink uses esc_attr() for option value, esc_html() for display text. Comparison for 'selected' outputs constant string. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-048",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant string 'checked' or ''. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-049",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sink uses esc_attr() for option value, esc_html() for display text. Comparison for 'selected' outputs constant string. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-050",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sink uses esc_attr() for option value, esc_html() for display text. Comparison for 'selected' outputs constant string. Admin-only context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-051",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sinks in attachment-template.php all use esc_url() for URLs and WordPress core functions (wp_get_attachment_image, wp_get_attachment_url) that handle escaping internally. Data comes from comment meta set through the plugin's review system."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-052",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Sink uses esc_url() for the video URL. YouTube video IDs extracted via regex are limited to [\\w-]{11}. Self-hosted video URLs go through wp_get_attachment_url() which returns sanitized URLs."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-053",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same as xss-052. Sink uses esc_url(). Video URL is either from wp_get_attachment_url() or constructed with a regex-extracted YouTube ID."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-054",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Output via saswp_json_print_format() which uses wp_json_encode(). This outputs inside <script type=\"application/ld+json\"> tag. wp_json_encode() properly escapes all string values including <, >, quotes. JSON-LD script blocks are not parsed as HTML."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-055",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Ternary comparison outputs only constant string 'checked=\"checked\"' or ''. No user data in output. Admin metabox context."
+    },
+    {
+      "flow_id": "schema-and-structured-data-for-wp-xss-056",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "wp_get_attachment_image() is a WordPress core function that internally escapes all HTML attributes including the 'alt' attribute via esc_attr(). The $image_alt from get_post_meta() is safely handled by the core function."
+    }
+  ]
+}

@@ -1,0 +1,141 @@
+{
+  "plugin": "feeds-for-youtube",
+  "analyst": "phase5-manual",
+  "date": "2026-06-16",
+  "summary": {
+    "total_flows_reviewed": 14,
+    "confirmed": 0,
+    "false_positive": 14,
+    "needs_more_info": 0
+  },
+  "verdicts": [
+    {
+      "flow_id": "feeds-for-youtube-sqli-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "rationale": "The taint analyzer misclassifies $wpdb->get_col() output as tainted user-controlled data, but it is not. The query 'SELECT ID FROM $wpdb->posts WHERE post_type = \"sby_videos\";' fetches only integer post IDs from WordPress's own database — these are internal autoincrement integers that cannot be injected by an external user. The resulting $id_string (e.g. '1, 2, 3') composed of integers is safe inside an IN() clause. Furthermore, this code runs only in uninstall.php which is executed exclusively under WP_UNINSTALL_PLUGIN context, not via any web-accessible HTTP request. No exploitable SQL injection exists.",
+      "file": "uninstall.php",
+      "lines": [42, 44, 46]
+    },
+    {
+      "flow_id": "feeds-for-youtube-sqli-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "rationale": "Same pattern as sqli-001 but in admin-functions.php::sby_clear_wp_posts(). The IDs come from $wpdb->get_col() using a hardcoded query restricted to post_type='sby_videos'. These are internal integer IDs from the database, not user-controlled. The function is invoked via AJAX action 'sby_delete_wp_posts' in MiscService.php which validates a nonce (wp_verify_nonce with 'sbspf_nonce') before calling sby_clear_wp_posts(). Even granting an attacker could call this action with a forged nonce, the SQL values are integers from WP's own posts table — not attacker-supplied. The IN ($id_string) with pure integers is not injectable.",
+      "file": "inc/Admin/admin-functions.php",
+      "lines": [491, 493, 495]
+    },
+    {
+      "flow_id": "feeds-for-youtube-xss-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "rationale": "The handler get_page() at SBY_Source.php:164-178 has a double nonce check (check_ajax_referer for 'sbi_admin_nonce' OR 'sby-admin') AND a capability check (sby_current_user_can). This restricts the endpoint to authenticated admins. The $args['page'] value is passed to SBI_Db::source_query() for pagination — it is used as a database query offset/limit parameter, not interpolated into raw SQL (would need to confirm SBI_Db::source_query internals but taint stops here). The output is echo json_encode($source_data) which returns JSON-encoded database records — not attacker XSS data echoed into HTML. JSON encoding in an application/json response context does not constitute XSS without further DOM rendering. Admin-only: no meaningful auth bypass.",
+      "file": "inc/Builder/SBY_Source.php",
+      "lines": [172, 173, 175]
+    },
+    {
+      "flow_id": "feeds-for-youtube-ssrf-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "rationale": "This is not SSRF. The $access_token from $_GET['sbi_access_token'] is appended as a query parameter to a hardcoded URL: 'https://graph.facebook.com/me/accounts?fields=...&access_token=' . $access_token. The destination host is always graph.facebook.com — the attacker cannot redirect the request to an internal server. The access_token is a credential passed through sbi_maybe_clean(urldecode()), so special characters are cleaned. In SSRF, the attacker must control the host portion of the URL; here only the access_token query parameter value is attacker-influenced, and the call goes to a fixed external API. This is token leakage risk at most (if a crafted token caused unexpected behavior), not SSRF. Additionally, maybe_source_connection_data() is called from builder_enqueue_admin_scripts() which runs only on the admin 'sby-feed-builder' screen load, behind WordPress admin authentication.",
+      "file": "inc/Builder/SBY_Source.php",
+      "lines": [353, 357, 362]
+    },
+    {
+      "flow_id": "feeds-for-youtube-ssrf-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "rationale": "Same as ssrf-001. The $access_token is appended as a query parameter to a hardcoded 'https://graph.facebook.com/me?...' URL. The destination host is fixed. Not SSRF. Access is admin-only (builder page context).",
+      "file": "inc/Builder/SBY_Source.php",
+      "lines": [353, 395, 399]
+    },
+    {
+      "flow_id": "feeds-for-youtube-ssrf-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "rationale": "Same as ssrf-001/002. The URL constructed is 'https://graph.facebook.com/' . $instagram_business_id . '?...&access_token=' . $access_token where $instagram_business_id comes from the Facebook API response (not attacker-controlled directly from GET), and $access_token is only a query parameter. The fixed host (graph.facebook.com) is not attacker-controlled. Not SSRF. Admin-only context.",
+      "file": "inc/Builder/SBY_Source.php",
+      "lines": [353, 412, 417]
+    },
+    {
+      "flow_id": "feeds-for-youtube-xss-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "rationale": "The feed_customizer_fly_preview() method at SBY_Feed_Saver_Manager.php:320 has: (1) check_ajax_referer('sby-admin', 'nonce') — valid nonce required, (2) sby_current_user_can('manage_youtube_feed_options') — admin/privileged user required. The output is echo json_encode($return) which is JSON-encoded data. Even if $preview_settings contains malicious strings, JSON encoding does not produce executable HTML XSS unless the JavaScript receiver uses innerHTML or eval on the raw JSON value without parsing. This is a JSON AJAX response to the admin builder UI. No meaningful XSS vulnerability for an already-privileged admin. The 'sink' is not an HTML context.",
+      "file": "inc/Builder/SBY_Feed_Saver_Manager.php",
+      "lines": [330, 333, 357, 359]
+    },
+    {
+      "flow_id": "feeds-for-youtube-xss-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "rationale": "Same as xss-002. feed_customizer_feed_handle_fly_preview() at line 370 has both check_ajax_referer('sby-admin', 'nonce') and sby_current_user_can('manage_youtube_feed_options'). Output is JSON-encoded. Admin-only, JSON response. Not meaningful XSS.",
+      "file": "inc/Builder/SBY_Feed_Saver_Manager.php",
+      "lines": [380, 384, 385, 406, 408]
+    },
+    {
+      "flow_id": "feeds-for-youtube-xss-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "rationale": "sby_get_next_post_set() in AdminAjaxService.php has: (1) check_ajax_referer('sby_nonce', 'nonce'), (2) feed_id must contain 'sby' substring (strpos check), (3) $feed_id = sanitize_text_field(...). The taint trace claims $feed_id reaches echo wp_json_encode($return) but the $return array is built from $return_html (feed rendering output) and $youtube_feed->get_report() — neither of which uses $feed_id directly in an unsanitized way. The $feed_id is used as a transient name ($transient_name = $feed_id at line 84), not echoed in HTML. wp_json_encode() does proper JSON escaping. This is admin-ajax with nonce protection and sanitization. No exploitable XSS path.",
+      "file": "inc/Services/AdminAjaxService.php",
+      "lines": [47, 194, 204]
+    },
+    {
+      "flow_id": "feeds-for-youtube-xss-005",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "rationale": "sby_process_wp_posts() in AdminAjaxService.php has: (1) check_ajax_referer('sby_nonce', 'nonce'), (2) feed_id strpos 'sby' check, (3) sanitize_text_field on $feed_id. The $feed_id is used as a transient name, not inserted unsanitized into HTML output. $vid_ids are sanitized via array_map('sanitize_text_field', ...). The output echo wp_json_encode($info) returns result data from sby_add_or_update_wp_posts(), not raw $feed_id. wp_json_encode ensures JSON safety. No exploitable XSS.",
+      "file": "inc/Services/AdminAjaxService.php",
+      "lines": [321, 351, 353]
+    },
+    {
+      "flow_id": "feeds-for-youtube-ssrf-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "rationale": "Not SSRF. The $sby_license (from get_option) is used as a query parameter value in add_query_arg($api_params, SBY_STORE_URL) where SBY_STORE_URL is the hardcoded constant 'https://smashballoon.com/'. The destination is always smashballoon.com — the license key value cannot redirect the request to an internal host. add_query_arg() only appends to the base URL query string. The license key is a stored option, not direct user input. No SSRF.",
+      "file": "inc/Services/Admin/LicenseService.php",
+      "lines": [184, 188, 196]
+    },
+    {
+      "flow_id": "feeds-for-youtube-ssrf-005",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "rationale": "Same analysis as ssrf-004. Hardcoded SBY_STORE_URL as base, license key only in query parameters. Not SSRF.",
+      "file": "inc/Services/Admin/LicenseService.php",
+      "lines": [293, 315, 322]
+    },
+    {
+      "flow_id": "feeds-for-youtube-ssrf-006",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "rationale": "Same analysis as ssrf-004/005. Duplicate code path in the same function. Not SSRF.",
+      "file": "inc/Services/Admin/LicenseService.php",
+      "lines": [293, 344, 349]
+    },
+    {
+      "flow_id": "feeds-for-youtube-ssrf-007",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "rationale": "Same analysis as ssrf-004/005/006. Hardcoded SBY_STORE_URL, license from stored option, query params only. Not SSRF.",
+      "file": "inc/Services/Admin/LicenseService.php",
+      "lines": [727, 730, 735]
+    },
+    {
+      "flow_id": "feeds-for-youtube-ssrf-008",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "rationale": "The handler maybe_upgrade_redirect() in SBY_Upgrader.php at line 96 has: (1) check_ajax_referer('sby-admin', 'nonce'), (2) sby_current_user_can check. The license key from $_POST is processed through sanitize_key() which strips all non-alphanumeric/dash/underscore characters. The URL is constructed as add_query_arg($args, self::CHECK_URL) where CHECK_URL = 'https://connect.smashballoon.com/activate/check.php' is a hardcoded constant. The sanitized key can only appear as a query parameter value. The call uses wp_safe_remote_get() which additionally prevents redirects to non-allowed hosts. No SSRF is possible — destination is always smashballoon.com, key is sanitized, and wp_safe_remote_get enforces allowed host lists.",
+      "file": "inc/Admin/SBY_Upgrader.php",
+      "lines": [113, 118, 128, 134]
+    },
+    {
+      "flow_id": "feeds-for-youtube-path-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "rationale": "This is not a path traversal vulnerability. $_FILES['feedFile']['tmp_name'] is the server-assigned temporary file path created by PHP's file upload mechanism — it is set by PHP itself based on the server's tmp directory (e.g. /tmp/phpXXXXXX), not by the user-supplied filename. The user-supplied name is in $_FILES['feedFile']['name'], not 'tmp_name'. PHP generates tmp_name from its own upload_tmp_dir configuration and the attacker cannot inject paths through it. The code correctly reads from tmp_name (server-controlled path) rather than from the user-supplied filename. Additionally, ajaxPreflightChecks() at line 24 enforces check_ajax_referer('sby-admin', 'nonce') and current_user_can('manage_options') — admin-only endpoint. No path traversal.",
+      "file": "inc/Services/Admin/ImporterService.php",
+      "lines": [33]
+    }
+  ]
+}

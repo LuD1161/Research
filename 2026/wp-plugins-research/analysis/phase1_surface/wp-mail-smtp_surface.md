@@ -1,6 +1,6 @@
 # Attack Surface: wp-mail-smtp
 
-> Generated: 2026-06-16T09:13:57Z
+> Generated: 2026-06-16T18:36:27Z
 
 ## Section 1: Entry Points
 

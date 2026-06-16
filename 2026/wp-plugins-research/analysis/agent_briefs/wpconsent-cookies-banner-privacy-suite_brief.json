@@ -1,0 +1,644 @@
+{
+  "plugin_slug": "wpconsent-cookies-banner-privacy-suite",
+  "priority_score": 61,
+  "metadata": {
+    "php_files": 77,
+    "total_lines": 25031
+  },
+  "attack_surface_summary": "# Attack Surface: wpconsent-cookies-banner-privacy-suite\n\n> Generated: 2026-06-16T18:36:27Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 563,
+    "total_sinks": 224,
+    "total_sanitizers": 668,
+    "direct_flows": 518,
+    "functions_with_sources": 115,
+    "functions_with_sinks": 109,
+    "files_analyzed": 77,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wpconsent-cookies-banner-privacy-suite",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$auth_header = isset( $_SERVER['HTTP_AUTHORIZATION'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_AUTHORIZATION'] ) ) : ''",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/class-wpconsent-scanner.php",
+        "line": 615
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 615,
+          "expression": "$auth_header = isset( $_SERVER['HTTP_AUTHORIZATION'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_AUTHORIZATION'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 622,
+          "expression": "$headers['Authorization'] = $auth_header",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 625,
+          "expression": "wp_remote_get(\n\t\t\tadd_query_arg(\n\t\t\t\tarray(\n\t\t\t\t\t'wpconsent_debug' => 'true',\n\t\t\t\t),\n\t\t\t\t$url\n\t\t\t),\n\t\t\tarray(\n\t\t\t\t'sslverify' => false,\n\t\t\t\t'headers'   => $headers,\n\t\t\t)\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_remote_get(\n\t\t\tadd_query_arg(\n\t\t\t\tarray(\n\t\t\t\t\t'wpconsent_debug' => 'true',\n\t\t\t\t),\n\t\t\t\t$url\n\t\t\t),\n\t\t\tarray(\n\t\t\t\t'sslverify' => false,\n\t\t\t\t'headers'   => $headers,\n\t\t\t)\n\t\t)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/class-wpconsent-scanner.php",
+        "line": 625
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wpconsent-cookies-banner-privacy-suite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$icon_value = wpconsent()->settings->get_option( 'consent_floating_icon', 'preferences' )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/class-wpconsent-banner.php",
+        "line": 890
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 890,
+          "expression": "$icon_value = wpconsent()->settings->get_option( 'consent_floating_icon', 'preferences' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 893,
+          "expression": "echo '<img src=\"' . esc_url( $icon_value ) . '\" alt=\"' . esc_attr__( 'Cookie Settings', 'wpconsent-cookies-banner-privacy-suite' ) . '\">';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<img src=\"' . esc_url( $icon_value ) . '\" alt=\"' . esc_attr__( 'Cookie Settings', 'wpconsent-cookies-banner-privacy-suite' ) . '\">';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/class-wpconsent-banner.php",
+        "line": 893
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wpconsent-cookies-banner-privacy-suite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$icon_value = wpconsent()->settings->get_option( 'consent_floating_icon', 'preferences' )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-banner.php",
+        "line": 555
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 555,
+          "expression": "$icon_value = wpconsent()->settings->get_option( 'consent_floating_icon', 'preferences' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 557,
+          "expression": "echo '<img src=\"' . esc_url( $icon_value ) . '\" alt=\"' . esc_attr__( 'Cookie Settings', 'wpconsent-cookies-banner-privacy-suite' ) . '\">';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<img src=\"' . esc_url( $icon_value ) . '\" alt=\"' . esc_attr__( 'Cookie Settings', 'wpconsent-cookies-banner-privacy-suite' ) . '\">';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-banner.php",
+        "line": 557
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wpconsent-cookies-banner-privacy-suite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$buttons = array(\n\t\t\t'accept'      => array(\n\t\t\t\t'label'   => esc_html__( 'Accept Button', 'wpconsent-cookies-banner-privacy-suite' ),\n\t\t\t\t'text'    => wpconsent()->settings->get_option( 'accept_button_text', wpconsent()->strings->get_string( 'accept_button_text' ) ),\n\t\t\t\t'enabled' => wpconsent()->settings->get_option( 'accept_button_enabled', true ),\n\t\t\t),\n\t\t\t'cancel'      => array(\n\t\t\t\t'label'   => esc_html__( 'Reject Button', 'wpconsent-cookies-banner-privacy-suite' ),\n\t\t\t\t'text'    => wpconsent()->settings->get_option( 'cancel_button_text', wpconsent()->strings->get_string( 'cancel_button_text' ) ),\n\t\t\t\t'enabled' => wpconsent()->settings->get_option( 'cancel_button_enabled', true ),\n\t\t\t),\n\t\t\t'preferences' => array(\n\t\t\t\t'label'   => esc_html__( 'Settings Button', 'wpconsent-cookies-banner-privacy-suite' ),\n\t\t\t\t'text'    => wpconsent()->settings->get_option( 'preferences_button_text', wpconsent()->strings->get_string( 'preferences_button_text' ) ),\n\t\t\t\t'enabled' => wpconsent()->settings->get_option( 'preferences_button_enabled', true ),\n\t\t\t),\n\t\t)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-banner.php",
+        "line": 1112
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1112,
+          "expression": "$buttons = array(\n\t\t\t'accept'      => array(\n\t\t\t\t'label'   => esc_html__( 'Accept Button', 'wpconsent-cookies-banner-privacy-suite' ),\n\t\t\t\t'text'    => wpconsent()->settings->get_option( 'accept_button_text', wpconsent()->strings->get_string( 'accept_button_text' ) ),\n\t\t\t\t'enabled' => wpconsent()->settings->get_option( 'accept_button_enabled', true ),\n\t\t\t),\n\t\t\t'cancel'      => array(\n\t\t\t\t'label'   => esc_html__( 'Reject Button', 'wpconsent-cookies-banner-privacy-suite' ),\n\t\t\t\t'text'    => wpconsent()->settings->get_option( 'cancel_button_text', wpconsent()->strings->get_string( 'cancel_button_text' ) ),\n\t\t\t\t'enabled' => wpconsent()->settings->get_option( 'cancel_button_enabled', true ),\n\t\t\t),\n\t\t\t'preferences' => array(\n\t\t\t\t'label'   => esc_html__( 'Settings Button', 'wpconsent-cookies-banner-privacy-suite' ),\n\t\t\t\t'text'    => wpconsent()->settings->get_option( 'preferences_button_text', wpconsent()->strings->get_string( 'preferences_button_text' ) ),\n\t\t\t\t'enabled' => wpconsent()->settings->get_option( 'preferences_button_enabled', true ),\n\t\t\t),\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1154,
+          "expression": "$button = $buttons[ $button_id ]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1177,
+          "expression": "echo $this->get_checkbox_toggle( $button['enabled'], $button_id . '_button_enabled', '', '', '', '#wpconsent-' . $button_id . '-all' );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $this->get_checkbox_toggle( $button['enabled'], $button_id . '_button_enabled', '', '', '', '#wpconsent-' . $button_id . '-all' );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-banner.php",
+        "line": 1177
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wpconsent-cookies-banner-privacy-suite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo wpconsent()->settings->get_option( 'enable_script_blocking', 1 ) ? 'checked' : '';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-scanner.php",
+        "line": 901
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 901,
+          "expression": "echo wpconsent()->settings->get_option( 'enable_script_blocking', 1 ) ? 'checked' : '';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo wpconsent()->settings->get_option( 'enable_script_blocking', 1 ) ? 'checked' : '';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-scanner.php",
+        "line": 901
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wpconsent-cookies-banner-privacy-suite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$selected_page_id = wpconsent()->settings->get_option( 'cookie_policy_page' )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-cookies.php",
+        "line": 1032
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1032,
+          "expression": "$selected_page_id = wpconsent()->settings->get_option( 'cookie_policy_page' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1065,
+          "expression": "echo esc_url( get_permalink( $selected_page_id ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( get_permalink( $selected_page_id ) );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-cookies.php",
+        "line": 1065
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wpconsent-cookies-banner-privacy-suite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$declarations = wpconsent()->settings->get_option( 'iab_tcf_publisher_declarations', array() )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-cookies.php",
+        "line": 2127
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2127,
+          "expression": "$declarations = wpconsent()->settings->get_option( 'iab_tcf_publisher_declarations', array() )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2141,
+          "expression": "$purposes_consent = isset( $declarations['purposes_consent'] ) ? $declarations['purposes_consent'] : array()",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 2159,
+          "expression": "echo count( $purposes_consent );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo count( $purposes_consent );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-cookies.php",
+        "line": 2159
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wpconsent-cookies-banner-privacy-suite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$declarations = wpconsent()->settings->get_option( 'iab_tcf_publisher_declarations', array() )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-cookies.php",
+        "line": 2127
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2127,
+          "expression": "$declarations = wpconsent()->settings->get_option( 'iab_tcf_publisher_declarations', array() )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2141,
+          "expression": "$purposes_consent = isset( $declarations['purposes_consent'] ) ? $declarations['purposes_consent'] : array()",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 2169,
+          "expression": "$checked = in_array( $purpose_id, $purposes_consent, true )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 2170,
+          "expression": "printf(\n\t\t\t\t\t\t\t'<label class=\"wpconsent-checkbox-label\">\n\t\t\t\t\t\t\t\t<input type=\"checkbox\" name=\"publisher_purposes_consent[]\" value=\"%1$s\" %2$s>\n\t\t\t\t\t\t\t\t<span><strong>%3$s:</strong> %4$s</span>\n\t\t\t\t\t\t\t</label>',\n\t\t\t\t\t\t\tesc_attr( $purpose_id ),\n\t\t\t\t\t\t\tchecked( $checked, true, false ),\n\t\t\t\t\t\t\t// Translators: Purpose ID.\n\t\t\t\t\t\t\tesc_html( sprintf( __( 'Purpose %d', 'wpconsent-cookies-banner-privacy-suite' ), $purpose_id ) ),\n\t\t\t\t\t\t\tesc_html( $purpose['name'] )\n\t\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf(\n\t\t\t\t\t\t\t'<label class=\"wpconsent-checkbox-label\">\n\t\t\t\t\t\t\t\t<input type=\"checkbox\" name=\"publisher_purposes_consent[]\" value=\"%1$s\" %2$s>\n\t\t\t\t\t\t\t\t<span><strong>%3$s:</strong> %4$s</span>\n\t\t\t\t\t\t\t</label>',\n\t\t\t\t\t\t\tesc_attr( $purpose_id ),\n\t\t\t\t\t\t\tchecked( $checked, true, false ),\n\t\t\t\t\t\t\t// Translators: Purpose ID.\n\t\t\t\t\t\t\tesc_html( sprintf( __( 'Purpose %d', 'wpconsent-cookies-banner-privacy-suite' ), $purpose_id ) ),\n\t\t\t\t\t\t\tesc_html( $purpose['name'] )\n\t\t\t\t\t\t)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-cookies.php",
+        "line": 2170
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wpconsent-cookies-banner-privacy-suite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$declarations = wpconsent()->settings->get_option( 'iab_tcf_publisher_declarations', array() )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-cookies.php",
+        "line": 2127
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2127,
+          "expression": "$declarations = wpconsent()->settings->get_option( 'iab_tcf_publisher_declarations', array() )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2142,
+          "expression": "$purposes_li      = isset( $declarations['purposes_li_transparency'] ) ? $declarations['purposes_li_transparency'] : array()",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 2199,
+          "expression": "printf(\n\t\t\t\t\t\t\t/* translators: 1: number of selected purposes, 2: total number of available purposes */\n\t\t\t\t\t\t\tesc_html__( '(%1$d/%2$d selected)', 'wpconsent-cookies-banner-privacy-suite' ),\n\t\t\t\t\t\t\tcount( $purposes_li ),\n\t\t\t\t\t\t\tabsint( $li_total )\n\t\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf(\n\t\t\t\t\t\t\t/* translators: 1: number of selected purposes, 2: total number of available purposes */\n\t\t\t\t\t\t\tesc_html__( '(%1$d/%2$d selected)', 'wpconsent-cookies-banner-privacy-suite' ),\n\t\t\t\t\t\t\tcount( $purposes_li ),\n\t\t\t\t\t\t\tabsint( $li_total )\n\t\t\t\t\t\t)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-cookies.php",
+        "line": 2199
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-009",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wpconsent-cookies-banner-privacy-suite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$declarations = wpconsent()->settings->get_option( 'iab_tcf_publisher_declarations', array() )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-cookies.php",
+        "line": 2127
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2127,
+          "expression": "$declarations = wpconsent()->settings->get_option( 'iab_tcf_publisher_declarations', array() )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2142,
+          "expression": "$purposes_li      = isset( $declarations['purposes_li_transparency'] ) ? $declarations['purposes_li_transparency'] : array()",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 2220,
+          "expression": "$checked = in_array( $purpose_id, $purposes_li, true )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 2221,
+          "expression": "printf(\n\t\t\t\t\t\t\t'<label class=\"wpconsent-checkbox-label\">\n\t\t\t\t\t\t\t\t<input type=\"checkbox\" name=\"publisher_purposes_li[]\" value=\"%1$s\" %2$s>\n\t\t\t\t\t\t\t\t<span><strong>%3$s:</strong> %4$s</span>\n\t\t\t\t\t\t\t</label>',\n\t\t\t\t\t\t\tesc_attr( $purpose_id ),\n\t\t\t\t\t\t\tchecked( $checked, true, false ),\n\t\t\t\t\t\t\t// Translators: Purpose ID.\n\t\t\t\t\t\t\tesc_html( sprintf( __( 'Purpose %d', 'wpconsent-cookies-banner-privacy-suite' ), $purpose_id ) ),\n\t\t\t\t\t\t\tesc_html( $purpose['name'] )\n\t\t\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "printf(\n\t\t\t\t\t\t\t'<label class=\"wpconsent-checkbox-label\">\n\t\t\t\t\t\t\t\t<input type=\"checkbox\" name=\"publisher_purposes_li[]\" value=\"%1$s\" %2$s>\n\t\t\t\t\t\t\t\t<span><strong>%3$s:</strong> %4$s</span>\n\t\t\t\t\t\t\t</label>',\n\t\t\t\t\t\t\tesc_attr( $purpose_id ),\n\t\t\t\t\t\t\tchecked( $checked, true, false ),\n\t\t\t\t\t\t\t// Translators: Purpose ID.\n\t\t\t\t\t\t\tesc_html( sprintf( __( 'Purpose %d', 'wpconsent-cookies-banner-privacy-suite' ), $purpose_id ) ),\n\t\t\t\t\t\t\tesc_html( $purpose['name'] )\n\t\t\t\t\t\t)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-cookies.php",
+        "line": 2221
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-010",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wpconsent-cookies-banner-privacy-suite",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$selected_page_id = wpconsent()->settings->get_option( 'dnt_page_id' )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-do-not-track.php",
+        "line": 464
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 464,
+          "expression": "$selected_page_id = wpconsent()->settings->get_option( 'dnt_page_id' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 497,
+          "expression": "echo esc_url( get_permalink( $selected_page_id ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( get_permalink( $selected_page_id ) );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wpconsent-cookies-banner-privacy-suite/includes/admin/pages/class-wpconsent-admin-page-do-not-track.php",
+        "line": 497
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [],
+  "stats": {
+    "taint_critical": 0,
+    "taint_high": 10,
+    "taint_total": 11,
+    "semgrep_error": 0,
+    "semgrep_warning": 0
+  }
+}

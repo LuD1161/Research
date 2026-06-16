@@ -1,10 +1,10 @@
 {
   "plugin": "wordpress-importer",
   "review_date": "2026-06-16",
-  "reviewer": "opus-4.6-agent",
-  "total_findings_reviewed": 1,
-  "confirmed": 0,
-  "false_positive": 1,
+  "reviewer": "sonnet-4.6-agent",
+  "total_findings_reviewed": 4,
+  "confirmed": 1,
+  "false_positive": 3,
   "needs_info": 0,
   "verdicts": [
     {
@@ -12,13 +12,55 @@
       "original_severity": "critical",
       "verdict": "FALSE_POSITIVE",
       "confidence": "high",
-      "reasoning": "The scanner flagged assert($arrayIsListFunction($address)) in a vendored IPv6 address parser (rowbot/url) as RCE. assert() in PHP 8+ only accepts boolean expressions, not string code execution. The $address array contains integer values from intval($current, 16) \u2014 hex digit parsing. The $arrayIsListFunction is array_is_list (a PHP 8.1 built-in). This is a type-checking assertion in a URL parser library, not a code execution sink. No user input reaches this code path in any exploitable way.",
+      "reasoning": "The scanner flagged assert($arrayIsListFunction($address)) in a vendored IPv6 address parser (rowbot/url) as RCE. assert() in PHP 8+ only accepts boolean expressions, not string code execution. The $address array contains integer values from intval($current, 16) — hex digit parsing. The $arrayIsListFunction is array_is_list (a PHP 8.1 built-in). This is a type-checking assertion in a URL parser library, not a code execution sink. No user input reaches this code path in any exploitable way.",
       "vulnerability_class": "rce",
       "auth_required": "admin",
       "cvss_score": 0.0,
       "poc_sketch": null
+    },
+    {
+      "finding_id": "wordpress-importer-ssrf-001",
+      "title": "SSRF via attacker-controlled <wp:attachment_url> in WXR import file",
+      "original_severity": "medium",
+      "verdict": "CONFIRMED",
+      "confidence": "high",
+      "confidence_score": 8,
+      "vulnerability_class": "ssrf",
+      "auth_required": "administrator",
+      "cvss_score": 5.5,
+      "cvss_vector": "CVSS:3.1/AV:N/AC:H/PR:H/UI:R/S:C/C:H/I:N/A:N",
+      "affected_file": "plugins/src/wordpress-importer/class-wp-import.php",
+      "affected_lines": "875, 1303-1307, 1364",
+      "reasoning": "The <wp:attachment_url> value in an attacker-supplied WXR file flows without sanitization through process_posts() -> process_attachment() -> fetch_remote_file() -> wp_safe_remote_get(). The attacker controls the ENTIRE URL (host + path). WordPress's wp_safe_remote_get() calls WP_HTTP::block_request() which blocks RFC1918 private ranges (10/8, 172.16/12, 192.168/16) and localhost/127.x.x.x, but does NOT block 169.254.0.0/16 (link-local). This enables SSRF to AWS/Azure/GCP/Oracle Cloud IMDS endpoints at 169.254.169.254. The attack requires: (1) administrator privilege to run an import, and (2) the admin to check the 'Download and import file attachments' checkbox. The response body is streamed to a temp file and gated by wp_check_filetype() before being stored, so direct credential exfiltration requires a secondary channel; however the SSRF network probe itself fires unconditionally upon import, enabling internal service discovery and timing-based information gathering even when response bodies are discarded.",
+      "poc_sketch": "1. Create WXR file with: <wp:attachment_url>http://169.254.169.254/latest/meta-data/iam/security-credentials/</wp:attachment_url> on an attachment post.\n2. As admin, navigate to Tools > Import > WordPress, upload the WXR file.\n3. On Step 2, check 'Download and import file attachments' and click Submit.\n4. wordpress-importer fires wp_safe_remote_get('http://169.254.169.254/...') with a 300-second timeout.\n5. On AWS EC2 with IMDSv1: the credentials JSON response is streamed to a temp file; even if discarded by wp_check_filetype(), the 300s timeout creates an observable timing side-channel. With IMDSv2, the request fails at the token-requirement step but still confirms the host is reachable."
+    },
+    {
+      "finding_id": "wordpress-importer-poi-001",
+      "title": "PHP Object Injection via C: type serialization bypass in maybe_unserialize()",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "medium",
+      "confidence_score": 7,
+      "vulnerability_class": "php_object_injection",
+      "auth_required": "administrator",
+      "cvss_score": 0.0,
+      "reasoning": "The bypass is technically real: the regex /O:\\d+:\"[^\"]+\":/ in maybe_unserialize() does not neutralize C:-prefixed serialized objects (classes implementing PHP's Serializable interface), and WordPress's is_serialized() does recognize C: types, so C: payloads reach PHP's unserialize() with class names intact. C: deserialization still functions on PHP 8.1+ (Serializable is deprecated but not removed). However, exploitation requires: (1) authenticated administrator access — not lower privilege, (2) a usable POP gadget chain implementing Serializable available in the autoloaded codebase. An administrator already has many direct RCE paths (plugin upload, theme editor). The confidence score of 7/10 falls below the required threshold of 8 for inclusion as a confirmed finding. The code defect is real and the fix is straightforward (extend regex or strip C: objects), but it does not represent exploitable risk beyond existing admin capabilities.",
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wordpress-importer-varvar-001",
+      "title": "Variable variable injection in process_menu_item() overwrites $menu_id",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "confidence_score": 2,
+      "vulnerability_class": "variable_injection",
+      "auth_required": "administrator",
+      "cvss_score": 0.0,
+      "reasoning": "The variable variable pattern ${$meta['key']} = $meta['value'] at line 1239 of process_menu_item() is confirmed in the code. Overwriting $menu_id with an attacker-supplied integer redirects a nav menu item to be inserted into a different menu — a cosmetic/UX effect only. No security boundary is crossed: no data exfiltration, no privilege escalation, no code execution. An administrator who can run imports can already call wp_update_nav_menu_item() directly with any menu ID. Excluded as a non-security-impactful finding.",
+      "poc_sketch": null
     }
   ],
-  "summary": "The single automated finding is a false positive. The scanner flagged assert() in a vendored IPv6 parser as RCE, but assert() in PHP 8+ only evaluates boolean expressions, and the value is an integer array from hex parsing. WordPress Importer has no unauthenticated attack surface \u2014 all import functionality requires manage_options capability.",
-  "feedback": "The scanner should not flag assert() as an RCE sink on PHP 8+ codebases. assert() with string evaluation was removed in PHP 8.0."
+  "summary": "One confirmed finding discovered beyond the original brief: SSRF via attacker-controlled attachment URL in WXR import. The attack requires admin access and enabling the 'Download and import file attachments' option, but successfully achieves out-of-band SSRF to cloud IMDS endpoints (169.254.169.254) not blocked by WordPress's block_request(). The original brief's single finding (IPv6 parser assert() as RCE sink) remains a false positive. Two additional findings from manual review are also false positives: a PHP C: type unserialize bypass (technically real but below confidence threshold given admin-only access and gadget-chain dependency) and a variable variable injection with no meaningful security impact.",
+  "feedback": "The automated taint analysis had a false positive rate of 100% on its single flagged finding (assert() in a vendored IPv6 parser). Manual review uncovered the real attack surface: the attachment fetch URL during WXR import. The C: bypass in maybe_unserialize() is a genuine code defect warranting a fix regardless of exploitability classification — extending the regex or converting C: objects to stdClass would be low-effort hardening."
 }

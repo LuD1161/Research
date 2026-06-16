@@ -1,0 +1,366 @@
+{
+  "plugin_slug": "simple-cloudflare-turnstile",
+  "priority_score": 26,
+  "metadata": {
+    "php_files": 39,
+    "total_lines": 6969
+  },
+  "attack_surface_summary": "# Attack Surface: simple-cloudflare-turnstile\n\n> Generated: 2026-06-16T18:36:26Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 576,
+    "total_sinks": 49,
+    "total_sanitizers": 188,
+    "direct_flows": 135,
+    "functions_with_sources": 116,
+    "functions_with_sinks": 29,
+    "files_analyzed": 39,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "simple-cloudflare-turnstile-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "simple-cloudflare-turnstile",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$recaptcha_secret = trim( (string) get_option('cfturnstile_recaptcha_secret_key') )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/simple-cloudflare-turnstile/inc/failsafe.php",
+        "line": 66
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 66,
+          "expression": "$recaptcha_secret = trim( (string) get_option('cfturnstile_recaptcha_secret_key') )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 79,
+          "expression": "$recaptcha_req = array(\r\n        'body' => array(\r\n            'secret'   => $recaptcha_secret,\r\n            'response' => $recaptcha_response,\r\n            'remoteip' => cfturnstile_get_ip(),\r\n        ),\r\n    )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 86,
+          "expression": "$recaptcha_verify = wp_remote_post('https://www.google.com/recaptcha/api/siteverify', $recaptcha_req)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$recaptcha_verify = wp_remote_post('https://www.google.com/recaptcha/api/siteverify', $recaptcha_req)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/simple-cloudflare-turnstile/inc/failsafe.php",
+        "line": 86
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-cloudflare-turnstile-ssrf-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "simple-cloudflare-turnstile",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$postdata = sanitize_text_field($_POST['cf-turnstile-response'])",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/simple-cloudflare-turnstile/inc/turnstile.php",
+        "line": 204
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 204,
+          "expression": "$postdata = sanitize_text_field($_POST['cf-turnstile-response'])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 225,
+          "expression": "$headers = array(\r\n\t\t\t'body' => [\r\n\t\t\t\t'secret' => $secret,\r\n\t\t\t\t'response' => $postdata,\r\n\t\t\t\t'remoteip' => cfturnstile_get_ip(),\r\n\t\t\t]\r\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 232,
+          "expression": "$verify = wp_remote_post('https://challenges.cloudflare.com/turnstile/v0/siteverify', $headers)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$verify = wp_remote_post('https://challenges.cloudflare.com/turnstile/v0/siteverify', $headers)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/simple-cloudflare-turnstile/inc/turnstile.php",
+        "line": 232
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-cloudflare-turnstile-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "simple-cloudflare-turnstile",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$LimitedToProductIDs = get_option('cfturnstile_mepr_product_ids')",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/simple-cloudflare-turnstile/inc/admin/admin-options.php",
+        "line": 1813
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1813,
+          "expression": "$LimitedToProductIDs = get_option('cfturnstile_mepr_product_ids')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1814,
+          "expression": "$ProductsNeedingCaptcha = explode(\"\\n\", str_replace(\"\\r\", \"\", $LimitedToProductIDs))",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1846,
+          "expression": "echo implode(', ' , $ProductsNeedingCaptcha);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo implode(', ' , $ProductsNeedingCaptcha);",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/simple-cloudflare-turnstile/inc/admin/admin-options.php",
+        "line": 1846
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-cloudflare-turnstile-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "simple-cloudflare-turnstile",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$log['date'] = date_i18n(get_option('date_format') . ' ' . get_option('time_format'), strtotime($log['date']))",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/simple-cloudflare-turnstile/inc/admin/admin-options.php",
+        "line": 2142
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2142,
+          "expression": "$log['date'] = date_i18n(get_option('date_format') . ' ' . get_option('time_format'), strtotime($log['date']))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2144,
+          "expression": "echo '<td>' . ($log['success'] ? '<span style=\"color: green;\">Yes</span>' : '<span style=\"color: red;\">No</span>') . '</td>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<td>' . ($log['success'] ? '<span style=\"color: green;\">Yes</span>' : '<span style=\"color: red;\">No</span>') . '</td>';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/simple-cloudflare-turnstile/inc/admin/admin-options.php",
+        "line": 2144
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "simple-cloudflare-turnstile-xss-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "simple-cloudflare-turnstile",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$payload['settings'][$name] = get_option($name)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/simple-cloudflare-turnstile/inc/admin/export-import.php",
+        "line": 40
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 40,
+          "expression": "$payload['settings'][$name] = get_option($name)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 43,
+          "expression": "$json = wp_json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 52,
+          "expression": "echo $json;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $json;",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/simple-cloudflare-turnstile/inc/admin/export-import.php",
+        "line": 52
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "simple-cloudflare-turnstile-path-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "simple-cloudflare-turnstile",
+      "vulnerability_class": "path_traversal",
+      "source": {
+        "expression": "$file = $_FILES['cfturnstile_import_file']",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/simple-cloudflare-turnstile/inc/admin/export-import.php",
+        "line": 73
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 73,
+          "expression": "$file = $_FILES['cfturnstile_import_file']",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 87,
+          "expression": "$contents = file_get_contents($file['tmp_name'])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$contents = file_get_contents($file['tmp_name'])",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/simple-cloudflare-turnstile/inc/admin/export-import.php",
+        "line": 87
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    }
+  ],
+  "semgrep_findings": [],
+  "stats": {
+    "taint_critical": 0,
+    "taint_high": 4,
+    "taint_total": 6,
+    "semgrep_error": 0,
+    "semgrep_warning": 0
+  }
+}

@@ -1,0 +1,891 @@
+{
+  "plugin_slug": "polldaddy",
+  "priority_score": 88,
+  "metadata": {
+    "php_files": 22,
+    "total_lines": 10856
+  },
+  "attack_surface_summary": "# Attack Surface: polldaddy\n\n> Generated: 2026-06-16T18:36:25Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 412,
+    "total_sinks": 68,
+    "total_sanitizers": 476,
+    "direct_flows": 53,
+    "functions_with_sources": 47,
+    "functions_with_sinks": 25,
+    "files_analyzed": 22,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "polldaddy-ssrf-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "polldaddy",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$polldaddy_email = stripslashes( $_POST['polldaddy_email'] )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/polldaddy.php",
+        "line": 259
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 259,
+          "expression": "$polldaddy_email = stripslashes( $_POST['polldaddy_email'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 271,
+          "expression": "$details = array(\n\t\t\t'uName'          => get_bloginfo( 'name' ),\n\t\t\t'uEmail'         => $polldaddy_email,\n\t\t\t'uPass'          => $polldaddy_password,\n\t\t\t'partner_userid' => $this->id\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 278,
+          "expression": "$polldaddy_api_key = wp_remote_post( polldaddy_api_url( '/key' ), array(\n\t\t\t\t\t'body' => $details\n\t\t\t\t) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$polldaddy_api_key = wp_remote_post( polldaddy_api_url( '/key' ), array(\n\t\t\t\t\t'body' => $details\n\t\t\t\t) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/polldaddy.php",
+        "line": 278
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "polldaddy-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "polldaddy",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$rating_id = get_option( 'pd-rating-posts-id' )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/polldaddy.php",
+        "line": 4300
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 4300,
+          "expression": "$rating_id = get_option( 'pd-rating-posts-id' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 4456,
+          "expression": "$delete_link = esc_url( wp_nonce_url( add_query_arg( array( 'action' => 'delete', 'id' => $rating_id, 'rating' => $rating->uid, 'change-report-to' => $report_type, 'message' => false ) ), \"delete-rating_$rating->uid\" ) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 4464,
+          "expression": "echo esc_url( $delete_link );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $delete_link );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/polldaddy.php",
+        "line": 4464
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "polldaddy-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "polldaddy",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo \"<ul><li> API Key: \" . get_option( 'polldaddy_api_key' ) . \"</li>\";",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/polldaddy.php",
+        "line": 4705
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 4705,
+          "expression": "echo \"<ul><li> API Key: \" . get_option( 'polldaddy_api_key' ) . \"</li>\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo \"<ul><li> API Key: \" . get_option( 'polldaddy_api_key' ) . \"</li>\";",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/polldaddy.php",
+        "line": 4705
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "polldaddy-xss-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "polldaddy",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo \"<li> ID Usercode: \" . get_option( 'pd-usercode-' . $current_user->ID ) . \"</li>\";",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/polldaddy.php",
+        "line": 4706
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 4706,
+          "expression": "echo \"<li> ID Usercode: \" . get_option( 'pd-usercode-' . $current_user->ID ) . \"</li>\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo \"<li> ID Usercode: \" . get_option( 'pd-usercode-' . $current_user->ID ) . \"</li>\";",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/polldaddy.php",
+        "line": 4706
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "polldaddy-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "polldaddy",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo \"<li> pd-rating-usercode: \" . get_option( 'pd-rating-usercode' ) . \"</li>\";",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/polldaddy.php",
+        "line": 4707
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 4707,
+          "expression": "echo \"<li> pd-rating-usercode: \" . get_option( 'pd-rating-usercode' ) . \"</li>\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo \"<li> pd-rating-usercode: \" . get_option( 'pd-rating-usercode' ) . \"</li>\";",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/polldaddy.php",
+        "line": 4707
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "polldaddy-xss-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "polldaddy",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo \"<li> pd-rating-posts-id: \" . get_option( 'pd-rating-posts-id' ) . \"</li>\";",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/polldaddy.php",
+        "line": 4708
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 4708,
+          "expression": "echo \"<li> pd-rating-posts-id: \" . get_option( 'pd-rating-posts-id' ) . \"</li>\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo \"<li> pd-rating-posts-id: \" . get_option( 'pd-rating-posts-id' ) . \"</li>\";",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/polldaddy.php",
+        "line": 4708
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "polldaddy-ssrf-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "polldaddy",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$polldaddy_email    = stripslashes( $_POST['polldaddy_email'] )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/polldaddy-org.php",
+        "line": 145
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 145,
+          "expression": "$polldaddy_email    = stripslashes( $_POST['polldaddy_email'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 169,
+          "expression": "$details = array(\n\t\t\t'uName'          => get_bloginfo( 'name' ),\n\t\t\t'uEmail'         => $polldaddy_email,\n\t\t\t'uPass'          => $polldaddy_password,\n\t\t\t'partner_userid' => $this->id\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 177,
+          "expression": "$polldaddy_api_key = wp_remote_post( polldaddy_api_url( '/key' ), array(\n\t\t\t\t\t'body' => $details\n\t\t\t\t) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$polldaddy_api_key = wp_remote_post( polldaddy_api_url( '/key' ), array(\n\t\t\t\t\t'body' => $details\n\t\t\t\t) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/polldaddy-org.php",
+        "line": 177
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "polldaddy-xss-006",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "polldaddy",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$url = $_POST['url']",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/ajax.php",
+        "line": 38
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 38,
+          "expression": "$url = $_POST['url']",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 54,
+          "expression": "$response  = $polldaddy->upload_image( $name, $url, 'poll', ($media_id>1000?$media_id:0), $data )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 57,
+          "expression": "echo urldecode( $response->upload_result ).'||'.$media_id;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo urldecode( $response->upload_result ).'||'.$media_id;",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/ajax.php",
+        "line": 57
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "polldaddy-xss-007",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "polldaddy",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$src = $_POST['src']",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/ajax.php",
+        "line": 72
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 72,
+          "expression": "$src = $_POST['src']",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 77,
+          "expression": "$response = '<li>\n\t\t\t\t<table class=\"answer\">\n\n\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t<th>\n\t\t\t\t\t\t\t\t<span class=\"handle\" title=\"' . esc_attr( __( 'click and drag to reorder', 'polldaddy' ) ) . '\"><img src=\"' . $src . 'img/icon-reorder.png\" alt=\"' . esc_attr( __( 'click and drag to reorder', 'polldaddy' ) ) . '\" width=\"6\" height=\"9\" /></span>\n\t\t\t\t\t\t\t</th>\n\t\t\t\t\t\t\t<td class=\"answer-input\">\n\t\t\t\t\t\t\t\t<input type=\"text\" autocomplete=\"off\" placeholder=\"' . esc_attr( __( 'Enter an answer here', 'polldaddy' ) ) .'\" value=\"\" tabindex=\"2\" size=\"30\" name=\"answer[new' . $a .']\" />\n\t\t\t\t\t\t\t</td>'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 116,
+          "expression": "echo $response;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $response;",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/ajax.php",
+        "line": 116
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "polldaddy-xss-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "polldaddy",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo isset( $_GET['iframe'] ) ? '1' : '0';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/poll-edit-form.php",
+        "line": 31
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 31,
+          "expression": "echo isset( $_GET['iframe'] ) ? '1' : '0';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo isset( $_GET['iframe'] ) ? '1' : '0';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/poll-edit-form.php",
+        "line": 31
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "polldaddy-xss-009",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "polldaddy",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"width: 55px !important;\"' : '';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/poll-edit-form.php",
+        "line": 250
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 250,
+          "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"width: 55px !important;\"' : '';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"width: 55px !important;\"' : '';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/poll-edit-form.php",
+        "line": 250
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "polldaddy-xss-010",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "polldaddy",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"min-width: 30px;\"' : '';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/poll-edit-form.php",
+        "line": 251
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 251,
+          "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"min-width: 30px;\"' : '';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"min-width: 30px;\"' : '';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/poll-edit-form.php",
+        "line": 251
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "polldaddy-xss-011",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "polldaddy",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"width: 55px !important;\"' : '';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/poll-edit-form.php",
+        "line": 325
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 325,
+          "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"width: 55px !important;\"' : '';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"width: 55px !important;\"' : '';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/poll-edit-form.php",
+        "line": 325
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "polldaddy-xss-012",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "polldaddy",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"min-width: 30px;\"' : '';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/poll-edit-form.php",
+        "line": 326
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 326,
+          "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"min-width: 30px;\"' : '';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"min-width: 30px;\"' : '';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/poll-edit-form.php",
+        "line": 326
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "polldaddy-xss-013",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "polldaddy",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"width:55px !important;\"' : '';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/poll-edit-form.php",
+        "line": 388
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 388,
+          "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"width:55px !important;\"' : '';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"width:55px !important;\"' : '';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/poll-edit-form.php",
+        "line": 388
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "polldaddy-xss-014",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "polldaddy",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"min-width: 30px;\"' : '';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/poll-edit-form.php",
+        "line": 389
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 389,
+          "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"min-width: 30px;\"' : '';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo isset( $_GET['iframe'] ) ? 'style=\"min-width: 30px;\"' : '';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/poll-edit-form.php",
+        "line": 389
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "polldaddy-xss-015",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "polldaddy",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$value = get_option( $field )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/settings-2.php",
+        "line": 51
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 51,
+          "expression": "$value = get_option( $field )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 76,
+          "expression": "$value = \"***********\" . substr( $value, -4 )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 78,
+          "expression": "$value = \"$value (<a href='https://app.crowdsignal.com/ratings/{$value}/edit/'>\" . __( 'Edit', 'polldaddy' ) . \"</a>)\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 83,
+          "expression": "echo $value;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $value;",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/settings-2.php",
+        "line": 83
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "polldaddy-xss-016",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "polldaddy",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$value = get_option( $field )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/settings-2.php",
+        "line": 51
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 51,
+          "expression": "$value = get_option( $field )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 76,
+          "expression": "$value = \"***********\" . substr( $value, -4 )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 78,
+          "expression": "$value = \"$value (<a href='https://app.crowdsignal.com/ratings/{$value}/edit/'>\" . __( 'Edit', 'polldaddy' ) . \"</a>)\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 112,
+          "expression": "$value = \"***********\" . substr( $value, -4 )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 114,
+          "expression": "$value = \"$value (<a href='https://app.crowdsignal.com/ratings/{$value}/edit/'>\" . __( 'Edit', 'polldaddy' ) . \"</a>)\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 119,
+          "expression": "echo $value;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $value;",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/partials/settings-2.php",
+        "line": 119
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [],
+  "stats": {
+    "taint_critical": 0,
+    "taint_high": 14,
+    "taint_total": 18,
+    "semgrep_error": 0,
+    "semgrep_warning": 0
+  }
+}

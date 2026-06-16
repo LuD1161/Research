@@ -1,0 +1,1020 @@
+{
+  "plugin": "feeds-for-youtube",
+  "php_files_analyzed": 132,
+  "parse_errors": 0,
+  "total_flows": 16,
+  "by_severity": {
+    "critical": 2,
+    "medium": 5,
+    "high": 8,
+    "low": 1
+  },
+  "by_vulnerability_class": {
+    "sql_injection": 2,
+    "xss": 5,
+    "ssrf": 8,
+    "path_traversal": 1
+  },
+  "flows": [
+    {
+      "flow_id": "feeds-for-youtube-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "feeds-for-youtube",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$youtube_ids = $wpdb->get_col( \"SELECT ID FROM $wpdb->posts WHERE post_type = 'sby_videos';\" )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/uninstall.php",
+        "line": 42
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 42,
+          "expression": "$youtube_ids = $wpdb->get_col( \"SELECT ID FROM $wpdb->posts WHERE post_type = 'sby_videos';\" )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 44,
+          "expression": "$id_string = implode( ', ', $youtube_ids )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 46,
+          "expression": "$wpdb->query( \"DELETE FROM $wpdb->postmeta WHERE post_id IN ($id_string);\" )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->query( \"DELETE FROM $wpdb->postmeta WHERE post_id IN ($id_string);\" )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/uninstall.php",
+        "line": 46
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "feeds-for-youtube-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "feeds-for-youtube",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$args        = array( 'page' => $_POST['page'] )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Builder/SBY_Source.php",
+        "line": 172
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 172,
+          "expression": "$args        = array( 'page' => $_POST['page'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 173,
+          "expression": "$source_data = SBI_Db::source_query( $args )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 175,
+          "expression": "echo json_encode( $source_data );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo json_encode( $source_data );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Builder/SBY_Source.php",
+        "line": 175
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "feeds-for-youtube-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "feeds-for-youtube",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$access_token = sbi_maybe_clean( urldecode( $_GET['sbi_access_token'] ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Builder/SBY_Source.php",
+        "line": 353
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 353,
+          "expression": "$access_token = sbi_maybe_clean( urldecode( $_GET['sbi_access_token'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 357,
+          "expression": "$url = 'https://graph.facebook.com/me/accounts?fields=instagram_business_account,access_token&limit=500&access_token=' . $access_token",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 362,
+          "expression": "$result     = wp_remote_get( $url, $args )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$result     = wp_remote_get( $url, $args )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Builder/SBY_Source.php",
+        "line": 362
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "feeds-for-youtube-ssrf-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "feeds-for-youtube",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$access_token = sbi_maybe_clean( urldecode( $_GET['sbi_access_token'] ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Builder/SBY_Source.php",
+        "line": 353
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 353,
+          "expression": "$access_token = sbi_maybe_clean( urldecode( $_GET['sbi_access_token'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 395,
+          "expression": "$user_url = 'https://graph.facebook.com/me?fields=name,id,picture&access_token=' . $access_token",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 399,
+          "expression": "$result   = wp_remote_get( $user_url, $args )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$result   = wp_remote_get( $user_url, $args )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Builder/SBY_Source.php",
+        "line": 399
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "feeds-for-youtube-ssrf-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "feeds-for-youtube",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$access_token = sbi_maybe_clean( urldecode( $_GET['sbi_access_token'] ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Builder/SBY_Source.php",
+        "line": 353
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 353,
+          "expression": "$access_token = sbi_maybe_clean( urldecode( $_GET['sbi_access_token'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 412,
+          "expression": "$instagram_account_url = 'https://graph.facebook.com/' . $instagram_business_id . '?fields=name,username,profile_picture_url&access_token=' . $access_token",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 417,
+          "expression": "$result = wp_remote_get( $instagram_account_url, $args )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$result = wp_remote_get( $instagram_account_url, $args )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Builder/SBY_Source.php",
+        "line": 417
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "feeds-for-youtube-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "feeds-for-youtube",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$preview_settings = SBY_Parse::parse_quoted_string_as_boolean($_POST['previewSettings'])",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Builder/SBY_Feed_Saver_Manager.php",
+        "line": 330
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 330,
+          "expression": "$preview_settings = SBY_Parse::parse_quoted_string_as_boolean($_POST['previewSettings'])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 333,
+          "expression": "$preview_settings = isset($_POST['isFeedTemplatesPopup']) ? SBY_Feed_Templates_Settings::get_feed_settings_by_feed_templates($preview_settings) + $preview_settings : $preview_settings",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 357,
+          "expression": "$return['customizerDataSettings'] = $preview_settings",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 359,
+          "expression": "echo json_encode($return);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo json_encode($return);",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Builder/SBY_Feed_Saver_Manager.php",
+        "line": 359
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "feeds-for-youtube-xss-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "feeds-for-youtube",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$preview_settings = SBY_Parse::parse_quoted_string_as_boolean($_POST['previewSettings'])",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Builder/SBY_Feed_Saver_Manager.php",
+        "line": 380
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 380,
+          "expression": "$preview_settings = SBY_Parse::parse_quoted_string_as_boolean($_POST['previewSettings'])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 384,
+          "expression": "$preview_settings = isset($_POST['isFeedTemplatesPopup']) ? SBY_Feed_Templates_Settings::get_feed_settings_by_feed_templates($preview_settings) + $preview_settings : $preview_settings",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 385,
+          "expression": "$preview_settings = self::filter_feed_model_data($preview_settings, $feed_type)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 406,
+          "expression": "$return['customizerDataSettings'] = $preview_settings",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 408,
+          "expression": "echo json_encode($return);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo json_encode($return);",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Builder/SBY_Feed_Saver_Manager.php",
+        "line": 408
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "feeds-for-youtube-xss-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "feeds-for-youtube",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$feed_id = sanitize_text_field( $_POST['feed_id'] )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Services/AdminAjaxService.php",
+        "line": 47
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 47,
+          "expression": "$feed_id = sanitize_text_field( $_POST['feed_id'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 194,
+          "expression": "$return = array(\n\t\t\t'html' => $return_html,\n\t\t\t'feedStatus' => $feed_status,\n\t\t\t'report' => $youtube_feed->get_report(),\n\t\t\t'resizedImages' => array()\n\t\t\t//'resizedImages' => SBY_Feed::get_resized_images_source_set( $youtube_feed->get_image_ids_post_set(), 0, $feed_id )\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 204,
+          "expression": "echo wp_json_encode( $return );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo wp_json_encode( $return );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Services/AdminAjaxService.php",
+        "line": 204
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "feeds-for-youtube-xss-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "feeds-for-youtube",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$feed_id = sanitize_text_field( $_POST['feed_id'] )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Services/AdminAjaxService.php",
+        "line": 321
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 321,
+          "expression": "$feed_id = sanitize_text_field( $_POST['feed_id'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 351,
+          "expression": "$info = $this->sby_add_or_update_wp_posts( $vid_ids, $feed_id, $atts, $offset, $cache_all )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 353,
+          "expression": "echo wp_json_encode( $info );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo wp_json_encode( $info );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Services/AdminAjaxService.php",
+        "line": 353
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "feeds-for-youtube-ssrf-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "feeds-for-youtube",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$sby_license= trim( get_option( 'sby_license_key' ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Services/Admin/LicenseService.php",
+        "line": 184
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 184,
+          "expression": "$sby_license= trim( get_option( 'sby_license_key' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 188,
+          "expression": "$api_params = array(\n\t\t\t'edd_action'=> 'deactivate_license',\n\t\t\t'license'   => $sby_license,\n\t\t\t'item_name' => urlencode( SBY_PLUGIN_EDD_NAME ), // the name of our product in EDD\n\t\t\t'url'       => home_url()\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 196,
+          "expression": "$response = wp_remote_get( add_query_arg( $api_params, SBY_STORE_URL ), array( 'timeout' => 15, 'sslverify' => false ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_get( add_query_arg( $api_params, SBY_STORE_URL ), array( 'timeout' => 15, 'sslverify' => false ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Services/Admin/LicenseService.php",
+        "line": 196
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "feeds-for-youtube-ssrf-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "feeds-for-youtube",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$sby_license = trim( get_option( 'sby_license_key' ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Services/Admin/LicenseService.php",
+        "line": 293
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 293,
+          "expression": "$sby_license = trim( get_option( 'sby_license_key' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 315,
+          "expression": "$sby_api_params = array(\n\t\t\t\t'edd_action'=> 'check_license',\n\t\t\t\t'license'   => $sby_license,\n\t\t\t\t'item_name' => urlencode( SBY_PLUGIN_EDD_NAME ) // the name of our product in EDD\n\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 322,
+          "expression": "$sby_response = wp_remote_get( add_query_arg( $sby_api_params, SBY_STORE_URL ), array( 'timeout' => 60, 'sslverify' => false ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$sby_response = wp_remote_get( add_query_arg( $sby_api_params, SBY_STORE_URL ), array( 'timeout' => 60, 'sslverify' => false ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Services/Admin/LicenseService.php",
+        "line": 322
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "feeds-for-youtube-ssrf-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "feeds-for-youtube",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$sby_license = trim( get_option( 'sby_license_key' ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Services/Admin/LicenseService.php",
+        "line": 293
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 293,
+          "expression": "$sby_license = trim( get_option( 'sby_license_key' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 344,
+          "expression": "$sby_api_params = array(\n\t\t\t\t\t'edd_action'=> 'check_license',\n\t\t\t\t\t'license'   => $sby_license,\n\t\t\t\t\t'item_name' => urlencode( SBY_PLUGIN_EDD_NAME ) // the name of our product in EDD\n\t\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 349,
+          "expression": "$sby_response = wp_remote_get( add_query_arg( $sby_api_params, SBY_STORE_URL ), array( 'timeout' => 60, 'sslverify' => false ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$sby_response = wp_remote_get( add_query_arg( $sby_api_params, SBY_STORE_URL ), array( 'timeout' => 60, 'sslverify' => false ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Services/Admin/LicenseService.php",
+        "line": 349
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "feeds-for-youtube-ssrf-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "feeds-for-youtube",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$sby_license = trim( get_option( 'sby_license_key' ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Services/Admin/LicenseService.php",
+        "line": 727
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 727,
+          "expression": "$sby_license = trim( get_option( 'sby_license_key' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 730,
+          "expression": "$sby_api_params = array(\n\t\t\t'edd_action'=> 'check_license',\n\t\t\t'license'   => $sby_license,\n\t\t\t'item_name' => urlencode( SBY_PLUGIN_NAME ) // the name of our product in EDD\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 735,
+          "expression": "$sby_response = wp_remote_get( add_query_arg( $sby_api_params, SBY_STORE_URL ), array( 'timeout' => 60, 'sslverify' => false ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$sby_response = wp_remote_get( add_query_arg( $sby_api_params, SBY_STORE_URL ), array( 'timeout' => 60, 'sslverify' => false ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Services/Admin/LicenseService.php",
+        "line": 735
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "feeds-for-youtube-path-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "feeds-for-youtube",
+      "vulnerability_class": "path_traversal",
+      "source": {
+        "expression": "$_FILES['feedFile']['tmp_name']",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Services/Admin/ImporterService.php",
+        "line": 33
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 33,
+          "expression": "$imported_settings = file_get_contents( $_FILES['feedFile']['tmp_name'] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$imported_settings = file_get_contents( $_FILES['feedFile']['tmp_name'] )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Services/Admin/ImporterService.php",
+        "line": 33
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "feeds-for-youtube-sqli-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "feeds-for-youtube",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$youtube_ids = $wpdb->get_col( \"SELECT ID FROM $wpdb->posts WHERE post_type = '\".SBY_CPT.\"';\" )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Admin/admin-functions.php",
+        "line": 491
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 491,
+          "expression": "$youtube_ids = $wpdb->get_col( \"SELECT ID FROM $wpdb->posts WHERE post_type = '\".SBY_CPT.\"';\" )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 493,
+          "expression": "$id_string = implode( ', ', $youtube_ids )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 495,
+          "expression": "$wpdb->query( \"DELETE FROM $wpdb->postmeta WHERE post_id IN ($id_string);\" )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->query( \"DELETE FROM $wpdb->postmeta WHERE post_id IN ($id_string);\" )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Admin/admin-functions.php",
+        "line": 495
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "feeds-for-youtube-ssrf-008",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "feeds-for-youtube",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$license = ! empty( $_POST['license_key'] ) ? sanitize_key( $_POST['license_key'] ) : ''",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Admin/SBY_Upgrader.php",
+        "line": 113
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 113,
+          "expression": "$license = ! empty( $_POST['license_key'] ) ? sanitize_key( $_POST['license_key'] ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 118,
+          "expression": "$args = array(\n\t\t\t'plugin_name' => self::NAME,\n\t\t\t'plugin_slug' => 'pro',\n\t\t\t'plugin_path' => plugin_basename(__FILE__),\n\t\t\t'plugin_url'  => trailingslashit(WP_PLUGIN_URL) . 'youtube-feed-pro',\n\t\t\t'home_url'    => $home_url,\n\t\t\t'version'     => '1.0',\n\t\t\t'key'         => $license,\n\t\t\t'is_pro_upgrade' => true\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 128,
+          "expression": "$url  = add_query_arg( $args, self::CHECK_URL )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 134,
+          "expression": "$response = wp_safe_remote_get( $url, $remote_request_args )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_safe_remote_get( $url, $remote_request_args )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/feeds-for-youtube/inc/Admin/SBY_Upgrader.php",
+        "line": 134
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    }
+  ]
+}

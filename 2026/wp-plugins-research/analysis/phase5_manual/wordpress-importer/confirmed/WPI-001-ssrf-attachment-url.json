@@ -1,0 +1,49 @@
+{
+  "finding_id": "WPI-001",
+  "plugin_slug": "wordpress-importer",
+  "title": "SSRF via attacker-controlled attachment URL in WXR import file",
+  "severity": "medium",
+  "vulnerability_class": "ssrf",
+  "cvss_vector": "CVSS:3.1/AV:N/AC:H/PR:H/UI:R/S:C/C:H/I:N/A:N",
+  "cvss_score": 5.5,
+  "cwe": "CWE-918",
+  "auth_required": "administrator (import capability / manage_options)",
+  "nonce_required": true,
+  "affected_file": "plugins/src/wordpress-importer/class-wp-import.php",
+  "affected_lines": "875, 1303-1307, 1364",
+  "entry_point": "Tools > Import > WordPress (Step 2 with 'Download and import file attachments' checkbox enabled)",
+  "root_cause": "The <wp:attachment_url> element in a WXR file is parsed into $post['attachment_url'] without any sanitization or allowlist validation. This value is used directly as the URL for wp_safe_remote_get() in fetch_remote_file(). While wp_safe_remote_get() calls WP_HTTP::block_request() to block RFC1918 private ranges (10/8, 172.16/12, 192.168/16) and loopback (127/8), it does NOT block 169.254.0.0/16 (link-local / APIPA). This gap allows SSRF to cloud Instance Metadata Service (IMDS) endpoints which universally reside at 169.254.169.254 across AWS, Azure, GCP, and Oracle Cloud.",
+  "taint_flow": [
+    "WXR file: <wp:attachment_url>http://169.254.169.254/latest/meta-data/</wp:attachment_url>",
+    "class-wxr-parser-simplexml.php: $post['attachment_url'] = (string) $p->children($this->wxr_base)->attachment_url",
+    "class-wp-import.php line 875: $remote_url = ! empty( $post['attachment_url'] ) ? $post['attachment_url'] : $post['guid']",
+    "class-wp-import.php line 891: $this->process_attachment( $postdata, $remote_url )",
+    "class-wp-import.php line 1307: $this->fetch_remote_file( $url, $post ) [no sanitization of $url]",
+    "class-wp-import.php line 1364: wp_safe_remote_get( $url, [ 'timeout' => 300, 'stream' => true, ... ] )",
+    "HTTP GET fires to 169.254.169.254 — not blocked by block_request()"
+  ],
+  "exploitation": {
+    "requirement": "Authenticated administrator account; admin must check 'Download and import file attachments' in the import wizard UI",
+    "attack_scenario": "Attacker social-engineers admin into importing a malicious WXR file (e.g., disguised as a site migration export, shared via a compromised plugin/theme marketplace, sent via phishing). The file contains attachment posts with URLs pointing to cloud IMDS or internal services.",
+    "steps": [
+      "1. Craft a WXR file containing an attachment post with <wp:attachment_url>http://169.254.169.254/latest/meta-data/iam/security-credentials/</wp:attachment_url>",
+      "2. Deliver WXR to admin (social engineering, compromised export source, etc.)",
+      "3. Admin navigates to Tools > Import > WordPress, uploads WXR file",
+      "4. On Step 2, admin checks 'Download and import file attachments' (standard workflow for migrating sites with media)",
+      "5. Plugin fires wp_safe_remote_get('http://169.254.169.254/...', ['timeout'=>300, 'stream'=>true])",
+      "6. On AWS EC2 with IMDSv1: IAM credential JSON is streamed to a temp file (/tmp/wordpress-importer-*.tmp)",
+      "7. wp_check_filetype() rejects the JSON response (not a recognized media type); temp file is deleted",
+      "8. Attacker cannot directly read the response body through the import flow",
+      "9. However: (a) 300-second timeout creates a detectable timing difference vs. unreachable host; (b) error messages may leak response characteristics; (c) with a collaborating external server, DNS rebinding can be used to exfiltrate response body"
+    ],
+    "notes": "IMDSv2 (AWS) requires a PUT request with X-aws-ec2-metadata-token-ttl-seconds header to obtain a session token first; a plain GET to 169.254.169.254 will return a 401, confirming SSRF but not yielding credentials. IMDSv1 (legacy, still common) responds directly to GET requests. Azure IMDS requires Metadata: true header. GCP IMDS requires Metadata-Flavor: Google header. WordPress does not add these headers, so credential theft is IMDS-version dependent. The SSRF probe itself (for service enumeration/timing) works regardless of IMDS version."
+  },
+  "also_exploitable_via": "The <guid> element is used as fallback if <wp:attachment_url> is absent (line 875: $remote_url = ! empty($post['attachment_url']) ? $post['attachment_url'] : $post['guid']). The <guid> element is also fully attacker-controlled in the WXR file.",
+  "base_url_amplification": "The <wp:base_site_url> element populates $this->base_url (line ~84 of class-wp-import.php). If an attachment has a relative URL (matching /^\/[\w\W]+$/), the plugin prepends $this->base_url (line 1303-1305). An attacker can set base_site_url to http://169.254.169.254 and use a relative attachment path like /latest/meta-data/ to achieve the same SSRF.",
+  "impact": "Server-Side Request Forgery enabling: (1) Cloud IMDS probing for metadata and credentials (169.254.169.254, not blocked); (2) Internal network service enumeration via timing side-channels; (3) Potential credential theft on cloud instances with IMDSv1 enabled (if response exfiltration channel is established); (4) Bypass of network-level access controls that block external access to internal services.",
+  "remediation": {
+    "primary": "Validate attachment URLs against an allowlist of trusted domains before fetching, or implement a user-configurable allowlist of permitted source domains.",
+    "secondary": "Extend WP_HTTP::block_request() (or apply a pre_http_request filter in the plugin) to also block 169.254.0.0/16 link-local addresses. The fix: if the resolved IP falls in 169.254.0.0/16, block the request.",
+    "code_fix": "In fetch_remote_file(), add before wp_safe_remote_get():\n$parsed = wp_parse_url( $url );\n$host = $parsed['host'] ?? '';\n// Block link-local IMDS\n$ip = gethostbyname( $host );\nif ( preg_match( '/^169\\.254\\./', $ip ) ) {\n    return new WP_Error( 'http_request_failed', 'Blocked: link-local address' );\n}\n\nNote: gethostbyname() is also subject to DNS rebinding; for robust SSRF prevention, perform post-connection IP validation or use a strict allowlist instead."
+  }
+}

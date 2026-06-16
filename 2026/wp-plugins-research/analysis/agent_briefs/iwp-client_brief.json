@@ -1,0 +1,888 @@
+{
+  "plugin_slug": "iwp-client",
+  "priority_score": 121,
+  "metadata": {
+    "php_files": 698,
+    "total_lines": 199084
+  },
+  "attack_surface_summary": "# Attack Surface: iwp-client\n\n> Generated: 2026-06-16T18:36:23Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 431,
+    "total_sinks": 1205,
+    "total_sanitizers": 159,
+    "direct_flows": 839,
+    "functions_with_sources": 234,
+    "functions_with_sinks": 571,
+    "files_analyzed": 698,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "iwp-client-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "iwp-client",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$alert_data = get_option('iwp_client_pageview_alerts',true)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/stats.class.php",
+        "line": 896
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 896,
+          "expression": "$alert_data = get_option('iwp_client_pageview_alerts',true)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 902,
+          "expression": "$url = $alert_data['url']",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 911,
+          "expression": "$result       = wp_remote_post($url, $args)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$result       = wp_remote_post($url, $args)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/stats.class.php",
+        "line": 911
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "iwp-client-path-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "iwp-client",
+      "vulnerability_class": "path_traversal",
+      "source": {
+        "expression": "$db_index_file = '<?php\r\n\t\t\tglobal $old_url, $old_file_path;\r\n\t\t\t$old_url = \\''.get_option('siteurl').'\\';\r\n\t\t\t$old_file_path = \\''.ABSPATH.'\\';\r\n\t\t\t'",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.singlecall.php",
+        "line": 1094
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1094,
+          "expression": "$db_index_file = '<?php\r\n\t\t\tglobal $old_url, $old_file_path;\r\n\t\t\t$old_url = \\''.get_option('siteurl').'\\';\r\n\t\t\t$old_file_path = \\''.ABSPATH.'\\';\r\n\t\t\t'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1099,
+          "expression": "file_put_contents(IWP_BACKUP_DIR.'/iwp_db/index.php', $db_index_file)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "file_put_contents(IWP_BACKUP_DIR.'/iwp_db/index.php', $db_index_file)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.singlecall.php",
+        "line": 1099
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "iwp-client-path-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "iwp-client",
+      "vulnerability_class": "path_traversal",
+      "source": {
+        "expression": "$create_table = $wpdb->get_row(\"SHOW CREATE TABLE `$table[0]`\", ARRAY_N)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.singlecall.php",
+        "line": 1325
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1325,
+          "expression": "$create_table = $wpdb->get_row(\"SHOW CREATE TABLE `$table[0]`\", ARRAY_N)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1326,
+          "expression": "$dump_data = \"\\n\\n\" . $create_table[1] . \";\\n\\n\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1327,
+          "expression": "file_put_contents($file, $dump_data, FILE_APPEND)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "file_put_contents($file, $dump_data, FILE_APPEND)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.singlecall.php",
+        "line": 1327
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "iwp-client-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "iwp-client",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$iwp_client_activate_key = get_option('iwp_client_activate_key')",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/core.class.php",
+        "line": 384
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 384,
+          "expression": "$iwp_client_activate_key = get_option('iwp_client_activate_key')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 405,
+          "expression": "echo '<tr><td align=\"right\">WP-ADMIN URL:</td><td align=\"left\"><strong>'.$notice_display_URL.'</strong></td></tr>\r\n\t\t\t<tr><td align=\"right\">WEBSITE URL:</td><td align=\"left\"><strong>'.$website_URL.'</strong></td></tr>\r\n\t\t\t<tr><td align=\"right\">ADMIN USERNAME:</td><td align=\"left\"><strong>'.$username.'</strong> (or any admin id)</td></tr>\r\n            <tr><td align=\"right\">ACTIVATION KEY:</td><td align=\"left\"><strong>'.$iwp_client_activate_key.'</strong></td></tr>\r\n            <tr class=\"only_flash\"><td></td><td align=\"left\" style=\"position:relative;\">\r\n            <tr id=\"copy_at_once\"><td align=\"right\">To quick add, copy this</td><td align=\"left\" style=\"position:relative;\"><input type=\"text\" style=\"width:295px;\" class=\"read_creds\" readonly value=\"'.$notice_display_URL.'|^|'.$username.'|^|'.$iwp_client_activate_key.'|^|'.$website_URL.'\" /></td></tr>\r\n            <tr class=\"only_flash\"><td></td><td align=\"left\" style=\"position:relative;\"><div id=\"copy_details\"  data-clipboard-text=\"'.$notice_display_URL.'|^|'.$username.'|^|'.$iwp_client_activate_key.'|^|'.$website_URL.'\" style=\"background:#008000;display: inline-block;padding: 4px 10px;border-radius: 5px;color:#fff;font-weight:600;cursor:pointer;\">Copy details</div><span class=\"copy_message\" style=\"display:none;margin-left:10px;color:#008000;\">Copied :)</span></td></tr>\r\n\r\n            <script type=\"text/javascript\">\r\n                  (function(){\r\n                  \tvar onhoverMsg = \"<span class=\\\"aftercopy_instruction\\\" style=\\\"position: absolute;top: 32px;left:20px;background:#fff;border:1px solid #000;-webkit-border-radius: 5px;-moz-border-radius: 5px;border-radius: 5px;padding:2px;margin:2px;text-align:center;\\\">Paste this in any field in the Add Website dialogue in the InfiniteWP admin panel.</span>\";\r\n                      var clipboard = new Clipboard(\"#copy_details\");\r\n                      if (clipboard != undefined) {\r\n\t                      clipboard.on(\"success\", function(e) {\r\n\t                      \tjQuery(\".copy_message\").show();\r\n\t                      \tsetTimeout(\\'jQuery(\".copy_message\").hide();\\',1000);\r\n\r\n\t                          e.clearSelection();\r\n\r\n\t                      });\r\n\t                      clipboard.on(\"error\", function(e) {\r\n\t                      \tjQuery(\".only_flash\").remove();\r\n\t                      \tjQuery(\".read_creds\").click(function(){jQuery(this).select();});\r\n\t                      });\r\n\t                       jQuery(\"#copy_at_once\").hide();\r\n\t                       jQuery(\"#copy_details\").mouseenter(function(){jQuery(onhoverMsg).appendTo(jQuery(this).parent());}).mouseleave(function(){jQuery(\".aftercopy_instruction\").remove();});\r\n                      }else{\r\n                      \tjQuery(\".only_flash\").remove();\r\n                      \tjQuery(\".read_creds\").click(function(){jQuery(this).select();});\r\n                      \tjQuery(\".read_creds\").mouseenter(function(e){jQuery(onhoverMsg).appendTo(jQuery(this).parent());}).mouseleave(function(){jQuery(\".aftercopy_instruction\").remove();});\r\n                      }\r\n               \t })();\r\n\r\n            </script>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<tr><td align=\"right\">WP-ADMIN URL:</td><td align=\"left\"><strong>'.$notice_display_URL.'</strong></td></tr>\r\n\t\t\t<tr><td align=\"right\">WEBSITE URL:</td><td align=\"left\"><strong>'.$website_URL.'</strong></td></tr>\r\n\t\t\t<tr><td align=\"right\">ADMIN USERNAME:</td><td align=\"left\"><strong>'.$username.'</strong> (or any admin id)</td></tr>\r\n            <tr><td align=\"right\">ACTIVATION KEY:</td><td align=\"left\"><strong>'.$iwp_client_activate_key.'</strong></td></tr>\r\n            <tr class=\"only_flash\"><td></td><td align=\"left\" style=\"position:relative;\">\r\n            <tr id=\"copy_at_once\"><td align=\"right\">To quick add, copy this</td><td align=\"left\" style=\"position:relative;\"><input type=\"text\" style=\"width:295px;\" class=\"read_creds\" readonly value=\"'.$notice_display_URL.'|^|'.$username.'|^|'.$iwp_client_activate_key.'|^|'.$website_URL.'\" /></td></tr>\r\n            <tr class=\"only_flash\"><td></td><td align=\"left\" style=\"position:relative;\"><div id=\"copy_details\"  data-clipboard-text=\"'.$notice_display_URL.'|^|'.$username.'|^|'.$iwp_client_activate_key.'|^|'.$website_URL.'\" style=\"background:#008000;display: inline-block;padding: 4px 10px;border-radius: 5px;color:#fff;font-weight:600;cursor:pointer;\">Copy details</div><span class=\"copy_message\" style=\"display:none;margin-left:10px;color:#008000;\">Copied :)</span></td></tr>\r\n\r\n            <script type=\"text/javascript\">\r\n                  (function(){\r\n                  \tvar onhoverMsg = \"<span class=\\\"aftercopy_instruction\\\" style=\\\"position: absolute;top: 32px;left:20px;background:#fff;border:1px solid #000;-webkit-border-radius: 5px;-moz-border-radius: 5px;border-radius: 5px;padding:2px;margin:2px;text-align:center;\\\">Paste this in any field in the Add Website dialogue in the InfiniteWP admin panel.</span>\";\r\n                      var clipboard = new Clipboard(\"#copy_details\");\r\n                      if (clipboard != undefined) {\r\n\t                      clipboard.on(\"success\", function(e) {\r\n\t                      \tjQuery(\".copy_message\").show();\r\n\t                      \tsetTimeout(\\'jQuery(\".copy_message\").hide();\\',1000);\r\n\r\n\t                          e.clearSelection();\r\n\r\n\t                      });\r\n\t                      clipboard.on(\"error\", function(e) {\r\n\t                      \tjQuery(\".only_flash\").remove();\r\n\t                      \tjQuery(\".read_creds\").click(function(){jQuery(this).select();});\r\n\t                      });\r\n\t                       jQuery(\"#copy_at_once\").hide();\r\n\t                       jQuery(\"#copy_details\").mouseenter(function(){jQuery(onhoverMsg).appendTo(jQuery(this).parent());}).mouseleave(function(){jQuery(\".aftercopy_instruction\").remove();});\r\n                      }else{\r\n                      \tjQuery(\".only_flash\").remove();\r\n                      \tjQuery(\".read_creds\").click(function(){jQuery(this).select();});\r\n                      \tjQuery(\".read_creds\").mouseenter(function(e){jQuery(onhoverMsg).appendTo(jQuery(this).parent());}).mouseleave(function(){jQuery(\".aftercopy_instruction\").remove();});\r\n                      }\r\n               \t })();\r\n\r\n            </script>';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/core.class.php",
+        "line": 405
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "iwp-client-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "iwp-client",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$error_notice = get_transient( 'iwp_mu_plugin_loader' )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/core.class.php",
+        "line": 858
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 858,
+          "expression": "$error_notice = get_transient( 'iwp_mu_plugin_loader' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 859,
+          "expression": "echo '<div class=\"error\" style=\"text-align: center;\"><p style=\"font-size: 14px; font-weight: bold; color:#c00;\">Attention !</p>\r\n\t\t<p>Unable to write InfiniteWP Client loader: '.$error_notice.'</p></div>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<div class=\"error\" style=\"text-align: center;\"><p style=\"font-size: 14px; font-weight: bold; color:#c00;\">Attention !</p>\r\n\t\t<p>Unable to write InfiniteWP Client loader: '.$error_notice.'</p></div>';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/core.class.php",
+        "line": 859
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "iwp-client-xss-003",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "iwp-client",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$where      = isset($_GET['iwp_goto']) ? $_GET['iwp_goto'] : false",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/core.class.php",
+        "line": 1091
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1091,
+          "expression": "$where      = isset($_GET['iwp_goto']) ? $_GET['iwp_goto'] : false",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1110,
+          "expression": "$auth = $this->authenticate_message($where . $message_id, $signature, $signature_new , $message_id)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1136,
+          "expression": "wp_die($auth['error'])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_die($auth['error'])",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/core.class.php",
+        "line": 1136
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "iwp-client-xss-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "iwp-client",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo get_option('iwp_client_activate_key');",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/core.class.php",
+        "line": 1462
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1462,
+          "expression": "echo get_option('iwp_client_activate_key');",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo get_option('iwp_client_activate_key');",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/core.class.php",
+        "line": 1462
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "iwp-client-rce-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "iwp-client",
+      "vulnerability_class": "code_injection",
+      "source": {
+        "expression": "$default = get_option('iwp_client_maintenace_mode')",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/init.php",
+        "line": 2093
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2093,
+          "expression": "$default = get_option('iwp_client_maintenace_mode')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2094,
+          "expression": "$params = empty($default) ? $params : array_merge($default, $params)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 2173,
+          "expression": "eval($params['code'])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "eval($params['code'])",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/init.php",
+        "line": 2173
+      },
+      "missing_sanitizer": "eval() with user input \u2014 no safe alternative",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "iwp-client-xss-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "iwp-client",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$html_maintenance = get_option('iwp_mmb_maintenance_html')",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/init.php",
+        "line": 2295
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2295,
+          "expression": "$html_maintenance = get_option('iwp_mmb_maintenance_html')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2296,
+          "expression": "echo $html_maintenance;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $html_maintenance;",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/init.php",
+        "line": 2296
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "iwp-client-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "iwp-client",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$this_table_name_from_db = $wpdb->get_var(\"SHOW TABLES LIKE '$this_table_name'\")",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.multicall.php",
+        "line": 7218
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 7218,
+          "expression": "$this_table_name_from_db = $wpdb->get_var(\"SHOW TABLES LIKE '$this_table_name'\")",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 7219,
+          "expression": "$this_table_name = check_iwp_file_list_table($this_table_name_from_db,$this_table_name)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 7222,
+          "expression": "$result = $wpdb->query('TRUNCATE TABLE ' . $this_table_name )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$result = $wpdb->query('TRUNCATE TABLE ' . $this_table_name )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.multicall.php",
+        "line": 7222
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "iwp-client-sqli-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "iwp-client",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$this_table_name_from_db = $wpdb->get_var(\"SHOW TABLES LIKE '$table_name'\")",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.multicall.php",
+        "line": 7493
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 7493,
+          "expression": "$this_table_name_from_db = $wpdb->get_var(\"SHOW TABLES LIKE '$table_name'\")",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 7494,
+          "expression": "$table_name = check_iwp_file_list_table($this_table_name_from_db,$table_name)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 7505,
+          "expression": "$columnData = $wpdb->get_var(\"SHOW COLUMNS FROM $table_name WHERE Field = 'thisFileNameHash'\")",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$columnData = $wpdb->get_var(\"SHOW COLUMNS FROM $table_name WHERE Field = 'thisFileNameHash'\")",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.multicall.php",
+        "line": 7505
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "iwp-client-sqli-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "iwp-client",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$this_table_name_from_db = $wpdb->get_var(\"SHOW TABLES LIKE '$table_name'\")",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.multicall.php",
+        "line": 7493
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 7493,
+          "expression": "$this_table_name_from_db = $wpdb->get_var(\"SHOW TABLES LIKE '$table_name'\")",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 7494,
+          "expression": "$table_name = check_iwp_file_list_table($this_table_name_from_db,$table_name)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 7510,
+          "expression": "$indexData = $wpdb->get_var(\"SHOW KEYS FROM $table_name WHERE Key_name = 'thisFileName'\")",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$indexData = $wpdb->get_var(\"SHOW KEYS FROM $table_name WHERE Key_name = 'thisFileName'\")",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.multicall.php",
+        "line": 7510
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "iwp-client-path-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "iwp-client",
+      "vulnerability_class": "path_traversal",
+      "source": {
+        "expression": "$db_index_file = '<?php\r\n\t\t\tglobal $old_url, $old_file_path;\r\n\t\t\t$old_url = \\''.get_option('siteurl').'\\';\r\n\t\t\t$old_file_path = \\''.ABSPATH.'\\';\r\n\t\t\t'",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.multicall.php",
+        "line": 870
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 870,
+          "expression": "$db_index_file = '<?php\r\n\t\t\tglobal $old_url, $old_file_path;\r\n\t\t\t$old_url = \\''.get_option('siteurl').'\\';\r\n\t\t\t$old_file_path = \\''.ABSPATH.'\\';\r\n\t\t\t'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 876,
+          "expression": "file_put_contents(IWP_DB_DIR . '/index.php', $db_index_file)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "file_put_contents(IWP_DB_DIR . '/index.php', $db_index_file)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.multicall.php",
+        "line": 876
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "iwp-client-path-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "iwp-client",
+      "vulnerability_class": "path_traversal",
+      "source": {
+        "expression": "$create_table = $wpdb->get_row(\"SHOW CREATE TABLE `$table[0]`\", ARRAY_N)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.multicall.php",
+        "line": 1097
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1097,
+          "expression": "$create_table = $wpdb->get_row(\"SHOW CREATE TABLE `$table[0]`\", ARRAY_N)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1098,
+          "expression": "$dump_data = \"\\n\\n\" . $create_table[1] . \";\\n\\n\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1100,
+          "expression": "file_put_contents($file, $dump_data, FILE_APPEND)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "file_put_contents($file, $dump_data, FILE_APPEND)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.multicall.php",
+        "line": 1100
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "iwp-client-sqli-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "iwp-client",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$clone_options['iwp_client_backup_tasks'] = $wpdb->get_results($qry, ARRAY_A)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.multicall.php",
+        "line": 3518
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 3518,
+          "expression": "$clone_options['iwp_client_backup_tasks'] = $wpdb->get_results($qry, ARRAY_A)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 3727,
+          "expression": "$insert  = $wpdb->insert($new_table_prefix.\"options\",array( 'option_name' => 'iwp_client_nossl_key', 'option_value' => $clone_options['iwp_client_nossl_key'],  'autoload' => 'yes'), array( '%s', '%s','%s') )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$insert  = $wpdb->insert($new_table_prefix.\"options\",array( 'option_name' => 'iwp_client_nossl_key', 'option_value' => $clone_options['iwp_client_nossl_key'],  'autoload' => 'yes'), array( '%s', '%s','%s') )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.multicall.php",
+        "line": 3727
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "iwp-client-sqli-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "iwp-client",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$clone_options['iwp_client_backup_tasks'] = $wpdb->get_results($qry, ARRAY_A)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.multicall.php",
+        "line": 3518
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 3518,
+          "expression": "$clone_options['iwp_client_backup_tasks'] = $wpdb->get_results($qry, ARRAY_A)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 3739,
+          "expression": "$insert  = $wpdb->insert($new_table_prefix.\"options\",array( 'option_name' => 'iwp_client_public_key', 'option_value' => $clone_options['iwp_client_public_key'],  'autoload' => 'yes'), array( '%s', '%s','%s') )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$insert  = $wpdb->insert($new_table_prefix.\"options\",array( 'option_name' => 'iwp_client_public_key', 'option_value' => $clone_options['iwp_client_public_key'],  'autoload' => 'yes'), array( '%s', '%s','%s') )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/backup.class.multicall.php",
+        "line": 3739
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [],
+  "stats": {
+    "taint_critical": 9,
+    "taint_high": 3,
+    "taint_total": 16,
+    "semgrep_error": 0,
+    "semgrep_warning": 0
+  }
+}

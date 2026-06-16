@@ -2,19 +2,16 @@
   "plugin": "wp-reviews-plugin-for-google",
   "php_files_analyzed": 27,
   "parse_errors": 0,
-  "total_flows": 13,
+  "total_flows": 7,
   "by_severity": {
     "high": 4,
-    "critical": 2,
-    "medium": 2,
-    "low": 5
+    "critical": 1,
+    "medium": 2
   },
   "by_vulnerability_class": {
     "xss": 2,
     "ssrf": 2,
-    "rce": 1,
-    "sql_injection": 3,
-    "open_redirect": 5
+    "sql_injection": 3
   },
   "flows": [
     {
@@ -25,7 +22,7 @@
       "vulnerability_class": "xss",
       "source": {
         "expression": "echo '<style type=\"text/css\">'.get_option($chosedPlatform->get_option_name('css-content')).'</style>';",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-google-widget.class.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-google-widget.class.php",
         "line": 49
       },
       "chain": [
@@ -45,7 +42,7 @@
       ],
       "sink": {
         "expression": "echo '<style type=\"text/css\">'.get_option($chosedPlatform->get_option_name('css-content')).'</style>';",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-google-widget.class.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-google-widget.class.php",
         "line": 49
       },
       "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
@@ -60,7 +57,7 @@
       "vulnerability_class": "ssrf",
       "source": {
         "expression": "$requestId = get_option($this->get_option_name('review-download-request-id'))",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-plugin.class.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-plugin.class.php",
         "line": 156
       },
       "chain": [
@@ -93,45 +90,10 @@
       ],
       "sink": {
         "expression": "wp_remote_post('https://admin.trustindex.io/source/wordpressPageRequest', [\n'body' => [\n'is_delete' => 1,\n'id' => $requestId\n],\n'timeout' => 300,\n'redirection' => '5',\n'blocking' => true\n])",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-plugin.class.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-plugin.class.php",
         "line": 160
       },
       "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
-      "auth_required": false,
-      "nonce_verified": false
-    },
-    {
-      "flow_id": "wp-reviews-plugin-for-google-rce-001",
-      "severity": "critical",
-      "confidence": "high",
-      "plugin": "wp-reviews-plugin-for-google",
-      "vulnerability_class": "rce",
-      "source": {
-        "expression": "function($v) {\nreturn $v ? sanitize_text_field(wp_unslash($v)) : $v;\n}",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-plugin.class.php",
-        "line": 203
-      },
-      "chain": [
-        {
-          "step": 1,
-          "line": 203,
-          "expression": "$review[ $key ] = array_map(function($v) {\nreturn $v ? sanitize_text_field(wp_unslash($v)) : $v;\n}, $value)",
-          "action": "sink_reached",
-          "active_labels": [
-            "cmd",
-            "path",
-            "sql",
-            "url",
-            "xss"
-          ]
-        }
-      ],
-      "sink": {
-        "expression": "$review[ $key ] = array_map(function($v) {\nreturn $v ? sanitize_text_field(wp_unslash($v)) : $v;\n}, $value)",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-plugin.class.php",
-        "line": 203
-      },
-      "missing_sanitizer": "escapeshellarg() not used",
       "auth_required": false,
       "nonce_verified": false
     },
@@ -142,15 +104,15 @@
       "plugin": "wp-reviews-plugin-for-google",
       "vulnerability_class": "sql_injection",
       "source": {
-        "expression": "$review[ $key ] = $value ? sanitize_text_field(wp_unslash($value)) : $value",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-plugin.class.php",
-        "line": 215
+        "expression": "$oldReviews = $wpdb->get_results($wpdb->prepare('SELECT reviewId, hidden, highlight FROM %i ORDER BY date DESC', $tableName), ARRAY_A)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-plugin.class.php",
+        "line": 193
       },
       "chain": [
         {
           "step": 1,
-          "line": 215,
-          "expression": "$review[ $key ] = $value ? sanitize_text_field(wp_unslash($value)) : $value",
+          "line": 193,
+          "expression": "$oldReviews = $wpdb->get_results($wpdb->prepare('SELECT reviewId, hidden, highlight FROM %i ORDER BY date DESC', $tableName), ARRAY_A)",
           "action": "taint_source",
           "active_labels": [
             "cmd",
@@ -162,6 +124,32 @@
         },
         {
           "step": 2,
+          "line": 194,
+          "expression": "$oldReviews = array_combine(array_column($oldReviews, 'reviewId'), $oldReviews)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 222,
+          "expression": "$hidden = $oldReviews[$review['id']]['hidden']",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
           "line": 226,
           "expression": "$wpdb->insert($tableName, [\n'user' => $review['reviewer']['name'],\n'user_photo' => $review['reviewer']['avatar_url'],\n'text' => $review['text'],\n'rating' => $review['rating'] ? $review['rating'] : 5,\n'date' => substr($review['created_at'], 0, 10),\n'reviewId' => isset($review['id']) ? $review['id'] : null,\n'reply' => isset($review['reply']) ? $review['reply'] : \"\",\n'hidden' => $hidden,\n'highlight' => $highlight ? $highlight : null,\n])",
           "action": "sink_reached",
@@ -176,7 +164,7 @@
       ],
       "sink": {
         "expression": "$wpdb->insert($tableName, [\n'user' => $review['reviewer']['name'],\n'user_photo' => $review['reviewer']['avatar_url'],\n'text' => $review['text'],\n'rating' => $review['rating'] ? $review['rating'] : 5,\n'date' => substr($review['created_at'], 0, 10),\n'reviewId' => isset($review['id']) ? $review['id'] : null,\n'reply' => isset($review['reply']) ? $review['reply'] : \"\",\n'hidden' => $hidden,\n'highlight' => $highlight ? $highlight : null,\n])",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-plugin.class.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-plugin.class.php",
         "line": 226
       },
       "missing_sanitizer": "$wpdb->prepare() not used",
@@ -191,7 +179,7 @@
       "vulnerability_class": "ssrf",
       "source": {
         "expression": "$setId = get_option($this->get_option_name('scss-set'), $defaultSet)",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-plugin.class.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-plugin.class.php",
         "line": 985
       },
       "chain": [
@@ -224,10 +212,44 @@
       ],
       "sink": {
         "expression": "$response = wp_remote_get('https://cdn.trustindex.io/assets/widget-presetted-css/v2/'.$styleId.'-'.$setId.'.css', [ 'timeout' => 30 ])",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-plugin.class.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/trustindex-plugin.class.php",
         "line": 986
       },
       "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-reviews-plugin-for-google-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-reviews-plugin-for-google",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo esc_url(get_option('siteurl')) .\"\\n\";",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/include/troubleshooting.php",
+        "line": 30
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 30,
+          "expression": "echo esc_url(get_option('siteurl')) .\"\\n\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url(get_option('siteurl')) .\"\\n\";",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/include/troubleshooting.php",
+        "line": 30
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
       "auth_required": false,
       "nonce_verified": false
     },
@@ -239,7 +261,7 @@
       "vulnerability_class": "sql_injection",
       "source": {
         "expression": "$start = sanitize_text_field(wp_unslash($_POST['start']))",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/tabs/my-reviews.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/tabs/my-reviews.php",
         "line": 12
       },
       "chain": [
@@ -252,8 +274,7 @@
             "cmd",
             "path",
             "sql",
-            "url",
-            "xss"
+            "url"
           ]
         },
         {
@@ -265,8 +286,7 @@
             "cmd",
             "path",
             "sql",
-            "url",
-            "xss"
+            "url"
           ]
         },
         {
@@ -278,14 +298,13 @@
             "cmd",
             "path",
             "sql",
-            "url",
-            "xss"
+            "url"
           ]
         }
       ],
       "sink": {
         "expression": "$wpdb->update($pluginManagerInstance->get_tablename('reviews'), ['highlight' => $highlight], ['id' => $id])",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/tabs/my-reviews.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/tabs/my-reviews.php",
         "line": 23
       },
       "missing_sanitizer": "$wpdb->prepare() not used",
@@ -300,7 +319,7 @@
       "vulnerability_class": "sql_injection",
       "source": {
         "expression": "$reply = wp_kses_post(wp_unslash($_POST['save-reply']))",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/tabs/my-reviews.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/tabs/my-reviews.php",
         "line": 56
       },
       "chain": [
@@ -331,272 +350,11 @@
       ],
       "sink": {
         "expression": "$wpdb->update($pluginManagerInstance->get_tablename('reviews'), ['reply' => $reply], ['id' => $id])",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/tabs/my-reviews.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/tabs/my-reviews.php",
         "line": 59
       },
       "missing_sanitizer": "$wpdb->prepare() not used",
       "auth_required": false,
-      "nonce_verified": true
-    },
-    {
-      "flow_id": "wp-reviews-plugin-for-google-xss-002",
-      "severity": "high",
-      "confidence": "high",
-      "plugin": "wp-reviews-plugin-for-google",
-      "vulnerability_class": "xss",
-      "source": {
-        "expression": "echo esc_url(get_option('siteurl')) .\"\\n\";",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/include/troubleshooting.php",
-        "line": 30
-      },
-      "chain": [
-        {
-          "step": 1,
-          "line": 30,
-          "expression": "echo esc_url(get_option('siteurl')) .\"\\n\";",
-          "action": "sink_reached",
-          "active_labels": [
-            "cmd",
-            "path",
-            "sql",
-            "xss"
-          ]
-        }
-      ],
-      "sink": {
-        "expression": "echo esc_url(get_option('siteurl')) .\"\\n\";",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/include/troubleshooting.php",
-        "line": 30
-      },
-      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
-      "auth_required": false,
-      "nonce_verified": false
-    },
-    {
-      "flow_id": "wp-reviews-plugin-for-google-open-001",
-      "severity": "low",
-      "confidence": "medium",
-      "plugin": "wp-reviews-plugin-for-google",
-      "vulnerability_class": "open_redirect",
-      "source": {
-        "expression": "$params['tab'] = sanitize_text_field(wp_unslash($_GET['tab']))",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/include/admin.php",
-        "line": 14
-      },
-      "chain": [
-        {
-          "step": 1,
-          "line": 14,
-          "expression": "$params['tab'] = sanitize_text_field(wp_unslash($_GET['tab']))",
-          "action": "taint_source",
-          "active_labels": [
-            "cmd",
-            "path",
-            "sql",
-            "url",
-            "xss"
-          ]
-        },
-        {
-          "step": 2,
-          "line": 16,
-          "expression": "header('Location: admin.php?' . build_query($params))",
-          "action": "sink_reached",
-          "active_labels": [
-            "cmd",
-            "path",
-            "sql",
-            "url",
-            "xss"
-          ]
-        }
-      ],
-      "sink": {
-        "expression": "header('Location: admin.php?' . build_query($params))",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/include/admin.php",
-        "line": 16
-      },
-      "missing_sanitizer": "no sanitizer applied",
-      "auth_required": true,
-      "nonce_verified": true
-    },
-    {
-      "flow_id": "wp-reviews-plugin-for-google-open-002",
-      "severity": "low",
-      "confidence": "medium",
-      "plugin": "wp-reviews-plugin-for-google",
-      "vulnerability_class": "open_redirect",
-      "source": {
-        "expression": "$type = sanitize_text_field(wp_unslash($_GET['notification']))",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/include/admin.php",
-        "line": 22
-      },
-      "chain": [
-        {
-          "step": 1,
-          "line": 22,
-          "expression": "$type = sanitize_text_field(wp_unslash($_GET['notification']))",
-          "action": "taint_source",
-          "active_labels": [
-            "cmd",
-            "path",
-            "sql",
-            "url",
-            "xss"
-          ]
-        },
-        {
-          "step": 2,
-          "line": 24,
-          "expression": "$options = $pluginManagerInstance->getNotificationOptions($type)",
-          "action": "taint_propagation",
-          "active_labels": [
-            "cmd",
-            "path",
-            "sql",
-            "url",
-            "xss"
-          ]
-        },
-        {
-          "step": 3,
-          "line": 40,
-          "expression": "header('Location: '. $options['redirect'])",
-          "action": "sink_reached",
-          "active_labels": [
-            "cmd",
-            "path",
-            "sql",
-            "url",
-            "xss"
-          ]
-        }
-      ],
-      "sink": {
-        "expression": "header('Location: '. $options['redirect'])",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/include/admin.php",
-        "line": 40
-      },
-      "missing_sanitizer": "no sanitizer applied",
-      "auth_required": true,
-      "nonce_verified": true
-    },
-    {
-      "flow_id": "wp-reviews-plugin-for-google-open-003",
-      "severity": "low",
-      "confidence": "medium",
-      "plugin": "wp-reviews-plugin-for-google",
-      "vulnerability_class": "open_redirect",
-      "source": {
-        "expression": "'Location: admin.php?page=' . sanitize_text_field(wp_unslash($_GET['page'])) .'&tab=advanced'",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/include/admin.php",
-        "line": 46
-      },
-      "chain": [
-        {
-          "step": 1,
-          "line": 46,
-          "expression": "header('Location: admin.php?page=' . sanitize_text_field(wp_unslash($_GET['page'])) .'&tab=advanced')",
-          "action": "sink_reached",
-          "active_labels": [
-            "cmd",
-            "path",
-            "sql",
-            "url",
-            "xss"
-          ]
-        }
-      ],
-      "sink": {
-        "expression": "header('Location: admin.php?page=' . sanitize_text_field(wp_unslash($_GET['page'])) .'&tab=advanced')",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/include/admin.php",
-        "line": 46
-      },
-      "missing_sanitizer": "no sanitizer applied",
-      "auth_required": true,
-      "nonce_verified": true
-    },
-    {
-      "flow_id": "wp-reviews-plugin-for-google-open-004",
-      "severity": "low",
-      "confidence": "medium",
-      "plugin": "wp-reviews-plugin-for-google",
-      "vulnerability_class": "open_redirect",
-      "source": {
-        "expression": "'Location: admin.php?page=' . sanitize_text_field(wp_unslash($_GET['page'])) .'&tab=advanced'",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/include/admin.php",
-        "line": 50
-      },
-      "chain": [
-        {
-          "step": 1,
-          "line": 50,
-          "expression": "header('Location: admin.php?page=' . sanitize_text_field(wp_unslash($_GET['page'])) .'&tab=advanced')",
-          "action": "sink_reached",
-          "active_labels": [
-            "cmd",
-            "path",
-            "sql",
-            "url",
-            "xss"
-          ]
-        }
-      ],
-      "sink": {
-        "expression": "header('Location: admin.php?page=' . sanitize_text_field(wp_unslash($_GET['page'])) .'&tab=advanced')",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/include/admin.php",
-        "line": 50
-      },
-      "missing_sanitizer": "no sanitizer applied",
-      "auth_required": true,
-      "nonce_verified": true
-    },
-    {
-      "flow_id": "wp-reviews-plugin-for-google-open-005",
-      "severity": "low",
-      "confidence": "medium",
-      "plugin": "wp-reviews-plugin-for-google",
-      "vulnerability_class": "open_redirect",
-      "source": {
-        "expression": "$star = isset($_REQUEST['star']) ? (int)$_REQUEST['star'] : 1",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/include/admin.php",
-        "line": 60
-      },
-      "chain": [
-        {
-          "step": 1,
-          "line": 60,
-          "expression": "$star = isset($_REQUEST['star']) ? (int)$_REQUEST['star'] : 1",
-          "action": "taint_source",
-          "active_labels": [
-            "cmd",
-            "path",
-            "sql",
-            "url",
-            "xss"
-          ]
-        },
-        {
-          "step": 2,
-          "line": 63,
-          "expression": "header('Location: https://wordpress.org/support/plugin/'. $pluginManagerInstance->get_plugin_slug() . '/reviews/?rate='. $star .'#new-post')",
-          "action": "sink_reached",
-          "active_labels": [
-            "cmd",
-            "path",
-            "sql",
-            "url",
-            "xss"
-          ]
-        }
-      ],
-      "sink": {
-        "expression": "header('Location: https://wordpress.org/support/plugin/'. $pluginManagerInstance->get_plugin_slug() . '/reviews/?rate='. $star .'#new-post')",
-        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-reviews-plugin-for-google/include/admin.php",
-        "line": 63
-      },
-      "missing_sanitizer": "no sanitizer applied",
-      "auth_required": true,
       "nonce_verified": true
     }
   ]

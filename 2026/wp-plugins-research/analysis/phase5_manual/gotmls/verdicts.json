@@ -1,0 +1,125 @@
+{
+  "plugin_slug": "gotmls",
+  "review_date": "2026-06-16",
+  "reviewer": "manual-trace",
+  "summary": "12 taint flows analyzed. 0 confirmed exploitable. All flagged flows are either false positives due to proper sanitization (htmlspecialchars), admin-only access behind capability checks and custom nonce verification, or the use of WordPress $wpdb->update/$wpdb->insert which auto-escape values. The plugin has multiple layers of protection: menu pages require activate_plugins/manage_network capability, AJAX handlers call GOTMLS_kill_invalid_user() which dies for non-admins, and most operations also require GOTMLS_get_nonce() validation.",
+  "verdicts": [
+    {
+      "flow_id": "gotmls-sqli-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The $ors[0]['ID'] value comes from $wpdb->get_results() which returns data already in the database. It is used in $wpdb->update() which uses parameterized queries internally (wpdb->update auto-escapes all values). Additionally, this code path is gated by GOTMLS_get_nonce() AND GOTMLS_user_can() checks (line 290), and $clear_hist is filtered by preg_replace('/[^0-9a-f]++]i/', '') to hex chars only. The source is the database itself, not user input flowing to a SQL sink.",
+      "auth_required": true,
+      "auth_details": "Requires GOTMLS_get_nonce() and GOTMLS_user_can() (activate_plugins/manage_network capability). Function is called within GOTMLS_settings() which is a menu page callback requiring the same capability.",
+      "exploitability": "none"
+    },
+    {
+      "flow_id": "gotmls-sqli-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The $insert array is built from get_option() data (already stored in the database) and passed to $wpdb->insert() which auto-escapes all values via wpdb->_real_escape(). The values like post_title are additionally run through GOTMLS_sanitize() (line 307). The source data is the plugin's own scan log options, not user-controllable input. This migration code only runs when the new scan log table has no entries, converting old option-based logs to post-based logs.",
+      "auth_required": true,
+      "auth_details": "Called from GOTMLS_settings() menu page which requires activate_plugins/manage_network capability.",
+      "exploitability": "none"
+    },
+    {
+      "flow_id": "gotmls-sqli-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "While $_POST['GOTMLS_admin_username'] flows to $wpdb->update(), the wpdb->update() method auto-escapes all values using esc_sql()/wpdb->prepare() internally. The value is also validated by: (1) preg_match('/^\\s*[a-z_0-9\\@\\.\\-]{3,}\\s*$/i') which restricts to alphanumeric/limited chars, making SQL injection impossible, (2) nonce verification ($GOTMLS_nonce_found), (3) this code only executes when $current_user->user_login == 'admin' (line 570). The regex whitelist alone is sufficient to prevent SQLi.",
+      "auth_required": true,
+      "auth_details": "Requires: (1) authenticated admin user with user_login='admin', (2) valid nonce ($GOTMLS_nonce_found), (3) called within GOTMLS_Firewall_Options() menu page requiring activate_plugins/manage_network capability.",
+      "exploitability": "none"
+    },
+    {
+      "flow_id": "gotmls-xss-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The blogname/blogdescription values are passed through GOTMLS_htmlspecialchars() (which wraps PHP's htmlspecialchars() with UTF-8 encoding) at lines 902-903 BEFORE being included in output. The scanner flagged this because it didn't recognize GOTMLS_htmlspecialchars as a sanitizer. The output is properly escaped. Additionally, this is an admin-only page.",
+      "auth_required": true,
+      "auth_details": "GOTMLS_settings() menu page requires activate_plugins/manage_network capability.",
+      "exploitability": "none"
+    },
+    {
+      "flow_id": "gotmls-xss-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "$_REQUEST['scan_type'] is passed through GOTMLS_htmlspecialchars() at line 1114 before being echoed. GOTMLS_htmlspecialchars wraps PHP's htmlspecialchars() with ENT_COMPAT flag and UTF-8 encoding, which escapes <, >, &, and \". This prevents XSS. The value is used inside GOTMLS_box() as a title argument in an HTML context, and the escaping is appropriate. Additionally, this code path requires nonce verification (line 786) and admin capability.",
+      "auth_required": true,
+      "auth_details": "Inside GOTMLS_settings() which requires activate_plugins/manage_network capability, and further gated by GOTMLS_get_nonce() check.",
+      "exploitability": "none"
+    },
+    {
+      "flow_id": "gotmls-xss-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The tainted value $_REQUEST['GOTMLS_fix'][0] is only used in a conditional check: is_numeric($_REQUEST['GOTMLS_fix'][0]). The result determines whether '.parentNode' is appended to a JavaScript string. The actual value of $_REQUEST['GOTMLS_fix'][0] is never interpolated into output - only the boolean result of is_numeric() controls which static string is used. This is a ternary producing either '.parentNode' or '' (empty string). No user-controlled data reaches the output. The AJAX handler also requires GOTMLS_kill_invalid_user() and GOTMLS_get_nonce().",
+      "auth_required": true,
+      "auth_details": "GOTMLS_ajax_fix() calls GOTMLS_kill_invalid_user() (dies for non-admins) and requires GOTMLS_get_nonce().",
+      "exploitability": "none"
+    },
+    {
+      "flow_id": "gotmls-xss-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "$_GET['GOTMLS_only_file'] is passed through md5() before being echoed (line 1814). md5() always returns a 32-character hex string regardless of input, completely destroying any XSS payload. The output is '//re-db_scan: ' followed by a hex hash and a timestamp - no user-controlled data reaches the output unsanitized. Additionally, the Content-type header is set to text/javascript (line 1811), not text/html.",
+      "auth_required": true,
+      "auth_details": "GOTMLS_ajax_scan() calls GOTMLS_kill_invalid_user() and requires GOTMLS_get_nonce().",
+      "exploitability": "none"
+    },
+    {
+      "flow_id": "gotmls-xss-005",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same as gotmls-xss-004. $_GET['GOTMLS_only_file'] is passed through md5() (line 1838), producing only a hex string. Content-type is text/javascript. No XSS vector exists.",
+      "auth_required": true,
+      "auth_details": "GOTMLS_ajax_scan() calls GOTMLS_kill_invalid_user() and requires GOTMLS_get_nonce().",
+      "exploitability": "none"
+    },
+    {
+      "flow_id": "gotmls-xss-006",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "$file is derived from GOTMLS_decode($_GET['GOTMLS_scan']) at line 1831. At line 1845, $file is passed through GOTMLS_encode() before being output, and the $path variable is derived from the definitions array (server-side data), not from $file. GOTMLS_encode is a base64-based encoding that transforms the input into safe alphanumeric characters. The Content-type is text/javascript. Additionally, GOTMLS_strip4java() is applied to the path label, which escapes quotes and special chars for JavaScript strings.",
+      "auth_required": true,
+      "auth_details": "GOTMLS_ajax_scan() calls GOTMLS_kill_invalid_user() and requires GOTMLS_get_nonce().",
+      "exploitability": "none"
+    },
+    {
+      "flow_id": "gotmls-xss-007",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "$file from GOTMLS_decode($_GET['GOTMLS_scan']) is passed to GOTMLS_scandir() which processes directories. The function is called only when is_dir($file) is true (line 1854), meaning the path must resolve to an actual directory on the server. Content-type is set to text/javascript. Additionally, the GOTMLS_scandir function processes directory contents and generates JavaScript output with GOTMLS_encode/GOTMLS_strip4java sanitization. An attacker would need to control a directory name on the server filesystem.",
+      "auth_required": true,
+      "auth_details": "GOTMLS_ajax_scan() calls GOTMLS_kill_invalid_user() and requires GOTMLS_get_nonce().",
+      "exploitability": "none"
+    },
+    {
+      "flow_id": "gotmls-xss-008",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "$file is passed through esc_html() at line 1874 in the title tag. The file contents displayed in the textarea are passed through GOTMLS_htmlentities() (line 1885), which wraps PHP's htmlentities() - this escapes all HTML-significant characters. The file viewer is a legitimate admin feature for examining scanned files. Both the filename and file contents are properly escaped for their output contexts.",
+      "auth_required": true,
+      "auth_details": "GOTMLS_ajax_scan() calls GOTMLS_kill_invalid_user() and requires GOTMLS_get_nonce().",
+      "exploitability": "none"
+    },
+    {
+      "flow_id": "gotmls-xss-009",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same file viewer as gotmls-xss-008. $file is used in md5($file) for element IDs (safe - hex output only), GOTMLS_file_details() for display, and the file contents in the textarea are encoded via GOTMLS_htmlentities(). The GOTMLS_encode($file) in the whitelist form value produces base64-encoded output. All user-facing output of $file goes through appropriate escaping.",
+      "auth_required": true,
+      "auth_details": "GOTMLS_ajax_scan() calls GOTMLS_kill_invalid_user() and requires GOTMLS_get_nonce().",
+      "exploitability": "none"
+    }
+  ],
+  "confirmed_count": 0,
+  "false_positive_count": 12,
+  "notes": [
+    "The plugin uses a custom nonce system (GOTMLS_set_nonce/GOTMLS_get_nonce) instead of WordPress wp_nonce, but it functions similarly - tokens are stored in wp_options and validated against the current user and hour.",
+    "All AJAX handlers for non-log functions route unauthenticated users to GOTMLS_ajax_nopriv() which immediately dies.",
+    "The plugin consistently uses GOTMLS_htmlspecialchars() (a wrapper around PHP htmlspecialchars with UTF-8) for HTML output and GOTMLS_strip4java() for JavaScript string contexts.",
+    "$wpdb->update() and $wpdb->insert() auto-escape all values, making the SQLi flags false positives even without additional validation.",
+    "The scanner's main weakness here was not recognizing GOTMLS_htmlspecialchars, GOTMLS_htmlentities, GOTMLS_encode, GOTMLS_strip4java, and md5() as sanitizers."
+  ]
+}

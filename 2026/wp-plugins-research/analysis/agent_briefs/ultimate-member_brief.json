@@ -1,0 +1,1253 @@
+{
+  "plugin_slug": "ultimate-member",
+  "priority_score": 87,
+  "metadata": {
+    "php_files": 366,
+    "total_lines": 101004
+  },
+  "attack_surface_summary": "# Attack Surface: ultimate-member\n\n> Generated: 2026-06-16T18:36:26Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 1862,
+    "total_sinks": 760,
+    "total_sanitizers": 1845,
+    "direct_flows": 1498,
+    "functions_with_sources": 484,
+    "functions_with_sinks": 362,
+    "files_analyzed": 366,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "ultimate-member-path-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "path_traversal",
+      "source": {
+        "expression": "$image = get_post_meta( $um_activity->ID, '_photo', true )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/uninstall.php",
+        "line": 275
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 275,
+          "expression": "$image = get_post_meta( $um_activity->ID, '_photo', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 281,
+          "expression": "unlink( $image_path )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink( $image_path )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/uninstall.php",
+        "line": 281
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ultimate-member-xss-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$nickname = get_user_meta( $user_id, 'nickname', true )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/core/um-actions-save-profile.php",
+        "line": 66
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 66,
+          "expression": "$nickname = get_user_meta( $user_id, 'nickname', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 70,
+          "expression": "$update_name = UM()->str_replace_first( UM()->user()->previous_data['nickname'], $nickname, UM()->user()->previous_data['display_name'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 86,
+          "expression": "$arr_user = array( 'ID' => $user_id, 'display_name' => $update_name )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 90,
+          "expression": "wp_die(  '<pre>' . var_export( array( 'message' => $return->get_error_message(), 'dump' => $arr_user, 'changes' => $changes ), true ) . '</pre>'  )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_die(  '<pre>' . var_export( array( 'message' => $return->get_error_message(), 'dump' => $arr_user, 'changes' => $changes ), true ) . '</pre>'  )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/core/um-actions-save-profile.php",
+        "line": 90
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ultimate-member-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$result = $wpdb->get_var(\n\t\t\t\t$wpdb->prepare(\n\t\t\t\t\t\"SELECT umeta_id\n\t\t\t\t\tFROM {$wpdb->prefix}um_metadata\n\t\t\t\t\tWHERE user_id = %d AND\n\t\t\t\t\t\t  um_key = %s\n\t\t\t\t\tLIMIT 1\",\n\t\t\t\t\t$object_id,\n\t\t\t\t\t$meta_key\n\t\t\t\t)\n\t\t\t)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/core/class-member-directory-meta.php",
+        "line": 167
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 167,
+          "expression": "$result = $wpdb->get_var(\n\t\t\t\t$wpdb->prepare(\n\t\t\t\t\t\"SELECT umeta_id\n\t\t\t\t\tFROM {$wpdb->prefix}um_metadata\n\t\t\t\t\tWHERE user_id = %d AND\n\t\t\t\t\t\t  um_key = %s\n\t\t\t\t\tLIMIT 1\",\n\t\t\t\t\t$object_id,\n\t\t\t\t\t$meta_key\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 194,
+          "expression": "$wpdb->update(\n\t\t\t\t\t\"{$wpdb->prefix}um_metadata\",\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'um_value' => maybe_serialize( $_meta_value ),\n\t\t\t\t\t),\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'umeta_id' => $result,\n\t\t\t\t\t),\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'%s',\n\t\t\t\t\t),\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'%d',\n\t\t\t\t\t)\n\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->update(\n\t\t\t\t\t\"{$wpdb->prefix}um_metadata\",\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'um_value' => maybe_serialize( $_meta_value ),\n\t\t\t\t\t),\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'umeta_id' => $result,\n\t\t\t\t\t),\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'%s',\n\t\t\t\t\t),\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'%d',\n\t\t\t\t\t)\n\t\t\t\t)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/core/class-member-directory-meta.php",
+        "line": 194
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ultimate-member-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$completed = $wpdb->get_row(\n\t\t\t$wpdb->prepare(\n\t\t\t\t\"SELECT ID\n\t\t\t\tFROM $wpdb->posts\n\t\t\t\tWHERE post_author = %d AND\n\t\t\t\t\t  post_type = 'user_request' AND\n\t\t\t\t\t  post_name = 'export_personal_data' AND\n\t\t\t\t\t  post_status = 'request-completed'\n\t\t\t\tORDER BY ID DESC\n\t\t\t\tLIMIT 1\",\n\t\t\t\t$user_id\n\t\t\t),\n\t\t\tARRAY_A\n\t\t)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/core/um-actions-account.php",
+        "line": 658
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 658,
+          "expression": "$completed = $wpdb->get_row(\n\t\t\t$wpdb->prepare(\n\t\t\t\t\"SELECT ID\n\t\t\t\tFROM $wpdb->posts\n\t\t\t\tWHERE post_author = %d AND\n\t\t\t\t\t  post_type = 'user_request' AND\n\t\t\t\t\t  post_name = 'export_personal_data' AND\n\t\t\t\t\t  post_status = 'request-completed'\n\t\t\t\tORDER BY ID DESC\n\t\t\t\tLIMIT 1\",\n\t\t\t\t$user_id\n\t\t\t),\n\t\t\tARRAY_A\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 678,
+          "expression": "echo '<a href=\"' . esc_url( $exports_url . get_post_meta( $completed['ID'], '_export_file_name', true ) ) . '\">' . esc_html__( 'Download Personal Data', 'ultimate-member' ) . '</a>';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo '<a href=\"' . esc_url( $exports_url . get_post_meta( $completed['ID'], '_export_file_name', true ) ) . '\">' . esc_html__( 'Download Personal Data', 'ultimate-member' ) . '</a>';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/core/um-actions-account.php",
+        "line": 678
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ultimate-member-path-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "path_traversal",
+      "source": {
+        "expression": "$src        = esc_url_raw( $_REQUEST['src'] )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/core/class-files.php",
+        "line": 434
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 434,
+          "expression": "$src        = esc_url_raw( $_REQUEST['src'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1346,
+          "expression": "$splitted = explode( '?', $src )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1347,
+          "expression": "$src = $splitted[0]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 1350,
+          "expression": "$is_temp = um_is_temp_upload( $src )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 1352,
+          "expression": "unlink( $is_temp )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink( $is_temp )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/core/class-files.php",
+        "line": 1352
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ultimate-member-path-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "path_traversal",
+      "source": {
+        "expression": "$user_id = empty( $_POST['user_id'] ) ? null : absint( $_POST['user_id'] )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/core/class-files.php",
+        "line": 698
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 698,
+          "expression": "$user_id = empty( $_POST['user_id'] ) ? null : absint( $_POST['user_id'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1391,
+          "expression": "$dir = $this->upload_basedir . $user_id . DIRECTORY_SEPARATOR",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1398,
+          "expression": "unlink($dir.$match)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink($dir.$match)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/core/class-files.php",
+        "line": 1398
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ultimate-member-path-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "path_traversal",
+      "source": {
+        "expression": "$old_filename = get_user_meta( $user_id, $key, true )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/core/class-uploader.php",
+        "line": 1269
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1269,
+          "expression": "$old_filename = get_user_meta( $user_id, $key, true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1271,
+          "expression": "$file = $user_basedir . DIRECTORY_SEPARATOR . $old_filename",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1281,
+          "expression": "unlink( $file )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink( $file )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/core/class-uploader.php",
+        "line": 1281
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ultimate-member-sqli-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$action_ids = $wpdb->get_col( $wpdb->prepare( \"SELECT action_id FROM {$wpdb->actionscheduler_actions} WHERE claim_id = %d AND status = %s\", $claim->get_id(), self::STATUS_PENDING ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/lib/action-scheduler/classes/data-stores/ActionScheduler_DBStore.php",
+        "line": 1164
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1164,
+          "expression": "$action_ids = $wpdb->get_col( $wpdb->prepare( \"SELECT action_id FROM {$wpdb->actionscheduler_actions} WHERE claim_id = %d AND status = %s\", $claim->get_id(), self::STATUS_PENDING ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1168,
+          "expression": "$action_id_string = implode( ',', array_map( 'absint', $action_ids ) )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1169,
+          "expression": "$row_updates      = $wpdb->query( \"UPDATE {$wpdb->actionscheduler_actions} SET claim_id = 0 WHERE action_id IN ({$action_id_string})\" )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$row_updates      = $wpdb->query( \"UPDATE {$wpdb->actionscheduler_actions} SET claim_id = 0 WHERE action_id IN ({$action_id_string})\" )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/lib/action-scheduler/classes/data-stores/ActionScheduler_DBStore.php",
+        "line": 1169
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ultimate-member-sqli-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$wp_usermeta_option = get_option( 'um_usermeta_fields', array() )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/core/class-admin-settings.php",
+        "line": 177
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 177,
+          "expression": "$wp_usermeta_option = get_option( 'um_usermeta_fields', array() )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 179,
+          "expression": "$count = $wpdb->get_var(\n\t\t\t\t\t\"SELECT COUNT(*)\n\t\t\t\t\tFROM {$wpdb->usermeta}\n\t\t\t\t\tWHERE meta_key IN ('\" . implode( \"','\", $wp_usermeta_option ) . \"')\"\n\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$count = $wpdb->get_var(\n\t\t\t\t\t\"SELECT COUNT(*)\n\t\t\t\t\tFROM {$wpdb->usermeta}\n\t\t\t\t\tWHERE meta_key IN ('\" . implode( \"','\", $wp_usermeta_option ) . \"')\"\n\t\t\t\t)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/core/class-admin-settings.php",
+        "line": 179
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ultimate-member-xss-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_tab    = empty( $_GET['tab'] ) ? '' : sanitize_key( $_GET['tab'] )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/core/class-admin-settings.php",
+        "line": 2414
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2414,
+          "expression": "$current_tab    = empty( $_GET['tab'] ) ? '' : sanitize_key( $_GET['tab'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2432,
+          "expression": "echo $this->generate_tabs_menu() . $this->generate_subtabs_menu( $current_tab );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $this->generate_tabs_menu() . $this->generate_subtabs_menu( $current_tab );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/core/class-admin-settings.php",
+        "line": 2432
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ultimate-member-xss-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_tab    = empty( $_GET['tab'] ) ? '' : sanitize_key( $_GET['tab'] )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/core/class-admin-settings.php",
+        "line": 2414
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2414,
+          "expression": "$current_tab    = empty( $_GET['tab'] ) ? '' : sanitize_key( $_GET['tab'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 2419,
+          "expression": "$custom_content = apply_filters( 'um_settings_section_' . $current_tab . '_' . $current_subtab . '_custom_content', false, $current_tab, $current_subtab )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 2425,
+          "expression": "$settings_section = $custom_content",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 2489,
+          "expression": "echo $settings_section;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $settings_section;",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/core/class-admin-settings.php",
+        "line": 2489
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ultimate-member-xss-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_tab    = empty( $_GET['tab'] ) ? '' : sanitize_key( $_GET['tab'] )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/core/class-admin-settings.php",
+        "line": 2586
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 2586,
+          "expression": "$current_tab    = empty( $_GET['tab'] ) ? '' : sanitize_key( $_GET['tab'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 3564,
+          "expression": "$custom_form_section_content = apply_filters( \"um_settings_form_section_{$current_tab}_{$current_subtab}_{$section_key}_custom_content\", false )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 3588,
+          "expression": "echo $custom_form_section_content;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $custom_form_section_content;",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/core/class-admin-settings.php",
+        "line": 3588
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ultimate-member-lfi-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "local_file_inclusion",
+      "source": {
+        "expression": "$pack = sanitize_text_field( $_POST['pack'] )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/core/class-admin-upgrade.php",
+        "line": 378
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 378,
+          "expression": "$pack = sanitize_text_field( $_POST['pack'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 380,
+          "expression": "$file = $this->packages_dir . $pack . DIRECTORY_SEPARATOR . 'init.php'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 383,
+          "expression": "include_once $file",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "include_once $file",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/core/class-admin-upgrade.php",
+        "line": 383
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ultimate-member-sqli-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "array(\n\t\t\t\t\t\t'post_title' => sanitize_text_field( wp_unslash( $_POST['post_title'] ) ),\n\t\t\t\t\t)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/core/class-admin-metabox.php",
+        "line": 1181
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1181,
+          "expression": "$wpdb->update(\n\t\t\t\t\t$wpdb->posts,\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'post_title' => sanitize_text_field( wp_unslash( $_POST['post_title'] ) ),\n\t\t\t\t\t),\n\t\t\t\t\t$where,\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'%s',\n\t\t\t\t\t),\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'%d',\n\t\t\t\t\t)\n\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->update(\n\t\t\t\t\t$wpdb->posts,\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'post_title' => sanitize_text_field( wp_unslash( $_POST['post_title'] ) ),\n\t\t\t\t\t),\n\t\t\t\t\t$where,\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'%s',\n\t\t\t\t\t),\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'%d',\n\t\t\t\t\t)\n\t\t\t\t)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/core/class-admin-metabox.php",
+        "line": 1181
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ultimate-member-sqli-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "array(\n\t\t\t\t\t\t'post_title' => sanitize_text_field( wp_unslash( $_POST['post_title'] ) ),\n\t\t\t\t\t)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/core/class-admin-metabox.php",
+        "line": 1291
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1291,
+          "expression": "$wpdb->update(\n\t\t\t\t\t$wpdb->posts,\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'post_title' => sanitize_text_field( wp_unslash( $_POST['post_title'] ) ),\n\t\t\t\t\t),\n\t\t\t\t\t$where,\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'%s',\n\t\t\t\t\t),\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'%d',\n\t\t\t\t\t)\n\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->update(\n\t\t\t\t\t$wpdb->posts,\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'post_title' => sanitize_text_field( wp_unslash( $_POST['post_title'] ) ),\n\t\t\t\t\t),\n\t\t\t\t\t$where,\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'%s',\n\t\t\t\t\t),\n\t\t\t\t\tarray(\n\t\t\t\t\t\t'%d',\n\t\t\t\t\t)\n\t\t\t\t)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/core/class-admin-metabox.php",
+        "line": 1291
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ultimate-member-sqli-006",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$fields_for_upgrade = get_option( 'um_upgrade_230_skype_fields_for_upgrade', array() )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/core/packages/2.3.0/functions.php",
+        "line": 70
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 70,
+          "expression": "$fields_for_upgrade = get_option( 'um_upgrade_230_skype_fields_for_upgrade', array() )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 74,
+          "expression": "$count = $wpdb->get_var( \"SELECT COUNT(*) FROM {$wpdb->usermeta} WHERE meta_key IN( '\" . implode( \"','\", $fields_for_upgrade ) . \"' )\" )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$count = $wpdb->get_var( \"SELECT COUNT(*) FROM {$wpdb->usermeta} WHERE meta_key IN( '\" . implode( \"','\", $fields_for_upgrade ) . \"' )\" )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/core/packages/2.3.0/functions.php",
+        "line": 74
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ultimate-member-xss-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$is_core = get_post_meta( get_the_ID(), '_um_core', true )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/templates/form/mode.php",
+        "line": 5
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 5,
+          "expression": "$is_core = get_post_meta( get_the_ID(), '_um_core', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 7,
+          "expression": "echo $is_core ? ' is-core-form' : '';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $is_core ? ' is-core-form' : '';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/templates/form/mode.php",
+        "line": 7
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "ultimate-member-xss-007",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo isset( $_GET['id'] ) ? esc_attr( sanitize_key( $_GET['id'] ) ) : ''",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/templates/role/role-edit.php",
+        "line": 231
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 231,
+          "expression": "echo isset( $_GET['id'] ) ? esc_attr( sanitize_key( $_GET['id'] ) ) : ''",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo isset( $_GET['id'] ) ? esc_attr( sanitize_key( $_GET['id'] ) ) : ''",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/templates/role/role-edit.php",
+        "line": 231
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ultimate-member-xss-008",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$id = sanitize_title( $_GET['id'] )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/templates/role/role-edit.php",
+        "line": 108
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 108,
+          "expression": "$id = sanitize_title( $_GET['id'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 110,
+          "expression": "$pre_role_meta = get_option( \"um_role_{$id}_meta\", array() )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 112,
+          "expression": "$data['name'] = $pre_role_meta['name']",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 236,
+          "expression": "echo ! empty( $data['_um_is_custom'] ) ? 1 : 0",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ! empty( $data['_um_is_custom'] ) ? 1 : 0",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/templates/role/role-edit.php",
+        "line": 236
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ultimate-member-xss-009",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$id = sanitize_title( $_GET['id'] )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/templates/role/role-edit.php",
+        "line": 108
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 108,
+          "expression": "$id = sanitize_title( $_GET['id'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 110,
+          "expression": "$pre_role_meta = get_option( \"um_role_{$id}_meta\", array() )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 112,
+          "expression": "$data['name'] = $pre_role_meta['name']",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 247,
+          "expression": "echo isset( $data['name'] ) ? $data['name'] : ''",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo isset( $data['name'] ) ? $data['name'] : ''",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/templates/role/role-edit.php",
+        "line": 247
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ultimate-member-xss-010",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$id = sanitize_title( $_GET['id'] )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/templates/role/role-edit.php",
+        "line": 108
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 108,
+          "expression": "$id = sanitize_title( $_GET['id'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 110,
+          "expression": "$pre_role_meta = get_option( \"um_role_{$id}_meta\", array() )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 112,
+          "expression": "$data['name'] = $pre_role_meta['name']",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 249,
+          "expression": "echo isset( $data['name'] ) ? stripslashes( $data['name'] ) : ''",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo isset( $data['name'] ) ? stripslashes( $data['name'] ) : ''",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/templates/role/role-edit.php",
+        "line": 249
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "ultimate-member-xss-011",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "ultimate-member",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo ! empty( $_GET['id'] ) ? esc_attr__( 'Update Role', 'ultimate-member' ) : esc_attr__( 'Create Role', 'ultimate-member' )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/templates/role/publish.php",
+        "line": 32
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 32,
+          "expression": "echo ! empty( $_GET['id'] ) ? esc_attr__( 'Update Role', 'ultimate-member' ) : esc_attr__( 'Create Role', 'ultimate-member' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ! empty( $_GET['id'] ) ? esc_attr__( 'Update Role', 'ultimate-member' ) : esc_attr__( 'Create Role', 'ultimate-member' )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ultimate-member/includes/admin/templates/role/publish.php",
+        "line": 32
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [],
+  "stats": {
+    "taint_critical": 4,
+    "taint_high": 5,
+    "taint_total": 22,
+    "semgrep_error": 0,
+    "semgrep_warning": 0
+  }
+}

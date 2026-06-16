@@ -1,0 +1,680 @@
+{
+  "plugin_slug": "the-plus-addons-for-elementor-page-builder",
+  "priority_score": 28,
+  "metadata": {
+    "php_files": 286,
+    "total_lines": 158876
+  },
+  "attack_surface_summary": "# Attack Surface: the-plus-addons-for-elementor-page-builder\n\n> Generated: 2026-06-16T18:36:26Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 2235,
+    "total_sinks": 197,
+    "total_sanitizers": 3111,
+    "direct_flows": 406,
+    "functions_with_sources": 368,
+    "functions_with_sinks": 90,
+    "files_analyzed": 286,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-ssrf-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "the-plus-addons-for-elementor-page-builder",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$name = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : ''",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/dashboard/class-tpae-dashboard-ajax.php",
+        "line": 742
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 742,
+          "expression": "$name = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 750,
+          "expression": "$theme_info = themes_api(\n\t\t\t\t'theme_information',\n\t\t\t\tarray(\n\t\t\t\t\t'slug'   => $name,\n\t\t\t\t\t'fields' => array(\n\t\t\t\t\t\t'description'     => false,\n\t\t\t\t\t\t'sections'        => false,\n\t\t\t\t\t\t'rating'          => true,\n\t\t\t\t\t\t'ratings'         => false,\n\t\t\t\t\t\t'downloaded'      => true,\n\t\t\t\t\t\t'download_link'   => true,\n\t\t\t\t\t\t'last_updated'    => true,\n\t\t\t\t\t\t'homepage'        => true,\n\t\t\t\t\t\t'tags'            => true,\n\t\t\t\t\t\t'template'        => true,\n\t\t\t\t\t\t'active_installs' => false,\n\t\t\t\t\t\t'parent'          => false,\n\t\t\t\t\t\t'versions'        => false,\n\t\t\t\t\t\t'screenshot_url'  => true,\n\t\t\t\t\t),\n\t\t\t\t)\n\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 779,
+          "expression": "$theme_zip_url = $theme_info->download_link",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 783,
+          "expression": "$theme = wp_remote_get( $theme_zip_url )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$theme = wp_remote_get( $theme_zip_url )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/dashboard/class-tpae-dashboard-ajax.php",
+        "line": 783
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "the-plus-addons-for-elementor-page-builder",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$custom_url     = get_post_meta( $post->ID, $prefix . 'custom_url', true )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/teammember_options.php",
+        "line": 98
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 98,
+          "expression": "$custom_url     = get_post_meta( $post->ID, $prefix . 'custom_url', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 148,
+          "expression": "echo esc_url( $custom_url );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $custom_url );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/teammember_options.php",
+        "line": 148
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "the-plus-addons-for-elementor-page-builder",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$website_url    = get_post_meta( $post->ID, $prefix . 'website_url', true )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/teammember_options.php",
+        "line": 100
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 100,
+          "expression": "$website_url    = get_post_meta( $post->ID, $prefix . 'website_url', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 156,
+          "expression": "echo esc_url( $website_url );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $website_url );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/teammember_options.php",
+        "line": 156
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "the-plus-addons-for-elementor-page-builder",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$facebook_link  = get_post_meta( $post->ID, $prefix . 'face_link', true )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/teammember_options.php",
+        "line": 101
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 101,
+          "expression": "$facebook_link  = get_post_meta( $post->ID, $prefix . 'face_link', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 160,
+          "expression": "echo esc_url( $facebook_link );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $facebook_link );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/teammember_options.php",
+        "line": 160
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "the-plus-addons-for-elementor-page-builder",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$google_link    = get_post_meta( $post->ID, $prefix . 'googgle_link', true )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/teammember_options.php",
+        "line": 102
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 102,
+          "expression": "$google_link    = get_post_meta( $post->ID, $prefix . 'googgle_link', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 164,
+          "expression": "echo esc_url( $google_link );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $google_link );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/teammember_options.php",
+        "line": 164
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "the-plus-addons-for-elementor-page-builder",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$instagram_link = get_post_meta( $post->ID, $prefix . 'insta_link', true )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/teammember_options.php",
+        "line": 103
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 103,
+          "expression": "$instagram_link = get_post_meta( $post->ID, $prefix . 'insta_link', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 168,
+          "expression": "echo esc_url( $instagram_link );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $instagram_link );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/teammember_options.php",
+        "line": 168
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-006",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "the-plus-addons-for-elementor-page-builder",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$twitter_link   = get_post_meta( $post->ID, $prefix . 'twit_link', true )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/teammember_options.php",
+        "line": 104
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 104,
+          "expression": "$twitter_link   = get_post_meta( $post->ID, $prefix . 'twit_link', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 172,
+          "expression": "echo esc_url( $twitter_link );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $twitter_link );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/teammember_options.php",
+        "line": 172
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-007",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "the-plus-addons-for-elementor-page-builder",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$linkedin_link  = get_post_meta( $post->ID, $prefix . 'linked_link', true )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/teammember_options.php",
+        "line": 105
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 105,
+          "expression": "$linkedin_link  = get_post_meta( $post->ID, $prefix . 'linked_link', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 176,
+          "expression": "echo esc_url( $linkedin_link );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $linkedin_link );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/teammember_options.php",
+        "line": 176
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-008",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "the-plus-addons-for-elementor-page-builder",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$fallback_url = get_post_meta( $post->ID, '_theplus_clients_url', true )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/clients_options.php",
+        "line": 100
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 100,
+          "expression": "$fallback_url = get_post_meta( $post->ID, '_theplus_clients_url', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 104,
+          "expression": "$client_url = $fallback_url",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 131,
+          "expression": "echo esc_url( $client_url );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $client_url );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/clients_options.php",
+        "line": 131
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-009",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "the-plus-addons-for-elementor-page-builder",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$logo        = get_post_meta( $post->ID, $prefix . 'logo', true )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/testimonial_option.php",
+        "line": 100
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 100,
+          "expression": "$logo        = get_post_meta( $post->ID, $prefix . 'logo', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 155,
+          "expression": "echo esc_url( $logo );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $logo );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/includes/admin/extra-option/testimonial_option.php",
+        "line": 155
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-010",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "the-plus-addons-for-elementor-page-builder",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$client_url = get_post_meta( get_the_id(), 'theplus_clients_url', true )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/modules/widgets-styles/client/post-meta-title.php",
+        "line": 21
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 21,
+          "expression": "$client_url = get_post_meta( get_the_id(), 'theplus_clients_url', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 27,
+          "expression": "echo esc_url( $client_url );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $client_url );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/modules/widgets-styles/client/post-meta-title.php",
+        "line": 27
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-011",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "the-plus-addons-for-elementor-page-builder",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$client_url = get_post_meta( get_the_id(), 'theplus_clients_url', true )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/modules/widgets-styles/client/client-style-1.php",
+        "line": 20
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 20,
+          "expression": "$client_url = get_post_meta( get_the_id(), 'theplus_clients_url', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 29,
+          "expression": "echo esc_url( $client_url );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $client_url );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/modules/widgets-styles/client/client-style-1.php",
+        "line": 29
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-012",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "the-plus-addons-for-elementor-page-builder",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$testimonial_logo = get_post_meta( get_the_id(), 'theplus_testimonial_logo', true )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/modules/widgets-styles/testimonial/post-meta-logo.php",
+        "line": 13
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 13,
+          "expression": "$testimonial_logo = get_post_meta( get_the_id(), 'theplus_testimonial_logo', true )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 18,
+          "expression": "echo esc_url( $testimonial_logo );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( $testimonial_logo );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/the-plus-addons-for-elementor-page-builder/modules/widgets-styles/testimonial/post-meta-logo.php",
+        "line": 18
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [],
+  "stats": {
+    "taint_critical": 0,
+    "taint_high": 3,
+    "taint_total": 13,
+    "semgrep_error": 0,
+    "semgrep_warning": 0
+  }
+}

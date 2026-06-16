@@ -1,6 +1,6 @@
 # Attack Surface: svg-support
 
-> Generated: 2026-06-16T09:13:54Z
+> Generated: 2026-06-16T18:36:26Z
 
 ## Section 1: Entry Points
 

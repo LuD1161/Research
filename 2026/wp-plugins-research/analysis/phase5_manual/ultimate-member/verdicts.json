@@ -1,0 +1,197 @@
+{
+  "plugin_slug": "ultimate-member",
+  "review_date": "2026-06-16",
+  "reviewer": "claude-opus-4-6-manual",
+  "summary": "22 taint flows reviewed. 19 are false positives. 3 are real but low-severity findings (stored XSS in admin-only contexts or error-path self-XSS). No critical or high-severity exploitable vulnerabilities confirmed.",
+  "verdicts": [
+    {
+      "flow_id": "ultimate-member-path-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "uninstall.php is only executed by WordPress when a user with delete_plugins capability triggers plugin deletion. This is a super-admin-only context. The attacker already has full server control at this privilege level."
+    },
+    {
+      "flow_id": "ultimate-member-xss-001",
+      "verdict": "true_positive",
+      "confidence": "medium",
+      "severity": "low",
+      "cvss_estimate": 3.1,
+      "vulnerability_class": "xss",
+      "reasoning": "wp_die() with var_export() output in <pre> tags does not escape HTML special characters. User-controlled profile data (display_name, nickname) flows into the output. However, this only triggers on the error path of wp_update_user() (which rarely fails), and is mostly self-XSS since the victim is the user updating their own profile. Requires authenticated user context.",
+      "exploitability": "Very low. Requires wp_update_user() to return WP_Error, which is uncommon. Mostly self-XSS.",
+      "affected_file": "includes/core/um-actions-save-profile.php",
+      "affected_line": 90
+    },
+    {
+      "flow_id": "ultimate-member-sqli-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "$wpdb->update() with format specifiers ('%s' for data, '%d' for WHERE) is a parameterized WordPress API. $result comes from a $wpdb->prepare() query. Both layers are safe."
+    },
+    {
+      "flow_id": "ultimate-member-xss-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Output is properly escaped: esc_url() for the href attribute, esc_html__() for the anchor text. No user-controlled data reaches unescaped output."
+    },
+    {
+      "flow_id": "ultimate-member-path-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Three layers of defense: (1) esc_url_raw() requires valid URL scheme, blocking raw path traversal; (2) um_is_temp_upload() validates path contains /ultimatemember/temp/ and explicitly blocks '../' and '%'; (3) nonce verification present. Path traversal is not feasible."
+    },
+    {
+      "flow_id": "ultimate-member-path-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "$user_id sanitized via absint() (integer only). $type is hardcoded by callers as 'profile_photo' or 'cover_photo' (never from user input). $match comes from glob() filesystem results, not user input. Auth checks (nonce + capability) present."
+    },
+    {
+      "flow_id": "ultimate-member-path-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Three layers of defense: (1) validate_file() at line 1275 checks for path traversal characters; (2) um_is_file_owner() verifies file is within user's upload directory; (3) source is get_user_meta() which stores values from previous sanitized upload operations, not direct user input."
+    },
+    {
+      "flow_id": "ultimate-member-sqli-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Values from $wpdb->prepare() query are additionally passed through array_map('absint', ...) which casts every value to a non-negative integer. Integer-only interpolation is safe. This is in a third-party library (Action Scheduler) with intentional phpcs:ignore comment."
+    },
+    {
+      "flow_id": "ultimate-member-sqli-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Source is get_option('um_usermeta_fields') which contains plugin-controlled metakey strings. The option is only written via admin AJAX handlers that build values from UM()->builtin()->all_user_fields (plugin field definitions). Not reachable by unprivileged users."
+    },
+    {
+      "flow_id": "ultimate-member-xss-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "$current_tab is sanitize_key() filtered (allows only [a-z0-9_-]). generate_subtabs_menu() uses this sanitized value to look up in registered settings structure. Output is built from plugin-registered data, not raw user input. Admin-only page (manage_options required)."
+    },
+    {
+      "flow_id": "ultimate-member-xss-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "$settings_section content comes either from render_settings_section() (plugin HTML generation) or from apply_filters() with sanitize_key-filtered tab name. Content originates from plugin code, not user input. Admin-only context."
+    },
+    {
+      "flow_id": "ultimate-member-xss-005",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same pattern as xss-004. $custom_form_section_content comes from apply_filters() with sanitize_key-filtered tab/section names. Content originates from plugin filter callbacks. Admin-only context."
+    },
+    {
+      "flow_id": "ultimate-member-lfi-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Three layers of defense: (1) wp_ajax_ hook requires authentication; (2) current_user_can('manage_options') capability check; (3) UM()->admin()->check_ajax_nonce() nonce verification; (4) in_array($pack, $this->necessary_packages, true) strict allowlist check. The $pack value must exactly match a known upgrade package directory name."
+    },
+    {
+      "flow_id": "ultimate-member-sqli-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "$wpdb->update() with format specifiers ('%s' for data, '%d' for WHERE) is WordPress's parameterized update API. It internally calls $wpdb->prepare(). The post_title is additionally sanitize_text_field(wp_unslash()) filtered."
+    },
+    {
+      "flow_id": "ultimate-member-sqli-005",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Identical pattern to sqli-004. $wpdb->update() with proper format specifiers is parameterized. Safe."
+    },
+    {
+      "flow_id": "ultimate-member-sqli-006",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Source is get_option('um_upgrade_230_skype_fields_for_upgrade') which is only written in the same file at line 57, containing metakey strings from plugin field definitions. One-time upgrade migration artifact. Not user-writable."
+    },
+    {
+      "flow_id": "ultimate-member-xss-006",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "$is_core from get_post_meta() is used solely as a boolean condition. If truthy, the hardcoded literal string ' is-core-form' is echoed. If falsy, empty string. No user-controlled data reaches the output."
+    },
+    {
+      "flow_id": "ultimate-member-xss-007",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Double-sanitized: sanitize_key() strips everything except [a-z0-9_-], then esc_attr() escapes for HTML attribute context. No XSS possible."
+    },
+    {
+      "flow_id": "ultimate-member-xss-008",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "echo !empty($data['_um_is_custom']) ? 1 : 0 - This outputs only the literal integer 1 or 0 based on a boolean check. No user-controlled data reaches the output."
+    },
+    {
+      "flow_id": "ultimate-member-xss-009",
+      "verdict": "true_positive",
+      "confidence": "medium",
+      "severity": "low",
+      "cvss_estimate": 2.4,
+      "vulnerability_class": "xss",
+      "reasoning": "$data['name'] from get_option() is echoed without esc_attr() into an HTML input value attribute. Missing esc_attr() on output. However, this is an admin-only page requiring manage_options capability. Exploitable only as admin-to-admin stored XSS if one admin can set a malicious role name that another admin views.",
+      "exploitability": "Very low. Requires manage_options capability to both set and view the role name. Admin-to-admin stored XSS only.",
+      "affected_file": "includes/admin/templates/role/role-edit.php",
+      "affected_line": 247
+    },
+    {
+      "flow_id": "ultimate-member-xss-010",
+      "verdict": "true_positive",
+      "confidence": "medium",
+      "severity": "low",
+      "cvss_estimate": 2.4,
+      "vulnerability_class": "xss",
+      "reasoning": "$data['name'] from get_option() is echoed with only stripslashes() (no HTML escaping) in an HTML context. Missing esc_html() on output. Same admin-only context as xss-009 - requires manage_options capability.",
+      "exploitability": "Very low. Requires manage_options capability to both set and view the role name. Admin-to-admin stored XSS only.",
+      "affected_file": "includes/admin/templates/role/role-edit.php",
+      "affected_line": 249
+    },
+    {
+      "flow_id": "ultimate-member-xss-011",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "$_GET['id'] is used only as a boolean check (!empty()). The echoed values are hardcoded translation strings passed through esc_attr__(). No user-controlled data reaches the output."
+    }
+  ],
+  "confirmed_count": 3,
+  "false_positive_count": 19,
+  "confirmed_findings": [
+    {
+      "id": "ultimate-member-xss-001",
+      "title": "Stored XSS via var_export() in wp_die() error output during profile save",
+      "severity": "low",
+      "cvss_estimate": 3.1,
+      "type": "xss",
+      "file": "includes/core/um-actions-save-profile.php",
+      "line": 90,
+      "auth_required": true,
+      "description": "When wp_update_user() returns a WP_Error during profile save, user-controlled profile data (display_name, nickname) is output via var_export() inside wp_die() without HTML escaping. var_export() does not escape <, >, &, or \" characters. This is an error-path-only issue and mostly self-XSS."
+    },
+    {
+      "id": "ultimate-member-xss-009",
+      "title": "Stored XSS in admin role edit page via unescaped role name in input value",
+      "severity": "low",
+      "cvss_estimate": 2.4,
+      "type": "xss",
+      "file": "includes/admin/templates/role/role-edit.php",
+      "line": 247,
+      "auth_required": true,
+      "admin_only": true,
+      "description": "Role name from get_option() echoed into HTML input value attribute without esc_attr(). Admin-to-admin stored XSS requiring manage_options capability."
+    },
+    {
+      "id": "ultimate-member-xss-010",
+      "title": "Stored XSS in admin role edit page via unescaped role name in span",
+      "severity": "low",
+      "cvss_estimate": 2.4,
+      "type": "xss",
+      "file": "includes/admin/templates/role/role-edit.php",
+      "line": 249,
+      "auth_required": true,
+      "admin_only": true,
+      "description": "Role name from get_option() echoed with stripslashes() but without esc_html() in HTML context. Admin-to-admin stored XSS requiring manage_options capability."
+    }
+  ]
+}

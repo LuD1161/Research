@@ -1,0 +1,51 @@
+{
+  "plugin": "polldaddy",
+  "flow_id": "polldaddy-xss-007",
+  "title": "Authenticated Stored XSS via Unescaped $src in ajax_add_answer()",
+  "vulnerability_class": "stored_xss",
+  "severity": "low",
+  "cvss_score": "4.1",
+  "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:H/UI:R/S:C/C:L/I:L/A:N",
+  "auth_required": true,
+  "required_capability": "edit_posts",
+  "nonce_verified": true,
+  "affected_file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/ajax.php",
+  "affected_lines": {
+    "source": 72,
+    "sink_build": 82,
+    "sink_echo": 116
+  },
+  "description": "The ajax_add_answer() AJAX handler (registered for authenticated requests only via wp_ajax_polls_add_answer) reads $_POST['src'] without sanitization and concatenates it directly into an HTML string at line 82: '<img src=\"' . $src . 'img/icon-reorder.png\"'. This HTML is echoed at line 116. A logged-in user with edit_posts capability can issue a crafted AJAX request (with a valid 'add-answer' nonce) and inject arbitrary HTML/JavaScript into the response, which the polling admin UI renders into the page DOM.",
+  "taint_trace": [
+    {
+      "step": 1,
+      "file": "ajax.php",
+      "line": 72,
+      "code": "$src = $_POST['src'];",
+      "action": "source"
+    },
+    {
+      "step": 2,
+      "file": "ajax.php",
+      "line": 82,
+      "code": "'<img src=\"' . $src . 'img/icon-reorder.png\"'",
+      "action": "unsanitized concatenation into HTML"
+    },
+    {
+      "step": 3,
+      "file": "ajax.php",
+      "line": 116,
+      "code": "echo $response;",
+      "action": "sink - HTML output"
+    }
+  ],
+  "missing_sanitization": "esc_url() should be applied to $src before interpolating into the src attribute. esc_attr() alone is insufficient for URL contexts.",
+  "exploitability_notes": "Requires valid WordPress login with edit_posts capability and a valid 'add-answer' nonce. The nonce can be obtained by visiting the poll edit page. Since this is an AJAX response that feeds into the admin UI, a contributor-level user could inject JS that executes in the context of a higher-privileged admin viewing the result. However, the nonce requirement limits CSRF exploitation.",
+  "poc_request": {
+    "method": "POST",
+    "url": "/wp-admin/admin-ajax.php",
+    "body": "action=polls_add_answer&_wpnonce=<valid_add-answer_nonce>&src=%22%3E%3Cscript%3Ealert(document.cookie)%3C/script%3E%3Cx+src%3D%22&aa=1&popup=0",
+    "expected_response": "HTML containing injected <script> tag"
+  },
+  "remediation": "In ajax.php ajax_add_answer(), replace: '<img src=\"' . $src . 'img/icon-reorder.png\"' with: '<img src=\"' . esc_url( $src ) . 'img/icon-reorder.png\"' and similarly for the delete icon at line 92 and 102: '<img src=\"' . esc_url($src) . 'img/icon-clear-search.png\"'"
+}

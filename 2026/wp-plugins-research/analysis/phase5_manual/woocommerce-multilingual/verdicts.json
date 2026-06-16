@@ -1,0 +1,73 @@
+{
+  "plugin": "woocommerce-multilingual",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "phase5-manual",
+  "summary": {
+    "total_flows_reviewed": 9,
+    "confirmed": 0,
+    "false_positives": 9,
+    "needs_investigation": 0
+  },
+  "verdicts": [
+    {
+      "flow_id": "woocommerce-multilingual-xss-001",
+      "verdict": "false_positive",
+      "reasoning": "The tainted value $custom_costs_status from get_post_meta() is used only in a boolean comparison (!$custom_costs_status). The echoed value $checked is ALWAYS a hardcoded string literal: either 'checked=\"checked\"' or ' '. The tainted data never flows into the output — only the result of the ternary (hardcoded) is echoed. The taint tracker incorrectly propagated taint through the ternary operator."
+    },
+    {
+      "flow_id": "woocommerce-multilingual-xss-002",
+      "verdict": "false_positive",
+      "reasoning": "Same as xss-001. $custom_costs_status is used only in the comparison ($custom_costs_status == 1). The echoed $checked is always 'checked=\"checked\"' or ' ' — hardcoded. No user-controlled data reaches the output. The taint tracker incorrectly propagated taint from the comparison operand into the ternary result."
+    },
+    {
+      "flow_id": "woocommerce-multilingual-xss-003",
+      "verdict": "false_positive",
+      "reasoning": "The function pre_select_translated_venue() is only registered via add_action('admin_footer', ...) inside an is_admin() block (line 48-49). Exploitation would require authenticated admin access. More critically, $translated_venue_id is the return value of apply_filters('wpml_object_id', ...) which by WPML contract returns an integer post ID or false. The code gates on 'if ($translated_venue_id)' before echoing. Echoing an integer into a JavaScript .val() call is not XSS. The $_GET['trid'], $_GET['lang'], $_GET['source_lang'] values influence look-ups but the final echoed value is a DB-sourced integer. No exploitable XSS path exists."
+    },
+    {
+      "flow_id": "woocommerce-multilingual-sqli-001",
+      "verdict": "false_positive",
+      "reasoning": "This is a false SQLi flow. The 'source' identified ($wpdb->get_var with $wpdb->prepare) is itself a properly parameterized query returning a DB integer ($orig_term). That integer is then passed to $wpdb->update() which uses $wpdb->prepare() internally. The taint analyzer incorrectly treated the output of a properly parameterized query as a taint source. No HTTP input is involved. This function is called during plugin install/activation by privileged users only."
+    },
+    {
+      "flow_id": "woocommerce-multilingual-sqli-002",
+      "verdict": "false_positive",
+      "reasoning": "Same class of false positive as sqli-001. $term_id comes from $wpdb->get_var($wpdb->prepare(...)) — a properly parameterized query. The result (integer) is passed to $wpdb->delete() which uses parameterized queries. No HTTP input reaches the SQL sink. Taint came from a prepared-query result, not external user input."
+    },
+    {
+      "flow_id": "woocommerce-multilingual-sqli-003",
+      "verdict": "false_positive",
+      "reasoning": "$not_existing_items comes from $wpdb->get_col() with a static hardcoded query (no external input). The values are then passed to DB::prepareIn() which internally calls $wpdb->prepare() with proper %s/%d placeholders and the $items array. The resulting string is safe. The taint analyzer incorrectly flagged DB-to-DB data flow. No HTTP input is involved; this code runs only during plugin upgrade routines."
+    },
+    {
+      "flow_id": "woocommerce-multilingual-xss-004",
+      "verdict": "false_positive",
+      "reasoning": "$selected_lang from $_COOKIE is used only in the comparison ($selected_lang == $l['language_code']). The echoed output is either 'selected=\"selected\"' or '' — both hardcoded literals. The tainted cookie value is never echoed to the page. The taint tracker incorrectly propagated taint through the ternary comparison result."
+    },
+    {
+      "flow_id": "woocommerce-multilingual-xss-005",
+      "verdict": "false_positive",
+      "reasoning": "$taxonomy from $_GET['taxonomy'] is first validated by in_array($taxonomy, $taxonomies) where $taxonomies contains only registered WordPress taxonomy names (lines 93-97). This check constrains input to known safe taxonomy slugs. Furthermore: (1) $taxonomy_obj->labels->name and ->singular_name come from WP taxonomy registration, not from raw $_GET. (2) AdminUrl::getTab($taxonomy) passes $taxonomy into add_query_arg() as a URL parameter value which URL-encodes it — no HTML injection possible. (3) The function is only registered via admin_notices in admin context (admin_menu_setup, admin_notices). Exploitation would require admin privileges and access to a taxonomy whose registered label contained HTML — not normally possible."
+    },
+    {
+      "flow_id": "woocommerce-multilingual-xss-006",
+      "verdict": "false_positive",
+      "reasoning": "This AJAX handler (wp_ajax_wcml_sync_product_variations) requires a valid nonce (wcml_sync_product_variations) verified at lines 383-386 before any processing. $taxonomy is passed through $wpdb->prepare() as a %s placeholder (line 413) — safe from SQL injection. The final output is json_encode($response) where $response contains only integer counts and hardcoded strings (sprintf with %d for count, hardcoded translation strings). $taxonomy itself does not appear in the JSON response. The taint trace through count($post_ids) is a false positive — count() returns an integer."
+    },
+    {
+      "flow_id": "woocommerce-multilingual-xss-007",
+      "verdict": "false_positive",
+      "reasoning": "This handler (wcml_sync_taxonomies_in_content_preview) requires a valid nonce (wcml_sync_taxonomies_in_content_preview) at lines 493-496. The unescaped $_POST['taxonomy'] appears in an error message only when it is NOT found in $wp_taxonomies (the else branch). This error string is JSON-encoded via json_encode() which produces a JSON string — not direct HTML output. Whether this becomes DOM XSS depends on how JavaScript consumes the errors field; however: (1) the endpoint is authenticated (wp_ajax_ prefix), (2) a valid nonce is required, making CSRF-driven exploitation impossible, (3) any DOM XSS risk would be in JavaScript code outside this plugin's scope. Not a confirmed PHP/reflected XSS vulnerability."
+    },
+    {
+      "flow_id": "woocommerce-multilingual-xss-008",
+      "verdict": "false_positive",
+      "reasoning": "Handler set_order_currency_on_ajax_update requires valid nonce (set_order_currency) at lines 435-439. $currency goes through filter_input(INPUT_POST, 'currency', FILTER_SANITIZE_FULL_SPECIAL_CHARS) which converts HTML special characters to entities. Output is json_encode() — not direct HTML. The nonce requirement prevents CSRF. No exploitable XSS path."
+    },
+    {
+      "flow_id": "woocommerce-multilingual-xss-009",
+      "verdict": "false_positive",
+      "reasoning": "Handler auto_generate_slug is registered via wp_ajax_wcml_editor_auto_slug (authenticated users only). $title = filter_input(INPUT_POST, 'title') → sanitize_title($title) which strips all HTML tags, special chars, and returns a URL-safe slug. urldecode() on an already-sanitized string is safe. The resulting $slug is safely sanitized by sanitize_title() before echo json_encode(). No XSS path."
+    }
+  ]
+}

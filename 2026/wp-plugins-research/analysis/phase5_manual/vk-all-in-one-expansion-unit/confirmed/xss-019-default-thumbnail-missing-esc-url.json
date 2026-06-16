@@ -1,0 +1,64 @@
+{
+  "id": "vk-all-in-one-expansion-unit-xss-019-CONFIRMED",
+  "plugin": "vk-all-in-one-expansion-unit",
+  "title": "Missing esc_url() on attachment image src in admin default thumbnail page",
+  "vulnerability_class": "xss",
+  "severity": "LOW",
+  "cvss_vector": "CVSS:3.1/AV:N/AC:H/PR:H/UI:R/S:U/C:L/I:L/A:N",
+  "cvss_score": 2.4,
+  "auth_required": true,
+  "capability_required": "activate_plugins",
+  "affected_file": "inc/default-thumbnail/default-thumbnail-admin.php",
+  "affected_line": 23,
+
+  "description": "The default thumbnail admin settings page outputs an attachment image URL into an HTML img src attribute without applying esc_url(). The URL is obtained by calling wp_get_attachment_image_src() with an attachment ID stored in the 'veu_defualt_thumbnail' option. While the URL is derived from WordPress's own attachment record rather than a raw user-supplied string, the missing esc_url() call violates WordPress coding standards and could theoretically facilitate XSS if the underlying attachment URL data were tampered with at the database level.",
+
+  "taint_trace": [
+    {
+      "step": 1,
+      "file": "inc/default-thumbnail/default-thumbnail-admin.php",
+      "line": 5,
+      "code": "$options = get_option('veu_defualt_thumbnail');",
+      "action": "source - reads stored option array"
+    },
+    {
+      "step": 2,
+      "file": "inc/default-thumbnail/default-thumbnail-admin.php",
+      "line": 17,
+      "code": "if (isset($options['default_thumbnail_image']) && is_numeric($options['default_thumbnail_image'])) {",
+      "action": "partial sanitization - validates the attachment ID is numeric"
+    },
+    {
+      "step": 3,
+      "file": "inc/default-thumbnail/default-thumbnail-admin.php",
+      "line": 18,
+      "code": "$image = wp_get_attachment_image_src($options['default_thumbnail_image'], 'large');",
+      "action": "WP media library lookup - returns [url, width, height]"
+    },
+    {
+      "step": 4,
+      "file": "inc/default-thumbnail/default-thumbnail-admin.php",
+      "line": 23,
+      "code": "<img src=\"<?php echo $image[0]; ?>\" style=\"width:200px;height:auto;\" />",
+      "action": "SINK - $image[0] (URL) echoed unescaped into src attribute"
+    }
+  ],
+
+  "exploitability": {
+    "exploitable": false,
+    "notes": "Practical exploitation requires: (1) direct database write access to insert a malicious URL into the wp_posts table for an attachment record, OR (2) control over the WordPress media library file upload. An attacker with either of these already has more powerful primitives. The numeric check on the attachment ID prevents arbitrary string injection. Real-world impact is negligible - classified as a coding standards violation rather than an exploitable vulnerability."
+  },
+
+  "remediation": {
+    "fix": "Apply esc_url() before outputting $image[0]",
+    "before": "echo $image[0];",
+    "after": "echo esc_url( $image[0] );",
+    "file": "inc/default-thumbnail/default-thumbnail-admin.php",
+    "line": 23
+  },
+
+  "references": [
+    "https://developer.wordpress.org/apis/security/escaping/",
+    "https://make.wordpress.org/core/handbook/best-practices/coding-standards/php/#escaping"
+  ]
+}

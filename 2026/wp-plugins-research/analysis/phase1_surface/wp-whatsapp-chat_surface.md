@@ -1,6 +1,6 @@
 # Attack Surface: wp-whatsapp-chat
 
-> Generated: 2026-06-16T09:13:58Z
+> Generated: 2026-06-16T18:36:28Z
 
 ## Section 1: Entry Points
 

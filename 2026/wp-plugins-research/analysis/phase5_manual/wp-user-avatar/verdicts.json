@@ -1,0 +1,220 @@
+{
+  "plugin_slug": "wp-user-avatar",
+  "analysis_date": "2026-06-16",
+  "analyst": "claude-opus-4-6",
+  "total_flows_reviewed": 19,
+  "confirmed_vulnerabilities": 0,
+  "false_positives": 19,
+  "summary": "All 19 taint flows flagged by static analysis are false positives. The plugin uses proper escaping (esc_url, esc_attr, selected()), hardcoded output values, admin-only contexts, or input sanitization (preg_replace, strip_tags, sanitize_text_field) that prevent exploitation. Two instances of missing output escaping were found (WPProfileFieldParserTrait.php:150 and FieldsShortcodeCallback.php:1098) but the stored filenames are sanitized to [A-Z0-9._-] at upload time by FileUploader::process(), making XSS injection infeasible through normal plugin flows.",
+  "verdicts": [
+    {
+      "flow_id": "wp-user-avatar-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "src/ShortcodeParser/MyAccount/billing-details.tmpl.php",
+      "source_line": 58,
+      "sink_file": "src/ShortcodeParser/MyAccount/billing-details.tmpl.php",
+      "sink_line": 78,
+      "reasoning": "The billing_country value from get_user_meta() is used only as a lookup key for ppress_array_of_world_states(). It never reaches HTML output directly. Field keys and types come from hardcoded arrays in CheckoutFields::standard_billing_fields(). The shortcode [edit-profile-cpf] handles its own rendering and escaping."
+    },
+    {
+      "flow_id": "wp-user-avatar-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "src/Admin/SettingsPages/Membership/TabbedWidget.php",
+      "source_line": 124,
+      "sink_file": "src/Admin/SettingsPages/Membership/TabbedWidget.php",
+      "sink_line": 124,
+      "reasoning": "Widget instance text values are sanitized with strip_tags() in the update() method, which removes all HTML tags. Additionally, widget configuration is admin-only (WordPress widgets are managed by users with manage_options capability). Admin-to-admin stored XSS is a won't-fix by WordPress design."
+    },
+    {
+      "flow_id": "wp-user-avatar-xss-003",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "src/Admin/SettingsPages/Membership/TabbedWidget.php",
+      "source_line": 162,
+      "sink_file": "src/Admin/SettingsPages/Membership/TabbedWidget.php",
+      "sink_line": 162,
+      "reasoning": "$_SERVER['REQUEST_URI'] is escaped with esc_url_raw() which strips dangerous protocols (javascript:, data:). While esc_url() would be more correct for HTML output context, esc_url_raw still prevents protocol-based XSS. Practical risk is negligible."
+    },
+    {
+      "flow_id": "wp-user-avatar-xss-004",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "src/Admin/SettingsPages/Membership/TabbedWidget.php",
+      "source_line": 188,
+      "sink_file": "src/Admin/SettingsPages/Membership/TabbedWidget.php",
+      "sink_line": 188,
+      "reasoning": "$_SERVER['REQUEST_URI'] is properly escaped with esc_url(), the correct escaping function for URLs in HTML context. This strips dangerous protocols and applies kses-style filtering."
+    },
+    {
+      "flow_id": "wp-user-avatar-xss-005",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "src/Classes/WPProfileFieldParserTrait.php",
+      "source_line": 145,
+      "sink_file": "src/Classes/WPProfileFieldParserTrait.php",
+      "sink_line": 150,
+      "reasoning": "Missing output escaping: $filename from pp_uploaded_files user meta is echoed directly into HTML. However, FileUploader::process() sanitizes filenames with preg_replace('/[^A-Z0-9._-]/i', '_', $filename) at line 103 of FileUploader.php, which replaces all HTML-special characters (<, >, ', \", &) with underscores. All code paths storing pp_uploaded_files go through FileUploader::init(). No practical XSS exploit path exists. Code quality issue only."
+    },
+    {
+      "flow_id": "wp-user-avatar-path-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "path_traversal",
+      "source_file": "src/Admin/SettingsPages/Membership/DashboardPage/EditUserProfile.php",
+      "source_line": 399,
+      "sink_file": "src/Admin/SettingsPages/Membership/DashboardPage/EditUserProfile.php",
+      "sink_line": 403,
+      "reasoning": "The pp_profile_avatar user meta is set exclusively by ImageUploader::process(), which sanitizes filenames with preg_replace to [A-Z0-9._-] then MD5-hashes the base name. Path traversal characters (../) cannot survive this pipeline. User can only act on their own avatar via get_current_user_id()."
+    },
+    {
+      "flow_id": "wp-user-avatar-path-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "path_traversal",
+      "source_file": "src/Admin/SettingsPages/Membership/DashboardPage/EditUserProfile.php",
+      "source_line": 459,
+      "sink_file": "src/Admin/SettingsPages/Membership/DashboardPage/EditUserProfile.php",
+      "sink_line": 463,
+      "reasoning": "Same as path-001: pp_profile_cover_image is set via ImageUploader::process() with MD5-hashed, sanitized filenames. No path traversal possible through the stored slug."
+    },
+    {
+      "flow_id": "wp-user-avatar-xss-006",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "deprecated/include.settings-page.php",
+      "source_line": 3,
+      "sink_file": "deprecated/include.settings-page.php",
+      "sink_line": 100,
+      "reasoning": "Source is get_option() (database value, not direct user input). Sink uses esc_url() for escaping. Data is sanitized with sanitize_text_field() before storage. Page is admin-only (manage_options capability required). Admin self-XSS via stored option is not exploitable."
+    },
+    {
+      "flow_id": "wp-user-avatar-xss-007",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "src/Admin/SettingsPages/Membership/Forms.php",
+      "source_line": 101,
+      "sink_file": "src/Admin/SettingsPages/Membership/Forms.php",
+      "sink_line": 113,
+      "reasoning": "$_GET['form-type'] is only used in a boolean comparison against a constant (FR::LOGIN_TYPE). The ternary outputs either the hardcoded string 'pp-type-active' or null. No user-controlled data reaches the echo statement. Admin-only page."
+    },
+    {
+      "flow_id": "wp-user-avatar-xss-008",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "src/Admin/SettingsPages/Membership/Forms.php",
+      "source_line": 102,
+      "sink_file": "src/Admin/SettingsPages/Membership/Forms.php",
+      "sink_line": 118,
+      "reasoning": "Same pattern as xss-007. Ternary outputs 'pp-type-active' or null based on comparison with FR::REGISTRATION_TYPE. No user data in output."
+    },
+    {
+      "flow_id": "wp-user-avatar-xss-009",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "src/Admin/SettingsPages/Membership/Forms.php",
+      "source_line": 103,
+      "sink_file": "src/Admin/SettingsPages/Membership/Forms.php",
+      "sink_line": 124,
+      "reasoning": "Same pattern as xss-007. Ternary outputs 'pp-type-active' or null based on comparison with FR::PASSWORD_RESET_TYPE. No user data in output."
+    },
+    {
+      "flow_id": "wp-user-avatar-xss-010",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "src/Admin/SettingsPages/Membership/Forms.php",
+      "source_line": 104,
+      "sink_file": "src/Admin/SettingsPages/Membership/Forms.php",
+      "sink_line": 129,
+      "reasoning": "Same pattern as xss-007. Ternary outputs 'pp-type-active' or null. No user data in output."
+    },
+    {
+      "flow_id": "wp-user-avatar-xss-011",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "src/Admin/SettingsPages/Membership/Forms.php",
+      "source_line": 105,
+      "sink_file": "src/Admin/SettingsPages/Membership/Forms.php",
+      "sink_line": 136,
+      "reasoning": "Same pattern as xss-007. Ternary outputs 'pp-type-active' or null. No user data in output."
+    },
+    {
+      "flow_id": "wp-user-avatar-xss-012",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "src/Admin/SettingsPages/Membership/Forms.php",
+      "source_line": 106,
+      "sink_file": "src/Admin/SettingsPages/Membership/Forms.php",
+      "sink_line": 144,
+      "reasoning": "Same pattern as xss-007. Ternary outputs 'pp-type-active' or null. No user data in output."
+    },
+    {
+      "flow_id": "wp-user-avatar-xss-013",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "src/Admin/SettingsPages/Membership/SettingsPage.php",
+      "source_line": 247,
+      "sink_file": "src/Admin/SettingsPages/Membership/SettingsPage.php",
+      "sink_line": 273,
+      "reasoning": "Source is $_GET['preset'] with sanitize_text_field applied. Sink is WordPress selected() function which only compares values and outputs 'selected=\"selected\"' or empty string. User-supplied value is never directly echoed into HTML. Admin-only page."
+    },
+    {
+      "flow_id": "wp-user-avatar-xss-014",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "src/Admin/SettingsPages/Membership/SettingsPage.php",
+      "source_line": 246,
+      "sink_file": "src/Admin/SettingsPages/Membership/SettingsPage.php",
+      "sink_line": 292,
+      "reasoning": "Source is $_GET['plan'] with sanitize_text_field applied. Sink is WordPress selected() function which only does comparison, outputting 'selected=\"selected\"' or empty string. Option values and text come from database (plan->id, plan->name). Admin-only page."
+    },
+    {
+      "flow_id": "wp-user-avatar-path-003",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "path_traversal",
+      "source_file": "src/Functions/GlobalFunctions.php",
+      "source_line": 1234,
+      "sink_file": "src/Functions/GlobalFunctions.php",
+      "sink_line": 1235,
+      "reasoning": "The $type parameter is allowlisted to exactly ['social-login', 'debug'] in ToolsSettingsPage.php:27 via in_array() check before being passed to ppress_clear_error_log(). The $file_token comes from get_option() (not user input). Requires manage_options capability and nonce verification."
+    },
+    {
+      "flow_id": "wp-user-avatar-xss-015",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "deprecated/class-wp-user-avatar.php",
+      "source_line": 164,
+      "sink_file": "deprecated/class-wp-user-avatar.php",
+      "sink_line": 178,
+      "reasoning": "Source is get_user_meta() returning a stored attachment ID (integer), echoed into a hidden input value attribute. While technically missing esc_attr(), the value is an attachment ID set by the plugin via update_user_meta and is always an integer. Admin-only page (user profile editing). Requires separate vulnerability or DB access to exploit."
+    },
+    {
+      "flow_id": "wp-user-avatar-xss-016",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "deprecated/wp-user-avatar/includes/window.php",
+      "source_line": 19,
+      "sink_file": "deprecated/wp-user-avatar/includes/window.php",
+      "sink_line": 19,
+      "reasoning": "Source is site_url() -- a WordPress core function returning the site URL from wp_options. This is an admin-configured setting, not user-controlled input. An attacker cannot control site_url() without already having admin access. File also has ABSPATH check preventing direct access."
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "plugin": "supreme-modules-for-divi",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "phase5-manual",
+  "summary": {
+    "total_flows": 9,
+    "confirmed": 0,
+    "false_positives": 9,
+    "needs_more_info": 0
+  },
+  "verdicts": [
+    {
+      "flow_id": "supreme-modules-for-divi-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "The tainted value '$time' is the return of seconds_to_words(), which performs arithmetic on time() and get_site_option() and returns __() translated strings containing only rounded integers (e.g., '3 weeks', 'a year'). The taint analyzer incorrectly marks get_site_option() as a user-controlled source, but the activation date stored in site options is set by the plugin itself on activation (insert_install_date), not from user-supplied input. Even if the site option contained a crafted value, seconds_to_words() converts it to a numeric result via round() arithmetic before returning a hard-coded translated string. No user-supplied data reaches the echo. Context is admin-only (plugins page, check at line 150: $screen->base == 'plugins')."
+    },
+    {
+      "flow_id": "supreme-modules-for-divi-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "echo get_post_meta($post->ID, 'dsm-header-footer-meta-box-options', true) at line 532 appears inside the meta box callback dsm_header_footer_meta_box_options(), which is an admin-only context registered via add_meta_box() for the 'dsm_header_footer' post type. The data is saved at line 615 via update_post_meta() with sanitize_text_field() applied to the POST input, which strips HTML tags. Even if the stored value somehow contained HTML, the output context is a CSS class attribute value ('dsm_<value>'), limiting harm. Exploiting this requires edit_posts capability — the same level as directly editing post content — so it does not represent a privilege escalation. Classified as FP (admin-only stored XSS with sanitization at save point)."
+    },
+    {
+      "flow_id": "supreme-modules-for-divi-xss-003",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "echo get_post_meta($post->ID, 'dsm-css-classes-meta-box-options', true) at line 559 is inside the same admin meta box callback as XSS-002. The value is stored at line 619 with sanitize_text_field(). The output is inside an HTML input value attribute. While esc_attr() is missing, sanitize_text_field() strips tags and encodes special characters sufficient to prevent injection. Admin-only, requires edit_posts capability. FALSE POSITIVE."
+    },
+    {
+      "flow_id": "supreme-modules-for-divi-xss-004",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "In callback_textarea() (line 300-309), the value is retrieved via $this->get_option() (reads from WordPress options table) and immediately escaped with esc_textarea() before being placed into the $value variable (line 302). The taint analyzer flagged this escaped $value as still tainted, but esc_textarea() properly encodes all HTML special characters for safe insertion into a <textarea> element. The sprintf at line 306 places $value as the %5$s position inside <textarea>...</textarea> tags. No XSS is possible. Context is Settings API — admin-only (registered via add_settings_field/admin_init). FALSE POSITIVE."
+    },
+    {
+      "flow_id": "supreme-modules-for-divi-xss-005",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "In callback_file() (lines 356-367), $value = esc_attr($this->get_option(...)) is properly escaped with esc_attr() before being placed as an HTML input value attribute. The taint analyzer incorrectly continued to propagate taint through an already-escaped variable. Admin-only context (Settings API). FALSE POSITIVE."
+    },
+    {
+      "flow_id": "supreme-modules-for-divi-xss-006",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "In callback_password() (lines 375-383), $value = esc_attr($this->get_option(...)) is escaped with esc_attr() before use as an HTML attribute. Same pattern as XSS-005. Admin-only. FALSE POSITIVE."
+    },
+    {
+      "flow_id": "supreme-modules-for-divi-xss-007",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "In callback_color() (lines 391-399), $value = esc_attr($this->get_option(...)) is escaped with esc_attr() before use in the HTML input's value and data-default-color attributes. Taint propagation through an already-sanitized variable. Admin-only. FALSE POSITIVE."
+    },
+    {
+      "flow_id": "supreme-modules-for-divi-xss-008",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "In callback_pages() (lines 408-418), the selected value is escaped with esc_attr() before being passed to wp_dropdown_pages(), which is a WordPress core function that generates safe HTML for a page-selection dropdown. The taint propagation through wp_dropdown_pages() is a false alarm — core WordPress handles safe HTML generation. The analyzer incorrectly tagged the output of wp_dropdown_pages() as tainted because the input array contained an esc_attr()-escaped tainted value. Admin-only context (Settings API). FALSE POSITIVE."
+    },
+    {
+      "flow_id": "supreme-modules-for-divi-xss-009",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": null,
+      "reasoning": "The CalderaForms dropdown field.php reads $_GET[$field['slug']] and sanitizes it with Caldera_Forms_Sanitize::sanitize() (line 4). The value is then passed to caldera_forms_field_attributes() which is a Caldera Forms core function responsible for building HTML attribute strings. Both Caldera_Forms_Sanitize::sanitize() and caldera_forms_field_attributes() are from the external Caldera Forms plugin (not bundled in this plugin). The attribute string is echoed inside a <select> tag's opening attributes. This is a frontend, unauthenticated context — potentially concerning. However: (1) this file is only loaded when Caldera Forms is active (class_exists('Caldera_Forms') guard at line 1051 of CalderaForms.php); (2) Caldera Forms' own sanitization/attribute-building functions are expected to handle escaping (the vulnerability, if any, would be in Caldera Forms, not this plugin); (3) the plugin merely replaces the field template file via the caldera_forms_render_field_file filter — the sanitization chain belongs to the parent plugin. This is a dependency-boundary FP: the risk belongs to Caldera Forms, not supreme-modules-for-divi."
+    }
+  ]
+}

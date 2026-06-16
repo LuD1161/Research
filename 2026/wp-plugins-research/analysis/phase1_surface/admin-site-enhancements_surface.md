@@ -1,6 +1,6 @@
 # Attack Surface: admin-site-enhancements
 
-> Generated: 2026-06-16T09:13:41Z
+> Generated: 2026-06-16T18:36:20Z
 
 ## Section 1: Entry Points
 

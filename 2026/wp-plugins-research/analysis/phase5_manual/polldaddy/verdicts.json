@@ -1,0 +1,130 @@
+{
+  "plugin": "polldaddy",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "security-agent",
+  "summary": {
+    "total_flows": 18,
+    "confirmed": 1,
+    "false_positives": 17,
+    "notes": "Most flagged flows are either fully sanitized before output, operate only in authenticated admin-only contexts with no privilege escalation path, or are cases where the taint analyzer misread isset() checks as taint sources. One low-severity admin-only XSS confirmed in ajax.php."
+  },
+  "verdicts": [
+    {
+      "flow_id": "polldaddy-ssrf-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "rationale": "The SSRF label is incorrect. The tainted value ($polldaddy_email from $_POST) goes into the *body* of wp_remote_post(), not the URL. The URL is fully hardcoded via polldaddy_api_url('/key'). No URL control is possible. The function is also protected by check_admin_referer('polldaddy-account') and called from an admin-only page. FP."
+    },
+    {
+      "flow_id": "polldaddy-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "rationale": "$rating_id (from get_option) flows through add_query_arg() then is wrapped twice: esc_url(wp_nonce_url(...)) and again echo esc_url($delete_link) at line 4464. Double esc_url() is applied before output. Even if the option value were attacker-controlled, esc_url() strips non-URL-safe characters, preventing XSS. FP."
+    },
+    {
+      "flow_id": "polldaddy-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "rationale": "contact_support_message() outputs get_option('polldaddy_api_key') unescaped. However, this function is only called from set_api_user_code(), settings_page(), management_page(), and rating_settings() — all of which are gated behind WP admin hooks (edit_posts / edit_others_posts capability). An attacker would need admin-level access to reach this codepath. The option itself is only written by the plugin's own API-key import. Effective severity: admin-only stored output. FP (no exploitable privilege escalation)."
+    },
+    {
+      "flow_id": "polldaddy-xss-003",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "rationale": "Same function and same reasoning as xss-002. get_option('pd-usercode-' . $current_user->ID) is output unescaped but context is always admin-only. FP."
+    },
+    {
+      "flow_id": "polldaddy-xss-004",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "rationale": "Same function and same reasoning as xss-002. get_option('pd-rating-usercode') is output unescaped but context is always admin-only. FP."
+    },
+    {
+      "flow_id": "polldaddy-xss-005",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "rationale": "Same function and same reasoning as xss-002. get_option('pd-rating-posts-id') is output unescaped but context is always admin-only. FP."
+    },
+    {
+      "flow_id": "polldaddy-ssrf-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "rationale": "Identical to polldaddy-ssrf-001 but in polldaddy-org.php. The tainted value ($polldaddy_email) goes into the POST body, not the URL. The URL is hardcoded via polldaddy_api_url('/key'). Protected by check_admin_referer('polldaddy-account'). FP."
+    },
+    {
+      "flow_id": "polldaddy-xss-006",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "rationale": "$_POST['url'] is passed to $polldaddy->upload_image() which sends it to Polldaddy's remote API. The output at line 57 is $response->upload_result — a value returned by the external API, not directly controlled by the attacker-supplied URL. Additionally, protected by check_admin_referer('send-media') and only reachable via wp_ajax_polls_upload_image (authenticated AJAX, requires being logged in). Attacker cannot directly control the echoed output. FP."
+    },
+    {
+      "flow_id": "polldaddy-xss-007",
+      "verdict": "CONFIRMED",
+      "severity": "low",
+      "cvss_score": "4.1",
+      "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:H/UI:R/S:C/C:L/I:L/A:N",
+      "vulnerability_class": "stored_xss",
+      "auth_required": true,
+      "required_capability": "edit_posts (contributor or higher)",
+      "rationale": "$_POST['src'] from ajax_add_answer() is inserted unescaped into an img src attribute: '<img src=\"' . $src . 'img/icon-reorder.png\"'. The nonce check (check_admin_referer('add-answer')) prevents CSRF but does not prevent an authenticated user from crafting a direct AJAX request. A contributor could send: src='\"><script>alert(1)</script><x src=\"' to inject arbitrary HTML/JS into the response. The response is rendered into the DOM by the polling admin UI. However, since this requires edit_posts (contributor+) and only affects the admin UI, severity is Low.",
+      "affected_file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/polldaddy/ajax.php",
+      "affected_lines": [72, 82, 116],
+      "poc": "POST /wp-admin/admin-ajax.php with action=polls_add_answer, _wpnonce=<valid add-answer nonce>, src='\\\"><script>alert(document.cookie)</script><x src=\", aa=1, popup=0",
+      "remediation": "Apply esc_url() to $src before interpolating it into img src attributes: '<img src=\"' . esc_url($src) . 'img/icon-reorder.png\"'"
+    },
+    {
+      "flow_id": "polldaddy-xss-008",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "rationale": "echo isset($_GET['iframe']) ? '1' : '0'; outputs a hardcoded string literal '1' or '0' based solely on whether the key exists, not on its value. No user-controlled data reaches the output. The taint analyzer incorrectly treated isset() on a superglobal as a taint source. FP."
+    },
+    {
+      "flow_id": "polldaddy-xss-009",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "rationale": "echo isset($_GET['iframe']) ? 'style=\"width: 55px !important;\"' : ''; outputs one of two fixed hardcoded strings. No user input value reaches output. FP — same misidentification of isset() as a taint source."
+    },
+    {
+      "flow_id": "polldaddy-xss-010",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "rationale": "Same as xss-009. Fixed literal strings, not user input. FP."
+    },
+    {
+      "flow_id": "polldaddy-xss-011",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "rationale": "Same as xss-009. Fixed literal strings, not user input. FP."
+    },
+    {
+      "flow_id": "polldaddy-xss-012",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "rationale": "Same as xss-009. Fixed literal strings, not user input. FP."
+    },
+    {
+      "flow_id": "polldaddy-xss-013",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "rationale": "Same as xss-009. Fixed literal strings, not user input. FP."
+    },
+    {
+      "flow_id": "polldaddy-xss-014",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "rationale": "Same as xss-009. Fixed literal strings, not user input. FP."
+    },
+    {
+      "flow_id": "polldaddy-xss-015",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "rationale": "settings-2.php echo $value at line 83. The value comes from get_option() fields set by the plugin itself (API key, rating IDs from Crowdsignal API). For the pd-rating-{pages,comments,posts}-id fields, the value is embedded into an HTML link href unescaped, but: (1) this is only rendered in the settings page inside settings_page() which requires edit_others_posts capability; (2) the option values are numeric IDs written by the plugin from API responses, not directly writable by lower-privilege users. No exploitable privilege escalation. FP — admin-level at worst."
+    },
+    {
+      "flow_id": "polldaddy-xss-016",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "rationale": "Same as xss-015 but for the 'Restore Previous Settings' table (lines 109-119 in settings-2.php). Values are from get_option('polldaddy_settings') which is a backup written by the plugin itself. Admin-only context. FP."
+    }
+  ]
+}

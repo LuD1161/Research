@@ -1,0 +1,160 @@
+{
+  "plugin": "wpconsent-cookies-banner-privacy-suite",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "phase5-manual",
+  "summary": {
+    "total_flows_reviewed": 11,
+    "confirmed": 0,
+    "false_positives": 11,
+    "needs_more_info": 0
+  },
+  "verdicts": [
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-ssrf-001",
+      "verdict": "false_positive",
+      "severity_adjusted": null,
+      "rationale": "The taint analyzer flagged $_SERVER['HTTP_AUTHORIZATION'] flowing into wp_remote_get(), but the URL argument to wp_remote_get() is never attacker-controlled. In ajax_scan_website() the URL is hardcoded as home_url('/'); in ajax_scan_page() it is get_permalink(absint($_POST['page_id'])) — a WordPress post permalink derived from an integer post ID. The auth-header forwarding is an intentional feature (pass-through basic auth to scan staging sites). There is no SSRF because the destination cannot be redirected to an attacker-chosen host.",
+      "trace_verification": {
+        "self_request_callers": [
+          "ajax_scan_website(): url = home_url('/') — server-controlled",
+          "ajax_scan_page(): url = get_permalink(absint($_POST['page_id'])) — constrained to existing WP posts",
+          "scan_request_body(): delegates to get_website_html() with the same safe URL"
+        ],
+        "url_taint": "none — $url parameter originates from home_url() or get_permalink(absint(...))",
+        "auth_required": true,
+        "nonce_verified": true,
+        "capability_check": "current_user_can('manage_options') enforced in both ajax_scan_website and ajax_scan_page"
+      }
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-001",
+      "verdict": "false_positive",
+      "severity_adjusted": null,
+      "rationale": "In class-wpconsent-banner.php:890-902, the value of 'consent_floating_icon' is first tested with filter_var($icon_value, FILTER_VALIDATE_URL). Only if it passes URL validation is it echoed — and then it is wrapped in esc_url(). If the value is not a URL, a named icon lookup function is called instead. No unescaped output path exists. Additionally this is an admin-only setting (manage_options capability required to write it).",
+      "trace_verification": {
+        "code_path": "if (filter_var($icon_value, FILTER_VALIDATE_URL)) { echo '<img src=\"' . esc_url($icon_value) . '\"...'; } else { echo wp_kses(...wpconsent_get_icon(...)...); }",
+        "escape_present": true,
+        "admin_only": true
+      }
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-002",
+      "verdict": "false_positive",
+      "severity_adjusted": null,
+      "rationale": "Identical pattern to xss-001 but in class-wpconsent-admin-page-banner.php:555-558. The code uses filter_var($icon_value, FILTER_VALIDATE_URL) guard and esc_url() on the img src attribute. The img is only rendered inside the WP admin panel when the option is a valid URL. All outputs are escaped.",
+      "trace_verification": {
+        "code_path": "if (filter_var($icon_value, FILTER_VALIDATE_URL)) { echo '<img src=\"' . esc_url($icon_value) . '\"...'; }",
+        "escape_present": true,
+        "admin_only": true
+      }
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-003",
+      "verdict": "false_positive",
+      "severity_adjusted": null,
+      "rationale": "The sink is get_checkbox_toggle() at class-wpconsent-admin-page.php:815-830. Inspection shows every attribute is escaped: name and id through esc_attr(), the checked state through checked() which only outputs 'checked' or '', value through esc_attr(), target through esc_attr(), label through esc_html(). The $button['enabled'] value passes through checked(bool, true, false) which always yields a safe string. No path to XSS.",
+      "trace_verification": {
+        "get_checkbox_toggle_uses": "checked($checked, true, false), esc_attr($name), esc_attr($id), esc_attr($value), esc_attr($target), esc_html($label), wp_kses_post($description)",
+        "escape_present": true,
+        "admin_only": true
+      }
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-004",
+      "verdict": "false_positive",
+      "severity_adjusted": null,
+      "rationale": "The expression 'wpconsent()->settings->get_option('enable_script_blocking', 1) ? 'checked' : ''' outputs only the literal string 'checked' or an empty string depending on a truthy check. Neither string contains HTML-special characters. There is no XSS regardless of what is stored in the option.",
+      "trace_verification": {
+        "output_values": ["'checked'", "''"],
+        "escape_needed": false,
+        "admin_only": true
+      }
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-005",
+      "verdict": "false_positive",
+      "severity_adjusted": null,
+      "rationale": "The flow is: $selected_page_id = get_option('cookie_policy_page') -> get_permalink($selected_page_id) -> esc_url(). WordPress's get_permalink() takes a post ID and returns a canonical URL string; it does not trust the ID as content. esc_url() then sanitizes the resulting URL before output. Even if the stored option contains an attacker-crafted value, get_permalink() will return false or a WordPress permalink (never a javascript: URI), and esc_url() removes unsafe schemes.",
+      "trace_verification": {
+        "code_path": "echo esc_url(get_permalink($selected_page_id))",
+        "escape_present": true,
+        "admin_only": true
+      }
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-006",
+      "verdict": "false_positive",
+      "severity_adjusted": null,
+      "rationale": "The sink is 'echo count($purposes_consent)'. PHP's count() always returns an integer (or 0 for null/non-array). An integer cannot contain XSS payload. The taint analyzer incorrectly propagated taint through count().",
+      "trace_verification": {
+        "output_type": "integer from count()",
+        "escape_needed": false,
+        "admin_only": true
+      }
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-007",
+      "verdict": "false_positive",
+      "severity_adjusted": null,
+      "rationale": "The printf() call uses format specifiers %1$s through %4$s, and the corresponding arguments are: esc_attr($purpose_id), checked($checked, true, false), esc_html(sprintf(...)), esc_html($purpose['name']). All four positions are escaped. The $purpose_id also derives from array_keys($purposes) where $purposes is a hardcoded IAB TCF array, not user input.",
+      "trace_verification": {
+        "printf_args": [
+          "%1$s: esc_attr($purpose_id)",
+          "%2$s: checked($checked, true, false) — only outputs 'checked' or ''",
+          "%3$s: esc_html(sprintf(...))",
+          "%4$s: esc_html($purpose['name'])"
+        ],
+        "escape_present": true,
+        "admin_only": true
+      }
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-008",
+      "verdict": "false_positive",
+      "severity_adjusted": null,
+      "rationale": "printf() with format string from esc_html__() (already safe) and arguments count($purposes_li) (integer) and absint($li_total) (non-negative integer). Both arguments are integers. No XSS possible.",
+      "trace_verification": {
+        "printf_args": [
+          "%1$d: count($purposes_li) — integer",
+          "%2$d: absint($li_total) — non-negative integer"
+        ],
+        "escape_needed": false,
+        "admin_only": true
+      }
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-009",
+      "verdict": "false_positive",
+      "severity_adjusted": null,
+      "rationale": "Identical to xss-007 but for the legitimate-interest section. printf() uses esc_attr($purpose_id), checked(), esc_html(sprintf(...)), esc_html($purpose['name']) for all four format positions. All output is properly escaped.",
+      "trace_verification": {
+        "printf_args": [
+          "%1$s: esc_attr($purpose_id)",
+          "%2$s: checked($checked, true, false)",
+          "%3$s: esc_html(sprintf(...))",
+          "%4$s: esc_html($purpose['name'])"
+        ],
+        "escape_present": true,
+        "admin_only": true
+      }
+    },
+    {
+      "flow_id": "wpconsent-cookies-banner-privacy-suite-xss-010",
+      "verdict": "false_positive",
+      "severity_adjusted": null,
+      "rationale": "Identical pattern to xss-005: $selected_page_id from settings is passed through get_permalink() and then esc_url() before output. Even if an attacker (already admin) stores a non-integer, get_permalink() accepts a post ID or WP_Post object and returns a canonical URL or false; esc_url() removes unsafe URL schemes. No XSS path.",
+      "trace_verification": {
+        "code_path": "echo esc_url(get_permalink($selected_page_id))",
+        "escape_present": true,
+        "admin_only": true
+      }
+    }
+  ],
+  "additional_observations": [
+    "All AJAX handlers in admin-ajax.php require both a nonce (check_ajax_referer or check_admin_referer) and current_user_can('manage_options'). There are no unauthenticated endpoints.",
+    "The main menu is registered with capability 'manage_options', so all admin page rendering is gated.",
+    "The taint tool incorrectly treats get_option() reads as fully tainted even when the values flow through type-narrowing functions (count(), absint(), absint(), checked(), get_permalink()) that neutralize arbitrary content.",
+    "No unescaped eval(), shell_exec(), system(), or include()/require() with user-controlled paths were found.",
+    "The scan_endpoint is a hardcoded string ('https://cookies.wpconsent.com/api/v1/scanner'), so there is no SSRF path through the external API call either."
+  ]
+}

@@ -1,6 +1,6 @@
 # Attack Surface: page-optimize
 
-> Generated: 2026-06-16T09:13:50Z
+> Generated: 2026-06-16T18:36:24Z
 
 ## Section 1: Entry Points
 

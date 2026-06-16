@@ -1,0 +1,1124 @@
+{
+  "plugin_slug": "google-captcha",
+  "priority_score": 29,
+  "metadata": {
+    "php_files": 13,
+    "total_lines": 9026
+  },
+  "attack_surface_summary": "# Attack Surface: google-captcha\n\n> Generated: 2026-06-16T18:36:23Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 536,
+    "total_sinks": 79,
+    "total_sanitizers": 368,
+    "direct_flows": 227,
+    "functions_with_sources": 62,
+    "functions_with_sinks": 39,
+    "files_analyzed": 13,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "google-captcha-ssrf-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$args = array(\n\t\t\t'body'      => array(\n\t\t\t\t'secret'   => $privatekey,\n\t\t\t\t'response' => isset( $_POST['g-recaptcha-response'] ) ? sanitize_text_field( wp_unslash( $_POST['g-recaptcha-response'] ) ) : '',\n\t\t\t\t'remoteip' => $remote_ip,\n\t\t\t),\n\t\t\t'sslverify' => false,\n\t\t)",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/google-captcha.php",
+        "line": 1037
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1037,
+          "expression": "$args = array(\n\t\t\t'body'      => array(\n\t\t\t\t'secret'   => $privatekey,\n\t\t\t\t'response' => isset( $_POST['g-recaptcha-response'] ) ? sanitize_text_field( wp_unslash( $_POST['g-recaptcha-response'] ) ) : '',\n\t\t\t\t'remoteip' => $remote_ip,\n\t\t\t),\n\t\t\t'sslverify' => false,\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1045,
+          "expression": "$resp = wp_remote_post( 'https://www.google.com/recaptcha/api/siteverify', $args )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$resp = wp_remote_post( 'https://www.google.com/recaptcha/api/siteverify', $args )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/google-captcha.php",
+        "line": 1045
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "google-captcha-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo ( isset( $_POST['gglcptch_add_to_allowlist'] ) ) ? ' style=\"display: none;\"' : '';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/includes/allowlist.php",
+        "line": 54
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 54,
+          "expression": "echo ( isset( $_POST['gglcptch_add_to_allowlist'] ) ) ? ' style=\"display: none;\"' : '';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ( isset( $_POST['gglcptch_add_to_allowlist'] ) ) ? ' style=\"display: none;\"' : '';",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/includes/allowlist.php",
+        "line": 54
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "google-captcha-sqli-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$this->s        = isset( $_REQUEST['s'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['s'] ) ) : ''",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/includes/allowlist.php",
+        "line": 160
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 160,
+          "expression": "$this->s        = isset( $_REQUEST['s'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['s'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 276,
+          "expression": "$where  =\n\t\t\t\t\t\t0 === $ip_int\n\t\t\t\t\t?\n\t\t\t\t\t\t$wpdb->prepare(\n\t\t\t\t\t\t\t' WHERE `ip` LIKE %s',\n\t\t\t\t\t\t\t'%' . $this->s . '%'\n\t\t\t\t\t\t)\n\t\t\t\t\t:\n\t\t\t\t\t\t$wpdb->prepare(\n\t\t\t\t\t\t\t' WHERE ( `ip_from_int` <= %d AND `ip_to_int` >= %d )',\n\t\t\t\t\t\t\t$ip_int,\n\t\t\t\t\t\t\t$ip_int\n\t\t\t\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 294,
+          "expression": "$wpdb->get_results( \"SELECT * FROM `{$wpdb->prefix}gglcptch_allowlist`{$where}{$order_by}{$order} LIMIT {$this->per_page}{$offset}\", ARRAY_A )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->get_results( \"SELECT * FROM `{$wpdb->prefix}gglcptch_allowlist`{$where}{$order_by}{$order} LIMIT {$this->per_page}{$offset}\", ARRAY_A )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/includes/allowlist.php",
+        "line": 294
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "google-captcha-sqli-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$list   = implode( ',', $_REQUEST['id'] )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/includes/allowlist.php",
+        "line": 389
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 389,
+          "expression": "$list   = implode( ',', $_REQUEST['id'] )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 390,
+          "expression": "$result = $wpdb->query( 'DELETE FROM `' . $wpdb->prefix . 'gglcptch_allowlist` WHERE `id` IN (' . $list . ');' )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$result = $wpdb->query( 'DELETE FROM `' . $wpdb->prefix . 'gglcptch_allowlist` WHERE `id` IN (' . $list . ');' )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/includes/allowlist.php",
+        "line": 390
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "google-captcha-sqli-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "google-captcha",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$ip_int = filter_var( $this->s, FILTER_VALIDATE_IP ) ? sprintf( '%u', ip2long( $this->s ) ) : 0",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/includes/allowlist.php",
+        "line": 275
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 275,
+          "expression": "$ip_int = filter_var( $this->s, FILTER_VALIDATE_IP ) ? sprintf( '%u', ip2long( $this->s ) ) : 0",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 276,
+          "expression": "$where  =\n\t\t\t\t\t\t0 === $ip_int\n\t\t\t\t\t?\n\t\t\t\t\t\t$wpdb->prepare(\n\t\t\t\t\t\t\t' WHERE `ip` LIKE %s',\n\t\t\t\t\t\t\t'%' . $this->s . '%'\n\t\t\t\t\t\t)\n\t\t\t\t\t:\n\t\t\t\t\t\t$wpdb->prepare(\n\t\t\t\t\t\t\t' WHERE ( `ip_from_int` <= %d AND `ip_to_int` >= %d )',\n\t\t\t\t\t\t\t$ip_int,\n\t\t\t\t\t\t\t$ip_int\n\t\t\t\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 294,
+          "expression": "$wpdb->get_results( \"SELECT * FROM `{$wpdb->prefix}gglcptch_allowlist`{$where}{$order_by}{$order} LIMIT {$this->per_page}{$offset}\", ARRAY_A )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->get_results( \"SELECT * FROM `{$wpdb->prefix}gglcptch_allowlist`{$where}{$order_by}{$order} LIMIT {$this->per_page}{$offset}\", ARRAY_A )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/includes/allowlist.php",
+        "line": 294
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "google-captcha-ssrf-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$bws_license_key = sanitize_text_field( wp_unslash( $_POST['bws_license_key'] ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 101
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 101,
+          "expression": "$bws_license_key = sanitize_text_field( wp_unslash( $_POST['bws_license_key'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 138,
+          "expression": "$to_send['plugins'][ $bws_license_plugin ]['bws_license_key'] = $bws_license_key",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 139,
+          "expression": "$options      = array(\n\t\t\t\t\t\t\t'timeout'    => ( ( defined( 'DOING_CRON' ) && DOING_CRON ) ? 30 : 3 ),\n\t\t\t\t\t\t\t'body'       => array( 'plugins' => serialize( $to_send ) ),\n\t\t\t\t\t\t\t'user-agent' => 'WordPress/' . $wp_version . '; ' . get_bloginfo( 'url' ),\n\t\t\t\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 144,
+          "expression": "$raw_response = wp_remote_post( 'https://bestwebsoft.com/wp-content/plugins/paid-products/plugins/pro-license-check/1.0/', $options )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$raw_response = wp_remote_post( 'https://bestwebsoft.com/wp-content/plugins/paid-products/plugins/pro-license-check/1.0/', $options )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 144
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "google-captcha-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$is_main_page = isset( $_GET['page'] ) && in_array( $_GET['page'], array( 'bws_panel', 'bws_themes', 'bws_system_status' ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 26
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 26,
+          "expression": "$is_main_page = isset( $_GET['page'] ) && in_array( $_GET['page'], array( 'bws_panel', 'bws_themes', 'bws_system_status' ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 328,
+          "expression": "echo esc_url( ( $is_main_page ) ? self_admin_url( 'admin.php?page=bws_panel' ) : self_admin_url( 'admin.php?page=' . $page ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( ( $is_main_page ) ? self_admin_url( 'admin.php?page=bws_panel' ) : self_admin_url( 'admin.php?page=' . $page ) );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 328
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "google-captcha-xss-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 27
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 27,
+          "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 33,
+          "expression": "$current_page = isset( $_GET['tab'] ) ? 'admin.php?page=' . $page . '&tab=' . $tab : 'admin.php?page=' . $page",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 534,
+          "expression": "echo esc_url( self_admin_url( $current_page ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( self_admin_url( $current_page ) );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 534
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "google-captcha-xss-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 27
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 27,
+          "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 33,
+          "expression": "$current_page = isset( $_GET['tab'] ) ? 'admin.php?page=' . $page . '&tab=' . $tab : 'admin.php?page=' . $page",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 537,
+          "expression": "$category_href = $current_page",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 550,
+          "expression": "echo esc_url( self_admin_url( $category_href ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( self_admin_url( $category_href ) );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 550
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "google-captcha-xss-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 27
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 27,
+          "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 33,
+          "expression": "$current_page = isset( $_GET['tab'] ) ? 'admin.php?page=' . $page . '&tab=' . $tab : 'admin.php?page=' . $page",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 537,
+          "expression": "$category_href = $current_page",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 559,
+          "expression": "echo esc_url( self_admin_url( $category_href . '&sub=installed' ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( self_admin_url( $category_href . '&sub=installed' ) );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 559
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "google-captcha-xss-006",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 27
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 27,
+          "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 33,
+          "expression": "$current_page = isset( $_GET['tab'] ) ? 'admin.php?page=' . $page . '&tab=' . $tab : 'admin.php?page=' . $page",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 537,
+          "expression": "$category_href = $current_page",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 568,
+          "expression": "echo esc_url( self_admin_url( $category_href . '&sub=not_installed' ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( self_admin_url( $category_href . '&sub=not_installed' ) );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 568
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "google-captcha-xss-007",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 27
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 27,
+          "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 33,
+          "expression": "$current_page = isset( $_GET['tab'] ) ? 'admin.php?page=' . $page . '&tab=' . $tab : 'admin.php?page=' . $page",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 588,
+          "expression": "echo esc_url( self_admin_url( $current_page . $sub_in_url ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( self_admin_url( $current_page . $sub_in_url ) );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 588
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "google-captcha-xss-008",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 27
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 27,
+          "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 33,
+          "expression": "$current_page = isset( $_GET['tab'] ) ? 'admin.php?page=' . $page . '&tab=' . $tab : 'admin.php?page=' . $page",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 600,
+          "expression": "echo esc_url( self_admin_url( $current_page . $sub_in_url . '&category=' . $category_key ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( self_admin_url( $current_page . $sub_in_url . '&category=' . $category_key ) );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 600
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "google-captcha-xss-009",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 27
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 27,
+          "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 33,
+          "expression": "$current_page = isset( $_GET['tab'] ) ? 'admin.php?page=' . $page . '&tab=' . $tab : 'admin.php?page=' . $page",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 722,
+          "expression": "echo esc_url( wp_nonce_url( self_admin_url( $current_page . '&bws_activate_plugin=' . $value_plugin['pro_version'] ), 'bws_activate_plugin' . $value_plugin['pro_version'] ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( wp_nonce_url( self_admin_url( $current_page . '&bws_activate_plugin=' . $value_plugin['pro_version'] ), 'bws_activate_plugin' . $value_plugin['pro_version'] ) );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 722
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "google-captcha-xss-010",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 27
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 27,
+          "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 33,
+          "expression": "$current_page = isset( $_GET['tab'] ) ? 'admin.php?page=' . $page . '&tab=' . $tab : 'admin.php?page=' . $page",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 731,
+          "expression": "echo esc_url( wp_nonce_url( self_admin_url( $current_page . '&bws_activate_plugin=' . $key_plugin ), 'bws_activate_plugin' . $key_plugin ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( wp_nonce_url( self_admin_url( $current_page . '&bws_activate_plugin=' . $key_plugin ), 'bws_activate_plugin' . $key_plugin ) );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 731
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "google-captcha-xss-011",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 27
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 27,
+          "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 33,
+          "expression": "$current_page = isset( $_GET['tab'] ) ? 'admin.php?page=' . $page . '&tab=' . $tab : 'admin.php?page=' . $page",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 764,
+          "expression": "echo esc_url( self_admin_url( $current_page . $sub_in_url ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( self_admin_url( $current_page . $sub_in_url ) );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 764
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "google-captcha-xss-012",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 27
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 27,
+          "expression": "$page         = sanitize_text_field( wp_unslash( $_GET['page'] ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 33,
+          "expression": "$current_page = isset( $_GET['tab'] ) ? 'admin.php?page=' . $page . '&tab=' . $tab : 'admin.php?page=' . $page",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 776,
+          "expression": "echo esc_url( self_admin_url( $current_page . $sub_in_url . '&category=' . $category_key ) );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url( self_admin_url( $current_page . $sub_in_url . '&category=' . $category_key ) );",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_menu.php",
+        "line": 776
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "google-captcha-lfi-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "local_file_inclusion",
+      "source": {
+        "expression": "$bstwbsftwppdtplgns_options = ( function_exists( 'is_multisite' ) && is_multisite() ) ? get_site_option( 'bstwbsftwppdtplgns_options' ) : get_option( 'bstwbsftwppdtplgns_options' )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_functions.php",
+        "line": 1328
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1328,
+          "expression": "$bstwbsftwppdtplgns_options = ( function_exists( 'is_multisite' ) && is_multisite() ) ? get_site_option( 'bstwbsftwppdtplgns_options' ) : get_option( 'bstwbsftwppdtplgns_options' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1343,
+          "expression": "require_once $bstwbsftwppdtplgns_options['custom_code']['bws-custom-code.php']",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "require_once $bstwbsftwppdtplgns_options['custom_code']['bws-custom-code.php']",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_functions.php",
+        "line": 1343
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "google-captcha-lfi-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "google-captcha",
+      "vulnerability_class": "local_file_inclusion",
+      "source": {
+        "expression": "$bstwbsftwppdtplgns_options = ( function_exists( 'is_multisite' ) && is_multisite() ) ? get_site_option( 'bstwbsftwppdtplgns_options' ) : get_option( 'bstwbsftwppdtplgns_options' )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_functions.php",
+        "line": 1328
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1328,
+          "expression": "$bstwbsftwppdtplgns_options = ( function_exists( 'is_multisite' ) && is_multisite() ) ? get_site_option( 'bstwbsftwppdtplgns_options' ) : get_option( 'bstwbsftwppdtplgns_options' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1357,
+          "expression": "require_once $bstwbsftwppdtplgns_options['custom_code'][ $blog_id ]['bws-custom-code.php']",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "require_once $bstwbsftwppdtplgns_options['custom_code'][ $blog_id ]['bws-custom-code.php']",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/google-captcha/bws_menu/bws_functions.php",
+        "line": 1357
+      },
+      "missing_sanitizer": "validate_file() / realpath() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    }
+  ],
+  "semgrep_findings": [],
+  "stats": {
+    "taint_critical": 1,
+    "taint_high": 0,
+    "taint_total": 19,
+    "semgrep_error": 0,
+    "semgrep_warning": 0
+  }
+}

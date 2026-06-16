@@ -1,0 +1,103 @@
+{
+  "plugin_slug": "xml-sitemap-feed",
+  "priority_score": 6,
+  "metadata": {
+    "php_files": 125,
+    "total_lines": 13155
+  },
+  "attack_surface_summary": "# Attack Surface: xml-sitemap-feed\n\n> Generated: 2026-06-16T18:36:28Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 107,
+    "total_sinks": 113,
+    "total_sanitizers": 180,
+    "direct_flows": 26,
+    "functions_with_sources": 43,
+    "functions_with_sinks": 52,
+    "files_analyzed": 125,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "xml-sitemap-feed-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "xml-sitemap-feed",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$options             = (array) get_option( 'xmlsf_news_tags', array() )",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/xml-sitemap-feed/views/admin/field-news-categories.php",
+        "line": 8
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 8,
+          "expression": "$options             = (array) get_option( 'xmlsf_news_tags', array() )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 9,
+          "expression": "$selected_categories = isset( $options['categories'] ) && is_array( $options['categories'] ) ? $options['categories'] : array()",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 28,
+          "expression": "$cat_list = str_replace(\n\t'name=\"post_category[]\"',\n\t'name=\"xmlsf_news_tags[categories][]\"',\n\twp_terms_checklist(\n\t\tnull,\n\t\tarray(\n\t\t\t'taxonomy'      => 'category',\n\t\t\t'selected_cats' => $selected_categories,\n\t\t\t'echo'          => false,\n\t\t)\n\t)\n)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 50,
+          "expression": "echo $cat_list;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $cat_list;",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/xml-sitemap-feed/views/admin/field-news-categories.php",
+        "line": 50
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [],
+  "stats": {
+    "taint_critical": 0,
+    "taint_high": 1,
+    "taint_total": 1,
+    "semgrep_error": 0,
+    "semgrep_warning": 0
+  }
+}

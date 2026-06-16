@@ -1,0 +1,209 @@
+{
+  "plugin_slug": "iwp-client",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "manual-phase5",
+  "summary": "InfiniteWP Client uses a custom cryptographic authentication protocol (OpenSSL RSA signature or MD5 shared-secret fallback) for all commands from the IWP Admin Panel. All 16 flagged taint flows were traced through actual PHP code. 14 are false positives -- the sources are server-side constants, internal DB state, or hardcoded strings with no user-controlled input. Two findings have real but limited security relevance: an intentional raw HTML maintenance page echo and an open-redirect-adjacent auto-login bypass for already-logged-in users. No unauthenticated RCE, SQLi, or SSRF vulnerabilities were found.",
+  "auth_model_notes": "The plugin receives commands as base64-encoded JSON via php://input. Authentication is via openssl_verify() with a stored public key (primary) or md5($data.$secret) (fallback). All action handlers except add_site/readd_site go through authenticate_message(). The auto_login GET-based flow has a separate code path that skips auth when the user is already logged in.",
+  "verdicts": [
+    {
+      "flow_id": "iwp-client-ssrf-001",
+      "verdict": "false_positive",
+      "severity": null,
+      "confidence": "high",
+      "vulnerability_class": "ssrf",
+      "reasoning": "The iwp_client_pageview_alerts option (containing the URL) can only be set via the authenticated set_alerts or readd_alerts IWP actions, which require a valid cryptographic signature from the IWP Admin Panel. An attacker who can forge that signature already has full site control. No unauthenticated path to write this option exists.",
+      "exploitability": "none",
+      "preconditions": []
+    },
+    {
+      "flow_id": "iwp-client-path-001",
+      "verdict": "false_positive",
+      "severity": null,
+      "confidence": "high",
+      "vulnerability_class": "path_traversal",
+      "reasoning": "Misclassified as path traversal. The file path (IWP_BACKUP_DIR/iwp_db/index.php) is a plugin constant, not user-controlled. The actual concern is PHP code injection via get_option('siteurl') embedded unescaped in generated PHP. However, siteurl modification requires admin access (Settings > General), and an admin can already execute arbitrary code. This is a code quality issue, not an exploitable vulnerability.",
+      "exploitability": "none",
+      "preconditions": []
+    },
+    {
+      "flow_id": "iwp-client-path-002",
+      "verdict": "false_positive",
+      "severity": null,
+      "confidence": "high",
+      "vulnerability_class": "path_traversal",
+      "reasoning": "The $file path is constructed from IWP_DB_DIR (plugin constant) + DB_NAME (wp-config constant) + generate_hash() (internal). The data written is a SHOW CREATE TABLE result from the local database. No user-controlled path component exists. This is a normal database backup operation.",
+      "exploitability": "none",
+      "preconditions": []
+    },
+    {
+      "flow_id": "iwp-client-xss-001",
+      "verdict": "false_positive",
+      "severity": null,
+      "confidence": "high",
+      "vulnerability_class": "xss",
+      "reasoning": "The iwp_client_activate_key is generated as sha1(rand().uniqid().siteurl) at core.class.php line 920. SHA1 output is a 40-character hex string [0-9a-f]{40}, which cannot contain HTML special characters. Additionally, the output is on an admin-only page guarded by current_user_can('administrator').",
+      "exploitability": "none",
+      "preconditions": []
+    },
+    {
+      "flow_id": "iwp-client-xss-002",
+      "verdict": "false_positive",
+      "severity": null,
+      "confidence": "high",
+      "vulnerability_class": "xss",
+      "reasoning": "The transient value is a PHP Exception getMessage() string generated server-side when a filesystem operation fails. It is not derived from user input. The output is on admin_notices (admin-only) and the transient expires after 30 seconds. No realistic attack vector.",
+      "exploitability": "none",
+      "preconditions": []
+    },
+    {
+      "flow_id": "iwp-client-xss-003",
+      "verdict": "false_positive",
+      "severity": null,
+      "confidence": "high",
+      "vulnerability_class": "xss",
+      "reasoning": "The $_GET['iwp_goto'] value is used as data for signature verification (openssl_verify) but is never included in any error message. authenticate_message() returns only hardcoded error strings like 'Authentication failed.' and 'Invalid message signature...'. The user input from iwp_goto is never reflected in the wp_die() output.",
+      "exploitability": "none",
+      "preconditions": []
+    },
+    {
+      "flow_id": "iwp-client-xss-004",
+      "verdict": "false_positive",
+      "severity": null,
+      "confidence": "high",
+      "vulnerability_class": "xss",
+      "reasoning": "Same as xss-001. The activate key is a SHA1 hex string that cannot contain XSS payloads. The function printConnectionModalOpenScript() is also guarded by current_user_can('activate_plugins').",
+      "exploitability": "none",
+      "preconditions": []
+    },
+    {
+      "flow_id": "iwp-client-xss-005",
+      "verdict": "true_positive",
+      "severity": "low",
+      "confidence": "high",
+      "vulnerability_class": "stored_xss",
+      "reasoning": "Raw HTML from get_option('iwp_mmb_maintenance_html') is echoed to all non-admin visitors via echo $html_maintenance; exit; at init.php line 2296. Additionally, die($mmode['template']) at line 2144/2149 outputs the maintenance template to front-end users. However, both options can ONLY be set through authenticated IWP commands (cryptographic signature required). This is also arguably by-design -- the feature's purpose is to render a custom maintenance page. Realistic exploitation requires compromising the IWP Admin Panel's private key, at which point the attacker already has full site control via the execute_php_code action.",
+      "exploitability": "theoretical",
+      "preconditions": [
+        "Attacker must compromise the IWP Admin Panel or its cryptographic private key",
+        "The maintenance mode must be activated"
+      ]
+    },
+    {
+      "flow_id": "iwp-client-rce-001",
+      "verdict": "false_positive",
+      "severity": null,
+      "confidence": "high",
+      "vulnerability_class": "code_injection",
+      "reasoning": "The static analysis tool conflated two separate functions that share the $params variable name. iwp_mmb_maintenance_mode() (line 2090) stores params to an option and returns. iwp_mmb_execute_php_code() (line 2170) calls eval($params['code']). These are independent functions with independent $params parameters. There is no data flow from get_option('iwp_client_maintenace_mode') to eval(). The eval() is an intentional authenticated feature (requires IWP panel signature).",
+      "exploitability": "none",
+      "preconditions": []
+    },
+    {
+      "flow_id": "iwp-client-sqli-001",
+      "verdict": "false_positive",
+      "severity": null,
+      "confidence": "high",
+      "vulnerability_class": "sql_injection",
+      "reasoning": "The table name is constructed as $wpdb->base_prefix . 'iwp_file_list' -- a trusted server config value from wp-config.php concatenated with a hardcoded string. No user input reaches the query. check_iwp_file_list_table() is a case-normalization helper, not a sanitizer.",
+      "exploitability": "none",
+      "preconditions": []
+    },
+    {
+      "flow_id": "iwp-client-sqli-002",
+      "verdict": "false_positive",
+      "severity": null,
+      "confidence": "high",
+      "vulnerability_class": "sql_injection",
+      "reasoning": "Identical pattern to sqli-001. $table_name = $wpdb->base_prefix . 'iwp_file_list' is entirely server-derived. No user input.",
+      "exploitability": "none",
+      "preconditions": []
+    },
+    {
+      "flow_id": "iwp-client-sqli-003",
+      "verdict": "false_positive",
+      "severity": null,
+      "confidence": "high",
+      "vulnerability_class": "sql_injection",
+      "reasoning": "Same as sqli-002. The SHOW KEYS FROM query uses the same internally-derived table name.",
+      "exploitability": "none",
+      "preconditions": []
+    },
+    {
+      "flow_id": "iwp-client-sqli-004",
+      "verdict": "false_positive",
+      "severity": null,
+      "confidence": "high",
+      "vulnerability_class": "sql_injection",
+      "reasoning": "The $new_table_prefix is read from wp-config.php via get_table_prefix() which parses the file with regex. This is a server-side file. The $wpdb->insert() calls use parameterized format strings ('%s') for all VALUES. The table name concatenation is a code quality issue but not exploitable since the prefix comes from a trusted config file.",
+      "exploitability": "none",
+      "preconditions": []
+    },
+    {
+      "flow_id": "iwp-client-sqli-005",
+      "verdict": "false_positive",
+      "severity": null,
+      "confidence": "high",
+      "vulnerability_class": "sql_injection",
+      "reasoning": "Same as sqli-004. The insert uses parameterized format strings and the table prefix is from wp-config.php.",
+      "exploitability": "none",
+      "preconditions": []
+    },
+    {
+      "flow_id": "iwp-client-path-003",
+      "verdict": "false_positive",
+      "severity": null,
+      "confidence": "high",
+      "vulnerability_class": "path_traversal",
+      "reasoning": "Identical pattern to path-001 but in backup.class.multicall.php. File path is IWP_DB_DIR/index.php (plugin constant). The siteurl embedding is a minor code quality issue but not exploitable path traversal.",
+      "exploitability": "none",
+      "preconditions": []
+    },
+    {
+      "flow_id": "iwp-client-path-004",
+      "verdict": "false_positive",
+      "severity": null,
+      "confidence": "high",
+      "vulnerability_class": "path_traversal",
+      "reasoning": "Identical pattern to path-002 but in backup.class.multicall.php. File path from plugin constants + DB_NAME + generated hash. No user-controlled path component.",
+      "exploitability": "none",
+      "preconditions": []
+    }
+  ],
+  "additional_findings": [
+    {
+      "finding_id": "iwp-client-manual-001",
+      "title": "Auto-login skips authentication for already-logged-in users",
+      "severity": "low",
+      "vulnerability_class": "authentication_bypass",
+      "description": "In core.class.php automatic_login() (line 1138-1145), when a WordPress user is already logged in, the code skips all signature verification and directly processes the redirect using attacker-controlled $_GET parameters (iwp_goto, page, action, post). While wp_safe_redirect() and admin_url() limit the redirect to the same domain's admin area, this means any authenticated WordPress user can be redirected within wp-admin without the IWP panel's cryptographic signature. The message_id is also set without verification, potentially enabling replay attacks.",
+      "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/core.class.php",
+      "lines": "1138-1147",
+      "exploitability": "low",
+      "preconditions": [
+        "Victim must be logged into WordPress",
+        "Attacker must craft a link with auto_login=1 and desired iwp_goto parameters",
+        "Redirect is constrained to admin_url() paths by wp_safe_redirect()"
+      ]
+    },
+    {
+      "finding_id": "iwp-client-manual-002",
+      "title": "Intentional eval() RCE behind authentication",
+      "severity": "informational",
+      "vulnerability_class": "design_concern",
+      "description": "iwp_mmb_execute_php_code() at init.php line 2173 calls eval($params['code']) with no input validation. This is an intentional feature allowing the IWP Admin Panel to execute arbitrary PHP. While gated by cryptographic signature verification, if the signing key is ever compromised (or if the MD5 fallback mode is active and the shared secret is leaked), this provides instant full server compromise. The MD5 fallback (helper.class.php) is significantly weaker than the OpenSSL primary authentication.",
+      "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/iwp-client/init.php",
+      "lines": "2169-2180",
+      "exploitability": "theoretical",
+      "preconditions": [
+        "Attacker must compromise the IWP Admin Panel's private key or the MD5 shared secret"
+      ]
+    }
+  ],
+  "stats": {
+    "total_flows_reviewed": 16,
+    "true_positives": 1,
+    "false_positives": 15,
+    "additional_manual_findings": 2,
+    "confirmed_exploitable": 0
+  }
+}

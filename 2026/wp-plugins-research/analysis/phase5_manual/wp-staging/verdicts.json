@@ -1,0 +1,135 @@
+{
+  "plugin_slug": "wp-staging",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "claude-opus-4-6",
+  "summary": "All 21 taint flows are false positives. The plugin demonstrates strong security practices: admin pages are behind manage_options capability, AJAX handlers use canRenderAjax() which verifies both capability and nonce, user inputs are validated via allowlists or strict type checks (ctype_digit, array_key_exists, in_array), and path operations use realpath() verification. The nopriv AJAX handlers all perform internal auth checks via canRenderAjax().",
+  "confirmed_vulnerabilities": [],
+  "false_positives": [
+    {
+      "flow_id": "wp-staging-lfi-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "The $activeTab value is validated with array_key_exists($_GET['tab'], $tabs) on line 30, which acts as an allowlist check. The value must match a key in the $tabs array, which is built from registered plugin tabs. Additionally, the settings page is only accessible to users with manage_options capability (registered via add_submenu_page). Path traversal is impossible since only known tab keys pass the check."
+    },
+    {
+      "flow_id": "wp-staging-lfi-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "Same allowlist check as lfi-001. The $activeTab must be a key in the $tabs array (line 30). The else branch on line 71 is only reached if the file doesn't exist in the pro/ path, but the value is still constrained to valid tab keys. Admin-only page."
+    },
+    {
+      "flow_id": "wp-staging-xss-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "The variable $isErrorCheckboxChecked is the boolean result of get_option(...) === 'true' (strict comparison). The echo on line 308 is a ternary that outputs either '' or 'hidden' - both are hardcoded string literals. No user-controlled data reaches the output. Admin-only page."
+    },
+    {
+      "flow_id": "wp-staging-xss-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "Same pattern as xss-001. $isCheckboxChecked is a boolean from strict comparison to 'true'. The ternary on line 359 outputs '' or 'hidden'. No user-controlled data in output. Admin-only page."
+    },
+    {
+      "flow_id": "wp-staging-xss-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "$hasHttpAuthCredentials is the boolean result of !empty($httpAuthCredentials['username']). The ternary on line 621 outputs '' or 'class=\"hidden\"'. No user-controlled data reaches output. Admin-only page."
+    },
+    {
+      "flow_id": "wp-staging-xss-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "$hasLicense is a boolean from !empty($licenseKeySanitized). The ternary outputs 'data-masked=\"true\"' or ''. No tainted data in output. Admin-only page."
+    },
+    {
+      "flow_id": "wp-staging-xss-005",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "Same as xss-004. Boolean ternary outputting hardcoded strings only."
+    },
+    {
+      "flow_id": "wp-staging-xss-006",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "Same as xss-004. Boolean ternary outputting hardcoded strings only."
+    },
+    {
+      "flow_id": "wp-staging-xss-007",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "Same as xss-004. Boolean ternary outputting hardcoded strings only."
+    },
+    {
+      "flow_id": "wp-staging-xss-008",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "The ajaxSendReport method is behind isAuthenticated() check (line 1092), which requires both capability and nonce. The output is json_encode(['errors' => $errors]) which properly encodes any special characters for JSON. This is a JSON API response, not HTML output. The $errors value comes from Report::send() which returns validation error strings, not user-supplied input directly."
+    },
+    {
+      "flow_id": "wp-staging-ssrf-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "The URL is constructed from admin_url('admin-ajax.php') on line 122-125, which is derived from the site's own URL configuration. No user input controls the URL. The request is a self-ping to the site's own admin-ajax.php endpoint for feature detection."
+    },
+    {
+      "flow_id": "wp-staging-path-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "The $wpstgRequest value is validated with in_array($wpstgRequest, $validWpstgRequests) on line 59, which is an allowlist of known constant values. Invalid values cause wp_send_json to exit. The file_get_contents on line 82 only runs with an allowlisted value. Additionally, ajaxResponse() calls canRenderAjax() requiring admin auth."
+    },
+    {
+      "flow_id": "wp-staging-path-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "Same allowlist check as path-001. The unlink on line 83 only runs with an allowlisted $wpstgRequest value. Admin auth required via canRenderAjax()."
+    },
+    {
+      "flow_id": "wp-staging-sqli-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "The $idsToDelete values come from $eventOption->option_id, which are integer primary keys returned by $wpdb->get_results() from the WordPress options table. These are database-internal auto-increment integers, not user input. Second-order injection would require an attacker to control option_id values in the wp_options table, which is not feasible without prior database compromise."
+    },
+    {
+      "flow_id": "wp-staging-ssrf-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "The $url variable comes from $this->getApiUrl('events') which returns a hardcoded analytics endpoint URL. The body contains data from the database but the URL itself is not user-controlled. This is a standard outbound analytics request."
+    },
+    {
+      "flow_id": "wp-staging-sqli-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "Same pattern as sqli-001. The $idsToDelete values are option_id integers from $wpdb->get_results(). Database-sourced auto-increment PKs, not user input."
+    },
+    {
+      "flow_id": "wp-staging-path-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "Triple defense: (1) $uniqueIdentifierSuffix is validated with ctype_digit() - only pure digit strings pass, otherwise empty string. (2) $resumableFilename uses sanitize_file_name() which strips path traversal sequences. (3) Lines 143-149 perform realpath() verification ensuring the resolved directory matches the backups base directory. Additionally, canRenderAjax() requires admin auth and nonce."
+    },
+    {
+      "flow_id": "wp-staging-path-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "Same triple defense as path-003: ctype_digit() check, sanitize_file_name(), and realpath() directory containment verification. Admin auth required."
+    },
+    {
+      "flow_id": "wp-staging-path-005",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "Same triple defense as path-003: ctype_digit() check, sanitize_file_name(), and realpath() directory containment verification. Admin auth required."
+    },
+    {
+      "flow_id": "wp-staging-path-006",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "Same triple defense as path-003: ctype_digit() check, sanitize_file_name(), and realpath() directory containment verification. Admin auth required."
+    },
+    {
+      "flow_id": "wp-staging-xss-009",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reason": "The output is DateTime::format() with a format string from get_option('time_format'). The time_format option can only be set by administrators (requires manage_options capability). A malicious time_format set by an admin is a self-XSS scenario at best, and DateTime::format() only interprets date format characters, not arbitrary HTML. Admin auth required."
+    }
+  ]
+}

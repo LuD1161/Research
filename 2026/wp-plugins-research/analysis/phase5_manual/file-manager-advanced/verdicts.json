@@ -1,0 +1,90 @@
+{
+  "plugin_slug": "file-manager-advanced",
+  "review_date": "2026-06-16",
+  "reviewer": "manual-audit",
+  "summary": "All 8 taint flows from automated analysis are false positives. No confirmed exploitable vulnerabilities found.",
+  "confirmed_vulnerabilities": [],
+  "false_positives": [
+    {
+      "flow_id": "file-manager-advanced-rce-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "$_SERVER['REQUEST_TIME'] is a PHP-set integer, not user-controllable. The value is also wrapped in $this->DB->quote(serialize(...)). No RCE vector exists. The exec() call is on a PDO/SQLite object, not shell exec.",
+      "taint_source": "$_SERVER['REQUEST_TIME']",
+      "sink": "$this->DB->exec()",
+      "file": "application/library/php/elFinderVolumeDropbox.class.php",
+      "line": 597
+    },
+    {
+      "flow_id": "file-manager-advanced-path-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "$_FILES['content']['tmp_name'] is set by PHP's upload handler to a server-controlled temp path. The user cannot control this value to achieve path traversal. This is standard PHP file upload handling. Additionally, the ZohoOffice editor requires ELFINDER_ZOHO_OFFICE_APIKEY to be defined and the save() method is only reachable through the elFinder connector which requires admin nonce verification.",
+      "taint_source": "$_FILES['content']['tmp_name']",
+      "sink": "file_get_contents()",
+      "file": "application/library/php/editors/ZohoOffice/editor.php",
+      "line": 203
+    },
+    {
+      "flow_id": "file-manager-advanced-xss-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The tainted value from get_option() is used only in a strict equality comparison: 'maximize' === $minimize_banner ? 'style=\"display: block;\"' : 'style=\"display: none;\"'. The actual echoed output is always one of two hardcoded literal strings, never the tainted variable itself. No XSS possible.",
+      "taint_source": "get_option('_fma_banner_minimize')",
+      "sink": "echo (ternary with literal outputs)",
+      "file": "application/pages/main.php",
+      "line": 81
+    },
+    {
+      "flow_id": "file-manager-advanced-xss-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same pattern as xss-001. The echoed output is always a hardcoded literal string selected by strict comparison, never the tainted variable. No XSS possible.",
+      "taint_source": "get_option('_fma_banner_minimize')",
+      "sink": "echo (ternary with literal outputs)",
+      "file": "application/pages/main.php",
+      "line": 159
+    },
+    {
+      "flow_id": "file-manager-advanced-xss-003",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same pattern. Output is always 'true' or 'false' literal strings based on strict comparison. The tainted value is never echoed.",
+      "taint_source": "get_option('_fma_banner_minimize')",
+      "sink": "echo (ternary with literal outputs)",
+      "file": "application/pages/main.php",
+      "line": 165
+    },
+    {
+      "flow_id": "file-manager-advanced-xss-004",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "Same pattern. Output is always '' or 'fma__minimized' literal strings based on strict comparison. The tainted value is never echoed.",
+      "taint_source": "get_option('_fma_banner_minimize')",
+      "sink": "echo (ternary with literal outputs)",
+      "file": "application/pages/main.php",
+      "line": 167
+    },
+    {
+      "flow_id": "file-manager-advanced-rce-002",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "This is PHPUnit library code bundled inside the svg-sanitizer dependency (application/svg-sanitizer/includes/phpunit/). PHPUnit is a test framework that is never invoked during normal WordPress plugin operation. The DefaultPhpProcess class is not instantiated by any plugin code path. Dead code in production context.",
+      "taint_source": "$_SERVER (entire superglobal as env)",
+      "sink": "proc_open()",
+      "file": "application/svg-sanitizer/includes/phpunit/phpunit/src/Util/PHP/DefaultPhpProcess.php",
+      "line": 99
+    },
+    {
+      "flow_id": "file-manager-advanced-ssrf-001",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "reasoning": "The AJAX handler has proper security: (1) nonce verification with wp_verify_nonce(), (2) capability check requiring manage_options (admin-only), (3) the base URL is hardcoded to https://connect.postmansmtp.com/, (4) the user-supplied 'status' is sanitized with sanitize_text_field() which strips newlines/tags. The attacker can only influence a query parameter value on a fixed trusted domain. This is not exploitable as SSRF - the host cannot be redirected. At most it allows an admin to send arbitrary status strings to the postmansmtp API, which is the intended functionality.",
+      "taint_source": "$_POST['status']",
+      "sink": "wp_remote_post()",
+      "file": "application/post-smtp-notice/recommend-post-smtp-base.php",
+      "line": 638
+    }
+  ],
+  "notes": "The plugin's main attack surface is the elFinder file manager connector, accessible via wp_ajax_fma_load_fma_ui. This requires authentication (WordPress login) and nonce verification (wp_verify_nonce with 'fmaskey'). The connector grants full filesystem access to admins, which is intentional functionality. Non-admin users have restrictions on PHP file uploads via the acceptedName callback. The REST API routes for banner hide/minimize also require manage_options capability. No unauthenticated entry points were identified."
+}

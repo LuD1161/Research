@@ -1,6 +1,6 @@
 # Attack Surface: really-simple-ssl
 
-> Generated: 2026-06-16T09:13:51Z
+> Generated: 2026-06-16T18:36:25Z
 
 ## Section 1: Entry Points
 

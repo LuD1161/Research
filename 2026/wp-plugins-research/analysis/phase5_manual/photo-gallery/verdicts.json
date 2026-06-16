@@ -1,0 +1,286 @@
+{
+  "plugin_slug": "photo-gallery",
+  "review_date": "2026-06-16",
+  "reviewer": "claude-opus-4-6",
+  "total_flows_reviewed": 40,
+  "confirmed_vulnerabilities": 0,
+  "false_positives": 40,
+  "verdicts": [
+    {
+      "flow_id": "photo-gallery-sqli-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The source is $_SERVER['REMOTE_ADDR'] which is set by the web server, not by user-controlled HTTP headers. It is directly concatenated into SQL without $wpdb->prepare(), but REMOTE_ADDR cannot be spoofed by a remote attacker in standard Apache/Nginx configurations. Additionally, the vulnerable code path requires the admin-configured option 'popup_enable_rate' to be enabled (default: 0). While this is technically an unsafe coding pattern, it is not exploitable in standard deployment scenarios."
+    },
+    {
+      "flow_id": "photo-gallery-sqli-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The sink is $wpdb->insert() with format specifiers array('%d', '%f', '%s', '%s'). WordPress's $wpdb->insert() method internally uses prepare() when format specifiers are provided, making this a parameterized query. The $_SERVER['REMOTE_ADDR'] source is also not user-controllable. Not exploitable."
+    },
+    {
+      "flow_id": "photo-gallery-sqli-003",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The source is a $wpdb->get_row() call using $wpdb->prepare() (properly parameterized). The sink is $wpdb->update() with format specifiers. Both operations use parameterized queries. Not exploitable."
+    },
+    {
+      "flow_id": "photo-gallery-sqli-004",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The filemanager controller is only accessible via the 'addImages' AJAX action (wp_ajax_addImages) which is behind bwg_filemanager_ajax(). That function requires current_user_can('manage_options') and nonce verification. Admin-only, not exploitable by unauthorized users. The sink $wpdb->insert() also uses format specifiers."
+    },
+    {
+      "flow_id": "photo-gallery-sqli-005",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as sqli-004: filemanager requires manage_options capability and nonce. The sink $wpdb->update() uses format specifiers ('%s'). Not exploitable."
+    },
+    {
+      "flow_id": "photo-gallery-sqli-006",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as sqli-004: filemanager requires manage_options capability and nonce. The sink $wpdb->update() uses format specifiers. Not exploitable."
+    },
+    {
+      "flow_id": "photo-gallery-sqli-007",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as sqli-004: filemanager requires manage_options and nonce. Sink uses $wpdb->update() with format specifiers. Not exploitable."
+    },
+    {
+      "flow_id": "photo-gallery-sqli-008",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as sqli-004: filemanager requires manage_options and nonce. Sink uses $wpdb->update() with format specifiers. Not exploitable."
+    },
+    {
+      "flow_id": "photo-gallery-sqli-009",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as sqli-004: filemanager requires manage_options and nonce. Sink uses $wpdb->update() with format specifiers. Not exploitable."
+    },
+    {
+      "flow_id": "photo-gallery-sqli-010",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as sqli-004: filemanager requires manage_options and nonce. Not exploitable by unauthorized users."
+    },
+    {
+      "flow_id": "photo-gallery-ssrf-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The source is get_site_option('tenweb_access_token') which is a server-side stored option. The URL ($url) used in wp_remote_get() is also not user-controlled - it is hardcoded or derived from plugin configuration. The access token is only used in the Authorization header, not in the URL. Not exploitable."
+    },
+    {
+      "flow_id": "photo-gallery-ssrf-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The sign_up_dashboard() function is only reachable through admin_page() which requires nonce verification (speed_ajax_nonce) and is triggered via wp_ajax_twb (authenticated-only AJAX). The $slug parameter from $_POST is only used in the request body (not the URL) as 'product_slug'. The URL is hardcoded. Not exploitable."
+    },
+    {
+      "flow_id": "photo-gallery-ssrf-003",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source is get_user_meta() for admin user's first/last name - not user-controllable by attackers. The URL (TEN_WEB_NEW_LIB_DEACTIVATION_URL) is a constant. User metadata is only sent in the request body. Also requires nonce verification. Not exploitable."
+    },
+    {
+      "flow_id": "photo-gallery-ssrf-004",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Uses $_SERVER['REMOTE_ADDR'] and $_SERVER['HTTP_HOST'] in a URL to api.web-dorado.com. While HTTP_HOST can potentially be spoofed, the URL base is hardcoded to https://api.web-dorado.com/hash/ - the attacker can only control a path segment, not redirect the request to an internal service. This is at most an open redirect to a fixed domain's path, not SSRF."
+    },
+    {
+      "flow_id": "photo-gallery-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The check_score() AJAX handler requires wp_verify_nonce('twb_nonce') AND current_user_can('manage_options'). Admin-only with nonce. The $post_id is sanitize_text_field'd and passed to TWBBWGLibrary::check_score() which returns structured data. Not exploitable by unauthorized users."
+    },
+    {
+      "flow_id": "photo-gallery-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source is get_post_meta() - database-stored value. The sink at line 61 is a ternary: echo $status == 'completed' ? '' : 'twb-hidden'. The output is always either empty string or the literal 'twb-hidden', never the tainted value itself. Not exploitable."
+    },
+    {
+      "flow_id": "photo-gallery-xss-003",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source is get_post_meta(). Line 64 does 'echo $status;' which could output unsanitized post meta. However, this is in the admin List table (TWBList extends WP_List_Table) which is only accessible to admin users. Stored XSS would require another vulnerability to inject malicious post_meta. Admin context only."
+    },
+    {
+      "flow_id": "photo-gallery-xss-004",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as xss-002. The sink outputs '' or 'twb-hidden' via a ternary comparison, never the raw $status value."
+    },
+    {
+      "flow_id": "photo-gallery-xss-005",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source is get_post_meta(). Output goes through TWBBWGLibrary::score() which is a rendering function. This is in the admin List table context, accessible only to authenticated admins."
+    },
+    {
+      "flow_id": "photo-gallery-xss-006",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source is $_SERVER['REQUEST_URI'] sanitized with sanitize_url(). The sink at line 852 wraps the output in esc_url() inside an href attribute. esc_url() properly encodes all special characters and strips javascript: protocol. Properly sanitized output."
+    },
+    {
+      "flow_id": "photo-gallery-xss-007",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same pattern as xss-006. REQUEST_URI goes through sanitize_url() then esc_url() in href attribute. Properly sanitized."
+    },
+    {
+      "flow_id": "photo-gallery-xss-008",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Uses raw $_SERVER['REQUEST_URI'] but wraps in esc_url(add_query_arg(...)). The esc_url() output encoding is applied before HTML output in href attribute. Properly sanitized."
+    },
+    {
+      "flow_id": "photo-gallery-xss-009",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as xss-008. esc_url() applied to add_query_arg() output before HTML context. Properly sanitized."
+    },
+    {
+      "flow_id": "photo-gallery-xss-010",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source: esc_url($_SERVER['REQUEST_URI']). Used as current_url parameter in add_query_arg() building a URL to admin-ajax.php. Output via addslashes() inside onclick JS string. The esc_url() sanitizes the input, add_query_arg() URL-encodes the parameter value, and addslashes() escapes the JS string context. Triple-layered sanitization makes this safe."
+    },
+    {
+      "flow_id": "photo-gallery-xss-011",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same pattern as xss-010. esc_url() + add_query_arg() URL encoding + addslashes() in JS string context. Properly sanitized."
+    },
+    {
+      "flow_id": "photo-gallery-xss-012",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source: sanitize_url($_SERVER['REQUEST_URI']). Passes through add_query_arg() then esc_url(). Final output in href attribute with esc_url(). Properly sanitized."
+    },
+    {
+      "flow_id": "photo-gallery-xss-013",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same pattern as xss-012. sanitize_url() + add_query_arg() + esc_url() in href. Properly sanitized."
+    },
+    {
+      "flow_id": "photo-gallery-xss-014",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source: sanitize_url($_SERVER['HTTP_HOST']). Sink: echo esc_url($current_url). The esc_url() properly sanitizes for href context. While HTTP_HOST can be spoofed, esc_url() prevents XSS."
+    },
+    {
+      "flow_id": "photo-gallery-xss-015",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same pattern as xss-012. sanitize_url() + add_query_arg() + esc_url() in href. Properly sanitized."
+    },
+    {
+      "flow_id": "photo-gallery-xss-016",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same pattern as xss-015. Output via esc_url() in href attribute. Properly sanitized."
+    },
+    {
+      "flow_id": "photo-gallery-xss-017",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source: REQUEST_URI via WDWLibrary::get() with sanitize_url callback. Sink: echo urlencode($share_url). urlencode() fully encodes all special characters, preventing XSS. Properly sanitized."
+    },
+    {
+      "flow_id": "photo-gallery-xss-018",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as xss-017. urlencode() applied to output. Properly sanitized."
+    },
+    {
+      "flow_id": "photo-gallery-xss-019",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as xss-017. urlencode() applied to output. Properly sanitized."
+    },
+    {
+      "flow_id": "photo-gallery-xss-020",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as xss-017. urlencode() applied to output. Properly sanitized."
+    },
+    {
+      "flow_id": "photo-gallery-xss-021",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Filemanager view is only accessible via bwg_filemanager_ajax() which requires manage_options capability and nonce. The 'dir' parameter is sanitized with sanitize_text_field and WDWLibrary::validate_path(). Although esc_html() is missing, the admin-only access prevents exploitation."
+    },
+    {
+      "flow_id": "photo-gallery-xss-022",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as xss-021. Filemanager is admin-only (manage_options + nonce). Not exploitable by unauthorized users."
+    },
+    {
+      "flow_id": "photo-gallery-xss-023",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Filemanager view, admin-only. The 'callback' parameter is sanitized with esc_js() before output in JS context. Properly sanitized for its context."
+    },
+    {
+      "flow_id": "photo-gallery-xss-024",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $add_image_btn variable is the result of a strict comparison: if callback == 'bwg_add_image', it outputs a hardcoded translated string, otherwise another hardcoded translated string. The user input is never reflected in the output. Not exploitable."
+    },
+    {
+      "flow_id": "photo-gallery-xss-025",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as xss-024. Output is always one of two hardcoded translated strings. User input not reflected."
+    },
+    {
+      "flow_id": "photo-gallery-xss-026",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Filemanager view, admin-only (manage_options + nonce). The 'dir' parameter is used in a URL via add_query_arg() which URL-encodes values. Not exploitable by unauthorized users."
+    },
+    {
+      "flow_id": "photo-gallery-xss-027",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Filemanager view, admin-only. The 'callback' parameter is sanitized with esc_attr() which is appropriate for HTML attribute context. Properly sanitized."
+    },
+    {
+      "flow_id": "photo-gallery-xss-028",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Filemanager view, admin-only (manage_options + nonce). Not accessible to unauthorized users."
+    },
+    {
+      "flow_id": "photo-gallery-path-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Filemanager controller requires manage_options capability and nonce verification via bwg_filemanager_ajax(). The 'dir' parameter is sanitized with sanitize_text_field, str_replace for '..', htmlspecialchars_decode, and esc_dir(). Admin-only functionality."
+    },
+    {
+      "flow_id": "photo-gallery-path-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as path-001. Filemanager is admin-only with nonce. Not exploitable by unauthorized users."
+    },
+    {
+      "flow_id": "photo-gallery-path-003",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as path-001. Filemanager is admin-only with nonce. Not exploitable by unauthorized users."
+    },
+    {
+      "flow_id": "photo-gallery-path-004",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as path-001. Filemanager is admin-only with nonce. Not exploitable by unauthorized users."
+    }
+  ]
+}

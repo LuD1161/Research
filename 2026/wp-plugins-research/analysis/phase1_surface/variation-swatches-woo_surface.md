@@ -1,6 +1,6 @@
 # Attack Surface: variation-swatches-woo
 
-> Generated: 2026-06-16T09:13:55Z
+> Generated: 2026-06-16T18:36:27Z
 
 ## Section 1: Entry Points
 

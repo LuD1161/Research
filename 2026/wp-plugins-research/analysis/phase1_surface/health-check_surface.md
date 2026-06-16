@@ -1,6 +1,6 @@
 # Attack Surface: health-check
 
-> Generated: 2026-06-16T09:13:46Z
+> Generated: 2026-06-16T18:36:23Z
 
 ## Section 1: Entry Points
 

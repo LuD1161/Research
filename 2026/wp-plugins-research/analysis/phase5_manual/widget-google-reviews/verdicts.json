@@ -1,0 +1,114 @@
+{
+  "plugin_slug": "widget-google-reviews",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "manual-phase5",
+  "summary": "All 36 taint flows are false positives. The plugin has adequate security controls: admin pages require manage_options capability, AJAX handlers verify nonces and check capabilities, user input is sanitized with sanitize_text_field(), output is properly escaped, and database queries use $wpdb->prepare(). The predominant FP pattern is the taint analyzer flagging ternary comparisons (e.g., echo $tab == 'active' ? 'block' : 'none') where the tainted variable is only compared, never echoed. The remaining flows involve boolean coercions (get_option() == '1'), JSON-encoded output (wp_json_encode, json_encode), properly escaped output (esc_url, esc_attr), or admin-only debug output inside <textarea> tags.",
+  "confirmed_vulnerabilities": [],
+  "false_positives": [
+    {
+      "flow_ids": ["widget-google-reviews-xss-001", "widget-google-reviews-xss-004", "widget-google-reviews-xss-005"],
+      "reason": "Ternary comparison pattern: $tab from $_GET is compared against constant strings; the echo outputs only 'block' or 'none', never the tainted value itself. sanitize_text_field() is applied regardless.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-xss-021", "widget-google-reviews-xss-022", "widget-google-reviews-xss-023", "widget-google-reviews-xss-024"],
+      "reason": "Same ternary comparison pattern in class-plugin-support.php. $tab is compared to constants; output is always 'block' or 'none'. sanitize_text_field() applied to input.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-xss-002", "widget-google-reviews-xss-003"],
+      "reason": "get_option('grw_active') == '1' produces a boolean. The echo outputs 'enabled'/'disabled' or 'Enable'/'Disable' string constants via ternary. No tainted data reaches output.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-xss-009", "widget-google-reviews-xss-010"],
+      "reason": "get_option('grw_revupd_cron') == '1' produces a boolean. Output is constant strings 'enabled'/'disabled' or 'Enable'/'Disable'. Admin-only page (manage_options).",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-xss-011", "widget-google-reviews-xss-012", "widget-google-reviews-xss-013"],
+      "reason": "get_option('grw_debug_mode') == '1' produces a boolean. Outputs are constant strings 'flex'/'none', 'enabled'/'disabled', 'Enable'/'Disable'. Admin-only page.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-xss-006"],
+      "reason": "$_SERVER['REQUEST_URI'] is sanitized with esc_url_raw() which strips javascript: and XSS vectors. home_url() prepends the site URL. Output is in a hidden input value attribute. While esc_attr() is not applied, esc_url_raw() prevents meaningful XSS. Web servers reject unencoded special characters in URLs. Admin-only page.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-xss-007"],
+      "reason": "wp_json_encode() properly JSON-encodes the auth code string, escaping <, >, and / characters. Output is inside a <script> block where JSON encoding is the correct escaping method. Admin-only page.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-xss-008"],
+      "reason": "Admin-only AJAX handler (wp_ajax_grw_feed_save_ajax). Feed_Serializer::save() checks current_user_can('manage_options') and check_admin_referer(). View::render() uses esc_html(), esc_url(), esc_attr(), and wp_kses_post() throughout for all output.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-xss-014"],
+      "reason": "esc_url() is applied to get_option('siteurl') before echo. This is the correct escaping function for URL output in HTML context.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-xss-015", "widget-google-reviews-xss-016", "widget-google-reviews-xss-017", "widget-google-reviews-xss-018", "widget-google-reviews-xss-019"],
+      "reason": "print_r() of DB data/options inside a <textarea readonly> on admin-only debug page (requires manage_options). textarea is RCDATA context preventing script execution. Data originates from Google API responses (not user-controlled input). Theoretical </textarea> injection from Google review text is prevented by Google's own content sanitization. Self-XSS only (admin to admin).",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-xss-020"],
+      "reason": "Admin-only AJAX (manage_options + nonce verified). json_encode() output. $place_id parameter goes through $wpdb->prepare with %d format in get_overview(), sanitizing to integer. Response consumed by JavaScript, not rendered as HTML.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-sqli-001"],
+      "reason": "The initial SELECT uses $wpdb->prepare() with %d placeholder. The $wpdb->update() call uses WordPress's update method which internally prepares/escapes all values. Both auth (editor/administrator capability) and nonce are verified.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-xss-025"],
+      "reason": "$hide is always either 'y' or '' (empty string) from a ternary comparison of DB data. json_encode() of this constant value. Auth + nonce checked.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-xss-026"],
+      "reason": "filter_var(FILTER_VALIDATE_BOOLEAN) returns true/false/null, not arbitrary user input. json_encode() of API response. Auth (manage_options) + nonce checked.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-xss-027", "widget-google-reviews-xss-028"],
+      "reason": "Admin-only AJAX handlers (manage_options + nonce). json_encode() of Google API responses. User input (API key, lang) goes into API request parameters, not directly into output. json_encode escapes HTML-significant characters.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-xss-029"],
+      "reason": "get_option('grw_notice_type') is only ever set to the hardcoded strings 'success' or 'error' by the plugin's own save_from_post_array() method (class-settings-save.php lines 38, 80). No user-controlled value reaches this option. Admin-only context.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-xss-030"],
+      "reason": "When notice_id != 'custom_msg', output comes from hardcoded self::$plugin_notices array. When notice_id == 'custom_msg', output comes from get_option('grw_notice_msg') which is set from Google API error messages (line 79 of settings-save.php) during admin settings save (manage_options + nonce). Google API error messages do not contain XSS payloads. Admin-only context.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-ssrf-001", "widget-google-reviews-ssrf-002"],
+      "reason": "User-provided API key is appended as a query parameter to hardcoded Google Places API URLs (GRW_GOOGLE_PLACE_API constant). The base URL domain cannot be changed. sanitize_text_field() strips tags. Admin-only (manage_options + nonce). Not exploitable as SSRF since the target host is always Google's API servers.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-ssrf-003"],
+      "reason": "Hardcoded URL https://app.richplugins.com/checkconn with md5() of auth code. No user-controlled component in the URL. Not SSRF.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-ssrf-004"],
+      "reason": "URL built with add_query_arg on hardcoded Google API base URL. API key from get_option (admin-set). User input 'input' goes as query parameter via sanitize_text_field. Admin-only (manage_options + nonce). Target is always Google's API.",
+      "verdict": "fp"
+    },
+    {
+      "flow_ids": ["widget-google-reviews-ssrf-005"],
+      "reason": "wp_remote_post to hardcoded URL https://admin.richplugins.com/plugins/feedback. User data ($rate, $email, $msg) is in POST body only, not in URL. All inputs sanitized with sanitize_text_field(). Auth (manage_options) + nonce checked. Not SSRF.",
+      "verdict": "fp"
+    }
+  ]
+}
