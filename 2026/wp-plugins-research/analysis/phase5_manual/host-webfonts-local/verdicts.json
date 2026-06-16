@@ -1,0 +1,47 @@
+{
+  "plugin": "host-webfonts-local",
+  "review_date": "2026-06-16",
+  "reviewer": "claude-manual-review",
+  "total_findings_reviewed": 2,
+  "confirmed": 0,
+  "false_positive": 2,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "finding_id": "HWFL-001",
+      "title": "get_option() result passed to maybe_unserialize() — flagged as object injection",
+      "original_flow_ids": ["host-webfonts-local-obje-001"],
+      "verdict": "false_positive",
+      "severity": "informational",
+      "vulnerability_class": "object_injection",
+      "cvss_estimate": "N/A",
+      "attack_vector": "Helper.php:get_option() reads from wp_options via WordPress's get_option(); if the stored value is a string it is passed to maybe_unserialize() at line 123. For PHP object injection via unserialize/maybe_unserialize, an attacker must first write a malicious serialized PHP object to the wp_options row. Writing to wp_options requires either (a) direct database access, or (b) admin-level authentication through an OMGF settings form — both of which already constitute full system compromise. Additionally, WordPress core itself calls maybe_unserialize() internally within get_option(); the additional call in Helper.php is therefore redundant but introduces no new attack surface. No user-supplied input flows into this path without prior admin authentication and nonce verification.",
+      "auth_required": "admin (database write) or direct DB access",
+      "affected_file": "plugins/src/host-webfonts-local/src/Helper.php",
+      "affected_lines": "117-126",
+      "evidence": "if ( str_starts_with( $name, 'omgf_' ) ) {\n    $value = get_option( $name, $default );\n    ...\n    if ( is_string( $value ) ) {\n        $value = maybe_unserialize( $value ); // line 123\n    }\n}",
+      "remediation": "No remediation required. The call to maybe_unserialize() on trusted DB data is a standard WordPress pattern. If defense-in-depth is desired, switch to json_encode/json_decode for serializing complex settings instead of relying on PHP serialization.",
+      "fp_reason": "No user-controlled taint reaches maybe_unserialize(). All OMGF option writes (update_option in Helper::update_option()) are gated by admin-only AJAX handlers (check_ajax_referer + current_user_can('manage_options')) or form submits with nonce verification. WordPress core already applies maybe_unserialize() to get_option() results internally, so this code adds no new deserialization surface."
+    },
+    {
+      "finding_id": "HWFL-002",
+      "title": "get_option() result passed to array_filter() — misclassified as RCE",
+      "original_flow_ids": ["host-webfonts-local-rce-001"],
+      "verdict": "false_positive",
+      "severity": "informational",
+      "vulnerability_class": "rce",
+      "cvss_estimate": "N/A",
+      "attack_vector": "AdminbarMenu.php:update_google_fonts_checker_results() reads the stored Google Fonts checker results from wp_options (line 109) and subsequently calls array_filter() with an inline closure at line 146. The taint scanner classified array_filter() as an RCE sink, which is incorrect — array_filter() iterates over an array applying a user-supplied PHP closure; it does not evaluate arbitrary strings, execute shell commands, or invoke dynamic function names from database data. The REST endpoint /omgf/v1/adminbar-menu/status that triggers this code path is protected by get_permission() (AdminbarMenu.php:313-320), which requires both current_user_can('manage_options') and a valid wp_rest nonce sent in the X-WP-Nonce header. All request parameters are cleaned via $this->clean() (line 56) before any use.",
+      "auth_required": "admin (manage_options capability + wp_rest nonce)",
+      "affected_file": "plugins/src/host-webfonts-local/src/API/AdminbarMenu.php",
+      "affected_lines": "109-153",
+      "evidence": "// get_permission() on lines 313-320:\n$is_allowed = apply_filters('omgf_api_adminbar_menu_permission', current_user_can('manage_options'), $request);\nif ( true !== $is_allowed ) { return $is_allowed; }\nreturn (bool) wp_verify_nonce( $request->get_header('X-WP-Nonce'), 'wp_rest' );\n\n// The flagged 'sink' (line 146-152):\n$stored_results = array_filter(\n    $stored_results,\n    function ( $url ) use ( $solved ) {\n        return ! in_array( $url, $solved );\n    },\n    ARRAY_FILTER_USE_KEY\n);",
+      "remediation": "No remediation required. array_filter() with a static closure is not an RCE primitive under any PHP configuration.",
+      "fp_reason": "The taint scanner incorrectly categorizes array_filter() as an RCE sink. array_filter() does not execute arbitrary code from tainted data — it applies a predefined PHP Closure that performs only an in_array() membership test. There is no dynamic dispatch from database content, no eval, no shell execution, and no unserialize. Furthermore, the REST endpoint is fully gated behind admin authentication and nonce verification, so even if the data manipulation were harmful in some theoretical sense, unauthenticated exploitation is not possible."
+    }
+  ],
+  "summary": "Both taint flows reported by the automated scanner for host-webfonts-local are false positives. Flow HWFL-001 is a standard WordPress get_option/maybe_unserialize pattern applied to plugin-owned database rows that are only writable by administrators; WordPress core already applies the same deserialization internally. Flow HWFL-002 is a scanner misclassification of array_filter() as an RCE sink; the REST endpoint is properly protected by manage_options + nonce checks and the array_filter closure performs only a membership comparison. No confirmed vulnerabilities were found. The plugin demonstrates solid security practices: all AJAX handlers use check_ajax_referer and current_user_can; both REST API endpoints implement proper permission callbacks; user input entering the REST endpoint is sanitized via a recursive clean() method applying sanitize_text_field/esc_url_raw; file downloads use wp_safe_remote_get with strict MIME-type validation before writing to disk.",
+  "feedback": {
+    "scanner_quality": "The two flagged flows represent common scanner over-reach patterns: (1) treating get_option→maybe_unserialize as object injection regardless of whether any user-controlled write path exists, and (2) misclassifying array_filter() as an RCE sink. The attack_surface_summary noted 0 AJAX handlers and 0 file upload handlers in its automated surface scan, yet the manual review found multiple AJAX handlers and two REST endpoints — indicating the surface scanner had enumeration issues (possibly due to the 'php_files: 0' metadata, suggesting the scanner did not successfully process PHP files). Despite this, the taint flow engine did find and trace real code paths (Helper.php and AdminbarMenu.php), so the PHP parsing itself worked. Priority score of 22 is appropriately low for this plugin."
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "plugin": "user-role-editor",
+  "review_date": "2026-06-16",
+  "reviewer": "manual-phase5",
+  "total_findings_reviewed": 2,
+  "confirmed": 0,
+  "false_positive": 2,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "flow_id": "user-role-editor-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The taint analyzer flagged $network_admin (from FILTER_SANITIZE_NUMBER_INT) as an XSS source flowing into an echo. However, the echo at role-view.php:134 is: echo admin_url() . ($network_admin ? 'network/':'') . URE_PARENT .'?page=users-'.URE_PLUGIN_FILE; — the user-controlled value is used only as a boolean condition in a ternary expression. Only the literal string constants 'network/' or '' are ever concatenated into the output. The integer-sanitized value of $network_admin itself is never printed. Furthermore, this function is called exclusively from URE_Ajax_Processor::get_caps_to_remove() (ajax-processor.php:195), which is gated at dispatch() (line 392) behind both a valid nonce check (wp_verify_nonce) and a capability check (current_user_can). No XSS path exists: the tainted value never reaches output, and the call requires authenticated admin-level access.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    },
+    {
+      "flow_id": "user-role-editor-obje-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The taint analyzer flagged $wpdb->get_var() (reading from the WordPress options table) as a taint source flowing into maybe_unserialize(). The data origin is the WordPress database — specifically the {prefix}_user_roles option for a given blog in a multisite network, which is standard WordPress role storage. maybe_unserialize() on data that WordPress itself previously serialized and stored via update_option() is the canonical WordPress pattern for reading options. An attacker cannot exploit this without first having already achieved database write access (which would itself constitute full compromise). The calling function leave_roles_for_blog() is a protected method invoked only from direct_network_roles_update() (editor.php:529), which is itself called only from save_roles-related flows that require current_user_can('ure_edit_roles') or super-admin capability. The taint tool incorrectly treats the trusted WordPress database as an untrusted user-controlled source.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    }
+  ],
+  "summary": {
+    "total_findings": 2,
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 2,
+    "needs_further_review": 0,
+    "overall_assessment": "Both flagged findings are false positives. The XSS finding (xss-001) misidentified a ternary boolean condition as a reflected-value sink — $network_admin is used only to choose between two hardcoded string literals and is never echoed directly; additionally the code path requires authenticated admin capability plus valid nonce. The object injection finding (obje-001) misclassified a WordPress database read as an untrusted taint source — maybe_unserialize() on data from WordPress's own options table is standard WordPress API usage, not a user-controlled deserialization sink; reaching this code also requires admin-level role-editing capability. The user-role-editor plugin correctly implements nonce verification and capability checks throughout its AJAX dispatcher and editor classes."
+  },
+  "feedback": {
+    "taint_engine_notes": "Two systematic issues observed: (1) FILTER_SANITIZE_NUMBER_INT output used as a boolean ternary condition was incorrectly propagated as a full taint label through string concatenation, missing that the value itself is never echoed. (2) $wpdb->get_var() on the WordPress options table was classified as an untrusted taint source equivalent to $_POST/$_GET input — the engine lacks a distinction between trusted database reads (data written by the application itself) and external user input.",
+    "signal_quality": "low — 0/2 findings confirmed (100% false positive rate for this plugin)"
+  }
+}

@@ -1,0 +1,145 @@
+{
+  "plugin": "better-search-replace",
+  "review_date": "2026-06-16",
+  "reviewer": "opus-4.6-agent",
+  "total_findings_reviewed": 12,
+  "confirmed": 0,
+  "false_positive": 12,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "finding_id": "better-search-replace-xss-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The transient 'bsr_results' is only set by BSR_AJAX::append_report() which is gated by BSR_Utils::check_admin_referer() (nonce + manage_options capability check). The values fed into sprintf are $result['tables'], $result['change'], $result['updates'] which are integers validated by is_int() checks at lines 113-119 before reaching the echo. The fourth parameter is get_admin_url() which is not user-controlled. The admin page itself is registered with 'manage_options' capability. An admin user cannot XSS themselves in a meaningful attack scenario. Additionally, the sprintf uses %1$d/%2$d/%3$d format specifiers which cast to integer, preventing any string injection.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "better-search-replace-xss-002",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The download_sysinfo() method is hooked to 'admin_post_bsr_download_sysinfo' which requires authentication. It also calls BSR_Utils::check_admin_referer('bsr_download_sysinfo', 'bsr_sysinfo_nonce') which verifies both the nonce AND manage_options capability. The output uses wp_strip_all_tags() which removes all HTML/script tags. The response Content-Type is 'text/plain' and Content-Disposition forces download as attachment. Even if HTML somehow survived wp_strip_all_tags(), the browser would treat it as a plain text file download, not render it. Triple-layered defense: auth + nonce + sanitization + safe content-type.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "better-search-replace-sqli-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $blog_id parameter comes from get_current_blog_id() which is a WordPress core function returning the current blog's ID (an integer from the database). It is NOT user-controlled input. Additionally, absint() is applied to $blog_id, ensuring it is cast to an absolute integer. The $wpdb->base_prefix is also an internal WordPress value. There is no user-controllable input reaching this SQL query. While $wpdb->prepare() would be best practice, this is not an exploitable SQL injection.",
+      "vulnerability_class": "sql_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "better-search-replace-open-001",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The header() call uses get_option('blog_charset') which is an internal WordPress database option (typically 'UTF-8'). This is not user-controlled input - it requires admin access to change WordPress options, and the value is used in a Content-Type header, not a Location header. This is not an open redirect. Additionally, manipulating Content-Type charset does not enable meaningful attacks. The entire code path is behind authentication (the AJAX endpoint requires ?bsr-ajax= parameter which triggers DOING_AJAX, and the actual processing requires nonce + manage_options).",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "better-search-replace-vari-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The parse_str() call on $_POST['bsr_data'] uses the two-argument form (parse_str($str, $args)), which stores results into the $args array rather than polluting the global scope. This is the SAFE form of parse_str(). The $args variable is then immediately overwritten at line 122-132 with a whitelist of specific keys (select_tables, case_insensitive, replace_guids, dry_run, search_for, replace_with, completed_pages). So even if extra variables were injected into $args, they would be discarded by the whitelist rebuild. Furthermore, this entire code path is behind BSR_Utils::check_admin_referer() which requires nonce + manage_options capability.",
+      "vulnerability_class": "variable_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "better-search-replace-xss-003",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $step variable uses absint() which casts to an absolute integer - no XSS possible through an integer. The $msg_tbl variable uses esc_html() at line 156. The output is json_encode() which escapes special characters. The entire process_search_replace() method is gated by BSR_Utils::check_admin_referer() at line 103 which requires both nonce verification and manage_options capability. The response Content-Type is set to text/html but the data is consumed as JSON by JavaScript (AJAX), not rendered directly as HTML.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "better-search-replace-xss-004",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $page_size variable comes from get_option('bsr_page_size') which is an internal WordPress option, and absint() is applied both when reading it (line 16) and when outputting it (line 40: 'echo absint($page_size)'). absint() returns an absolute integer, making XSS impossible. The settings page is only accessible to users with manage_options capability since it is loaded within the admin submenu page.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "better-search-replace-xss-005",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Line 42: 'echo $page_size;' - while this does not use absint() at the echo point, $page_size was already cast through absint() at line 16. Since absint() returns an integer, no string-based XSS payload can survive. The option 'bsr_page_size' is registered with 'absint' as its sanitize callback (class-bsr-admin.php line 271), so the stored value is always an integer. The page requires manage_options capability to access. This is a minor code quality issue (should use esc_attr in the value attribute) but not exploitable.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "better-search-replace-xss-006",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Line 65 uses a strict equality comparison: $active_tab == 'bsr_search_replace'. The echo output is either the string 'nav-tab-active' or an empty string ''. The user-controlled $_GET['tab'] value is NEVER echoed directly - only the result of the comparison (a fixed string or empty string) is output. No XSS is possible because no user input reaches the echo statement. The page also requires manage_options capability.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "better-search-replace-xss-007",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same pattern as xss-006. Line 66 compares $active_tab == 'bsr_settings' and echoes either 'nav-tab-active' or ''. The $_GET['tab'] value itself is never echoed. The comparison operator returns a boolean which controls a ternary outputting fixed strings.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "better-search-replace-xss-008",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same pattern as xss-006 and xss-007. Line 67 compares $active_tab == 'bsr_help' and echoes either 'nav-tab-active' or ''. No user input is echoed.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "better-search-replace-lfi-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The BSR_Templates_Helper::get_tab_template() method uses a switch/case whitelist that only returns three hardcoded paths: 'templates/bsr-settings.php', 'templates/bsr-help.php', or 'templates/bsr-search-replace.php' (default). The user-controlled $_GET['tab'] value is matched against exact string cases. Any value that doesn't match 'bsr_settings' or 'bsr_help' falls through to the default case. There is NO path traversal or arbitrary file inclusion possible because the input never becomes part of the file path - only pre-defined constants are returned. The page also requires manage_options capability to access.",
+      "vulnerability_class": "local_file_inclusion",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    }
+  ],
+  "summary": "All 12 taint flow findings are false positives. The plugin has solid security architecture: (1) The entire plugin only loads for users with manage_options capability (admin). (2) The AJAX endpoint uses double-gated auth (nonce + capability check via BSR_Utils::check_admin_referer). (3) The LFI finding is completely mitigated by a switch/case whitelist in BSR_Templates_Helper::get_tab_template() that only returns hardcoded paths. (4) XSS findings on the tab comparison are false positives because the comparison result (fixed strings) is echoed, not the user input itself. (5) The parse_str uses the safe two-argument form and the result is immediately overwritten by a whitelist. (6) The SQL injection finding uses get_current_blog_id() (not user input) with absint(). (7) download_sysinfo uses wp_strip_all_tags + text/plain content-type + nonce + capability.",
+  "feedback": "The automated taint analysis has a very high false positive rate on this plugin. Key issues: (1) The analyzer treats get_transient(), get_option(), and get_current_blog_id() as taint sources, but these are internal WordPress values not directly controllable by attackers. (2) The analyzer fails to recognize that comparison operators (==) in ternary expressions output fixed strings, not the compared values. (3) The analyzer does not follow switch/case whitelists that constrain file inclusion paths. (4) The analyzer does not account for the safe two-argument form of parse_str(). (5) Auth analysis is inaccurate - the brief marks auth_required as false, but the entire plugin only loads for manage_options users, and all sensitive endpoints have additional nonce verification."
+}

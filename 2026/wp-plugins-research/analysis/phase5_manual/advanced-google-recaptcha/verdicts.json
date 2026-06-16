@@ -1,0 +1,156 @@
+{
+  "plugin": "advanced-google-recaptcha",
+  "review_date": "2026-06-16",
+  "reviewer": "opus-4.6-agent",
+  "total_findings_reviewed": 13,
+  "confirmed": 0,
+  "false_positive": 13,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "finding_id": "advanced-google-recaptcha-ssrf-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The URL passed to wp_remote_get() has a hardcoded host of 'https://www.google.com/recaptcha/api/siteverify'. The user-controlled POST parameter 'g-recaptcha-response' is appended as a query parameter value after sanitize_text_field(). The attacker cannot change the destination host - the request always goes to google.com. No SSRF is possible with a hardcoded base URL; at most an attacker could append extra query parameters which has no security impact.",
+      "vulnerability_class": "ssrf",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "advanced-google-recaptcha-ssrf-002",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Identical pattern to ssrf-001 but for reCAPTCHA v3 on line 314. Same hardcoded google.com URL, same sanitize_text_field() on the response parameter. No SSRF possible.",
+      "vulnerability_class": "ssrf",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "advanced-google-recaptcha-rce-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The scanner flagged array_map('sanitize_text_field', wp_unslash($_POST['wpcaptcha_captcha'])) as RCE because the first argument to array_map is a string callback name. However, the callback is the hardcoded string 'sanitize_text_field' - a WordPress sanitization function. There is no exec(), system(), eval(), passthru(), or any shell/command execution in this flow. The result is simply used for a wp_hash() comparison. This is a textbook false positive from over-aggressive taint analysis on array_map.",
+      "vulnerability_class": "rce",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "advanced-google-recaptcha-rce-002",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same pattern as rce-001. array_map('sanitize_text_field', ...) on POST['wpcaptcha_captcha_token']. The callback is hardcoded, not user-controlled. The sanitized tokens are only used in a wp_hash() comparison. No command execution sink exists in this flow.",
+      "vulnerability_class": "rce",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "advanced-google-recaptcha-sqli-001",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The value $lock_id = intval($_POST['lock_id']) is cast to integer via intval(), which returns a pure integer value that cannot contain SQL metacharacters. It is then passed to $wpdb->update() which internally parameterizes values. Additionally, the handler requires check_ajax_referer('wpcaptcha_run_tool') and current_user_can('manage_options'), so only admins can reach this code. Double-safe: intval() sanitization + $wpdb->update() parameterization + admin-only access.",
+      "vulnerability_class": "sql_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "advanced-google-recaptcha-xss-001",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "wp_send_json_success(array('id' => $lock_id)) where $lock_id is the result of intval(). The value is an integer echoed in a JSON response with Content-Type: application/json. JSON responses are not rendered as HTML by browsers. Even if they were, an integer cannot contain XSS payloads. Admin-only endpoint.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "advanced-google-recaptcha-sqli-002",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same pattern as sqli-001: $lock_id = intval($_POST['lock_id']) passed to $wpdb->delete(). intval() ensures the value is a pure integer. $wpdb->delete() internally parameterizes. Admin-only with nonce verification.",
+      "vulnerability_class": "sql_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "advanced-google-recaptcha-xss-002",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as xss-001: integer value in JSON response. No XSS possible.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "advanced-google-recaptcha-sqli-003",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same pattern: $fail_id = intval($_POST['fail_id']) passed to $wpdb->delete(). intval() sanitization makes SQL injection impossible. Admin-only with nonce.",
+      "vulnerability_class": "sql_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "advanced-google-recaptcha-xss-003",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as xss-001/xss-002: integer from intval() in JSON response. No XSS possible.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "advanced-google-recaptcha-xss-004",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The verify_captcha AJAX handler (admin-only, nonce-protected) passes user-supplied captcha_site_key through sanitize_text_field() then to self::verify_captcha(). That method returns either boolean true, a WP_Error object, or a float score (recaptchav3). The user-supplied site_key is sent to Google's API as a parameter, not reflected in the response to the client. The JSON response contains the captcha verification result, not the raw input. Admin-only endpoint.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "advanced-google-recaptcha-sqli-004",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The ORDER BY clause is constructed safely. The sort direction uses a strict comparison: ($sSortDir === 'desc') ? 'DESC' : 'ASC' - only two possible literal string outputs regardless of input. The column name comes from $aColumns[$iSortCol] where $aColumns is a hardcoded array of safe column names and $iSortCol is intval()'d. Array access with an out-of-bounds index returns null, which would not produce valid SQL but also not injection. The WHERE clause properly uses $wpdb->prepare() with placeholders. Admin-only with nonce check.",
+      "vulnerability_class": "sql_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "advanced-google-recaptcha-sqli-005",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Identical safe pattern to sqli-004 but for the activity_logs function. Sort direction is strictly compared to produce only 'DESC' or 'ASC' literals. Column names come from hardcoded $aColumns array. WHERE clause uses $wpdb->prepare(). Admin-only with nonce verification.",
+      "vulnerability_class": "sql_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    }
+  ],
+  "summary": "All 13 taint flow findings are false positives. The plugin demonstrates generally sound security practices: AJAX handlers are protected with both nonce verification (check_ajax_referer) and capability checks (current_user_can('manage_options')). Integer inputs are sanitized with intval(), text inputs with sanitize_text_field(), and database operations use either $wpdb->prepare() or $wpdb helper methods that parameterize internally. The SSRF findings are false positives because the URL host is hardcoded to google.com. The RCE findings are false positives because array_map() with a hardcoded callback string is not a command execution sink. The SQL injection findings are false positives due to intval() sanitization and/or strict value whitelisting. The XSS findings are false positives because integer values in JSON responses cannot contain XSS payloads.",
+  "feedback": "The automated taint analysis scanner has a high false positive rate on this plugin because it lacks understanding of: (1) hardcoded URL hosts preventing SSRF, (2) array_map with hardcoded callbacks not being RCE sinks, (3) intval() completely neutralizing SQL injection, (4) strict string comparisons acting as value whitelists, and (5) JSON responses with Content-Type headers preventing XSS. Consider adding semantic understanding of these sanitization patterns to reduce noise."
+}

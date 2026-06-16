@@ -1,0 +1,118 @@
+{
+  "plugin": "post-types-order",
+  "review_date": "2026-06-16",
+  "reviewer": "security-agent",
+  "total_findings_reviewed": 7,
+  "confirmed": 0,
+  "false_positive": 7,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "flow_id": "post-types-order-vari-001",
+      "verdict": "false_positive",
+      "vulnerability_class": "variable_injection",
+      "severity_claimed": "medium",
+      "severity_actual": "N/A",
+      "reasoning": "parse_str is called after nonce verification (wp_verify_nonce against 'interface_sort_nonce'). The resulting $data array is only traversed to extract post IDs (passed through intval()) and positional keys. The values stored back in $data are computed integers ($position from the array key, $id from intval). There is no code path where parse_str output overwrites sensitive program variables or escapes into a dangerous context. The 'variable_injection' label assigned by the scanner is a category mismatch — parse_str here is a deserialization-style parser for the jQuery sortable serialize() output, not an arbitrary variable injection sink in this context.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "capability_checked": false,
+      "file": "include/class.cpto.php",
+      "line": 383
+    },
+    {
+      "flow_id": "post-types-order-sqli-001",
+      "verdict": "false_positive",
+      "vulnerability_class": "sql_injection",
+      "severity_claimed": "medium",
+      "severity_actual": "N/A",
+      "reasoning": "$wpdb->update() is not raw SQL — it uses parameterized internally via $wpdb->prepare(). The $data array at the point of the update call contains only array('menu_order' => $position) where $position is the foreach key from the parse_str output (an integer-keyed PHP array), and $id is run through intval(). The WHERE clause uses array('ID' => $id) with intval-sanitized $id. The scanner incorrectly flagged $wpdb->update as equivalent to a raw $wpdb->query. No SQL injection is present.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "capability_checked": false,
+      "file": "include/class.cpto.php",
+      "line": 403
+    },
+    {
+      "flow_id": "post-types-order-sqli-002",
+      "verdict": "false_positive",
+      "vulnerability_class": "sql_injection",
+      "severity_claimed": "medium",
+      "severity_actual": "N/A",
+      "reasoning": "Identical analysis to sqli-001 but for the else branch (hierarchical parent key path). The $data array in this branch is array('menu_order' => $position, 'post_parent' => str_replace('item_', '', $key)) where $key comes from the parse_str output key. str_replace output on a string key is safe for $wpdb->update which handles parameterization internally. $id is intval()-sanitized. No SQL injection.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "capability_checked": false,
+      "file": "include/class.cpto.php",
+      "line": 421
+    },
+    {
+      "flow_id": "post-types-order-rce-001",
+      "verdict": "false_positive",
+      "vulnerability_class": "rce",
+      "severity_claimed": "medium",
+      "severity_actual": "N/A",
+      "reasoning": "The scanner incorrectly identified preg_replace() as an RCE sink. preg_replace('/[^a-zA-Z0-9_\\-]/', '', ...) is a sanitizing allowlist filter that strips all characters except alphanumerics, underscores, and hyphens from the POST 'post_type' value. It is not a shell execution function, not an eval sink, and the '/e' modifier (deprecated in PHP 7+) is not present. The sanitized $post_type value is subsequently used only in $wpdb->prepare() at line 458. No RCE is present; this is a textbook false positive from misidentifying the function as a dangerous sink.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "capability_checked": false,
+      "file": "include/class.cpto.php",
+      "line": 444
+    },
+    {
+      "flow_id": "post-types-order-vari-002",
+      "verdict": "false_positive",
+      "vulnerability_class": "variable_injection",
+      "severity_claimed": "medium",
+      "severity_actual": "N/A",
+      "reasoning": "Same analysis as vari-001 but in saveArchiveAjaxOrder(). Nonce is verified against 'CPTO_archive_sort_nonce_' . $userdata->ID before parse_str is called. The $data array resulting from parse_str is only used to populate $data['post'][$index] at line 488, where results are cast to (int). The parse_str output does not overwrite critical program variables and does not flow to any dangerous sink in an exploitable way.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "capability_checked": false,
+      "file": "include/class.cpto.php",
+      "line": 452
+    },
+    {
+      "flow_id": "post-types-order-sqli-003",
+      "verdict": "false_positive",
+      "vulnerability_class": "sql_injection",
+      "severity_claimed": "medium",
+      "severity_actual": "N/A",
+      "reasoning": "$paged is sanitized with FILTER_SANITIZE_NUMBER_INT which produces a numeric string safe for integer arithmetic. It is used only in the calculation $edit_start_at = $paged * $objects_per_page - $objects_per_page to compute a loop start index (integer). This index is used only to slice the $objects_ids array (PHP array access by integer offset). The resulting loop writes array('menu_order' => $menu_order) to $data where $menu_order is the foreach integer key. The $wpdb->update() call is internally parameterized and $id is intval()-sanitized. The taint chain through integer arithmetic to an array index is not exploitable for SQL injection.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "capability_checked": false,
+      "file": "include/class.cpto.php",
+      "line": 507
+    },
+    {
+      "flow_id": "post-types-order-vari-003",
+      "verdict": "false_positive",
+      "vulnerability_class": "variable_injection",
+      "severity_claimed": "high",
+      "severity_actual": "N/A",
+      "reasoning": "extract($r, EXTR_SKIP) is called in the list_pages() method. The EXTR_SKIP flag means no existing variable will be overwritten by the extracted values — only new variable names are introduced. More critically, the $args parameter to list_pages() is passed as a hardcoded server-side string: 'hide_empty=0&title_li=&post_type=' . $this->CPTO->current_post_type->name, where current_post_type is validated server-side in admin_init() via get_post_type_object() (returns null for invalid types, causing wp_die). There is no user-controlled input reaching extract(). The taint scanner incorrectly traced get_option('date_format') in $defaults as a taint source — database options are not attacker-controlled in any meaningful threat model here. No variable injection is possible.",
+      "auth_required": true,
+      "nonce_verified": false,
+      "capability_checked": true,
+      "note": "EXTR_SKIP is used; $args is server-controlled; get_option taint source is a scanner FP",
+      "file": "include/class.interface.php",
+      "line": 213
+    }
+  ],
+  "summary": "All 7 taint flows reported by the automated scanner are false positives. The plugin demonstrates generally sound security practices: both AJAX handlers (saveAjaxOrder and saveArchiveAjaxOrder) verify nonces before processing input; post IDs are sanitized with intval(); $wpdb->update() is used instead of raw SQL (providing internal parameterization); and the archive handler uses $wpdb->prepare() for its SELECT query. The scanner produced FPs due to: (1) misidentifying $wpdb->update() as a raw SQL sink, (2) misidentifying preg_replace() as an RCE sink, (3) treating integer arithmetic intermediate variables as SQL-injectable, (4) flagging parse_str() as 'variable injection' without tracing how the output is consumed, and (5) treating get_option() return values as user-tainted sources. No confirmed vulnerabilities were identified.",
+  "feedback": {
+    "scanner_issues": [
+      "wpdb->update() should be excluded from SQLi sinks — it uses internal prepare()",
+      "preg_replace() without /e modifier is not an RCE sink; scanner needs modifier detection",
+      "parse_str() into a named second argument ($data) is not arbitrary variable injection when output usage is tracked",
+      "FILTER_SANITIZE_NUMBER_INT output should clear integer taint labels",
+      "get_option() should not be treated as a taint source in this context",
+      "EXTR_SKIP flag should reduce or eliminate variable_injection severity significantly"
+    ],
+    "plugin_recommendations": [
+      "Consider adding capability checks (e.g., edit_posts or manage_options) to saveAjaxOrder and saveArchiveAjaxOrder in addition to nonce verification — currently any logged-in user who knows the nonce could reorder posts",
+      "The str_replace('item_', '', $key) at line 414 passes a parse_str output key directly to wpdb->update post_parent field without integer casting; while wpdb->update parameterizes this, casting to int would be safer and more explicit"
+    ]
+  }
+}

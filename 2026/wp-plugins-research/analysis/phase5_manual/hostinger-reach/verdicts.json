@@ -1,0 +1,46 @@
+{
+  "plugin": "hostinger-reach",
+  "review_date": "2026-06-16",
+  "reviewer": "opus-4.6-agent",
+  "total_findings_reviewed": 3,
+  "confirmed": 0,
+  "false_positive": 3,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "finding_id": "hostinger-reach-rce-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The taint source is $wpdb->get_var() reading the 'siteurl' option from the wp_options table -- a trusted, admin-controlled value. The alleged 'sink' is preg_replace() which strips the URL scheme prefix. This is NOT an RCE sink: PHP 7+ removed the /e modifier, and no command execution occurs anywhere in this flow. The resulting value is passed to wp_localize_script() as a JavaScript variable ('raw_domain'). There is no code execution, no path traversal, no SQL injection -- this is a completely benign data transformation of a trusted value for frontend display in the admin panel. The function admin_enqueue_scripts is only called on admin pages.",
+      "vulnerability_class": "rce",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "hostinger-reach-rce-002",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The taint source is $wpdb->get_results($sql) which reads WooCommerce customer data from the wc_customer_lookup table. The table name is constructed from $wpdb->prefix (trusted, hardcoded in wp-config.php) concatenated with a hardcoded string 'wc_customer_lookup'. The LIMIT and OFFSET parameters use $wpdb->prepare() with %d placeholders. The alleged 'sink' is array_map() which merely transforms the result set into an array structure -- this is NOT a code execution sink, not an SQL injection, not a command injection. The data flows to the Reach API for contact import. The get_contacts() method is only callable via the authenticated REST endpoint 'import/{integration}' which requires manage_options capability. No RCE or injection vulnerability exists.",
+      "vulnerability_class": "rce",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "hostinger-reach-rce-003",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The taint source is $wpdb->get_results() with $wpdb->prepare() using the %i identifier placeholder for the table name and %d for limit/offset. The table name comes from get_contacts_table_name() which constructs it from $wpdb->prefix (trusted) plus a hardcoded string or a PHP constant (TVE_LEADS_DB_PREFIX). The alleged 'sink' is array_map() which creates ReachContact DTOs from the query results -- this is purely a data transformation, NOT a code execution sink. The get_contacts() method is only accessible via the authenticated import REST endpoint requiring manage_options. The static analysis tool incorrectly flagged array_map as an RCE sink and misidentified the taint propagation. No vulnerability exists.",
+      "vulnerability_class": "rce",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    }
+  ],
+  "summary": "All 3 flagged taint flows are false positives. The static analysis tool incorrectly classified preg_replace() and array_map() as RCE sinks, and misidentified trusted database values ($wpdb->prefix, wp_options siteurl) as attacker-controlled taint sources. Manual review of the full plugin attack surface found: (1) The unauthenticated POST /contact endpoint has an additional is_authorized() check inside the handler requiring a valid WP REST nonce, preventing unauth abuse. (2) The unauthenticated GET /integrations endpoint discloses which plugins are installed/active -- this is a very low-severity information disclosure (common in WordPress plugins, no sensitive data exposed). (3) The wp_ajax_nopriv_abandoned-carts handler properly checks a nonce via check_ajax_referer(). (4) The unauthenticated POST /optinmonster endpoint also verifies a WP REST nonce in its handler. No exploitable vulnerabilities were confirmed in this plugin.",
+  "feedback": "The scanner's taint analysis engine needs improvement in sink classification: array_map() and preg_replace() (without /e modifier) are not code execution sinks. Additionally, values from $wpdb->get_var() reading well-known WordPress core options (siteurl) should not be treated as attacker-controlled taint sources. The scanner should also recognize defense-in-depth patterns where permission_callback is __return_true but the handler itself performs authorization checks (nonce verification). All 3 findings were clear false positives that could be eliminated with better sink/source modeling."
+}

@@ -1,0 +1,91 @@
+{
+  "plugin": "health-check",
+  "review_date": "2026-06-16",
+  "reviewer": "claude-sonnet-4-6",
+  "total_findings_reviewed": 6,
+  "confirmed": 0,
+  "false_positive": 6,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "flow_id": "health-check-xss-001",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "vulnerability_class": "xss",
+      "title": "XSS via $_POST['plugin'] through loopback test message",
+      "reasoning": "The taint analyzer incorrectly propagates taint from $plugin_slug through Health_Check_Loopback::can_perform_loopback(). Tracing the actual function (lines 37-105 of class-health-check-loopback.php), the $allowed_plugins parameter is only used to construct a URL query arg passed in a wp_remote_get() loopback request. The returned object's ->message field is always a hardcoded translated string (esc_html__(...)) set within can_perform_loopback() itself, never derived from user input. The $plugin_slug value is never reflected back into the message. The sprintf() at line 280-284 uses esc_attr() on ->status and the hardcoded ->message, so no XSS path exists.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "capability_checked": "view_site_health_checks"
+    },
+    {
+      "flow_id": "health-check-open-001",
+      "verdict": "false_positive",
+      "severity_original": "low",
+      "vulnerability_class": "open_redirect",
+      "title": "Header injection via $_GET['health-check-screenshot'] to Content-Type",
+      "reasoning": "The taint analyzer conflates the GET parameter with the database-retrieved value. $_GET['health-check-screenshot'] is used only as a meta_value in get_posts() to look up a stored post. The $image variable at line 99 comes from $screenshot->screenshot, a post meta value stored in the database, not from the GET param. Furthermore, before the Content-Type header is set (line 108), the image_type is validated at line 104 against $this->allowed_image_mimes which only permits 'image/jpeg'. Any non-matching value causes early return. No header injection is possible. The open_redirect classification also does not apply: no Location header is emitted.",
+      "auth_required": false,
+      "nonce_verified": false,
+      "capability_checked": null
+    },
+    {
+      "flow_id": "health-check-open-002",
+      "verdict": "false_positive",
+      "severity_original": "low",
+      "vulnerability_class": "open_redirect",
+      "title": "Header injection via $_GET['health-check-screenshot'] to Content-Disposition",
+      "reasoning": "Same root cause as health-check-open-001: the taint propagation from $_GET['health-check-screenshot'] through get_posts() is a false taint. $screenshot->post_title at line 111 is a database value, not user-controlled via the GET parameter (the GET param is a hash_id used to look up the post, not the title). Additionally sanitize_title() is applied to the post_title before inclusion in the Content-Disposition header. No valid injection path exists. The 'open_redirect' classification is also incorrect; Content-Disposition does not cause redirects.",
+      "auth_required": false,
+      "nonce_verified": false,
+      "capability_checked": null
+    },
+    {
+      "flow_id": "health-check-xss-002",
+      "verdict": "false_positive",
+      "severity_original": "high",
+      "vulnerability_class": "xss",
+      "title": "XSS via echo base64_decode() of screenshot data",
+      "reasoning": "The data echoed at line 115 originates from the database-stored 'screenshot' post meta value, not directly from $_GET['health-check-screenshot']. The GET param is only used as a lookup hash. More critically, before any output occurs the image_type is checked at line 104 against $this->allowed_image_mimes = ['image/jpeg'], and execution returns early if the mime type doesn't match. This means only valid JPEG base64 data stored in the database could ever reach the echo. The taint tracker fails to recognize the database as a sanitization boundary for the GET parameter's taint label. Even if an authenticated user could store malicious data, the screenshot endpoint has strict JPEG-only validation in the REST API's store_screenshot validation_callback (line 188 checks 'data:image/jpeg;' prefix), and permission_callback requires 'view_site_health_checks' capability.",
+      "auth_required": false,
+      "nonce_verified": false,
+      "capability_checked": null
+    },
+    {
+      "flow_id": "health-check-file-001",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "vulnerability_class": "file_inclusion",
+      "title": "Arbitrary file read via $_POST['file'] in file_get_contents()",
+      "reasoning": "The code at lines 238-254 applies two strong validation gates before file_get_contents() is reached. First, validate_file($file) at line 241 returns non-zero for path traversal sequences ('../'), absolute paths, and Windows drive references - any such input causes immediate error response. Second, at line 250 the file must be present in $allowed_files, which is populated from the WordPress.org checksum API (official checksums for WP core files). This allowlist restricts readable files to real WordPress core files only. The handler also requires 'view_site_health_checks' capability and passes check_ajax_referer(). No arbitrary file read is possible.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "capability_checked": "view_site_health_checks"
+    },
+    {
+      "flow_id": "health-check-ssrf-001",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "vulnerability_class": "ssrf",
+      "title": "SSRF via $_POST['file'] appended to SVN URL in wp_remote_get()",
+      "reasoning": "Same validation gates as health-check-file-001 apply: validate_file() prevents path traversal and the WordPress.org checksum allowlist restricts $file to real WP core filenames. The URL is constructed as 'https://core.svn.wordpress.org/tags/' . $wpversion . '/' . $file - the base is hardcoded to WordPress.org's SVN server. Even without the allowlist, an attacker could only append a WP core filename like 'wp-login.php', which would fetch a legitimate WP core file from WordPress.org. There is no way to redirect to an internal network address or arbitrary URL. The allowlist further limits $file to checksummed WP core files.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "capability_checked": "view_site_health_checks"
+    }
+  ],
+  "summary": "All 6 taint flows are false positives. The plugin is a WordPress admin tool that requires 'view_site_health_checks' capability for all sensitive operations. The two main false-positive patterns are: (1) the taint analyzer tracking taint through database lookups - the screenshots flow uses $_GET['health-check-screenshot'] only as a database lookup key, and all output comes from stored database values validated by a strict JPEG mime-type allowlist; (2) the taint analyzer not recognizing implicit whitelists - the files integrity flow applies WordPress's validate_file() path traversal guard plus a WordPress.org checksum API allowlist before any file read or remote request, making exploitation impossible. The XSS-001 flow is a taint propagation error where the plugin_slug is passed as a URL parameter but the returned message is a hardcoded string.",
+  "feedback": {
+    "fp_patterns": [
+      "DB-as-taint-sink: taint from GET/POST used only as DB lookup key should be cleansed after get_posts()/get_post_meta() when data flows from DB to output",
+      "Implicit-allowlist: validate_file() + external checksum API allowlist effectively whitelists only WP core files - taint should be cleansed after both checks pass",
+      "Fixed-return-value: when a tainted param is passed to a function whose return value is always a constant/translated string, taint on the return value is spurious",
+      "Header mime-type gating: in_array() strict check against an allowlist should cleanse taint before header() / echo calls"
+    ],
+    "suggested_rule_improvements": [
+      "Model validate_file() as a path sanitizer that removes path/cmd taint labels",
+      "Recognize get_posts()/get_post_meta()/WP_Query as taint boundaries - output should not inherit taint from the query's meta_value argument",
+      "Track return-value taint separately from parameter taint when callee always returns from a set of constant expressions"
+    ]
+  }
+}

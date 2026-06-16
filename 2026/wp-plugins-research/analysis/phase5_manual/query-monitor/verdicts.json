@@ -1,0 +1,82 @@
+{
+  "plugin": "query-monitor",
+  "review_date": "2026-06-16",
+  "reviewer": "security-researcher-agent",
+  "total_findings_reviewed": 6,
+  "confirmed": 0,
+  "false_positive": 6,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "flow_id": "query-monitor-xss-001",
+      "status": "false_positive",
+      "severity": "N/A",
+      "vulnerability_class": "xss",
+      "file": "output/html/hooks.php",
+      "line": 111,
+      "reasoning": "The taint scanner incorrectly labeled the echo statement itself as both the source and the sink. Examining the actual code at line 111: `echo '<th scope=\"row\" rowspan=\"' . intval( $rowspan ) . '\" class=\"qm-nowrap qm-ltr\"><span class=\"qm-sticky\">';` — the only dynamic value is `$rowspan` which is cast through `intval()`. All subsequent dynamic values in nearby lines (lines 112-123) use `esc_html()` (e.g., `esc_html( $hook['name'] )`). There is no unsanitized user-controlled data flowing into this output. The scanner flagged a statement that uses proper sanitization as a vulnerability. The code comment `// WPCS: XSS ok.` on line 103 further confirms the author intentionally verified this output.",
+      "auth_context": "Query Monitor output is gated by `user_can_view()` which requires the `view_query_monitor` capability. The output here is in a capability-gated admin panel, further reducing any theoretical risk."
+    },
+    {
+      "flow_id": "query-monitor-xss-002",
+      "status": "false_positive",
+      "severity": "N/A",
+      "vulnerability_class": "xss",
+      "file": "output/html/hooks.php",
+      "line": 127,
+      "reasoning": "The echo at line 127: `echo '<td rowspan=\"' . intval( $rowspan ) . '\" class=\"qm-nowrap qm-ltr\"><span class=\"qm-sticky\">' . esc_html( $type ) . '</td>';` — uses `intval()` for the numeric rowspan attribute and `esc_html()` for the `$type` string. The `$type` variable is derived from a comparison against `'action'` and set via `__('Action', 'query-monitor')` or `__('Filter', 'query-monitor')` (line 126), which are translation strings — not user input. Both dynamic values are properly sanitized. The scanner flagged sanitized output as a vulnerability.",
+      "auth_context": "Same capability gate as xss-001."
+    },
+    {
+      "flow_id": "query-monitor-xss-003",
+      "status": "false_positive",
+      "severity": "N/A",
+      "vulnerability_class": "xss",
+      "file": "dispatchers/Html.php",
+      "line": 604,
+      "reasoning": "The `output_fatal()` method at line 604 uses a printf with three format arguments: `esc_attr( $e['message'] )`, `esc_attr( QM_Util::standard_dir( $e['file'], '' ) )`, and `intval( $e['line'] )`. All three are properly sanitized — `esc_attr()` prevents HTML attribute injection, and `intval()` is sufficient for an integer line number in a `%3$d` format specifier. The scanner flagged `intval( $e['line'] )` as the 'source' but intval() produces a PHP integer which cannot carry XSS payload. No unsanitized taint flows into an HTML context here.",
+      "auth_context": "The `output_fatal()` code path (collectors/php_errors.php line 328) has a guard: `if ( empty( $this->display_errors ) && ! $dispatcher::user_can_view() ) return;` — meaning it only outputs to unauthenticated users if PHP's `display_errors` is enabled, which is a server misconfiguration outside the plugin's control. When `display_errors` is off (recommended for production), only authenticated `view_query_monitor` users see this output."
+    },
+    {
+      "flow_id": "query-monitor-xss-004",
+      "status": "false_positive",
+      "severity": "N/A",
+      "vulnerability_class": "xss",
+      "file": "dispatchers/Html.php",
+      "line": 613,
+      "reasoning": "The printf at line 613 uses: `nl2br( esc_html( $e['message'] ), false )`, `esc_html( $e['file'] )`, and `intval( $e['line'] )`. The message is double-protected with `esc_html()` before `nl2br()`, the file path uses `esc_html()`, and the line number uses `intval()` with a `%3$d` integer format specifier. The `nl2br()` wrapping `esc_html()` is safe — `esc_html()` runs first, converting any `<` or `>` to entities before `nl2br` adds `<br>` tags for newlines. This is a standard and correct pattern. The scanner's 'missing sanitizer' claim is incorrect.",
+      "auth_context": "Same access control as xss-003 — requires `display_errors=on` OR `view_query_monitor` capability."
+    },
+    {
+      "flow_id": "query-monitor-open-001",
+      "status": "false_positive",
+      "severity": "N/A",
+      "vulnerability_class": "open_redirect",
+      "file": "dispatchers/AJAX.php",
+      "line": 128,
+      "reasoning": "The finding classifies this as an open redirect, which is incorrect — `header('Content-Type: ...')` sets a content-type header, not a redirect. The actual concern would be header injection if `get_option('blog_charset')` contains a newline (CRLF injection). However: (1) `blog_charset` is a WordPress site option stored in the database, set by administrators via Settings > Reading — not a user-supplied request parameter; (2) WordPress sanitizes options on save with `sanitize_text_field()` and related functions; (3) exploiting this would require an attacker to already have `manage_options` capability (administrator), at which point they have far more powerful attack vectors; (4) the `output_fatal()` method in AJAX.php is only invoked during fatal PHP errors on AJAX requests, a rare internal code path. This is a false positive on both the classification (open_redirect vs. possible header injection) and the exploitability.",
+      "auth_context": "Modifying `blog_charset` requires administrator access."
+    },
+    {
+      "flow_id": "query-monitor-open-002",
+      "status": "false_positive",
+      "severity": "N/A",
+      "vulnerability_class": "open_redirect",
+      "file": "dispatchers/REST.php",
+      "line": 94,
+      "reasoning": "Identical pattern to query-monitor-open-001 in the REST dispatcher. Same `header('Content-Type: application/json; charset=' . get_option('blog_charset'))` construct. The misclassification as open_redirect is the same error — this is a Content-Type header, not a Location header. The `blog_charset` option is administrator-controlled and sanitized on write. Modifying it to include CRLF characters would require administrator-level database access. This is a false positive.",
+      "auth_context": "Modifying `blog_charset` requires administrator access."
+    }
+  ],
+  "summary": "All 6 reported findings are false positives. The automated taint analyzer produced a 100% false positive rate for this plugin. The root causes of the false positives fall into three categories: (1) The scanner labeled properly-sanitized echo/printf statements as vulnerabilities because it detected 'taint labels' in the code region without recognizing that esc_html(), esc_attr(), and intval() adequately neutralize the taint (xss-001 through xss-004); (2) The scanner misclassified a Content-Type header() call as an open_redirect — a fundamental category error (open-001, open-002); (3) The only data flowing into these outputs is either integer-cast, esc_html'd, esc_attr'd, or derived from administrator-controlled site options, not from unauthenticated user input. Query Monitor is a developer debugging tool that consistently enforces the `view_query_monitor` capability before displaying any output, and its HTML output code uses appropriate WordPress escaping functions throughout. No confirmed vulnerabilities were found.",
+  "feedback": {
+    "taint_analyzer_quality": "poor",
+    "issues": [
+      "Scanner cannot track sanitization through intval(), esc_html(), and esc_attr() — it flags code as vulnerable even when proper escaping is applied immediately before output",
+      "Scanner misclassifies header() calls that set Content-Type as open_redirect vulnerabilities — these are entirely different vulnerability classes",
+      "Scanner appears to propagate taint labels broadly without tracking where sanitization neutralizes them, leading to false source/sink relationships",
+      "The attack_surface_summary showing 0 capability checks, 0 nonce verifications, and 0 ajax handlers is misleading — the plugin has substantial auth checks; the static analysis simply did not detect PHP files (metadata shows php_files: 0, which is clearly wrong for a PHP plugin)"
+    ],
+    "recommended_targets": "Query Monitor has a very mature codebase with consistent use of WordPress security APIs. Priority for future review should be on plugins with direct SQL queries, file uploads, or REST endpoints that accept arbitrary user parameters without capability checks."
+  }
+}

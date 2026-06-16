@@ -1,0 +1,156 @@
+{
+  "plugin": "wp-reviews-plugin-for-google",
+  "review_date": "2026-06-16",
+  "reviewer": "opus-4.6-agent",
+  "total_findings_reviewed": 13,
+  "confirmed": 0,
+  "false_positive": 13,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "finding_id": "wp-reviews-plugin-for-google-xss-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The echo of get_option('css-content') outputs CSS stored in the database. This value is set exclusively by admin actions (noreg_save_css method fetches CSS from cdn.trustindex.io and stores it, or admin settings update it). The admin.php file checks current_user_can('edit_pages') at line 3, and the widget class outputs this in a <style> tag. The data source is get_option() which reads from the wp_options table - there is no user-controllable input path for unauthenticated users. An admin storing malicious CSS in their own site is a self-XSS scenario, not a vulnerability. Additionally, the widget output path uses wp_kses() with allowedAttributesForWidget which includes 'style' tags with 'type' attribute.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-reviews-plugin-for-google-ssrf-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The wp_remote_post call at line 160 uses a hardcoded URL 'https://admin.trustindex.io/source/wordpressPageRequest'. The $requestId from get_option is used only as a POST body parameter ('id' => $requestId), NOT as part of the URL. This is not SSRF - the destination URL is fixed. The $requestId value is set by the plugin's own logic (stored during review download process). An attacker cannot redirect the HTTP request to an arbitrary server. The delete_async_request() method is called from uninstall() which requires admin privileges.",
+      "vulnerability_class": "ssrf",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-reviews-plugin-for-google-rce-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The flagged code at line 203 is inside save_reviews() which applies sanitize_text_field(wp_unslash()) to reviewer data via array_map. This is a sanitization function, not an RCE sink. The data is then passed to $wpdb->insert() which uses parameterized queries internally. There is no exec(), system(), eval(), preg_replace with /e, or any other code execution path. The scanner incorrectly flagged array_map() as a dangerous function - array_map with a sanitization callback is safe. The save_reviews() method is called from my-reviews.php which requires admin authentication (admin.php checks current_user_can('edit_pages')).",
+      "vulnerability_class": "rce",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-reviews-plugin-for-google-sqli-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $wpdb->insert() at line 226 is a WordPress core function that internally uses $wpdb->prepare() with parameterized placeholders for all values. WordPress's insert() method automatically escapes all values passed in the data array. The data is also sanitized with sanitize_text_field() and wp_kses_post() before being passed. The save_reviews() function is called from the download_data POST handler in my-reviews.php (line 75) which requires: (1) admin.php's current_user_can('edit_pages') check at line 3, and (2) check_admin_referer('ti-download-reviews') nonce verification at line 70. This is not exploitable.",
+      "vulnerability_class": "sql_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-reviews-plugin-for-google-ssrf-002",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The wp_remote_get at line 986 uses a hardcoded base URL 'https://cdn.trustindex.io/assets/widget-presetted-css/v2/' with $styleId (cast to int at line 984) and $setId (from get_option with default 'light-background'). The $setId comes from the database option set by admin actions. Even if an admin could set a malicious scss-set value, the URL is constructed as cdn.trustindex.io/... with path segments, not as a fully controllable URL. Path traversal in the URL would not redirect to a different host. The noreg_save_css() method is called from admin settings which requires edit_pages capability.",
+      "vulnerability_class": "ssrf",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-reviews-plugin-for-google-sqli-002",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $wpdb->update() at line 23 of my-reviews.php is a WordPress core function that internally parameterizes all values. WordPress's update() method uses prepare() with proper escaping for both the SET and WHERE clauses. The $highlight value is constructed from sanitize_text_field() inputs, and $id is cast to (int). Additionally, the code requires: (1) admin.php's current_user_can('edit_pages') at line 3, and (2) check_admin_referer('ti-save-highlight') nonce at line 4. This is properly authenticated and not vulnerable to SQL injection.",
+      "vulnerability_class": "sql_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-reviews-plugin-for-google-sqli-003",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as sqli-002: $wpdb->update() at line 59 of my-reviews.php internally uses parameterized queries. The $reply value is sanitized with wp_kses_post(wp_unslash()). The $id is cast to (int). Protected by current_user_can('edit_pages') and check_admin_referer('ti-save-reply'). WordPress's $wpdb->update() is safe against SQL injection by design.",
+      "vulnerability_class": "sql_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-reviews-plugin-for-google-xss-002",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The output at line 30 of troubleshooting.php uses esc_url(get_option('siteurl')) which properly escapes the URL. esc_url() strips javascript: URIs and encodes HTML special characters. This is the correct WordPress escaping function for URL output. The troubleshooting.php file is included from admin context only (via admin.php which checks current_user_can('edit_pages')). The siteurl option is a core WordPress option only settable by admins.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-reviews-plugin-for-google-open-001",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The header('Location: admin.php?' . build_query($params)) at line 16 of admin.php uses a relative URL path 'admin.php?...' which cannot redirect to an external domain. The $params values come from $_GET['page'] and $_GET['tab'], both sanitized with sanitize_text_field(). Since the base is 'admin.php?' (relative), any injected values would only modify query parameters, not the host. Protected by current_user_can('edit_pages') at line 3 and check_admin_referer('ti-test-proxy') at line 7. Not an exploitable open redirect.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-reviews-plugin-for-google-open-002",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The header('Location: '. $options['redirect']) at line 40 uses a value from getNotificationOptions() which is a hardcoded array in the plugin code (lines 655-727 of trustindex-plugin.class.php). The $type parameter from $_GET['notification'] is used as an array key to look up from the hardcoded $list. All 'redirect' values in the list are either relative WordPress admin paths or wordpress.org URLs. The $type value cannot inject an arbitrary redirect URL because the redirect is looked up from the static list, not derived from user input. Protected by current_user_can('edit_pages') and check_admin_referer('ti-notification').",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-reviews-plugin-for-google-open-003",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The header at line 46 uses 'Location: admin.php?page=' . sanitize_text_field($_GET['page']) . '&tab=advanced'. This is a relative URL starting with 'admin.php?page=', making external redirects impossible. Protected by current_user_can('edit_pages') and check_admin_referer('ti-notification'). sanitize_text_field strips newlines preventing header injection.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-reviews-plugin-for-google-open-004",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Identical pattern to open-003. Line 50 uses the same relative URL construction 'admin.php?page=...&tab=advanced'. Cannot redirect externally. Protected by admin auth and nonce.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-reviews-plugin-for-google-open-005",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $star variable at line 60 is cast to (int), making it safe. The redirect URL at line 63 uses a hardcoded base 'https://wordpress.org/support/plugin/' with the plugin slug (from get_plugin_slug() which returns a fixed value) and appends '?rate=' . $star . '#new-post'. The integer cast prevents any injection. The destination is always wordpress.org. Protected by current_user_can('edit_pages') and check_admin_referer('ti-rate-us').",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    }
+  ],
+  "summary": "All 13 taint flow findings are false positives. The plugin has good security practices: (1) All admin pages check current_user_can('edit_pages') at the top of admin.php. (2) All state-changing operations verify nonces with check_admin_referer(). (3) WordPress's $wpdb->insert() and $wpdb->update() internally use parameterized queries, making the SQLi findings invalid. (4) SSRF findings flag get_option() values used in hardcoded URLs - not attacker-controllable. (5) XSS findings either use proper escaping (esc_url) or output admin-controlled CSS in style tags. (6) Open redirect findings use relative URLs (admin.php?...) or hardcoded external domains (wordpress.org). (7) The two REST API routes with __return_true permission_callback expose minimal data (widget list requiring a subscription, and a boolean). No exploitable vulnerabilities found.",
+  "feedback": "The scanner's main weakness is treating get_option() as a taint source equivalent to user input. WordPress options are stored in the database and typically only writable by admins. The scanner also incorrectly flags $wpdb->insert() and $wpdb->update() as SQL injection sinks - these WordPress core functions use parameterized queries internally. The RCE finding flagging array_map with a sanitization callback is a clear false positive pattern. The open redirect findings fail to account for relative URL bases preventing external redirects."
+}

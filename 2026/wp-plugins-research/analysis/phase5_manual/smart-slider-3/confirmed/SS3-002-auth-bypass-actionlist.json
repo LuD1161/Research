@@ -1,0 +1,37 @@
+{
+  "finding_id": "SS3-002",
+  "plugin_slug": "smart-slider-3",
+  "title": "AJAX actionList exposes published slider metadata to any authenticated user (missing permission check)",
+  "severity": "low",
+  "vulnerability_class": "auth_bypass",
+  "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:N/A:N",
+  "cvss_score": 4.3,
+  "cwe": "CWE-862",
+  "auth_required": "subscriber (any authenticated user)",
+  "nonce_required": true,
+  "affected_file": "plugins/src/smart-slider-3/Nextend/SmartSlider3/Application/Admin/Sliders/ControllerAjaxSliders.php",
+  "affected_lines": "26-56",
+  "entry_point": "wp_ajax_smart-slider3 (AdminHelper.php:35-38) -> display_admin_ajax() -> ControllerAjaxSliders::actionList()",
+  "root_cause": "ControllerAjaxSliders::actionList() calls $this->validateToken() but omits $this->validatePermission('smartslider_config'). The wp_ajax_smart-slider3 handler display_admin_ajax() performs no capability check before dispatching to controllers. Because wp_ajax_* fires for all logged-in users and any WordPress user can generate a valid nextend_security nonce, any subscriber can call actionList to enumerate published slider metadata.",
+  "data_exposed": [
+    "slider IDs",
+    "slider aliases (human-readable URL slugs)",
+    "slider titles",
+    "thumbnail file paths (wp-content/uploads relative)",
+    "group membership and child counts"
+  ],
+  "exploitation": {
+    "steps": [
+      "1. Log in as any WordPress subscriber account",
+      "2. Generate a nonce: GET /wp-admin/admin-ajax.php?action=smart-slider3 or visit any wp-admin page to find nextend_nonce in page source",
+      "3. POST to /wp-admin/admin-ajax.php with: action=smart-slider3&nextend_nonce=<nonce>&nextendcontroller=sliders&nextendaction=list&parentID=0",
+      "4. Receive JSON array of all published sliders with IDs, titles, aliases, thumbnails"
+    ],
+    "poc_curl": "curl -s -b 'wordpress_logged_in_XXXX=subscriber_cookie' -X POST https://target.com/wp-admin/admin-ajax.php -d 'action=smart-slider3&nextend_nonce=NONCE&nextendcontroller=sliders&nextendaction=list&parentID=0'"
+  },
+  "impact": "Low. Published sliders are already displayed publicly on the frontend via shortcodes, so the information (IDs, titles) is largely accessible without authentication. Thumbnail file paths and internal aliases may provide minor reconnaissance value. There is no write capability through this endpoint.",
+  "remediation": {
+    "fix": "Add $this->validatePermission('smartslider_config'); as the second line of actionList(), consistent with all other methods in ControllerAjaxSliders (actionOrder, actionTrash, etc.).",
+    "alternative": "Add current_user_can('smartslider_config') check in display_admin_ajax() before routing."
+  }
+}

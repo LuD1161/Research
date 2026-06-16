@@ -1,0 +1,121 @@
+{
+  "plugin": "broken-link-checker-seo",
+  "analysis_date": "2026-06-16",
+  "analyst": "manual-phase5",
+  "priority_areas_checked": [
+    "XSS in email footer template (taint flow BLCS-XSS-001)",
+    "SQL injection via searchTerm in getLinkWhereClause",
+    "SQL injection via orderBy/orderDir parameters",
+    "REST endpoint authentication and authorization",
+    "Unsubscribe endpoint CSRF/auth",
+    "Link update/unlink operations and CSRF",
+    "LIKE wildcard injection in search"
+  ],
+  "verdicts": [
+    {
+      "finding_id": "BLCS-001",
+      "title": "Email Footer XSS — False Positive (esc_url Applied at Sink)",
+      "vulnerability_class": "xss",
+      "original_flow_ids": ["broken-link-checker-seo-xss-001"],
+      "files": [
+        "app/Emails/Views/Footer.php"
+      ],
+      "lines": [8, 11, 34],
+      "verdict": "false_positive",
+      "confirmed_exploitable": false,
+      "auth_required": false,
+      "unauthenticated": false,
+      "severity": "none",
+      "analysis": "The taint analyzer flagged $adminEmail from get_option('admin_email') flowing into printf() at line 34. Examining the actual sink: the value is passed through rawurlencode() (line 14) when building the URL, and then esc_url() (line 39) is applied before printf() outputs it as the %1$s parameter. The static string template itself is passed through wp_kses_post() which whitelists only safe HTML. The printf pattern is: wp_kses_post(__('...href=\"%1$s\"...')), esc_url($unsubscribeUrl). The format string is a static translation string; the only user-controlled substitution is $unsubscribeUrl which is fully escaped by esc_url(). esc_url() strips all dangerous characters and enforces valid URL schemes. No XSS is possible. The automated taint analyzer failed to track that esc_url() is a complete sanitizer for URL output contexts.",
+      "exploit_steps": null,
+      "cve_reference": null
+    },
+    {
+      "finding_id": "BLCS-002",
+      "title": "LIKE Wildcard Injection in searchTerm — Authenticated, No Data Disclosure",
+      "vulnerability_class": "sql_injection",
+      "original_flow_ids": [],
+      "files": [
+        "app/Models/Link.php",
+        "app/Api/LinkStatusTable.php"
+      ],
+      "lines": [309, 314, 326],
+      "verdict": "not_exploitable",
+      "confirmed_exploitable": false,
+      "auth_required": true,
+      "auth_level": "aioseo_blc_broken_links_page capability (Editor+ or custom)",
+      "unauthenticated": false,
+      "severity": "none",
+      "analysis": "The getLinkWhereClause() method in Link.php (line 309) builds a WHERE clause for LIKE searches. The searchTerm is first sanitized by sanitize_text_field() in LinkStatusTable::fetchData() (line 29), then passed to getLinkWhereClause() where esc_sql() is applied (line 314) before direct string interpolation into the LIKE clause. esc_sql() correctly escapes SQL special characters (single quotes, backslashes) preventing SQL injection. However, esc_sql() does NOT escape LIKE wildcards (% and _). An authenticated user can supply '%' or '_' patterns to expand the result set — this is a LIKE wildcard injection, not SQL injection. Because the search only reads data the authenticated user already has access to (the broken links dashboard), and the endpoint itself requires the aioseo_blc_broken_links_page capability, there is no meaningful security boundary crossed. The correct fix would be to additionally apply $wpdb->esc_like() before esc_sql(), but the missing call does not create a material security vulnerability in this context.",
+      "exploit_steps": null,
+      "cve_reference": null
+    },
+    {
+      "finding_id": "BLCS-003",
+      "title": "orderBy/orderDir Parameter — False Positive (Database::orderBy() Properly Sanitizes)",
+      "vulnerability_class": "sql_injection",
+      "original_flow_ids": [],
+      "files": [
+        "app/Api/LinkStatusTable.php",
+        "app/Core/Database.php"
+      ],
+      "lines": [31, 32, 1082],
+      "verdict": "false_positive",
+      "confirmed_exploitable": false,
+      "auth_required": true,
+      "unauthenticated": false,
+      "severity": "none",
+      "analysis": "The $orderBy and $orderDir values from the API request are sanitized by sanitize_text_field() and strtoupper() respectively (LinkStatusTable.php lines 31-32), then passed to the Database::orderBy() method (Database.php line 1082). The orderBy() method further strips all characters except [a-zA-Z0-9_.] via preg_replace() (line 1100), backtick-escapes the column name via escapeColNames(), and validates $direction against an allowlist of ['ASC','DESC'] (line 1104-1106). No SQL injection is possible through this path.",
+      "exploit_steps": null,
+      "cve_reference": null
+    },
+    {
+      "finding_id": "BLCS-004",
+      "title": "REST API Authentication — Properly Enforced on All Sensitive Routes",
+      "vulnerability_class": "auth_bypass",
+      "original_flow_ids": [],
+      "files": [
+        "app/Api/Api.php"
+      ],
+      "lines": [140, 152],
+      "verdict": "false_positive",
+      "confirmed_exploitable": false,
+      "auth_required": true,
+      "unauthenticated": false,
+      "severity": "none",
+      "analysis": "All REST API routes use the validRequest() permission_callback which calls is_user_logged_in() AND validateAccess(). Routes with 'access' => ['aioseo_blc_broken_links_page'] require current_user_can() to return true. Routes with 'access' => 'any' still require is_user_logged_in() AND at least one aioseo_blc_* capability. The getOptions and ping routes use 'access' => 'any' but still require being logged in. No unauthenticated access to sensitive operations is possible.",
+      "exploit_steps": null,
+      "cve_reference": null
+    },
+    {
+      "finding_id": "BLCS-005",
+      "title": "Unsubscribe Email Handler — Properly Protected by Nonce and Email Validation",
+      "vulnerability_class": "csrf",
+      "original_flow_ids": [],
+      "files": [
+        "app/Emails/Emails.php"
+      ],
+      "lines": [54, 61, 69, 75],
+      "verdict": "false_positive",
+      "confirmed_exploitable": false,
+      "auth_required": false,
+      "unauthenticated": false,
+      "severity": "none",
+      "analysis": "The handleUnsubscribe() hook (init action) processes GET requests with ?aioseo_blc_action=unsubscribe. Protection is layered: (1) the supplied email must match get_option('admin_email') exactly (line 70), (2) wp_verify_nonce() validates the token against the email (line 75). The nonce is generated server-side and embedded only in emails sent to the admin address. An attacker would need to intercept the admin email to obtain a valid nonce. The nonce ties to the admin email address, preventing substitution attacks. No CSRF or unauthenticated exploitation path exists.",
+      "exploit_steps": null,
+      "cve_reference": null
+    }
+  ],
+  "summary": {
+    "total_findings": 5,
+    "confirmed_critical": 0,
+    "confirmed_high": 0,
+    "confirmed_medium": 0,
+    "confirmed_low": 0,
+    "false_positives": 5,
+    "unauthenticated_exploitable": 0,
+    "most_critical_finding": "None — all findings are false positives or non-exploitable",
+    "overall_risk": "none",
+    "notes": "The single automated taint finding (XSS-001) is a false positive — esc_url() is applied at the sink. No SQL injection, authentication bypass, or meaningful CSRF vectors were found. The plugin has solid security posture: all REST API endpoints enforce authentication and capability checks, the orderBy/orderDir parameters go through multi-layer sanitization in Database::orderBy(), and the unsubscribe endpoint is protected by a nonce that requires email interception to abuse. The only code quality concern is the missing $wpdb->esc_like() in getLinkWhereClause(), which allows LIKE wildcard expansion but does not enable SQL injection and is behind authentication anyway."
+  }
+}

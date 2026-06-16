@@ -1,0 +1,65 @@
+{
+  "plugin": "imsanity",
+  "version_reviewed": "2.9.2",
+  "reviewed_at": "2026-06-16",
+  "reviewer_notes": "Full taint-flow trace and manual source audit across all 7 PHP files. All automated findings are false positives.",
+  "confirmed_count": 0,
+  "false_positive_count": 2,
+  "additional_findings_count": 0,
+  "verdicts": [
+    {
+      "flow_id": "imsanity-xss-001",
+      "verdict": "false_positive",
+      "severity": null,
+      "reason": "The taint source $_POST['resume_id'] is cast to (int) immediately at line 36, yielding a pure integer. That integer is then used in wpdb->prepare() with a %d placeholder — correctly parameterized. The array returned by get_col() is further walked with intval via array_walk($attachments, 'intval'). wp_send_json() encodes the final array as JSON with Content-Type application/json — there is no HTML rendering context, so integer values in a JSON response cannot produce XSS. The taint engine incorrectly propagated labels through (int) cast and prepare().",
+      "trace_verdict": {
+        "source_sanitized_at": "line 36 via (int) cast",
+        "sink_is_json": true,
+        "html_context": false,
+        "auth_check": "manage_options + nonce verified",
+        "exploitable": false
+      }
+    },
+    {
+      "flow_id": "imsanity-xss-002",
+      "verdict": "false_positive",
+      "severity": null,
+      "reason": "The taint source $_POST['id'] is cast to (int) immediately at line 67, yielding a pure integer. The integer is passed to imsanity_resize_from_id(), which immediately re-casts it with (int) again at line 338 of utils.php. The $results array is constructed entirely from: (a) translated strings wrapped in esc_html__(), (b) database-derived values (attachment metadata), and (c) integer IDs. wp_send_json($results) sends application/json — no HTML rendering context. No XSS is possible.",
+      "trace_verdict": {
+        "source_sanitized_at": "line 67 via (int) cast, re-cast in imsanity_resize_from_id() line 338",
+        "sink_is_json": true,
+        "html_context": false,
+        "message_fields_use_esc_html": true,
+        "auth_check": "edit_others_posts + nonce verified",
+        "exploitable": false
+      }
+    }
+  ],
+  "additional_manual_findings": [],
+  "notable_non_issues": [
+    {
+      "location": "settings.php:485",
+      "pattern": "unserialize($result)",
+      "assessment": "Not exploitable. Data comes from the plugin's own custom DB table (imsanity_ms). The only write path is imsanity_network_settings_update(), which requires manage_options capability + valid nonce. A superadmin can already execute arbitrary code via WP core. No injection path from untrusted input.",
+      "verdict": "false_positive"
+    },
+    {
+      "location": "settings.php:143",
+      "pattern": "SHOW TABLES LIKE '$wpdb->imsanity_ms'",
+      "assessment": "Not injectable. $wpdb->imsanity_ms is set to $wpdb->get_blog_prefix(0) . 'imsanity' at plugin load — a WordPress-internal value with no user input.",
+      "verdict": "false_positive"
+    },
+    {
+      "location": "ajax.php — all four handlers",
+      "pattern": "wp_ajax_* (authenticated only)",
+      "assessment": "All AJAX actions are registered on wp_ajax_* only (not wp_ajax_nopriv_*). Every handler verifies both capability and nonce before acting. No unauthenticated attack surface.",
+      "verdict": "no_issue"
+    },
+    {
+      "location": "imsanity.php, utils.php — file operations",
+      "pattern": "unlink, rename, fopen on image files",
+      "assessment": "All file paths are derived from WordPress attachment metadata (wp_get_attachment_metadata, get_attached_file) or from the WP upload directory API. No user-controlled path components reach file system operations without going through WP internals first.",
+      "verdict": "no_issue"
+    }
+  ]
+}

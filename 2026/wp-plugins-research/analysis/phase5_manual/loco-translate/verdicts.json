@@ -1,0 +1,54 @@
+{
+  "plugin": "loco-translate",
+  "version_reviewed": "2.8.5",
+  "review_date": "2026-06-16",
+  "reviewer_notes": "Manual taint-flow analysis of all 244 PHP files. Two automated findings reviewed; both are false positives. No confirmed exploitable vulnerabilities found. Plugin demonstrates strong security posture: nonce verification on all state-changing operations, capability checks (loco_admin) enforced in base Controller::auth(), no unauthenticated AJAX or REST endpoints, and file path normalization with directory boundary checks on all file operations.",
+  "findings": [
+    {
+      "flow_id": "loco-translate-open-001",
+      "original_severity": "low",
+      "original_confidence": "medium",
+      "vulnerability_class": "open_redirect",
+      "file": "src/admin/file/HeadController.php",
+      "line": 87,
+      "verdict": "FALSE_POSITIVE",
+      "verdict_confidence": "high",
+      "reasoning": "The flagged pattern `wp_redirect($_SERVER['REQUEST_URI'])` is a standard POST-redirect-GET pattern. REQUEST_URI contains only the path component of the current URL (e.g., '/wp-admin/admin.php?page=...'), never an external scheme+host. An attacker cannot control REQUEST_URI to redirect to an arbitrary external URL via this code path. WordPress's own wp_redirect() additionally sanitizes the location. Furthermore, this code is only reachable after a valid nonce check (checkNonce) and the user must be logged in with the 'loco_admin' capability. Not exploitable as an open redirect.",
+      "auth_required": true,
+      "minimum_role": "loco_admin (translator equivalent)"
+    },
+    {
+      "flow_id": "loco-translate-vari-001",
+      "original_severity": "high",
+      "original_confidence": "high",
+      "vulnerability_class": "variable_injection",
+      "file": "src/data/Cookie.php",
+      "line": 23,
+      "verdict": "FALSE_POSITIVE",
+      "verdict_confidence": "high",
+      "reasoning": "The Loco_data_Cookie class is explicitly marked '@codeCoverageIgnore' with a PHPDoc note stating 'Not currently used anywhere - replaced with usermeta-based session'. A full codebase grep confirms the class is referenced only in its own definition and in test/WordPressTestCase.php (test helper only — not production). The class is dead code and has no callers in production code paths. parse_str writes into a local $data variable with a second argument (not extract()), so even if reached, variables would be isolated to that local scope. No variable injection is possible.",
+      "auth_required": false,
+      "minimum_role": "N/A - dead code, unreachable"
+    }
+  ],
+  "additional_findings": [],
+  "attack_surface_summary": {
+    "entry_points_reviewed": [
+      "All admin page controllers (AdminRouter routes: root, bundle, file, config, list, init)",
+      "All AJAX controllers (loco_ajax / loco_download actions): Save, Upload, Download, Sync, Msginit, Xgettext, FsConnect, FsReference, Apis, Diff, DownloadConf, Ping",
+      "Heartbeat filter (filter_heartbeat_received)"
+    ],
+    "auth_model": "All admin controllers inherit from Loco_mvc_Controller which calls auth() requiring is_user_logged_in() AND current_user_can('loco_admin'). All AJAX controllers call validate() which enforces nonce check via checkNonce(). No wp_ajax_nopriv handlers found. No REST API endpoints.",
+    "file_operations": "All file read/write operations go through Loco_fs_File with normalize() path resolution and are constrained to WP_CONTENT_DIR. FsReferenceController additionally enforces underContentDirectory() || underWordPressDirectory() and blocks wp-config.php explicitly.",
+    "notable_non_issues": [
+      "FsReferenceController source viewer: well-gated behind code_view setting, capability check, path boundary check, extension allowlist, and translatable-string content validation",
+      "UploadController: only accepts .po/.mo extensions, validates locale extraction, enforces correct filename, goes through Loco_api_WordPressFileSystem authorization",
+      "SaveController: validates file extension to po/pot/mo only, normalizes path against WP_CONTENT_DIR",
+      "Cookie class: dead code, never instantiated in production",
+      "REQUEST_URI usage: only for same-page PRG pattern, not redirectable to external URLs"
+    ]
+  },
+  "confirmed_count": 0,
+  "false_positive_count": 2,
+  "total_reviewed": 2
+}

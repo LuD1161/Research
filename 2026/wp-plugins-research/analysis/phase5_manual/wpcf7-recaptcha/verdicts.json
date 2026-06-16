@@ -1,0 +1,43 @@
+{
+  "plugin": "wpcf7-recaptcha",
+  "review_date": "2026-06-16",
+  "reviewer": "manual-phase5",
+  "total_findings_reviewed": 2,
+  "confirmed": 0,
+  "false_positive": 2,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "flow_id": "wpcf7-recaptcha-rce-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "vulnerability_class": "rce",
+      "rationale": "The taint analyzer incorrectly treats array_filter() as an RCE sink. The full chain is: get_site_option('network_iqfix_recaptcha') -> array_filter((array)$network_wpcf7). array_filter without a callback simply removes falsy values from an array; it is not a shell execution, eval, or code execution sink. Downstream in network_wpcf7_options() (lines 368-381) the array values are read as string API keys and assigned to $value['recaptcha'], $value['iqfix_recaptcha'], and $value['iqfix_recaptcha_source']. The 'recaptcha_source' value is further validated through IQFix_WPCF7_Deity::verify_recaptcha_source() which restricts it to a strict allowlist of 'google.com' or 'recaptcha.net'. The sitekey/secret values are stored API keys passed to the Google reCAPTCHA verification request body, not executed. No RCE sink exists anywhere in this taint chain. This is the same category of false positive seen repeatedly in the CF7 core analysis where array_filter is misclassified.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    },
+    {
+      "flow_id": "wpcf7-recaptcha-ssrf-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "vulnerability_class": "ssrf",
+      "rationale": "The taint analyzer flagged $_SERVER['REMOTE_ADDR'] as a source reaching wp_safe_remote_post() as a sink. However, the REMOTE_ADDR value is placed in the POST body array under the key 'remoteip' ($request['body']['remoteip']) — it does not control the URL of the HTTP request. The request URL ($endpoint) is constructed at line 560 via sprintf('https://www.%s/recaptcha/api/siteverify', $source) where $source has already been validated through IQFix_WPCF7_Deity::verify_recaptcha_source() (wpcf7-recaptcha.php:55-61) to be strictly 'google.com' or 'recaptcha.net' — no other value is possible. Additionally, wp_safe_remote_post() (unlike wp_remote_post()) internally enforces WordPress's safe_http_request filter, blocking requests to loopback addresses, private IP ranges, and non-HTTP(S) schemes. There is no SSRF vector: the attacker cannot control the destination URL, and even if they could influence the remoteip field, it is only POST body data sent to Google's API which ignores or validates it server-side. The missing_sanitizer note ('esc_url() not used') is irrelevant since esc_url_raw() IS applied to the endpoint at line 571, and the endpoint is already allowlist-constrained.",
+      "exploitable": false,
+      "auth_required": false,
+      "poc": null
+    }
+  ],
+  "summary": {
+    "total_findings": 2,
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 2,
+    "needs_further_review": 0,
+    "overall_assessment": "Both flagged findings are false positives. The RCE finding (rce-001) results from the taint analyzer misclassifying array_filter() as an RCE sink — the actual downstream use of the get_site_option() data is to populate API key configuration, not to execute code. The SSRF finding (ssrf-001) results from the taint analyzer treating $_SERVER['REMOTE_ADDR'] reaching wp_safe_remote_post() as SSRF, but the IP value only appears in the POST body (remoteip parameter) sent to Google's verification API — it cannot affect the request destination URL. The endpoint URL is both allowlist-constrained (google.com/recaptcha.net only) and passed through esc_url_raw(). This plugin has very limited attack surface: no AJAX handlers, no REST endpoints, no file uploads, no database queries, and no shortcodes. It functions as a thin adapter between Contact Form 7 and Google's reCAPTCHA v2 API."
+  },
+  "feedback": {
+    "taint_engine_notes": "The taint engine has a systematic false positive pattern on array_filter() which it treats as a dangerous sink regardless of whether a callable is supplied or what the downstream data use is. This generated the rce-001 false positive. The engine also has a category error on SSRF detection: it should distinguish between user-controlled data reaching the URL parameter of an HTTP function versus reaching only the request body. The ssrf-001 false positive stems from this confusion. Additionally, the brief's attack_surface_summary showed 0 PHP files and 0 lines analyzed — the surface summary appears to have failed to parse the plugin, while the source_sink_summary correctly found 3 files. This inconsistency should be investigated in the pipeline."
+  }
+}

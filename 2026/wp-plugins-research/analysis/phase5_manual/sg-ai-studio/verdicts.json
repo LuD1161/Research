@@ -1,0 +1,79 @@
+{
+  "plugin": "sg-ai-studio",
+  "review_date": "2026-06-16",
+  "reviewer": "opus-4.6-agent",
+  "total_findings_reviewed": 6,
+  "confirmed": 0,
+  "false_positive": 6,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "finding_id": "sg-ai-studio-xss-001",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The echo statement outputs either the literal string 'no-api-key' or an empty string based on the result of empty($api_key). The actual value of $api_key is NEVER echoed to the page. The ternary operator uses empty() as a boolean check and only outputs hardcoded string constants. No user-controlled data reaches the echo sink. Code: echo empty($api_key) ? 'no-api-key' : '';",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "sg-ai-studio-xss-002",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Identical pattern to xss-001. The echo statement at line 330 in render() outputs either the literal string 'no-api-key' or empty string. The $api_key value from get_option() is only used as input to the empty() boolean check and never directly output. Additionally, this code only executes in admin context (render() is the callback for add_menu_page with 'manage_options' capability). The brief incorrectly flagged auth_required as false.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "sg-ai-studio-sqli-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $wpdb->insert() call includes format specifiers array('%d', '%d', '%s', '%s') as the third parameter. WordPress's $wpdb->insert() internally uses $wpdb->prepare() when format specifiers are provided, making this a properly parameterized query. Additionally, both $activity and $description are sanitized with sanitize_text_field() before being passed to the insert. The $visitor_id is either from get_current_user_id() (integer) or 0. The 'ts' value is from time() (integer). No SQL injection is possible.",
+      "vulnerability_class": "sql_injection",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "sg-ai-studio-rce-001",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The flagged sink is preg_replace() which is NOT a command execution function. The /e modifier (which would enable code execution) is NOT used - the pattern is '/^https?:\\/\\/(www\\.)?/i' with only the /i modifier. preg_replace without /e is a pure string replacement operation. Furthermore, the source data comes from get_option() (database-stored value set during admin-authenticated init_auth flow), not from untrusted user input. The scanner incorrectly classified preg_replace as an RCE sink.",
+      "vulnerability_class": "rce",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "sg-ai-studio-file-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The file upload flow has multiple layers of protection: (1) JWT authorization via check_jwt_authorization() requiring a valid cryptographically-signed token from SiteGround's backend service, (2) sanitize_file_name() on the filename, (3) validate_file_extension() blocking all executable extensions (php, phtml, phar, sh, py, js, etc.), (4) validate_file_content() performing MIME type detection via finfo and verifying content matches the declared extension, (5) image validation via getimagesizefromstring() for image files, (6) wp_tempnam() generates a unique temp path where the user-supplied filename only serves as a prefix hint, (7) wp_handle_sideload() performs WordPress's own file type validation. The file_put_contents() writes to a system temp file, not a user-controlled path. No path traversal or arbitrary file upload is possible.",
+      "vulnerability_class": "file_inclusion",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "sg-ai-studio-file-002",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same upload_media() handler as file-001, just the file_url code path instead of base64 file path. All the same protections apply: JWT auth, sanitize_file_name(), validate_file_extension(), validate_file_content() with finfo MIME detection, image content validation, wp_tempnam() for temp file path, and wp_handle_sideload(). The file_url is also sanitized with esc_url_raw() before being passed to wp_remote_get(). The URL-based upload path has identical security controls to the base64 path.",
+      "vulnerability_class": "file_inclusion",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    }
+  ],
+  "summary": "All 6 taint flow findings are false positives. The XSS findings (xss-001, xss-002) incorrectly flag echo statements that only output hardcoded string constants based on empty() boolean checks - the tainted variable is never actually echoed. The SQLi finding (sqli-001) misses that $wpdb->insert() with format specifiers IS parameterized. The RCE finding (rce-001) incorrectly classifies preg_replace (without /e modifier) as a command execution sink. The file inclusion findings (file-001, file-002) ignore extensive multi-layer validation including JWT auth, extension blocklists, MIME type content verification, and WordPress sideload handling. The plugin uses a well-designed JWT-based authentication system for its REST API endpoints backed by asymmetric key cryptography (ES384/RS512). All data-modifying REST routes require valid JWT tokens from SiteGround's AI Studio backend service.",
+  "feedback": "The scanner has a high false positive rate on this plugin because: (1) It treats any echo of a variable touching get_option() as XSS, even when the variable is only used in a boolean check and never directly output. (2) It does not recognize $wpdb->insert() with format array as parameterized. (3) It classifies preg_replace without /e as an RCE sink. (4) It does not trace through the JWT authorization in permission_callback, marking routes as 'auth_required: false' when they actually require cryptographic token validation. The static analysis should be enhanced to recognize WordPress-specific safe patterns: $wpdb->insert/update/replace with format arrays, ternary operators that only emit constants, and preg_replace without the deprecated /e modifier."
+}

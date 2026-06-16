@@ -1,0 +1,46 @@
+{
+  "plugin": "post-duplicator",
+  "review_date": "2026-06-16",
+  "reviewer": "security-agent",
+  "total_findings_reviewed": 2,
+  "confirmed": 0,
+  "false_positive": 2,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "flow_id": "post-duplicator-rce-001",
+      "verdict": "false_positive",
+      "severity_original": "critical",
+      "severity_confirmed": null,
+      "vulnerability_class": "rce",
+      "rationale": "The scanner incorrectly classified uasort() as an RCE sink. uasort() is a standard PHP array sort function that takes an array and a comparison callback. The callback here is a hardcoded anonymous function using strcasecmp() — no user-controlled callable is ever passed. The values being sorted ($post_types array) are sanitized via sanitize_text_field() before insertion (line 33). There is no code path that leads from these string values to shell command execution, eval, or any dangerous function. This is a textbook false positive caused by the scanner treating all array-manipulation functions as dangerous sinks.",
+      "taint_path_valid": false,
+      "auth_required": null,
+      "exploitable": false,
+      "notes": "The scanner appears to have flagged uasort() generically. The sink description even mentions 'escapeshellarg() not used' which is completely irrelevant — no shell command is being constructed anywhere near this code. The values are post type label strings displayed in a dropdown menu."
+    },
+    {
+      "flow_id": "post-duplicator-sqli-001",
+      "verdict": "false_positive",
+      "severity_original": "critical",
+      "severity_confirmed": null,
+      "vulnerability_class": "sql_injection",
+      "rationale": "The scanner flagged $wpdb->update() as a SQL injection sink because '$wpdb->prepare() not used'. However, $wpdb->update() with explicit format specifier arrays IS the correct parameterized approach in WordPress — it is internally equivalent to prepare(). At line 69-75 in simple-custom-post-order.php, the call uses format arrays ['%d'] for both the SET clause (menu_order) and the WHERE clause (ID). The $duplicate_id variable is also pre-sanitized with absint() at line 37, guaranteeing a non-negative integer. The $new_menu_order value is constructed as (int)$max + 1 where $max comes from a properly prepare()'d MAX() query (lines 59-65). There is zero SQL injection risk in this code path.",
+      "taint_path_valid": false,
+      "auth_required": null,
+      "exploitable": false,
+      "notes": "The scanner incorrectly treated absint() output as a taint source. absint() is a strict integer coercion that eliminates any SQL injection risk. Additionally, the scanner's claim that '$wpdb->prepare() not used' is misleading — $wpdb->update() with format specifiers IS a parameterized query. This is a common false positive pattern for WordPress-specific taint analysis tools that don't model $wpdb->update() correctly."
+    }
+  ],
+  "summary": "Both flagged findings are false positives. The plugin is well-written security-wise. Key observations from manual review: (1) REST API endpoints are all authenticated via permission_callback functions that call user_can_duplicate() and current_user_can() checks. (2) The PHP fallback handler (handle_quick_duplicate) properly uses check_admin_referer() with a post-ID-specific nonce, preventing CSRF. (3) Meta value handling in perform_duplication() explicitly guards against PHP object injection by using 'allowed_classes' => false in unserialize() calls and refusing to deserialize O:/C: prefixed strings. (4) Post type and taxonomy inputs are validated via post_type_exists(), taxonomy_exists(), and sanitize_key(). (5) SQL queries use $wpdb->prepare() and $wpdb->update() with format specifiers correctly throughout. No confirmed vulnerabilities found.",
+  "feedback": {
+    "scanner_quality": "poor",
+    "fp_rate_observed": "100%",
+    "issues": [
+      "Scanner models uasort() as an RCE sink — this is incorrect. uasort() accepts a PHP callable but in this code that callable is a hardcoded anonymous function, not user-controlled.",
+      "Scanner does not model $wpdb->update() with format arrays as a safe parameterized query equivalent, generating false SQL injection findings.",
+      "Scanner treats absint() output as a taint source rather than a sanitizer, contradicting its own sanitizer list.",
+      "Scanner found 0 AJAX handlers, 0 capability checks, and 0 nonce verifications in the attack surface summary despite the plugin having REST API endpoints with permission callbacks, check_admin_referer() calls, and wp_create_nonce() calls — indicating the static analysis phase missed key constructs."
+    ]
+  }
+}

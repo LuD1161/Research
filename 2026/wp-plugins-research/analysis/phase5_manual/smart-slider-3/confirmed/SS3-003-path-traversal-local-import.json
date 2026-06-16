@@ -1,0 +1,32 @@
+{
+  "finding_id": "SS3-003",
+  "plugin_slug": "smart-slider-3",
+  "title": "Local import file path not validated - path traversal to read arbitrary server files",
+  "severity": "low",
+  "vulnerability_class": "path_traversal",
+  "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:H/I:N/A:N",
+  "cvss_score": 4.9,
+  "cwe": "CWE-22",
+  "auth_required": "administrator (smartslider_edit + unfiltered_html capabilities)",
+  "nonce_required": true,
+  "affected_file": "plugins/src/smart-slider-3/Nextend/SmartSlider3/Application/Admin/Sliders/ControllerAjaxSliders.php",
+  "affected_lines": "282-290",
+  "entry_point": "wp_ajax_smart-slider3 -> ControllerAjaxSliders::actionImport() via nextendcontroller=sliders&nextendaction=import",
+  "root_cause": "The 'local-import-file' POST parameter is used to construct a filesystem path without sanitization: $file = Platform::getPublicDirectory() . '/' . $data->get('local-import-file'). No basename() stripping or path prefix validation is applied. The UI widget (SelectFile) only lists .ss3 files in the uploads root, but the backend accepts arbitrary values. A path like '../../wp-config.php' resolves to the file outside the uploads directory.",
+  "exploitation": {
+    "requirement": "Must have admin/smartslider_edit access",
+    "steps": [
+      "1. Authenticate as a user with smartslider_edit + unfiltered_html capabilities (typically WordPress admin)",
+      "2. POST to /wp-admin/admin-ajax.php: action=smart-slider3&nextend_nonce=NONCE&nextendcontroller=sliders&nextendaction=import",
+      "   with slider[restore]=0&slider[local-import-file]=../../wp-config.php&slider[image-mode]=clone",
+      "3. Server attempts to open wp-config.php as a zip file (via Reader::read())",
+      "4. If not a valid zip, import fails with 'unzipping' error - file content not directly returned",
+      "5. For actual file read: attacker needs to place a valid .ss3-format zip at the target path, OR exploit error messages that may include file content"
+    ],
+    "notes": "Direct file content exposure is limited because ImportSlider::import() passes the file to a zip reader (Reader::read()) which fails on non-zip files. The primary risk is: (a) determining file existence/non-existence based on different error messages, (b) if a gadget chain exists in unserialize() (SS3-004), combining path traversal to load a crafted file from an accessible filesystem location."
+  },
+  "impact": "Low in isolation (requires admin). Path traversal outside uploads directory is confirmed. Direct content exfiltration is limited by the zip reader expectation. Combined with SS3-004 (unserialize), this could escalate: an admin-level attacker controlling a crafted zip at an accessible path could achieve RCE via PHP object injection.",
+  "remediation": {
+    "fix": "Sanitize the local-import-file parameter to prevent directory traversal:\n$_file = basename($data->get('local-import-file'));\n$file = Platform::getPublicDirectory() . '/' . $_file;\n$realFile = realpath($file);\n$realBase = realpath(Platform::getPublicDirectory());\nif (!$realFile || strpos($realFile, $realBase) !== 0) {\n    Notification::error('Invalid file path.');\n    $this->response->error();\n}"
+  }
+}

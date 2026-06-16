@@ -1,0 +1,75 @@
+{
+  "plugin": "kadence-starter-templates",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "security-agent",
+  "summary": {
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 3,
+    "notes": "All three taint flows reported by automated analysis are false positives. Every AJAX handler is gated behind check_ajax_referer + import/edit_theme_options capability (admin-level). All REST endpoints require manage_options. No unauthenticated (nopriv) AJAX handlers exist. Deserialization uses allowed_classes:false throughout."
+  },
+  "verdicts": [
+    {
+      "flow_id": "kadence-starter-templates-ssrf-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "vulnerability_class": "ssrf",
+      "rationale": "The subscribe_ajax_callback() is gated by Helpers::verify_ajax_call() which calls check_ajax_referer('kadence-ajax-verification','security') and then checks current_user_can('import') — an administrator-level capability. The $email parameter passes is_email() + FILTER_VALIDATE_EMAIL before use. Critically, the $email is appended as a URL-encoded query parameter to a hardcoded URL (https://www.kadencewp.com/kadence-blocks/wp-json/kadence-subscribe/v1/subscribe/) via add_query_arg(). There is no mechanism to alter the host or path of the target — add_query_arg() with a relative URL base encodes all args as key=value pairs. True SSRF requires attacker control over the destination host. Additionally, $selected_index (the only other untrusted input in $args) is sanitize_text_field()-treated and also encoded as a query parameter — no host/path injection possible. This is not exploitable SSRF.",
+      "auth_required": true,
+      "minimum_capability": "import",
+      "exploitable": false,
+      "taint_flow_analysis": {
+        "source": "$_POST['email'] (sanitize_text_field + is_email + FILTER_VALIDATE_EMAIL)",
+        "sink": "wp_remote_get($api_url)",
+        "host_controllable": false,
+        "path_controllable": false,
+        "explanation": "add_query_arg() appends args as URL-encoded query params to a fixed hardcoded HTTPS URL. No URL fragment, path segment, or host injection is possible."
+      }
+    },
+    {
+      "flow_id": "kadence-starter-templates-open-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "vulnerability_class": "open_redirect",
+      "rationale": "The export_data() function reads $charset = get_option('blog_charset') and places it in a Content-Type header. This requires (1) current_user_can('edit_theme_options') AND (2) a valid wp_verify_nonce for 'kadence-starter-exporting'. The blog_charset option is only writable by administrators. The sink (header injection into Content-Type charset field) cannot cause an HTTP redirect — the 'open_redirect' classification is incorrect. Even if an admin could set a malicious charset value, the exploit path requires admin-level compromise which is out-of-scope for most WordPress threat models. The nonce verification and capability check are both present. Not exploitable.",
+      "auth_required": true,
+      "minimum_capability": "edit_theme_options",
+      "exploitable": false,
+      "taint_flow_analysis": {
+        "source": "get_option('blog_charset') — admin-controlled database option",
+        "sink": "header('Content-Type: application/octet-stream; charset=' . $charset)",
+        "vulnerability_class_correct": false,
+        "correct_class_if_any": "header_injection (requires admin + valid nonce; negligible real-world impact)",
+        "explanation": "Content-Type charset manipulation cannot redirect a browser. The nonce 'kadence-starter-exporting' is verified before this code is reached."
+      }
+    },
+    {
+      "flow_id": "kadence-starter-templates-file-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_adjusted": "informational",
+      "confidence": "high",
+      "vulnerability_class": "file_inclusion",
+      "rationale": "The import_data() function is gated by current_user_can('edit_theme_options') AND wp_verify_nonce for 'kadence-starter-importing'. wp_handle_upload() is called with $overrides = array('test_form'=>false, 'test_type'=>false, 'mimes'=>array('dat'=>'text/plain')) — only .dat files are accepted. The $file['file'] value from wp_handle_upload() is a WordPress-sanitized path within the uploads directory. The subsequent unlink($file['file']) deletes the freshly uploaded temporary file — this is intentional cleanup after reading the file contents. 'file_inclusion' is a complete misnomer here; the code reads and deserializes the file (using unserialize with allowed_classes:false preventing object injection), then deletes it. An authenticated admin cannot use this to delete arbitrary files since wp_handle_upload() constructs the destination path internally. Not exploitable.",
+      "auth_required": true,
+      "minimum_capability": "edit_theme_options",
+      "exploitable": false,
+      "taint_flow_analysis": {
+        "source": "$_FILES['kadence-starter-import-file'] via wp_handle_upload()",
+        "sink": "unlink($file['file'])",
+        "vulnerability_class_correct": false,
+        "correct_class_if_any": "none — this is intentional file cleanup",
+        "explanation": "wp_handle_upload() controls destination path entirely; $file['file'] is in WP uploads dir. The unserialize uses allowed_classes:false preventing PHP object injection. Both nonce and capability checks pass before this code runs."
+      }
+    }
+  ],
+  "additional_findings": [],
+  "manual_review_notes": [
+    "No wp_ajax_nopriv_* handlers registered anywhere in the plugin — all AJAX requires authentication.",
+    "All REST API endpoints (Library_REST_Controller, Site_Assist_REST_Controller, Kadence_Starter_Templates_AI_Events) require manage_options or edit_posts capability.",
+    "The ajax_dismiss_starter_notice handler uses nonce action 'kadence-starter-ajax-verification' but the JS sends 'kadence-ajax-verification' — these are different nonce actions, so the nonce check always fails. The handler is effectively dead but the only action it would perform is setting an option to true (dismiss a notice) — negligible impact.",
+    "All unserialize() calls use array('allowed_classes'=>false) preventing PHP object injection deserialization attacks.",
+    "The sideload_image() function downloads external images from URLs found in serialized .dat import files, but the file upload requires edit_theme_options + valid nonce, so this is admin-only functionality.",
+    "The plugin handles sensitive operations (plugin install, content import, customizer reset) but all such operations are consistently gated behind capability checks and nonces."
+  ]
+}

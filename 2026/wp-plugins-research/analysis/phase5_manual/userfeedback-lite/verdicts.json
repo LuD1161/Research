@@ -1,0 +1,123 @@
+{
+  "plugin": "userfeedback-lite",
+  "review_date": "2026-06-16",
+  "reviewer": "opus-4.6-agent",
+  "total_findings_reviewed": 10,
+  "confirmed": 0,
+  "false_positive": 9,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "finding_id": "userfeedback-lite-xss-001",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The taint flow traces $_POST['key'] through sanitize_text_field(wp_unslash()) into add_query_arg() which builds a URL, then returned via wp_send_json_success(). The sink is a JSON response, not HTML output -- wp_send_json_success sets Content-Type: application/json, so XSS is not possible here. The data is also sanitized via sanitize_text_field. Furthermore, the handler is gated by check_ajax_referer('uf-admin-nonce') AND userfeedback_can_install_plugins() which requires admin-level capabilities.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "userfeedback-lite-xss-002",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The taint flow traces get_post_meta() value ($specific_survey) into a WordPress selected() function call in echo output. However, examining the actual code at line 204: the value is used inside selected($specific_survey, $survey['value'], false) which is a WordPress core function that outputs 'selected=\"selected\"' or empty string -- it compares the stored value against known survey IDs from the database. The value from $specific_survey is only compared, not directly echoed raw. The surrounding output uses esc_attr() and esc_html() on all other variables. The selected() function is safe as it only outputs a known attribute string. Additionally this is an admin-only metabox requiring nonce verification and post edit capabilities.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "userfeedback-lite-ssrf-001",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The wp_remote_post() call uses userfeedback_get_licensing_url() as the URL, which is a hardcoded function returning the plugin's licensing server URL -- the attacker cannot control the destination URL. The user-supplied email is sanitized via sanitize_email() and sent as POST body data to the fixed URL. This is not SSRF because the URL is not user-controlled. The handler also requires check_ajax_referer('uf-admin-nonce') for authenticated admin users.",
+      "vulnerability_class": "ssrf",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "userfeedback-lite-xss-003",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The handler userfeedback_validate_settings_blurb() reads user_meta and returns it via wp_send_json(). wp_send_json sets Content-Type: application/json -- XSS is not possible through JSON responses with proper content type. The value stored is a boolean (true) set by the dismiss handler. Additionally, this handler is registered only as wp_ajax_ (not wp_ajax_nopriv_), so it requires WordPress authentication. While there is no nonce check, the handler only reads current user's own metadata (get_user_meta with get_current_user_id()), making it a low-risk information disclosure at most (returning a boolean).",
+      "vulnerability_class": "xss",
+      "auth_required": "subscriber",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "userfeedback-lite-rce-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The taint flow flags usort() as an RCE sink, which is incorrect. usort() with a closure callback (as used here) is not a code execution vulnerability. The data being sorted comes from get_option() (the notification events stored in wp_options), and usort simply sorts the array by the 'priority' property. No user input reaches any shell execution or eval. The function is internal notification management logic with no direct user input path.",
+      "vulnerability_class": "rce",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "userfeedback-lite-xss-004",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The output uses wp_kses() for HTML filtering, absint() for the count value, and esc_attr(esc_url()) for the URL. All three substitution values are fully sanitized. absint() guarantees an integer, esc_url+esc_attr prevents URL-based XSS, and wp_kses restricts HTML tags. This is in the Action Scheduler library (third-party, well-audited), and the admin notice is only shown to admin users on the admin dashboard. No XSS is possible.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "userfeedback-lite-rce-002",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The taint flow flags array_map('absint', $_GET['ID']) as RCE. This is a well-known safe pattern -- array_map with 'absint' (a WordPress function that returns absolute integer value) is used to sanitize an array of IDs from GET input. 'absint' is a string callback name for a known safe function, not user-controlled. This is in the Action Scheduler admin list table which is admin-only with nonce verification.",
+      "vulnerability_class": "rce",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "userfeedback-lite-xss-005",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The echo implode() call outputs $status_list_items, but examining the sprintf that populates it: all values use esc_attr(), esc_url(), esc_html(), and absint() respectively. Every variable is properly escaped before being concatenated into the HTML string. This is in the Action Scheduler admin list table (third-party library, admin-only).",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "userfeedback-lite-rce-003",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The taint flow flags array_map(array($this, 'create_entry_from_db_record'), $records) as RCE. This is not RCE -- it is calling a method on the same object ($this) to transform database records into log entry objects. The callback is hardcoded as a method reference, not user-controlled. The data comes from $wpdb->prepare() with %d placeholder, so no SQL injection either. This is internal Action Scheduler logging.",
+      "vulnerability_class": "rce",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "userfeedback-lite-sqli-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The taint flow traces action IDs from a $wpdb->prepare() query result into an unprepared UPDATE query. However, the data source is trusted: $action_ids comes from $wpdb->get_col() with a prepared query returning integer IDs from the database. Before interpolation into the UPDATE query, the IDs are sanitized via array_map('absint', $action_ids), which casts every value to a non-negative integer. This is a defense-in-depth pattern -- even if the database contained unexpected data, absint() prevents injection. This is internal Action Scheduler claim release logic with no user-input path.",
+      "vulnerability_class": "sql_injection",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    }
+  ],
+  "summary": "All 10 taint flows from the static analysis are false positives. The scanner's primary errors were: (1) flagging JSON responses (wp_send_json) as XSS sinks -- JSON responses set Content-Type: application/json, preventing XSS; (2) misidentifying safe PHP functions like usort(), array_map('absint'), and array_map([$this, 'method']) as RCE sinks; (3) flagging data flows where proper sanitization (sanitize_text_field, sanitize_email, absint, esc_attr, esc_html, esc_url) was applied but not recognized by the scanner; (4) ignoring authentication/authorization gates (check_ajax_referer, current_user_can). One noteworthy finding NOT in the taint flows was manually identified: the perform_notification_action() REST endpoint (POST /userfeedback/v1/notifications/action) accepts a user-supplied class name and action, instantiating 'new $class()' and calling '$class_instance->perform_action_$action()'. While this is a dangerous pattern (arbitrary class instantiation), it requires userfeedback_create_edit_surveys or userfeedback_save_settings capability (admin by default), and the method prefix 'perform_action_' limits callable methods. For admin-level users this is acceptable risk, but could become exploitable if plugin permissions are relaxed to lower roles.",
+  "feedback": "The static analysis taint tracker has a very high false positive rate here (100%). Key improvements needed: (1) Recognize wp_send_json/wp_send_json_success/wp_send_json_error as safe sinks for XSS since they set JSON content type; (2) Do not flag usort(), array_map with hardcoded callbacks as RCE sinks; (3) Recognize absint(), sanitize_text_field(), sanitize_email() as effective sanitizers for their respective vulnerability classes; (4) Track authentication context from wp_ajax_ vs wp_ajax_nopriv_ hook registration and check_ajax_referer/current_user_can calls."
+}

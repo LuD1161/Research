@@ -1,0 +1,79 @@
+{
+  "plugin": "variation-swatches-woo",
+  "review_date": "2026-06-16",
+  "reviewer": "opus-4.6-agent",
+  "total_findings_reviewed": 6,
+  "confirmed": 0,
+  "false_positive": 6,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "finding_id": "variation-swatches-woo-xss-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The sink is `echo absint($product_id)` which outputs an integer. absint() strips all non-numeric characters and returns an unsigned integer. It is impossible to inject XSS through an integer value. The output appears in a data-product_id HTML attribute which is also safe.",
+      "vulnerability_class": "xss",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "variation-swatches-woo-xss-002",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $_POST['product_id'] is sanitized via absint() at line 727 producing an integer. The integer is passed to get_permalink() which returns a URL from the database, not user input. The result is sent via wp_send_json() which sets Content-Type: application/json, not text/html, so browser will not render it as HTML. Additionally, check_ajax_referer() is called at line 721 requiring a valid nonce.",
+      "vulnerability_class": "xss",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "variation-swatches-woo-xss-003",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The term meta value (cfvsw_image) is output using esc_url() in printf('<img ... src=\"%s\" ...>', esc_url($image_url)). esc_url() is the correct WordPress sanitizer for URL context in HTML attributes - it strips dangerous protocols (javascript:, data:) and encodes special characters. Additionally, this code runs in the admin taxonomy list table column, requiring admin authentication. The save path (save_term_fields in term-meta-config.php line 118) also applies esc_url_raw() before storing the value.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "variation-swatches-woo-xss-004",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $saved_image value is passed through intval() at line 366, producing an integer. This integer is then passed to wp_get_attachment_url() which looks up an attachment by ID in the database and returns its URL - not user-controlled content. The resulting URL is output via esc_url() at line 410. Three layers of protection: intval() on input, wp_get_attachment_url() database lookup, and esc_url() on output. This code also only runs in the WooCommerce admin product edit screen.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "variation-swatches-woo-xss-005",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The get_term_meta() value is output via esc_url() at line 178. esc_url() is the correct sanitizer for URL values in HTML src attributes. It prevents javascript: protocol injection and encodes special characters. The save path also sanitizes with esc_url_raw(). This code runs only on admin taxonomy edit pages requiring admin authentication.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "variation-swatches-woo-xss-006",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The sink expression is `echo (empty($value) ? 'display:none' : '')`. The $value variable is NEVER echoed to output. It is only used as a boolean test via empty(). The output is always one of two hardcoded strings: the literal 'display:none' or an empty string ''. No user-controlled data reaches the echo statement. This is a static output that cannot be influenced by any input.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    }
+  ],
+  "summary": "All 6 flagged taint flows are false positives. The plugin demonstrates generally good security practices: (1) The AJAX add-to-cart handler uses check_ajax_referer() and absint() on product_id. (2) Admin AJAX handlers (save/update/reset swatches, update settings) all use check_ajax_referer() and current_user_can('manage_woocommerce'). (3) Output escaping uses appropriate WordPress functions: esc_url() for URLs, esc_attr() for attributes, esc_html() for text content, absint() for integers. (4) Database operations use $wpdb->prepare(). (5) Input sanitization uses sanitize_text_field(), esc_url_raw(), absint(), intval(). One minor note: in filters_html() (swatches.php line 903), a term_meta image URL is concatenated into a CSS style string without esc_url(), but the entire style string is then wrapped in esc_attr() preventing HTML attribute breakout, and the stored value is sanitized via esc_url_raw() on save.",
+  "feedback": "The static taint analysis tool has a high false positive rate on this plugin because it does not recognize WordPress sanitization functions (absint, esc_url, esc_attr) as effective sanitizers. It also incorrectly flags empty() boolean checks as sinks when the tested variable is never output. The tool should learn to recognize: (1) absint()/intval() as complete XSS sanitizers for integer context, (2) esc_url() as a complete sanitizer for URL/src attributes, (3) empty($var) conditional expressions where $var itself is never echoed, (4) wp_send_json() as a JSON content-type response that doesn't render HTML."
+}

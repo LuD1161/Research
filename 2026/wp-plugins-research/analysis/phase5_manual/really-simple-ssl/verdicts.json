@@ -1,0 +1,200 @@
+{
+  "plugin": "really-simple-ssl",
+  "review_date": "2026-06-16",
+  "reviewer": "opus-4.6-agent",
+  "total_findings_reviewed": 17,
+  "confirmed": 1,
+  "false_positive": 15,
+  "needs_info": 1,
+  "verdicts": [
+    {
+      "finding_id": "really-simple-ssl-vari-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The parse_str() call at class-admin.php:793 is used inside is_settings_page() only to check if the 'page' query param equals 'really-simple-security'. The parsed $params array is local scope and only used for an array_key_exists check. No variables are injected into a broader scope (parse_str with a second argument captures into a local array, not into the current scope via extract). The result is a boolean return. No exploitation path exists.",
+      "vulnerability_class": "variable_injection",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "really-simple-ssl-open-001",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "At class-front-end.php:63, the redirect URL is constructed as 'https://' + HTTP_HOST + REQUEST_URI. This is the standard HTTP-to-HTTPS redirect pattern. The redirect always goes to the same host and URI, just changing the scheme to https. wp_redirect() does set the Location header, but since it hardcodes 'https://' as the scheme prefix, an attacker cannot redirect to an arbitrary external domain. HTTP_HOST is controlled by the browser request's Host header, which points to the site itself. The Host header can be spoofed, but the redirect only fires when is_ssl() is false, meaning you're already on the site. This is standard SSL redirect behavior, not an open redirect.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "really-simple-ssl-open-002",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same pattern as open-001. At class-front-end.php:85-87, the redirect forces HTTP to HTTPS using the same host and URI. The scheme is hardcoded to 'https://'. While there's an apply_filters on the URL, this is a plugin extensibility point, not user-controlled input. Standard SSL redirect pattern, not exploitable as an open redirect.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "really-simple-ssl-xss-001",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "At upgrade-to-pro.php:474, the license value from $_GET['license'] is sanitized with sanitize_title() which strips HTML tags and special characters, making XSS impossible. The output at line 482 is json_encode'd and sent with Content-Type: application/json header. JSON-encoded output with proper content type is not vulnerable to reflected XSS. Additionally, this endpoint requires rsssl_user_can_manage() (admin-level) and a valid nonce.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "really-simple-ssl-ssrf-001",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "At upgrade-to-pro.php:521, wp_remote_post() is called to $this->api_url (a hardcoded plugin property pointing to the Really Simple SSL API server), not to a user-controlled URL. The user-controlled $license value is passed as a POST body parameter, not as the URL. The URL target cannot be manipulated by user input. This is not SSRF - the destination URL is fixed. Requires admin auth + nonce.",
+      "vulnerability_class": "ssrf",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "really-simple-ssl-file-001",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "At upgrade-to-pro.php:564-569, the transient 'rsssl_upgrade_dir' is used in a rename() call. However: (1) The transient is set by the plugin itself during the upgrade process, not from user input. (2) The entire validate() function requires rsssl_user_can_manage() (admin-level auth). (3) The rename target ($default_dir) is derived from WP_CONTENT_DIR + plugin slug, which is fixed. An admin who can set arbitrary transients already has full site control.",
+      "vulnerability_class": "file_inclusion",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "really-simple-ssl-ssrf-002",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "At EmailService.php:93, wp_remote_post() is called to $this->uriConfig->getUrl('rsp.mailinglist'), which is a hardcoded configuration URL from the plugin's URI config, not user-controlled. The user-controlled email is passed as POST body data, properly sanitized with sanitize_email(). This is not SSRF - the target URL is a fixed plugin endpoint. The caller (OnboardingController) requires rsssl_user_can_manage() + nonce verification via the do_action REST route.",
+      "vulnerability_class": "ssrf",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "really-simple-ssl-sqli-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "At rename-admin-user.php:60, $wpdb->get_var() uses $wpdb->prepare() with a %s placeholder - this IS properly parameterized. At line 129, $wpdb->update() is used which internally uses prepare() for all values. The $user_hash value comes from the database itself (the existing password hash). The function rsssl_rename_admin_user() is gated by rsssl_user_can_manage() at the top (line 49). No SQL injection is possible here.",
+      "vulnerability_class": "sql_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "really-simple-ssl-obje-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "At rename-admin-user.php:141-143, unserialize() is called on data from $wpdb->get_var() which reads from the sitemeta table (meta_key = 'site_admins'). This is WordPress core's own serialized data stored in the database. An attacker would need to already have direct database write access to poison this value, at which point they already have full control. The function is also gated by rsssl_user_can_manage(). The is_serialized() check is applied before unserialize(). This is a standard WordPress pattern for reading serialized site options.",
+      "vulnerability_class": "object_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "really-simple-ssl-xss-002",
+      "original_severity": "medium",
+      "verdict": "CONFIRMED",
+      "confidence": "medium",
+      "reasoning": "At class-rsssl-two-factor-profile-settings.php:175-176, the start_email_validation_callback() retrieves the 2FA email token hash from user_meta (RSSSL_TOKEN_META_KEY) and returns it in a wp_send_json_success response. While the stored value is wp_hash($token) (not the plaintext token), this AJAX handler (wp_ajax_change_method_to_email) lacks nonce verification. Any authenticated user (subscriber+) can call this AJAX endpoint to trigger 2FA email generation for themselves. More critically, the response leaks the wp_hash() of the token back to the client. Since wp_hash() uses HMAC-MD5 with the site's NONCE_SALT, this is the exact same hash stored in user_meta that is later compared for verification. An attacker who captures this hash value from the AJAX response could potentially use it to bypass the 2FA email verification step if they can reverse the comparison logic. However, the validate_token() method re-hashes the user-supplied token with wp_hash() and compares, so knowing the hash alone doesn't bypass it. The real issue is: (1) missing nonce on authenticated AJAX, and (2) information disclosure of internal hash. Severity is low-medium.",
+      "vulnerability_class": "information_disclosure",
+      "auth_required": "subscriber",
+      "cvss_score": 4.3,
+      "poc_sketch": "1. Authenticate as any subscriber-level user\n2. POST to /wp-admin/admin-ajax.php?action=change_method_to_email\n3. Response contains the wp_hash() of the 2FA email token in JSON 'token' field\n4. This triggers an email to be sent to the user and leaks the stored hash\n5. No nonce required - any authenticated user can trigger this repeatedly"
+    },
+    {
+      "finding_id": "really-simple-ssl-rce-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "At trait-rsssl-two-fa-helper.php:140-141, preg_replace('/\\s+/', '', $code) is used to strip whitespace from a token. The scanner flagged this as RCE because preg_replace can be dangerous with the /e modifier, but this pattern uses NO /e modifier. Without /e, preg_replace simply performs string replacement and cannot execute code. The replacement string is a literal empty string. This is a safe sanitization operation.",
+      "vulnerability_class": "rce",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "really-simple-ssl-rce-002",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as rce-001. At class-rsssl-two-factor-provider.php:134, preg_replace('/\\s+/', '', $code) without /e modifier. This is a safe whitespace-stripping operation. No code execution is possible. The scanner incorrectly flagged preg_replace as an RCE sink, but it is only dangerous with the /e modifier (deprecated since PHP 7.0).",
+      "vulnerability_class": "rce",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "really-simple-ssl-rce-003",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same pattern as rce-001 and rce-002. At class-rsssl-email-controller.php:287, preg_replace('/\\s+/', '', $code) without /e modifier. Safe whitespace stripping. Not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "really-simple-ssl-rce-004",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "At class-mail-admin.php:55-56, preg_replace('/[^0-9]/', '', $verification_code) strips all non-numeric characters. No /e modifier. This is actually an excellent sanitization - the result can only contain digits [0-9]. Additionally, this handler requires a logged-in user (get_current_user_id()) and verifies a nonce. Not RCE.",
+      "vulnerability_class": "rce",
+      "auth_required": "subscriber",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "really-simple-ssl-file-002",
+      "original_severity": "high",
+      "verdict": "NEEDS_MORE_INFO",
+      "confidence": "medium",
+      "reasoning": "At class-letsencrypt-handler.php:1019-1024, file_get_contents() reads from a path stored in get_option('rsssl_certificate_path'). The option is set by the Let's Encrypt handler during certificate generation, not directly from user input. However, if an admin can control this option value (via the settings REST API), they could potentially read arbitrary files. The function cron_certificate_needs_renewal() is called from a WP cron context (lets-encrypt/cron.php:28), not directly from a REST endpoint. An admin who can set WordPress options already has significant control. The risk depends on whether 'rsssl_certificate_path' can be set via the plugin's settings UI/API. If only set programmatically during cert generation, this is a false positive. If settable via admin UI, it's admin-only arbitrary file read which is low severity.",
+      "vulnerability_class": "file_inclusion",
+      "auth_required": "admin",
+      "cvss_score": 2.7,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "really-simple-ssl-file-003",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "At class-letsencrypt-handler.php:1426, mkdir() uses get_option('rsssl_ssl_dirname') concatenated with ABSPATH. The option value is set by the plugin itself at line 1422 using str_shuffle(time()) - a random token generated by the plugin, not from user input. The option is only set if it doesn't exist yet. Even if an admin could somehow control this option, mkdir() with a manipulated path would at most create a directory - not read or execute files. The function is called as part of the Let's Encrypt certificate directory setup.",
+      "vulnerability_class": "file_inclusion",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "really-simple-ssl-ssrf-003",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "At httpsocket.php:246, $_SERVER['SESSION_ID'] and $_SERVER['SESSION_KEY'] are used in a curl cookie. This is a DirectAdmin integration library (HTTPSocket class v3.0.4). These $_SERVER variables are DirectAdmin server environment variables, not user-supplied HTTP request data. They are only set when running within a DirectAdmin control panel context. The curl request itself goes to $this->remote_host which is set programmatically by the Let's Encrypt handler, not from user input. This is a server-to-server integration, not an attack surface.",
+      "vulnerability_class": "ssrf",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    }
+  ],
+  "summary": "Of 17 scanner findings, 15 are false positives, 1 is confirmed as a low-severity information disclosure (missing nonce on 2FA AJAX handler that leaks token hash), and 1 needs more investigation. The scanner had a particularly high false positive rate here due to: (1) flagging preg_replace without /e as RCE (4 findings), (2) flagging wp_remote_post to hardcoded URLs as SSRF (3 findings), (3) flagging standard HTTP-to-HTTPS redirects as open redirects (2 findings), and (4) flagging database reads feeding back into database writes as SQLi/object injection. The only confirmed finding is the wp_ajax_change_method_to_email handler lacking nonce verification and leaking the 2FA token hash.",
+  "feedback": "The scanner needs significant improvements: (1) preg_replace should only be flagged as RCE when the /e modifier is present - all 4 RCE findings were FPs; (2) SSRF detection should check if the URL parameter to wp_remote_post/wp_remote_get is user-controlled, not just if any parameter contains user input; (3) HTTP-to-HTTPS redirects with hardcoded 'https://' scheme prefix should be excluded from open redirect detection; (4) Database read->database write flows where the data comes from trusted tables should not be flagged as SQLi without checking for user-controlled intermediate steps."
+}

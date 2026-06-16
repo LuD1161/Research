@@ -1,0 +1,61 @@
+{
+  "plugin": "white-label-cms",
+  "review_date": "2026-06-16",
+  "reviewer": "claude-sonnet-4-6",
+  "total_findings_reviewed": 4,
+  "confirmed": 0,
+  "false_positive": 4,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "flow_id": "white-label-cms-file-001",
+      "original_severity": "medium",
+      "original_class": "file_inclusion",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "title": "Unlink of PHP-controlled tmp_name — not attacker-controllable",
+      "reasoning": "The source is $_FILES['import_file']['tmp_name'], which is set by PHP itself during multipart upload processing. It always points to a server-side temporary file created by PHP; the client has no ability to supply an arbitrary path here. The import() function also requires is_wlcms_super_admin() (which checks current_user_can('manage_options')), is_admin(), and a verified nonce (wp_verify_nonce). Even if we imagine a contrived path, unlink() on a file chosen by PHP's upload machinery cannot be leveraged for arbitrary file deletion by an external attacker. The esc_attr() wrapping is cosmetically odd but does not introduce or remove a vulnerability.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "white-label-cms-xss-001",
+      "original_severity": "high",
+      "original_class": "xss",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "title": "AJAX search_pages — sanitized and JSON-encoded, admin-only",
+      "reasoning": "The handler is registered via wp_ajax_wlcms_search_pages (no wp_ajax_nopriv_ variant), so it is reachable only by authenticated WordPress users. The $_GET['q'] value is passed to wlcms_search_pages($q) which immediately calls wlcms_sanitize_text_field($q) → wp_kses_post($q) before using it in a WP_Query 's' (search) parameter. The return value is an array of post IDs and post titles retrieved from the database and then passed to wp_send_json(), which calls json_encode() — this encoding context makes XSS impossible regardless of the content. There is no unescaped HTML reflection of the raw input.",
+      "auth_required": true,
+      "nonce_verified": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "white-label-cms-obje-001",
+      "original_severity": "critical",
+      "original_class": "object_injection",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "title": "maybe_unserialize on _wlcms_messages — only hardcoded strings are ever stored",
+      "reasoning": "maybe_unserialize() is used when reading the _wlcms_messages option. For PHP object injection to be a concern, an attacker must first write a serialized payload containing a malicious object into that option. The only write path is WLCMS_Messages::queue(), which stores $messages[$class][] = $message into the DB. Every call site passes a hardcoded string literal as $message (e.g., 'Settings saved.', 'Sorry, your nonce did not verify.'). No user-controlled input ever reaches the $message parameter. The data stored is always a plain PHP string-keyed array of string values; when WordPress serializes and then maybe_unserialize() deserializes it, there are no objects. This is a scanner false positive caused by flagging any maybe_unserialize(get_option(...)) pattern without tracing the write side.",
+      "auth_required": false,
+      "nonce_verified": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "white-label-cms-obje-002",
+      "original_severity": "critical",
+      "original_class": "object_injection",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "title": "maybe_unserialize on _wlcms_messages (show path) — same analysis as obje-001",
+      "reasoning": "This is the read path in WLCMS_Messages::show(), reading the same _wlcms_messages option that is analyzed in obje-001. The write side is exclusively WLCMS_Messages::queue() with hardcoded string messages. There is no attacker-controlled path to influence the serialized content. Additionally, even if the stored value contained attacker-controlled data (which it cannot through normal plugin operation), PHP object injection requires a suitable gadget chain in the application, and the Messages class and its consumers are simple string display utilities with no such gadgets. False positive by identical reasoning to obje-001.",
+      "auth_required": false,
+      "nonce_verified": false,
+      "exploitable": false
+    }
+  ],
+  "summary": "All 4 automated taint findings are false positives. The plugin implements proper authentication (manage_options capability checks via is_wlcms_super_admin()), nonce verification for destructive operations, and sanitization of user input before use. The file-001 finding misidentifies a PHP-controlled upload tmp_name as attacker-controllable. The xss-001 finding overlooks both the admin-only AJAX registration and the wp_kses_post sanitization + JSON encoding context. The two object injection findings (obje-001, obje-002) are pure scanner false positives: they flag the maybe_unserialize(get_option()) read path without verifying that the only write path stores exclusively hardcoded string literals, making injection impossible.",
+  "feedback": "The scanner correctly identified the maybe_unserialize pattern as a category of interest but lacked write-side taint analysis, producing two critical-rated FPs. For the XSS finding, the scanner did not model wp_ajax_* (authenticated) vs wp_ajax_nopriv_* and incorrectly classified wp_send_json() as a raw XSS sink without accounting for JSON encoding. Future taint passes should model: (1) $_FILES['tmp_name'] as a PHP-controlled source that is not attacker-injectable as an arbitrary path; (2) JSON encoding as an XSS-safe output context; (3) bidirectional option taint tracing (both write and read sides before flagging object injection)."
+}

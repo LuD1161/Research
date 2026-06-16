@@ -1,0 +1,90 @@
+{
+  "plugin": "aryo-activity-log",
+  "review_date": "2026-06-16",
+  "reviewer": "opus-4.6-agent",
+  "total_findings_reviewed": 7,
+  "confirmed": 0,
+  "false_positive": 7,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "finding_id": "aryo-activity-log-xss-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $_REQUEST['dateshow'] value is only passed to WordPress core selected() function, which compares it against $key and returns either ' selected=\"selected\"' or empty string. The $key and $value variables in the printf come from a hardcoded $date_options array (empty string, 'today', 'yesterday', 'week', 'month'), NOT from user input. Additionally, this code only executes on admin pages requiring 'edit_pages' capability. No user-controlled data reaches the HTML output.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "aryo-activity-log-xss-002",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same pattern as xss-001. The $_REQUEST['capshow'] is only passed to selected() for comparison. The $key values come from $this->_get_allow_caps() which returns role names from the hardcoded $this->_caps array (administrator, editor, author, guest, plus WP role slugs). The $value comes from __( ucwords( $cap ) ) translation calls. No user-controlled data reaches HTML output. Admin page requires 'edit_pages' capability.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "aryo-activity-log-xss-003",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same pattern. $_REQUEST['usershow'] goes only to selected(). The $key is $user->ID (integer) and $value is $user->user_nicename from the WordPress users table. These values are set by WordPress core during user registration and are sanitized. No direct user input reaches HTML output. Admin page requires 'edit_pages' capability.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "aryo-activity-log-xss-004",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same pattern. $_REQUEST['typeshow'] goes only to selected(). The $object_type values come from a database query (SELECT DISTINCT object_type FROM activity_log). These are set by the plugin's own insert() method using hardcoded strings like 'Posts', 'Users', 'Core', etc. from hook classes. The values are not user-controlled. The __() translation call provides additional indirection. Admin page requires 'edit_pages' capability.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "aryo-activity-log-xss-005",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same pattern. $_REQUEST['showaction'] goes only to selected(). The $action->action values come from a database query (SELECT DISTINCT action FROM activity_log). These actions are set by the plugin's hook classes using hardcoded strings like 'created', 'updated', 'deleted', etc. Not user-controlled. Admin page requires 'edit_pages' capability.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "aryo-activity-log-xss-006",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The ajax_aal_get_properties handler requires 'manage_options' capability (admin-only). While it lacks a nonce check (CSRF concern), the $action_category from $_REQUEST goes to get_settings_dropdown_values() which uses it in a switch statement matching hardcoded strings ('user', 'action-type', 'action-value'). Non-matching values fall to a filter default that returns empty array. The output is sent via wp_send_json_success() which sets Content-Type: application/json, preventing XSS. The missing nonce is a minor CSRF issue but has no security impact since the endpoint only reads data (no state modification) and returns JSON.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "aryo-activity-log-xss-007",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The echo uses absint($args['rows']) which casts to a non-negative integer. absint() is a complete sanitizer for XSS in this context - it strips all non-numeric characters. Additionally, $args['rows'] comes from the settings field configuration array which is hardcoded by the plugin, not from user input. The 'rows' value is set to 5 as a default in textarea_field() (line 441). Admin settings page requires 'manage_options' capability.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    }
+  ],
+  "summary": "All 7 taint flow findings are false positives. The plugin's filter dropdowns (xss-001 through xss-005) use a common pattern where $_REQUEST values are only passed to WordPress core selected() function for comparison, while the actual HTML output values come from hardcoded arrays or trusted database queries. The AJAX handler (xss-006) requires manage_options and returns JSON. The textarea rows (xss-007) uses absint() sanitization. All affected pages require admin-level authentication. No confirmed vulnerabilities found.",
+  "feedback": "The static analysis flagged selected() calls as taint sinks, but selected() is a comparison function that outputs a fixed string - it does not echo user input. The taint analysis engine should model WordPress core functions like selected(), checked(), and disabled() as sanitizers/comparators rather than sinks. All 7 findings share this fundamental misunderstanding of the selected() function's behavior."
+}

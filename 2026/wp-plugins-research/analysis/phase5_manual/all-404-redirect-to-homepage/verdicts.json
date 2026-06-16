@@ -1,0 +1,211 @@
+{
+  "plugin": "all-404-redirect-to-homepage",
+  "review_date": "2026-06-16",
+  "reviewer": "opus-4.6-agent",
+  "total_findings_reviewed": 18,
+  "confirmed": 0,
+  "false_positive": 18,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "finding_id": "all-404-redirect-to-homepage-sqli-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The source is $wpdb->get_row($wpdb->prepare(...)) which returns database-stored data previously inserted via WordPress APIs. The sink is $wpdb->update() which uses WordPress's internal parameterized query mechanism (column => value array format). The data being updated ($existing->count + 1 and $existing->id) are integer values from the database row. The entire flow is within migrate_redirected_links() which processes admin-stored option data from get_option(), not user input. No SQL injection is possible.",
+      "vulnerability_class": "sql_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "all-404-redirect-to-homepage-rce-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The 'sink' is preg_replace('/:\\d+$/', '', $request_host) which uses a hardcoded regex pattern without the /e modifier. preg_replace with a fixed pattern is NOT a command execution sink -- it is a string manipulation function. The /e modifier (which would evaluate replacement as PHP code) is not used and was removed from PHP 7.0+. Additionally, the input passes through sanitize_text_field() and strtolower(), and the result is validated against an allowlist of allowed hosts (line 502). If validation fails, the function returns home_url() as a safe fallback.",
+      "vulnerability_class": "rce",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "all-404-redirect-to-homepage-sqli-002",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The source is $wpdb->get_row($wpdb->prepare(...)) with properly parameterized placeholders (%s for all user-derived values). The sink is $wpdb->update() with explicit format arrays: array('%d', '%s') for data columns and array('%d') for the WHERE clause. WordPress's $wpdb->update() internally uses $wpdb->prepare() when format arrays are provided, making this fully parameterized. The values being used ($recent_entry->count + 1, current_time('mysql'), $recent_entry->id) are all safe types.",
+      "vulnerability_class": "sql_injection",
+      "auth_required": "none",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "all-404-redirect-to-homepage-xss-001",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The input passes through sanitize_email() which strips all characters except letters, digits, @, ., +, !, #, $, %, &, ', *, -, /, =, ?, ^, _, `, {, |, }, ~ -- no HTML special characters can survive. The output goes through wp_send_json_success() which sets Content-Type: application/json and JSON-encodes the response, preventing HTML rendering. The handler also requires manage_options capability and valid nonce, limiting access to admins only.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "all-404-redirect-to-homepage-open-001",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $redirect_type value comes from get_option() (admin-stored database setting) and is cast through intval(), producing a pure integer. An integer injected into 'HTTP/1.1 $redirect_type Moved Permanently' cannot cause header injection or open redirect. The Location header uses $options['p404_redirect_to'] which is also an admin-configured database option, not user-controlled input. Only administrators can set these values through the settings page (protected by manage_options capability check and nonce).",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "all-404-redirect-to-homepage-open-002",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Identical to open-001. Same code path for the else branch (non-media 404s). Same intval() cast on admin-stored option, same admin-controlled Location header value.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "all-404-redirect-to-homepage-xss-002",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The source is absint() on an admin-stored option (returns unsigned integer). wp_get_attachment_image_src() returns WordPress-controlled attachment URLs from the database. The output uses esc_url() which properly sanitizes URLs for HTML context. Triple protection: integer cast on input, WP-controlled data source, and esc_url() on output. Admin page also requires manage_options capability.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "all-404-redirect-to-homepage-xss-003",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $_GET['orderby'] value passes through sanitize_text_field() and is then validated against an allowlist at line 116 of option_page.php: $allowed_columns = ['last_redirected', 'url', 'count']. If the value is not in the allowlist, it defaults to 'last_redirected'. The validated value is passed to get_column_sort_url() which builds a URL, and the output uses esc_url(). The allowlist validation completely neutralizes any injection. The page also requires manage_options capability.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "all-404-redirect-to-homepage-xss-004",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as xss-003. The orderby parameter is allowlist-validated and the output uses esc_url(). Different column name ('url' vs 'last_redirected') but same safe pattern.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "all-404-redirect-to-homepage-xss-005",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as xss-003. The orderby parameter is allowlist-validated and the output uses esc_url(). Different column name ('count') but same safe pattern.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "all-404-redirect-to-homepage-xss-006",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $_GET['paged'] value is cast through intval() which returns a pure integer. The echo outputs the result of integer arithmetic: (($current_page - 1) * $per_page) + 1. Integer arithmetic on integers always produces an integer, which cannot contain HTML special characters. No XSS is possible.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "all-404-redirect-to-homepage-xss-007",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as xss-006. echo min($current_page * $per_page, $pagination_data['total']) -- min() of two integers returns an integer. $pagination_data['total'] is cast to (int) at line 143. No XSS possible.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "all-404-redirect-to-homepage-xss-008",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "echo $pagination_data['total'] where 'total' is cast to (int) at line 143 of option_page.php: return array('total' => (int)$total_items, ...). Pure integer output, no XSS possible.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "all-404-redirect-to-homepage-xss-009",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "echo $prev_page where $prev_page = $current_page - 1 and $current_page = intval($_GET['paged']). Integer minus integer is an integer. No XSS possible.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "all-404-redirect-to-homepage-xss-010",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "echo in button onclick: goToPage($i) where $i iterates from $start_page (derived from max(1, $current_page - 2)) to $end_page. All values are results of integer arithmetic on intval()-cast input. $class is derived from comparing integers. No user-controlled string data reaches the output.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "all-404-redirect-to-homepage-xss-011",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "echo $next_page where $next_page = $current_page + 1 and $current_page = intval($_GET['paged']). Integer plus integer is an integer. No XSS possible.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "all-404-redirect-to-homepage-xss-012",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "echo $pagination_data['pages'] where 'pages' is computed as ceil($total_items / $per_page) -- ceil() returns a float/int from integer division. No string data, no XSS possible.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "all-404-redirect-to-homepage-xss-013",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "wp_get_attachment_image_src(absint($_POST['misha-img'])) returns WP-controlled attachment data. Output uses esc_url($image_url). The input is cast to unsigned integer via absint(), the data comes from WordPress's attachment system, and the output is properly escaped. No XSS possible.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    }
+  ],
+  "summary": "All 18 flagged taint flows are false positives. The plugin demonstrates generally sound security practices: proper use of $wpdb->prepare() for database queries, intval()/absint() casting for numeric inputs, sanitize_text_field()/sanitize_email() for string inputs, esc_url()/esc_attr()/esc_html() for outputs, allowlist validation for ORDER BY columns, nonce verification and capability checks on sensitive operations, and wp_ajax_ (not wp_ajax_nopriv_) for AJAX handlers. Two minor AJAX handlers (P404REDIRECT_HideMsg, P404REDIRECT_HideAlert) lack nonce verification and capability checks but are auth-only and have negligible impact (setting hardcoded dismiss flags). No confirmed exploitable vulnerabilities were found.",
+  "feedback": "The automated scanner produced 100% false positives for this plugin. Key issues: (1) preg_replace with a hardcoded pattern was flagged as RCE -- the scanner should check for the /e modifier before flagging; (2) $wpdb->get_row() results used in $wpdb->update() with format arrays were flagged as SQLi -- the scanner should recognize WordPress's parameterized update/insert methods; (3) intval()-cast values echoed after arithmetic were flagged as XSS -- the scanner should track type narrowing through integer casts; (4) sanitize_email() output in wp_send_json_success() was flagged as XSS -- the scanner should recognize JSON responses as non-HTML contexts; (5) admin-stored options (get_option) were treated as user-controlled input -- the scanner should distinguish between options that require manage_options to set vs. direct user input."
+}

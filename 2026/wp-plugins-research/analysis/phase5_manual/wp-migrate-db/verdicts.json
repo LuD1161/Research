@@ -1,0 +1,90 @@
+{
+  "plugin": "wp-migrate-db",
+  "review_date": "2026-06-16",
+  "reviewer": "opus-4.6-agent",
+  "total_findings_reviewed": 7,
+  "confirmed": 0,
+  "false_positive": 7,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "finding_id": "wp-migrate-db-rce-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The source is get_site_option('wpmdb_saved_profiles'), which reads from the WordPress options table. This is not user-controlled input - it is data that was previously saved by an authenticated admin via the save_profile() function. The sink is array_map() which merely restructures the array - it does not execute commands, include files, or perform any dangerous operation. array_map with an inline closure that extracts keys is not an RCE vector. The data flows from database to a JSON response for the admin UI. No shell execution, no eval, no unserialize.",
+      "vulnerability_class": "rce",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-migrate-db-open-001",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The download_file() function is called from load_assets() which is hooked via add_action('load-' . $hook_suffix, ...) from add_management_page(). This means it only runs on the plugin's admin page, requiring 'export' capability (admin-level). Additionally, http_verify_download() checks current_user_can() for 'export' or 'manage_network_options' AND verifies a nonce. The header('Content-Length: ' . $filesize) sink only outputs the integer filesize of a file - this is not an open redirect. The path is also validated with basename(), realpath(), and a directory prefix check.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-migrate-db-open-002",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same auth context as open-001 - requires admin capability + nonce. The Content-Disposition header sets a download filename, which is not an open redirect vector. The filename is derived from basename() of a file that has already been validated to exist within the upload directory via realpath() check. An attacker cannot reach this code without admin access and a valid nonce.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-migrate-db-file-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The readfile($diskfile) call is protected by multiple layers: (1) admin capability check via current_user_can('export'), (2) nonce verification via wp_verify_nonce(), (3) basename() strips path traversal characters, (4) realpath() resolves symlinks and validates the file exists, (5) strpos() check ensures the resolved path starts with the upload directory path. An admin who already has 'export' capability can already export the database, so reading files from the plugin's own upload directory is not a privilege escalation. The path traversal is fully mitigated by basename() + realpath() validation.",
+      "vulnerability_class": "file_inclusion",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-migrate-db-file-002",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same protection as file-001. The unlink($diskfile) call is reached only after the same admin auth + nonce + basename() + realpath() + directory prefix validation chain. The file deletion is intentional behavior - after downloading an export, the plugin cleans up the temporary file. Only files within the plugin's upload directory can be affected, and only by authenticated admins with valid nonces.",
+      "vulnerability_class": "file_inclusion",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-migrate-db-xss-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The save_profile() function is registered as a REST API callback via registerRestRoute(), which automatically adds a permission_callback requiring 'export' capability (admin-level). The sink is wp_send_json_success() which outputs a JSON response with Content-Type: application/json - XSS is not possible in JSON responses as browsers do not render them as HTML. The data flowing from get_site_option('wpmdb_recent_migrations') is admin-stored data being returned to the admin in a JSON API response. The 'auth_required: false' in the brief is incorrect - all REST routes go through WPMDBRestAPIServer::registerRestRoute() which always sets permission_callback.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wp-migrate-db-open-003",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The http_prepare_download_log() function checks wp_verify_nonce($_GET['nonce'], 'wpmdb-download-log') before proceeding. The source data ($url['host']) comes from Util::parse_url(home_url()), which parses the site's own URL - this is server-controlled data, not user input. The hostname is further passed through sanitize_file_name(). A Content-Disposition header with a sanitized filename derived from the site's own hostname is not an open redirect. The nonce check also means this requires admin authentication.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    }
+  ],
+  "summary": "All 7 taint flow findings are false positives. The plugin has solid security practices: (1) All REST API routes go through WPMDBRestAPIServer::registerRestRoute() which enforces a permission_callback requiring 'export' or 'manage_network_options' capability. (2) The download_file() function is only reachable from admin page load hooks with capability + nonce checks, plus path traversal is fully mitigated by basename() + realpath() + directory prefix validation. (3) AJAX handlers use check_ajax_referer() for nonce verification. (4) Data sources flagged as 'taint sources' are either database-stored admin data or server-derived values (home_url()), not attacker-controlled input. The automated scanner incorrectly labeled auth_required as false for several flows because it didn't trace the hook registration chain back to the admin page capability requirements.",
+  "feedback": "The scanner's main weaknesses here: (1) It cannot trace WordPress hook chains - load_assets() is hooked via add_action('load-' . $hook_suffix, ...) from add_management_page(), which implies admin auth, but the scanner sees no explicit current_user_can() in the function. (2) It treats get_site_option() as a taint source, but this is admin-stored data, not user input. (3) It classifies array_map() as an RCE sink, which is never correct. (4) It classifies Content-Length and Content-Disposition headers as 'open redirect' sinks, but these headers cannot cause redirects. (5) wp_send_json_success() outputs JSON with proper content-type, making XSS impossible."
+}

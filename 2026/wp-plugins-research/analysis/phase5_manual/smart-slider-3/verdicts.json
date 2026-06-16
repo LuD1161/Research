@@ -1,0 +1,91 @@
+{
+  "plugin_slug": "smart-slider-3",
+  "review_date": "2026-06-16",
+  "reviewer": "claude-manual-review",
+  "verdicts": [
+    {
+      "finding_id": "SS3-001",
+      "title": "Taint flow: XSS via widget DB value echoed as slider HTML - FALSE POSITIVE (intentional slider rendering)",
+      "original_flow_ids": ["smart-slider-3-xss-001"],
+      "verdict": "false_positive",
+      "severity": "informational",
+      "vulnerability_class": "xss",
+      "cvss_estimate": "N/A",
+      "attack_vector": "The taint analyzer marked $wpdb->get_var() (returning an integer slider ID from the DB) as a taint source, then flagged echo $slider (line 76) as the sink. In practice, $instance['slider'] is used only as a shortcode parameter to do_shortcode('[smartslider3 slider=' . $instance['slider'] . ']'). The return value $slider is the fully-rendered HTML output produced by the SliderManager/Shortcode::render() pipeline - it is intentionally unescaped HTML that the plugin generates internally (marked with phpcs:ignore and comment 'Content already escaped'). The integer slider ID itself cannot introduce XSS; the rendered HTML is plugin-generated, not user-controlled. Furthermore, even if $instance['slider'] were non-integer (e.g. an alias string), it is stored in the widget instance via the update() method which sanitizes through the WordPress widget save flow. This is a design pattern false positive: DB-fetched integer fed into do_shortcode then rendered as HTML.",
+      "auth_required": "admin (to create widget)",
+      "affected_file": "plugins/src/smart-slider-3/Nextend/SmartSlider3/Platform/WordPress/Widget/WidgetSmartSlider3.php",
+      "affected_lines": "63-76",
+      "evidence": "$instance['slider'] = $wpdb->get_var('SELECT id FROM ... WHERE slider_status = \\'published\\' LIMIT 0,1'); // returns integer\n$slider = do_shortcode('[smartslider3 slider=' . $instance['slider'] . ']'); // integer, not attacker-controlled\necho $slider; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped - plugin-generated HTML",
+      "remediation": "N/A - not a vulnerability. The phpcs:ignore comment is appropriate."
+    },
+    {
+      "finding_id": "SS3-002",
+      "title": "AJAX actionList exposes published slider metadata to any authenticated user (missing permission check)",
+      "original_flow_ids": [],
+      "verdict": "confirmed",
+      "severity": "low",
+      "vulnerability_class": "auth_bypass",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:N/A:N (4.3)",
+      "attack_vector": "The wp_ajax_smart-slider3 handler (AdminHelper.php:35-38) routes all logged-in users through display_admin_ajax() (line 155-158) which calls processRequest('sliders', 'index', true) with NO capability check before dispatch. When nextendcontroller=sliders&nextendaction=list is posted with a valid nextend_security nonce (which any authenticated user can generate via wp_create_nonce), the ControllerAjaxSliders::actionList() method (line 26-56) executes with only validateToken() - no validatePermission() call. It returns a JSON array of all published sliders including their IDs, aliases, titles, thumbnail paths, and child counts. Any WordPress subscriber-level user can enumerate this data. Note: the data returned (published slider IDs/titles) is also exposed publicly via shortcodes on the frontend, so impact is low. However, thumbnail internal paths and aliases could assist further reconnaissance.",
+      "auth_required": "subscriber (any authenticated user)",
+      "affected_file": "plugins/src/smart-slider-3/Nextend/SmartSlider3/Application/Admin/Sliders/ControllerAjaxSliders.php",
+      "affected_lines": "26-56",
+      "evidence": "// AdminHelper.php - no cap check before routing:\npublic function display_admin_ajax() {\n    $this->display_controller('sliders', 'index', true); // no current_user_can() check\n}\n\n// ControllerAjaxSliders.php - missing validatePermission:\npublic function actionList() {\n    $this->validateToken();  // only nonce check - any logged-in user passes\n    // MISSING: $this->validatePermission('smartslider_config');\n    $sliders = $slidersModel->getAll($parentID, 'published', ...);\n    $this->response->respond($data); // returns slider IDs, titles, aliases, thumbnails\n}\n\n// PoC HTTP request:\n// POST /wp-admin/admin-ajax.php\n// action=smart-slider3&nextend_nonce=<wp_create_nonce('nextend_security')>&nextendcontroller=sliders&nextendaction=list&parentID=0",
+      "remediation": "Add $this->validatePermission('smartslider_config'); at the start of actionList(), consistent with the other methods in ControllerAjaxSliders. Alternatively, add a current_user_can() check in display_admin_ajax() before routing."
+    },
+    {
+      "finding_id": "SS3-003",
+      "title": "Local import file path not validated - path traversal to read arbitrary files as admin",
+      "original_flow_ids": [],
+      "verdict": "confirmed",
+      "severity": "low",
+      "vulnerability_class": "path_traversal",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:H/I:N/A:N (4.9)",
+      "attack_vector": "In ControllerAjaxSliders::actionImport() (lines 282-288), the 'local-import-file' POST parameter is read directly from user input ($data->get('local-import-file')) and concatenated with the uploads base directory without any path sanitization: $file = Platform::getPublicDirectory() . '/' . $_file. An attacker-controlled value like '../../wp-config.php' would resolve to a file outside the uploads directory. Filesystem::fileexists() checks file existence, and if true, the file is passed to ImportSlider::import() which calls Reader::read() (a zip reader). If the file is not a valid zip, it returns non-array and import fails gracefully. However, a specially crafted file elsewhere on the filesystem could be read. This requires the 'smartslider_edit' capability AND 'unfiltered_html' capability (enforced by WordPressAcl::authorise()). These are typically only available to admins, making this low-severity (admin-to-admin). The UI only lists .ss3 files in the uploads root via SelectFile, but the POST value is not restricted to that list.",
+      "auth_required": "administrator (requires smartslider_edit + unfiltered_html capabilities)",
+      "affected_file": "plugins/src/smart-slider-3/Nextend/SmartSlider3/Application/Admin/Sliders/ControllerAjaxSliders.php",
+      "affected_lines": "282-290",
+      "evidence": "$_file = $data->get('local-import-file'); // raw user input, not validated against SelectFile list\nif (!empty($_file)) {\n    $file = Platform::getPublicDirectory() . '/' . $_file; // no path sanitization, allows ../\n}\nif (Filesystem::fileexists($file)) {\n    $import = new ImportSlider($this);\n    $sliderId = $import->import($file, $groupID, ...); // file is opened and parsed\n}",
+      "remediation": "Sanitize the local-import-file value to only allow filenames (not paths) from the uploads directory: use basename() and verify the resolved path starts with Platform::getPublicDirectory(). Example: $_file = basename($data->get('local-import-file')); and verify with strpos(realpath($file), $uploadsDir) === 0."
+    },
+    {
+      "finding_id": "SS3-004",
+      "title": "unserialize() on imported slider data - PHP object injection - admin-only, but dangerous pattern",
+      "original_flow_ids": [],
+      "verdict": "confirmed",
+      "severity": "medium",
+      "vulnerability_class": "deserialization",
+      "cvss_estimate": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:H/I:H/A:H (7.2) - if POP chain exists",
+      "attack_vector": "ImportSlider::import() at line 81 calls unserialize($importData['data']) on data read from an uploaded .ss3 file (which is a zip archive). The data is only validated by a custom Serialize\\Parser::isValidData() check at line 77 before unserialize() is called. PHP object injection via unserialize() with a suitable POP (Property-Oriented Programming) chain in any loaded class could lead to arbitrary code execution. The validator (Serialize\\Parser) may not be sufficient to prevent all gadget chains. This is gated by the 'smartslider_edit' + 'unfiltered_html' capability requirements, restricting it to admins. Additionally, for admin users with access to the import feature, an attacker who can trick an admin into importing a crafted .ss3 file could achieve RCE. This is a class of vulnerability frequently patched in WP plugins (CVE references exist for similar patterns).",
+      "auth_required": "administrator (requires smartslider_edit + unfiltered_html capabilities - must upload or trick admin to import malicious .ss3 file)",
+      "affected_file": "plugins/src/smart-slider-3/Nextend/SmartSlider3/BackupSlider/ImportSlider.php",
+      "affected_lines": "77-81",
+      "evidence": "$parser = new Serialize\\Parser;\nif (!$parser->isValidData($importData['data'])) {\n    return false;\n}\n$this->backup = unserialize($importData['data']); // PHP object injection risk if POP chain exists",
+      "remediation": "Replace unserialize() with json_decode() or another safe deserialization method. If serialized PHP objects are required for the backup format, use a strict allowlist of permitted classes via unserialize()'s $allowed_classes parameter: unserialize($data, ['allowed_classes' => [BackupData::class, ...]]) to prevent arbitrary class instantiation."
+    },
+    {
+      "finding_id": "SS3-005",
+      "title": "Stored XSS via slider parameters in admin editing - by-design unfiltered_html requirement",
+      "original_flow_ids": [],
+      "verdict": "false_positive",
+      "severity": "informational",
+      "vulnerability_class": "xss",
+      "cvss_estimate": "N/A",
+      "attack_vector": "The plugin intentionally requires 'unfiltered_html' capability for all admin operations (WordPressAcl::authorise() checks current_user_can('unfiltered_html')). This means any user who can create/edit sliders already has the ability to inject arbitrary HTML/JS through other WordPress mechanisms. The plugin's checkForCap() method (AdminHelper.php:114-125) explicitly documents this: 'Smart Slider allows you to place many things on your slider, so only users with the unfiltered_html capability can have access to it.' This is a documented design decision, not a vulnerability.",
+      "auth_required": "administrator",
+      "affected_file": "plugins/src/smart-slider-3/Nextend/SmartSlider3/Platform/WordPress/Admin/AdminHelper.php",
+      "affected_lines": "114-125",
+      "evidence": "public function checkForCap() {\n    if (!current_user_can('unfiltered_html')) {\n        wp_die('...only users with the unfiltered_html capability can have access to it...');\n    }\n}",
+      "remediation": "N/A - by design. The plugin correctly gates all admin functionality behind unfiltered_html."
+    }
+  ],
+  "summary": {
+    "total_findings": 5,
+    "confirmed": 3,
+    "false_positives": 2,
+    "critical": 0,
+    "high": 0,
+    "medium": 1,
+    "low": 2
+  }
+}

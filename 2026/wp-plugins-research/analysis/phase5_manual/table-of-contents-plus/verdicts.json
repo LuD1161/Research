@@ -1,0 +1,54 @@
+{
+  "plugin": "table-of-contents-plus",
+  "reviewed_by": "manual-phase5",
+  "review_date": "2026-06-16",
+  "verdicts": [
+    {
+      "flow_id": "table-of-contents-plus-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The taint tracer flagged $_GET['page'] flowing into echo esc_url('?page=' . $page . '&update') at line 745. However, two separate sanitizers are applied: (1) sanitize_text_field(wp_unslash($_GET['page'])) at input (line 728), and (2) esc_url() at output (line 745). esc_url() is precisely the correct escaping function for URL contexts in HTML href attributes — it strips anything that is not a valid URL character, including angle brackets, quotes, and JavaScript scheme characters. This is correct, idiomatic WordPress escaping for a URL attribute context. No XSS is possible.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    },
+    {
+      "flow_id": "table-of-contents-plus-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The taint analyzer incorrectly chained two unrelated variables across the options array. The flagged source is $custom_background_colour (line 622), which is processed through hex_value() — a function that strips all non-hex characters via preg_replace('/[^a-fA-F0-9]*/', '', $input) and then prepends '#'. The output can only ever be '#' followed by 3 or 6 hex digits. The flagged sink is echo intval($this->options['smooth_scroll_offset']) at line 1095, which is a completely different option. The taint propagation through the array_merge at line 673 caused the analyzer to treat all merged values as sharing the same taint label, but the actual sink operates on smooth_scroll_offset (saved via intval() at line 647), not on any color value. The flow is logically incoherent and represents a false positive.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    },
+    {
+      "flow_id": "table-of-contents-plus-xss-003",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The flagged sink is echo intval($this->options['smooth_scroll_offset']) at line 1095. smooth_scroll_offset is saved at line 647 via intval($_POST['smooth_scroll_offset']), which casts the user-supplied value to a PHP integer at storage time. On output, intval() is applied again to the already-integer value. An integer value echoed directly into HTML cannot produce XSS under any circumstances — intval() always returns a numeric value with no HTML-special characters. The brief incorrectly marks auth_required as false; this output appears inside the admin settings page (admin_options() method), which is only accessible to manage_options-capable users (Administrators). This is a false positive on both the vulnerability class and the authentication assessment.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    }
+  ],
+  "additional_findings": [
+    {
+      "finding_id": "table-of-contents-plus-note-001",
+      "vulnerability_class": "css_injection",
+      "severity": "informational",
+      "verdict": "NOT_EXPLOITABLE",
+      "rationale": "get_custom_css() (lines 1215-1260) concatenates option values directly into inline CSS strings passed to wp_add_inline_style(). The options width_custom_units and font_size_units are saved via sanitize_text_field() only (lines 654, 657), which does not strip CSS-breaking characters such as braces or semicolons. A malicious value like '} body{display:none} .x{' could inject arbitrary CSS. However: (1) this requires manage_options capability (WordPress Administrator role), (2) WordPress's own security model explicitly acknowledges that administrators can modify CSS/appearance, (3) color values go through hex_value() which restricts to #[a-fA-F0-9]{3,6}, width values are compared against hardcoded strings from a dropdown (line 652 uses sanitize_text_field but the UI only presents valid CSS values), and (4) CSS injection via wp_add_inline_style cannot achieve JavaScript execution in any modern browser without a pre-existing CSP bypass. WordPress does not consider admin-level CSS modification a security vulnerability by policy. No CVE-worthy finding.",
+      "exploitable": false,
+      "auth_required": true
+    }
+  ],
+  "summary": {
+    "total_flows_reviewed": 3,
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 3,
+    "notes": "All three taint flows from the automated scanner are false positives. Flow 001 applies correct URL escaping (esc_url) for a URL attribute context. Flows 002 and 003 are artifacts of imprecise taint propagation through an array_merge — the alleged source and sink are unrelated option fields, and the actual sink uses intval() which cannot produce XSS. The plugin demonstrates generally sound security hygiene: nonce verification and capability checks in save_admin_options(), hex_value() for color inputs, intval()/floatval() for numeric inputs, sanitize_text_field() throughout, and consistent esc_attr()/esc_html()/esc_url() at output points."
+  }
+}

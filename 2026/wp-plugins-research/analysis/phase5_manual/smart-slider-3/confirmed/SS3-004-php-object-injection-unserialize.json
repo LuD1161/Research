@@ -1,0 +1,43 @@
+{
+  "finding_id": "SS3-004",
+  "plugin_slug": "smart-slider-3",
+  "title": "PHP object injection via unserialize() on imported slider backup data",
+  "severity": "medium",
+  "vulnerability_class": "deserialization",
+  "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:H/I:H/A:H",
+  "cvss_score": 7.2,
+  "cwe": "CWE-502",
+  "auth_required": "administrator (smartslider_edit + unfiltered_html) - or social engineering admin into importing a malicious .ss3 file",
+  "nonce_required": true,
+  "affected_file": "plugins/src/smart-slider-3/Nextend/SmartSlider3/BackupSlider/ImportSlider.php",
+  "affected_lines": "77-81",
+  "entry_point": "ImportSlider::import() called from ControllerAjaxSliders::actionImport() and ControllerAjaxSlider::actionImportDemo()",
+  "root_cause": "Line 81: $this->backup = unserialize($importData['data']); is called on data extracted from an uploaded .ss3 zip file after only a custom Serialize\\Parser::isValidData() check. PHP's unserialize() will instantiate arbitrary objects from any class loaded in the current request context. If a suitable POP (Property-Oriented Programming) gadget chain exists in the WordPress core, any loaded plugin, or this plugin's own classes (742 PHP files), an attacker can craft a malicious .ss3 file to trigger arbitrary code execution during __destruct, __wakeup, or __toString magic method calls.",
+  "exploitation": {
+    "attack_vector_1": {
+      "name": "Direct admin exploit",
+      "steps": [
+        "1. Identify a POP chain in loaded PHP classes (WordPress core, other plugins, or Smart Slider 3 itself)",
+        "2. Craft a serialized PHP payload that triggers the POP chain",
+        "3. Package it as a valid .ss3 zip file (zip with 'data' entry containing the serialized payload)",
+        "4. Import via the Smart Slider admin interface (Sliders > Import)",
+        "5. unserialize() instantiates attacker-controlled objects, triggering the POP chain"
+      ]
+    },
+    "attack_vector_2": {
+      "name": "Social engineering / supply chain",
+      "steps": [
+        "1. Craft malicious .ss3 export file",
+        "2. Distribute as a 'sample slider' or 'template'",
+        "3. Admin imports the .ss3 file via the import interface",
+        "4. Code executes with web server privileges"
+      ]
+    },
+    "notes": "The Serialize\\Parser isValidData() check may block some payloads but is unlikely to prevent all POP chains. Common WP POP chains are documented in phpggc (PHP Generic Gadget Chains) for WordPress/Yoast/etc. The actionImportDemo() method also calls ImportSlider::import() with data fetched from smartslider3.com, but that endpoint verifies the URL, so SSRF-to-deserialization is not directly possible."
+  },
+  "impact": "Medium/High depending on available POP chains. If exploitable POP chain exists: Remote Code Execution as web server user (unauthenticated RCE if social engineering succeeds, authenticated RCE for admins). Without a POP chain: impact is limited to unexpected object instantiation effects.",
+  "remediation": {
+    "primary": "Replace unserialize() with json_decode() by migrating the .ss3 format to JSON. This eliminates the entire class of object injection.",
+    "secondary": "If PHP serialization must be retained, use unserialize()'s $allowed_classes parameter to restrict which classes can be instantiated:\n$this->backup = unserialize($importData['data'], [\n    'allowed_classes' => [\n        'Nextend\\\\SmartSlider3\\\\BackupSlider\\\\BackupData',\n        // ... exact list of expected classes\n    ]\n]);\nPHP 7.0+ supports this option. Classes not in the allowlist are instantiated as __PHP_Incomplete_Class."
+  }
+}

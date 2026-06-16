@@ -1,0 +1,57 @@
+{
+  "plugin": "use-any-font",
+  "review_date": "2026-06-16",
+  "reviewer": "opus-4.6-agent",
+  "total_findings_reviewed": 4,
+  "confirmed": 0,
+  "false_positive": 4,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "finding_id": "use-any-font-file-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The fopen() call in uaf_save_font_files() is only reachable via uaf_trigger_actions() which requires current_user_can('manage_options') at line 246 of uaf_admin_functions.php AND wp_verify_nonce() at line 278. The font name is passed through sanitize_file_name() which strips directory traversal characters (/, .., etc). The file path is constructed using wp_upload_dir() basedir plus a hardcoded 'useanyfont/' subdirectory. The file content comes from wp_safe_remote_get() which restricts to safe HTTP URLs. No unauthenticated or subscriber-level user can reach this code path. The automated scanner incorrectly marked auth_required as false and nonce_verified as false because it analyzed the function in isolation without tracing the call chain back to uaf_trigger_actions().",
+      "vulnerability_class": "file_write",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "use-any-font-file-002",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same code path as use-any-font-file-001. The fwrite() call writing font file content is protected by manage_options capability check and nonce verification in the calling function uaf_trigger_actions(). The file content is fetched via wp_safe_remote_get() from the plugin's own conversion server response URLs. The filename uses sanitize_file_name() and the extension is limited to 'woff2' or 'woff' from a hardcoded array. An admin writing font files to the uploads directory is expected plugin behavior, not a vulnerability.",
+      "vulnerability_class": "file_write",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "use-any-font-rce-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The scanner flagged array_map('sanitize_text_field', $_POST['elements']) as RCE because escapeshellarg() was not used. This is completely wrong. The data never reaches any shell execution function. The elements are CSS selector strings (like 'h1', 'body', '.entry-title') from checkbox values. They are sanitized with sanitize_text_field(), stored in a WordPress option via update_option(), and later output into a CSS file through uaf_sanitize_css_selector() which strips non-CSS characters. The entire code path requires manage_options + nonce. There is no command injection vector here whatsoever.",
+      "vulnerability_class": "not_applicable",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "use-any-font-rce-002",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The scanner flagged custom_elements flowing through array_map('trim',...) and array_filter() as RCE due to missing escapeshellarg(). This is not RCE. The custom_elements value is sanitized with sanitize_textarea_field(), split by newlines, joined with commas, and stored as CSS selectors in a WordPress option. On output in uaf_write_css(), it passes through uaf_sanitize_css_selector() which uses preg_replace to allow only [A-Za-z0-9\\s\\-\\_\\.\\#\\>\\:\\,\\*\\+\\~\\[\\]\\=\\\"\\'\\(\\)\\/]. No shell functions are ever called. The entire path requires manage_options + nonce verification.",
+      "vulnerability_class": "not_applicable",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    }
+  ],
+  "summary": "All 4 automated findings are false positives. The scanner analyzed functions in isolation without tracing call chains back to the central dispatcher uaf_trigger_actions() which gates all sensitive operations behind current_user_can('manage_options') and wp_verify_nonce(). The 2 'file_inclusion' findings flagged admin-only font file writes as unauthenticated file operations. The 2 'RCE' findings incorrectly assumed CSS selector data would reach shell execution functions. During manual review, one minor issue was noted: the predefined font addition handler (line 339-341 of uaf_admin_functions.php) lacks nonce verification, creating a CSRF vector where an admin could be tricked into adding a predefined font. However, this is low severity since it requires admin authentication and the font comes from the plugin's own server. The plugin also writes to theme.json without capability checks beyond the initial manage_options gate, which is expected admin behavior.",
+  "feedback": "The automated taint analysis suffered from two systematic issues: (1) it analyzed PHP functions in isolation without tracing callers to find authentication/authorization gates, leading to false 'auth_required: false' classifications; (2) it flagged any use of array_map/array_filter as potential RCE sinks when 'escapeshellarg' was absent, despite the data never reaching shell execution functions. Both 'critical RCE' findings were particularly egregious false positives - the sink expressions (array_map, array_filter) are array manipulation functions, not command execution. The scanner should differentiate between data processing functions and actual dangerous sinks like exec(), system(), passthru(), proc_open(), etc."
+}

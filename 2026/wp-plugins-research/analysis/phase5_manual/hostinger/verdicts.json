@@ -1,0 +1,82 @@
+{
+  "plugin": "hostinger",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "security-agent",
+  "summary": {
+    "total_flows_reviewed": 2,
+    "confirmed": 0,
+    "false_positives": 2,
+    "new_findings": 0
+  },
+  "verdicts": [
+    {
+      "flow_id": "hostinger-open-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity": "N/A",
+      "confidence": "high",
+      "vulnerability_class": "open_redirect",
+      "file": "includes/Hooks.php",
+      "lines": "77-85",
+      "description": "The taint flow traces $_SERVER['HTTP_HOST'] through sanitize_text_field() and into wp_safe_redirect(). The automated scanner correctly identified that HTTP_HOST is attacker-controlled and reaches a redirect sink, but failed to account for wp_safe_redirect() semantics.",
+      "analysis": "wp_safe_redirect() internally calls wp_validate_redirect(), which validates the redirect destination against an allowlist: the site home URL (get_option('home')) and any hosts registered via the allowed_redirect_hosts filter. If an attacker spoofs HTTP_HOST to 'evil.com', the constructed URL 'https://evil.com/path' would be rejected by wp_validate_redirect() because 'evil.com' does not match the registered site host. WordPress then falls back to admin_url() as the redirect target. The sanitize_text_field() call on HTTP_HOST is redundant for security (wp_safe_redirect handles it) but does not create a bypass. Additionally, HTTP_HOST header spoofing at the network layer is generally controlled by the web server configuration on a hosting platform like Hostinger, further reducing exploitability.",
+      "exploitation_path": "Not exploitable. wp_safe_redirect() blocks cross-host redirects.",
+      "references": [
+        "WordPress source: wp-includes/functions.php - wp_validate_redirect()",
+        "includes/Hooks.php lines 76-86"
+      ]
+    },
+    {
+      "flow_id": "hostinger-open-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity": "N/A",
+      "confidence": "high",
+      "vulnerability_class": "open_redirect",
+      "file": "includes/Hooks.php",
+      "lines": "90-98",
+      "description": "Second taint flow for the force-www redirect path. Same source ($_SERVER['HTTP_HOST']) and same sink (wp_safe_redirect()). Shares the same analysis as hostinger-open-001.",
+      "analysis": "Identical protection mechanism to flow 001. The 'https://www.' prefix prepended to the attacker-controlled HTTP_HOST before passing to wp_safe_redirect() does not change the outcome: wp_validate_redirect() will reject any destination host that does not match the site's registered home URL. The 'www.' normalization only affects substrings, not the host validation logic inside WordPress.",
+      "exploitation_path": "Not exploitable. wp_safe_redirect() blocks cross-host redirects.",
+      "references": [
+        "WordPress source: wp-includes/functions.php - wp_validate_redirect()",
+        "includes/Hooks.php lines 90-98"
+      ]
+    }
+  ],
+  "additional_manual_review": {
+    "attack_surface_notes": [
+      {
+        "area": "ComingSoon bypass_code comparison",
+        "file": "includes/ComingSoon.php",
+        "line": 75,
+        "note": "Compares $_GET['bypass_code'] directly against the stored bypass code (no sanitization before comparison). This is safe — it is a string equality check, not a sink. The bypass code is a 16-character random hex string (from Helper::generate_bypass_code(16)), making brute-force impractical. No issue."
+      },
+      {
+        "area": "REST API routes",
+        "file": "includes/Rest/Routes.php",
+        "note": "All routes (get-settings, update-settings, regenerate-bypass-code) are gated behind permission_check() which requires current_user_can('manage_options'). Properly restricted to administrators."
+      },
+      {
+        "area": "AJAX handler",
+        "file": "includes/Admin/Ajax.php",
+        "note": "Single AJAX endpoint dismiss_plugin_split_notice verifies wp_verify_nonce() against 'hts_close_plugin_split' before acting. Properly protected."
+      },
+      {
+        "area": "Proxy.php undefined index",
+        "file": "includes/Admin/Proxy.php",
+        "line": 29,
+        "note": "isset() check missing for $_SERVER['H_PLATFORM'] before boolean negation: '! $_SERVER['H_PLATFORM']'. This could trigger a PHP notice/warning on non-Hostinger environments but is not a security issue. The function returns early with a WP_Error, preventing further processing."
+      },
+      {
+        "area": "LlmsTxt file write",
+        "file": "includes/LlmsTxtGenerator/LlmsTxtFileHelper.php",
+        "note": "File writes are to ABSPATH . 'llms.txt' using WP_Filesystem abstraction. No user-controlled path components. The generate() function is only triggered by authenticated admin actions or internal WordPress hooks (post status transitions, option updates). No arbitrary file write vulnerability."
+      },
+      {
+        "area": "update_settings REST endpoint",
+        "file": "includes/Rest/SettingsRoutes.php",
+        "lines": "106-147",
+        "note": "update_settings() iterates over known setting keys from PluginOptions::to_array() and casts values with !empty(). The bypass_code field is explicitly preserved from existing settings and never overwritten by request parameters. No setting injection possible. The do_action() on line 126 uses the dynamic hook name 'hostinger_tools_setting_{$field_key}_update' where $field_key is from the controlled set of PluginOptions fields, not user input."
+      }
+    ]
+  }
+}

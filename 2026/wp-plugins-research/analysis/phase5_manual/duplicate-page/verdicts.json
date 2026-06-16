@@ -1,0 +1,119 @@
+{
+  "plugin": "duplicate-page",
+  "review_date": "2026-06-16",
+  "reviewer": "claude-sonnet-4-6",
+  "total_findings_reviewed": 12,
+  "confirmed": 0,
+  "false_positive": 12,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "flow_id": "duplicate-page-rce-001",
+      "status": "false_positive",
+      "vulnerability_class": "rce",
+      "severity_claimed": "medium",
+      "severity_actual": "none",
+      "reason": "The taint source is `intval($_GET['post'])`, which produces a pure integer — no shell-injectable content is possible. The chain reaches `get_object_taxonomies($post->post_type)` at line 196, which is a WordPress core function returning taxonomy slugs from the database. No shell execution occurs anywhere in this path. The scanner misidentified a database/API call as a shell sink. Complete false positive."
+    },
+    {
+      "flow_id": "duplicate-page-xss-001",
+      "status": "false_positive",
+      "vulnerability_class": "xss",
+      "severity_claimed": "medium",
+      "severity_actual": "none",
+      "reason": "The taint source is `$post_id = intval(...)` — an integer. At line 281, `wp_die(__('Error! Post creation failed, could not find original post: ','duplicate-page').$post_id)` concatenates the integer to a string. An integer value cannot carry XSS payload; `intval()` fully strips any non-numeric input to a safe integer. False positive."
+    },
+    {
+      "flow_id": "duplicate-page-xss-002",
+      "status": "false_positive",
+      "vulnerability_class": "xss",
+      "severity_claimed": "medium",
+      "severity_actual": "none",
+      "reason": "The sink at admin-settings.php line 49 is `echo (isset($opt['duplicate_post_editor']) && $opt['duplicate_post_editor'] == 'all') ? \"selected = 'selected'\" : '';`. The echoed output is only ever the hardcoded literal string `\"selected = 'selected'\"` or empty string `''`. The option value itself is used only inside the boolean comparison, never in the output. No attacker-controlled data reaches the output. False positive."
+    },
+    {
+      "flow_id": "duplicate-page-xss-003",
+      "status": "false_positive",
+      "vulnerability_class": "xss",
+      "severity_claimed": "medium",
+      "severity_actual": "none",
+      "reason": "Identical pattern to xss-002. Sink at line 50: `echo (...$opt['duplicate_post_editor'] == 'classic') ? \"selected = 'selected'\" : ''`. Output is only the hardcoded `\"selected = 'selected'\"` or `''`. The option value is used only in the ternary condition, not the output. False positive."
+    },
+    {
+      "flow_id": "duplicate-page-xss-004",
+      "status": "false_positive",
+      "vulnerability_class": "xss",
+      "severity_claimed": "medium",
+      "severity_actual": "none",
+      "reason": "Identical pattern to xss-002/003. Sink at line 51 outputs only `\"selected = 'selected'\"` or `''` based on comparison with the hardcoded string `'gutenberg'`. The tainted option value is never echoed. False positive."
+    },
+    {
+      "flow_id": "duplicate-page-xss-005",
+      "status": "false_positive",
+      "vulnerability_class": "xss",
+      "severity_claimed": "medium",
+      "severity_actual": "none",
+      "reason": "Sink at admin-settings.php line 60: `echo($opt['duplicate_post_status'] == 'draft') ? \"selected = 'selected'\" : ''`. Output is only hardcoded literals. Option value used in boolean comparison only. False positive."
+    },
+    {
+      "flow_id": "duplicate-page-xss-006",
+      "status": "false_positive",
+      "vulnerability_class": "xss",
+      "severity_claimed": "medium",
+      "severity_actual": "none",
+      "reason": "Sink at line 61: `echo($opt['duplicate_post_status'] == 'publish') ? \"selected = 'selected'\" : ''`. Output is only hardcoded literals. False positive."
+    },
+    {
+      "flow_id": "duplicate-page-xss-007",
+      "status": "false_positive",
+      "vulnerability_class": "xss",
+      "severity_claimed": "medium",
+      "severity_actual": "none",
+      "reason": "Sink at line 62: `echo($opt['duplicate_post_status'] == 'private') ? \"selected = 'selected'\" : ''`. Output is only hardcoded literals. False positive."
+    },
+    {
+      "flow_id": "duplicate-page-xss-008",
+      "status": "false_positive",
+      "vulnerability_class": "xss",
+      "severity_claimed": "medium",
+      "severity_actual": "none",
+      "reason": "Sink at line 63: `echo($opt['duplicate_post_status'] == 'pending') ? \"selected = 'selected'\" : ''`. Output is only hardcoded literals. False positive."
+    },
+    {
+      "flow_id": "duplicate-page-xss-009",
+      "status": "false_positive",
+      "vulnerability_class": "xss",
+      "severity_claimed": "medium",
+      "severity_actual": "none",
+      "reason": "Sink at line 71: `echo($opt['duplicate_post_redirect'] == 'to_list') ? \"selected = 'selected'\" : ''`. Output is only hardcoded literals. The option value is not echoed. False positive."
+    },
+    {
+      "flow_id": "duplicate-page-xss-010",
+      "status": "false_positive",
+      "vulnerability_class": "xss",
+      "severity_claimed": "medium",
+      "severity_actual": "none",
+      "reason": "Sink at line 72: `echo($opt['duplicate_post_redirect'] == 'to_page') ? \"selected = 'selected'\" : ''`. Output is only hardcoded literals. False positive."
+    },
+    {
+      "flow_id": "duplicate-page-xss-011",
+      "status": "false_positive",
+      "vulnerability_class": "xss",
+      "severity_claimed": "medium",
+      "severity_actual": "none",
+      "reason": "Sink at line 80: `echo !empty($opt['duplicate_post_suffix']) ? esc_attr($opt['duplicate_post_suffix']) : ''`. The brief claims `esc_attr()` is missing, but the code explicitly uses `esc_attr()` around the option value before output. Properly escaped. False positive — the scanner failed to recognize the sanitizer that was already present."
+    }
+  ],
+  "summary": "All 12 automated taint findings are false positives. The plugin's security posture is sound for its attack surface. Key observations: (1) The RCE finding (rce-001) is entirely fabricated — the scanner mislabeled `get_object_taxonomies()` as a shell sink; no shell execution occurs anywhere in the codebase. (2) The XSS findings xss-002 through xss-010 all misidentify ternary comparisons as sinks — in every case the option value is used only inside the boolean condition, and only hardcoded string literals are echoed. (3) Finding xss-001 is a false positive because the taint source uses `intval()`, making the value a pure integer incapable of carrying XSS. (4) Finding xss-011 is a false positive because the code already uses `esc_attr()` on the output — the scanner failed to recognize this sanitizer. The main duplication function (dt_duplicate_post_as_draft) enforces nonce verification and capability checks before any operation. Settings saves are gated behind nonce + manage_options capability check. No exploitable vulnerabilities were found.",
+  "feedback": {
+    "scanner_quality": "poor",
+    "false_positive_rate": "100%",
+    "root_causes_of_fps": [
+      "Scanner incorrectly classified get_object_taxonomies() as a shell/RCE sink — this is a WordPress API call with no command execution.",
+      "Scanner failed to track that ternary conditional `($opt['x'] == 'literal') ? 'hardcoded' : ''` only ever outputs hardcoded literals, not the tainted value.",
+      "Scanner failed to recognize intval() as a complete sanitizer for integer values, flagging integer concatenation as XSS.",
+      "Scanner failed to detect the esc_attr() call already present in the xss-011 sink, incorrectly reporting a missing sanitizer."
+    ],
+    "notes": "The plugin is well-written for its class. Authentication is required for all sensitive operations, nonces are validated, and capability checks are performed. The one mildly interesting pattern is at duplicatepage.php line 281 where `wp_die()` concatenates `$post_id` — but this is safe because `$post_id` is `intval()`-cast at line 117 before first use."
+  }
+}

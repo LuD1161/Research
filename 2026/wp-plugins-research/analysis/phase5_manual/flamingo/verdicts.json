@@ -1,0 +1,134 @@
+{
+  "plugin": "flamingo",
+  "review_date": "2026-06-16",
+  "reviewer": "opus-4.6-agent",
+  "total_findings_reviewed": 11,
+  "confirmed": 0,
+  "false_positive": 11,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "finding_id": "flamingo-open-001",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The source is get_option('blog_charset') which reads from the wp_options table. This value is only settable by site administrators via Settings > Reading. It is not user-controlled input from an untrusted source. The header() call sets Content-Type charset, which is a benign use of an admin-controlled DB option. No injection or redirect vector exists here.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "flamingo-xss-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "This flow is inside Flamingo_Inbound_CSV::print_data(), which is only callable from flamingo_load_inbound_admin() at line 653-667 of admin.php. That code path requires: (1) the user to have 'flamingo_edit_inbound_messages' capability (mapped to 'edit_users', admin-only), (2) a valid nonce via check_admin_referer('bulk-posts'). Furthermore, the output is sent with Content-Type: text/csv, not text/html, so browser XSS is not possible. The $_REQUEST['channel'] value flows into a WP_Query parameter for post lookup, and the echoed data comes from stored post meta fields, not directly from the request parameter. The CSV output is also properly quoted via flamingo_csv_quote().",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "flamingo-open-002",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The sink is wp_safe_redirect() which validates the redirect URL against allowed hosts (by default only the same site). Even though $_GET['post_status'] flows into the URL as a query parameter via add_query_arg(), wp_safe_redirect() will reject any redirect to an external domain. Additionally, the entire function flamingo_load_inbound_admin() is only reachable on admin pages requiring 'flamingo_edit_inbound_messages' capability, and each action branch has its own nonce check.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "flamingo-open-003",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as flamingo-open-002. wp_safe_redirect() prevents open redirect. Auth + nonce required. This is just a different branch (trash action) of the same function.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "flamingo-open-004",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as flamingo-open-002. wp_safe_redirect() prevents open redirect. Auth + nonce required. This is the untrash action branch.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "flamingo-open-005",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as flamingo-open-002. wp_safe_redirect() prevents open redirect. Auth + nonce required. This is the delete action branch.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "flamingo-open-006",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as flamingo-open-002. wp_safe_redirect() prevents open redirect. Auth + nonce required. This is the spam action branch.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "flamingo-open-007",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as flamingo-open-002. wp_safe_redirect() prevents open redirect. Auth + nonce required. This is the unspam action branch.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "flamingo-open-008",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as flamingo-open-002. wp_safe_redirect() prevents open redirect. Auth + nonce required. This is another action branch endpoint.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "flamingo-xss-002",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The output explicitly uses esc_attr() to sanitize $_REQUEST['post_status'] before echoing it into an HTML attribute value context. esc_attr() is the correct WordPress escaping function for attribute contexts, preventing XSS. The taint analyzer incorrectly flagged this despite the sanitizer being present in the very same expression.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "flamingo-rce-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "This is a completely false RCE classification. The data flow is: $_REQUEST['contact_tag_id'] -> explode() -> get_term() -> $term->term_id (integer) -> passed as 'selected' parameter to wp_dropdown_categories(). The 'sink' identified is array_filter($filters) which is NOT a command execution function -- it is a standard PHP array filtering function. There is no shell command execution, eval, or any RCE-capable operation anywhere in this flow. The 'selected' parameter in wp_dropdown_categories() is used only to mark which <option> element gets the 'selected' attribute. Furthermore, this code runs on an admin page requiring 'flamingo_edit_contacts' capability (admin-level). get_term() also returns an integer term_id from the database taxonomy tables, sanitizing the input.",
+      "vulnerability_class": "rce",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    }
+  ],
+  "summary": "All 11 taint flow findings in Flamingo v2.6.2 are false positives. The plugin has a small, well-contained attack surface: no AJAX handlers (authenticated or unauthenticated), no REST API routes, no file uploads, no unserialize, no eval/exec, no direct SQL queries. All admin functionality is properly gated behind capability checks (mapped to 'edit_users') and nonce verification. The open redirect findings all use wp_safe_redirect() which prevents external redirects. The XSS findings either use proper escaping (esc_attr) or output to non-HTML contexts (CSV Content-Type). The RCE finding is a misclassification -- array_filter() is not a command execution function.",
+  "feedback": "The taint analyzer has significant issues: (1) It classified array_filter() as an RCE sink, which is completely wrong. (2) It flagged wp_safe_redirect() as vulnerable to open redirect despite this being WordPress's explicit safe redirect function. (3) It flagged esc_attr()-wrapped output as XSS despite the sanitizer being applied in the same expression. (4) It flagged get_option('blog_charset') as untrusted user input. (5) All 7 open redirect findings are essentially the same single code path (line 372) to different branches -- these should be deduplicated. The confidence/severity ratings were inflated (e.g., 'critical' + 'high confidence' for the non-existent RCE)."
+}

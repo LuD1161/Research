@@ -1,0 +1,59 @@
+{
+  "plugin_slug": "antispam-bee",
+  "review_date": "2026-06-16",
+  "reviewer": "claude-manual-review",
+  "verdicts": [
+    {
+      "finding_id": "ASB-001",
+      "title": "XSS via $spam_reason in selected() call - value never echoed, only used for comparison",
+      "original_flow_ids": ["antispam-bee-xss-001"],
+      "verdict": "false_positive",
+      "severity": "informational",
+      "vulnerability_class": "xss",
+      "cvss_estimate": "N/A",
+      "attack_vector": "The taint scanner flagged $_GET['comment_spam_reason'] flowing into an echo at columns.class.php:116. Tracing the actual code: $spam_reason (line 108) is the first argument to WordPress's selected() helper function. The selected() function performs a strict == comparison of two values and returns either ' selected=\"selected\"' or ''. It never outputs $spam_reason itself. The echo at line 116 outputs: (a) esc_attr($reason['meta_value']) for the option value attribute - this comes from the database, not GET; (b) selected($spam_reason, $reason['meta_value'], false) - outputs only 'selected=\"selected\"' or empty string; (c) esc_html($label) - a hardcoded translation string from Antispam_Bee::$defaults['reasons']. The user-controlled $spam_reason value is never placed into any HTML context. Additionally, this function only runs in the admin on the spam comments page (edit-comments.php?comment_status=spam), requiring manage_comments capability at minimum.",
+      "auth_required": "editor (manage_comments capability)",
+      "affected_file": "plugins/src/antispam-bee/inc/columns.class.php",
+      "affected_lines": "108, 116",
+      "evidence": "$spam_reason = isset( $_GET['comment_spam_reason'] ) ? sanitize_text_field( wp_unslash( $_GET['comment_spam_reason'] ) ) : '';\n// ...\necho \"\\t\" . '<option value=\"' . esc_attr( $reason['meta_value'] ) . '\"' . selected( $spam_reason, $reason['meta_value'], false ) . '>' . esc_html( $label ) . \"</option>\\n\";\n// $spam_reason is only used as first arg to selected(), which returns 'selected=\"selected\"' or ''. Never echoed.",
+      "remediation": "No action needed. The code is correct. The scanner confused the taint source with the echo sink without tracing the actual data flow through selected()."
+    },
+    {
+      "finding_id": "ASB-002",
+      "title": "No nonce check on comment_spam_reason filter - CSRF-style state change in WP_Comment_Query via GET param",
+      "original_flow_ids": [],
+      "verdict": "false_positive",
+      "severity": "informational",
+      "vulnerability_class": "csrf",
+      "cvss_estimate": "N/A",
+      "attack_vector": "columns.class.php lines 83, 108, 133 read $_GET['orderby'] and $_GET['comment_spam_reason'] without nonce verification. The code intentionally disables the nonce check (phpcs:disable WordPress.CSRF.NonceVerification). However, these GET parameters only control which comments are displayed (filtering/sorting the admin comment list). They do not modify any data in the database. No state change occurs, so CSRF is not applicable. WordPress core similarly does not require nonces for GET-based admin filtering/sorting queries.",
+      "auth_required": "editor (manage_comments capability, admin area only)",
+      "affected_file": "plugins/src/antispam-bee/inc/columns.class.php",
+      "affected_lines": "72-143",
+      "evidence": "// phpcs:disable WordPress.CSRF.NonceVerification.NoNonceVerification\n$orderby = isset( $_GET['orderby'] ) ? sanitize_text_field(...) : '';\n// used only to set $query->query_vars['orderby'] = 'meta_value';\n// no database writes occur",
+      "remediation": "No action needed. Read-only query parameter use in admin area without state change does not require CSRF protection."
+    },
+    {
+      "finding_id": "ASB-003",
+      "title": "Overall codebase security posture",
+      "original_flow_ids": [],
+      "verdict": "informational",
+      "severity": "informational",
+      "vulnerability_class": "none",
+      "cvss_estimate": "N/A",
+      "attack_vector": "Full manual review of all three PHP files (antispam_bee.php, inc/columns.class.php, inc/gui.class.php). Key findings: (1) Settings save (gui.class.php save_changes) requires current_user_can('manage_options') + check_admin_referer() nonce verification - properly protected. (2) All POST inputs in save_changes are either cast to (int), sanitize_text_field(), or validated against an allowlist before storage. (3) All outputs in options_page() use esc_attr(), esc_html(), esc_url(), or wp_kses_post(). (4) Database queries use $wpdb->prepare() with parameterized placeholders everywhere. (5) IP addresses are run through filter_var(FILTER_VALIDATE_IP) before use. (6) The honeypot mechanism manipulates $_POST['comment'] and a secret field - field swapping logic is safe as it only moves values between POST keys. (7) Country code validation uses preg_replace('/[^A-Z ,;]/', '', strtoupper(...)) before storage. (8) The log file write (file_put_contents) only fires when ANTISPAM_BEE_LOG_FILE constant is explicitly defined by site admin and validates the path. (9) Comment meta values displayed via print_plugin_column() are run through esc_html(). No confirmed vulnerabilities found.",
+      "auth_required": "N/A",
+      "affected_file": "plugins/src/antispam-bee/antispam_bee.php, plugins/src/antispam-bee/inc/columns.class.php, plugins/src/antispam-bee/inc/gui.class.php",
+      "affected_lines": "N/A",
+      "evidence": "N/A",
+      "remediation": "None required."
+    }
+  ],
+  "summary": {
+    "total_findings_reviewed": 1,
+    "confirmed": 0,
+    "false_positives": 1,
+    "informational": 2,
+    "notes": "The single taint flow flagged by the automated scanner (antispam-bee-xss-001) is a false positive. The user-controlled value $spam_reason flows into the selected() WordPress helper as the comparison target, which only ever outputs a fixed string ('selected=\"selected\"' or empty). The user input is never placed into an HTML output context. The plugin has strong security practices throughout: proper capability checks, nonce verification on state-changing operations, parameterized database queries, and consistent output escaping."
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "plugin": "skyboot-custom-icons-for-elementor",
+  "review_date": "2026-06-16",
+  "reviewer": "phase5-manual-security-review",
+  "total_findings_reviewed": 5,
+  "confirmed": 0,
+  "false_positive": 5,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "flow_id": "skyboot-custom-icons-for-elementor-xss-001",
+      "verdict": "false_positive",
+      "severity_adjusted": null,
+      "title": "Textarea callback: esc_textarea() is correct escaping for textarea content",
+      "reasoning": "The taint scanner misidentified esc_textarea() as a taint source rather than a sanitizer. Line 308: $value = esc_textarea($this->get_option(...)) — esc_textarea() encodes <, >, &, and \" as HTML entities, which is the correct and complete escaping function for content placed between <textarea> tags. The value in the sprintf at line 312 is safely placed as %5$s between the opening and closing textarea tags. There is no XSS vector here. The scanner erroneously treated the esc_textarea()-wrapped assignment as a taint source rather than recognizing it as a sanitized value.",
+      "context": "Admin-only settings page (manage_options capability required). Even if the escaping were absent, this would be admin self-XSS at best.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "skyboot-custom-icons-for-elementor-xss-002",
+      "verdict": "false_positive",
+      "severity_adjusted": null,
+      "title": "File callback: esc_attr() is correct escaping for HTML attribute value context",
+      "reasoning": "Line 364: $value = esc_attr($this->get_option(...)) — esc_attr() encodes <, >, &, \", and ' as HTML entities, which is the correct escaping for content placed inside a double-quoted HTML attribute. The value is interpolated as %4$s in value=\"%4$s\" within the sprintf at line 369. This is properly escaped. The scanner incorrectly flagged esc_attr() as a taint source rather than a sanitizer.",
+      "context": "Admin-only settings page (manage_options capability required).",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "skyboot-custom-icons-for-elementor-xss-003",
+      "verdict": "false_positive",
+      "severity_adjusted": null,
+      "title": "Password callback: esc_attr() is correct escaping for HTML attribute value context",
+      "reasoning": "Line 383: $value = esc_attr($this->get_option(...)) placed as value=\"%4$s\" in the password input field at line 386. esc_attr() is the correct escaping function for HTML attribute context. The scanner wrongly classified esc_attr() as a taint source rather than a sanitizer, creating a phantom taint flow. No XSS vulnerability exists.",
+      "context": "Admin-only settings page (manage_options capability required).",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "skyboot-custom-icons-for-elementor-xss-004",
+      "verdict": "false_positive",
+      "severity_adjusted": null,
+      "title": "Color callback: esc_attr() on value is correct; std/default is developer-controlled hardcoded data",
+      "reasoning": "Line 399: $value = esc_attr($this->get_option(...)) placed as value=\"%4$s\" and $args['std'] placed as data-default-color=\"%5$s\" in the color input at line 402. The $value is properly escaped with esc_attr(). The $args['std'] comes from the developer-defined settings field array in settings-fields.php — it is hardcoded plugin data (e.g., a default color string), not user-controlled input. Reviewing settings-fields.php confirms no color fields are actually defined for this plugin; the color callback is unused in practice. Even theoretically, std is a developer-supplied default, not a user-controlled value. No XSS vulnerability exists.",
+      "context": "Admin-only settings page (manage_options capability required). Color field type not used in actual settings registration.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "skyboot-custom-icons-for-elementor-xss-005",
+      "verdict": "false_positive",
+      "severity_adjusted": null,
+      "title": "Pages callback: esc_attr() on selected value passed to WordPress core wp_dropdown_pages() is safe",
+      "reasoning": "Line 416-423: The selected value is escaped with esc_attr() before being passed as the 'selected' key to wp_dropdown_pages(). WordPress core's wp_dropdown_pages() function generates its own escaped HTML output — it uses the selected page ID as an integer comparison for the selected attribute and constructs the option elements using esc_attr() on page titles internally. The scanner's taint propagation through wp_dropdown_pages() at line 422 is a false positive; WP core functions that generate HTML are not XSS sinks when called with proper inputs. Additionally, the pages callback type is not registered in the actual settings fields configuration for this plugin.",
+      "context": "Admin-only settings page (manage_options capability required). Pages field type not used in actual settings registration.",
+      "auth_required": true,
+      "exploitable": false
+    }
+  ],
+  "summary": "All 5 flagged taint flows are false positives. The automated scanner incorrectly classified WordPress escaping functions (esc_attr(), esc_textarea()) as taint sources rather than sanitizers/sinks, producing phantom taint chains. Every callback method in class.settings-api.php applies the contextually-correct WordPress escaping function before output: esc_attr() for HTML attribute values, esc_textarea() for textarea element content. Furthermore, the actual settings fields registered in settings-fields.php use only the 'checkbox' field type (for toggling icon packs on/off), meaning the flagged callback methods (callback_textarea, callback_file, callback_password, callback_color, callback_pages) are not even invoked in practice for this plugin. All settings UI is restricted to authenticated administrators with manage_options capability. There are no confirmed vulnerabilities in this plugin.",
+  "feedback": "The taint analysis tool has a systematic flaw in this batch: it treats calls like esc_attr($user_input) as taint sources rather than recognizing them as sanitizers that neutralize taint. This produces high-volume false positives across every settings field rendering function. The tool should be configured to recognize esc_attr(), esc_textarea(), esc_html(), esc_url(), and esc_js() as taint-terminating sanitizers, not as propagation steps. Additionally, the attack surface scanner noted 0 PHP files and 0 total lines, suggesting a tool parsing failure that may have contributed to degraded analysis quality for this plugin."
+}

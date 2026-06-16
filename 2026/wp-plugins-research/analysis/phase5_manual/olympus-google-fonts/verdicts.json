@@ -1,0 +1,68 @@
+{
+  "plugin": "olympus-google-fonts",
+  "analysis_date": "2026-06-16",
+  "analyst": "phase5-manual",
+  "version_analyzed": "4.1.3",
+  "summary": {
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 1,
+    "informational": 0,
+    "overall_risk": "none"
+  },
+  "verdicts": [
+    {
+      "flow_id": "olympus-google-fonts-rce-001",
+      "original_severity": "critical",
+      "original_class": "rce",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The taint tracker misidentified array_map('sanitize_text_field', ...) as a dangerous sink. In reality, sanitize_text_field() is a sanitization function, not a command execution sink. The data path is: $_POST[taxonomy_slug] -> wp_unslash() -> array_map('sanitize_text_field') -> OGF_Fonts_Taxonomy::update_font_data() -> update_option(). This is standard WordPress taxonomy term meta storage. No shell command, eval(), include(), or file write with attacker-controlled content occurs downstream. The 'RCE' label is completely unwarranted.",
+      "auth_analysis": {
+        "required": true,
+        "capability": "edit_theme_options",
+        "mechanism": "WordPress taxonomy form handling, nonce provided by WordPress core for taxonomy edit actions (phpcs suppression comment at line 412 confirms this). The admin menu page (line 85) is registered with OGF_Fonts_Taxonomy::$capability = 'edit_theme_options'.",
+        "bypass_possible": false
+      },
+      "nonce_analysis": {
+        "present": true,
+        "note": "WordPress core provides nonce verification for all taxonomy term create/edit actions via the standard admin-post.php flow. The save_metadata function is only triggered by the WordPress taxonomy hooks 'edited_ogf_custom_fonts' and 'create_ogf_custom_fonts', which WordPress fires only after verifying the taxonomy edit nonce."
+      },
+      "sink_analysis": {
+        "actual_sink": "update_option() in OGF_Fonts_Taxonomy::update_font_data()",
+        "sink_type": "database_write",
+        "impact": "Stores sanitized font metadata in wp_options. No code execution path.",
+        "rce_path_exists": false
+      }
+    }
+  ],
+  "additional_findings": [
+    {
+      "id": "ogf-note-001",
+      "class": "css_injection",
+      "verdict": "NOT_EXPLOITABLE",
+      "severity": "informational",
+      "description": "The font family name (stored via sanitize_text_field, which does not strip CSS special characters like single quotes, semicolons, or curly braces) is output inside a CSS @font-face block wrapped in single quotes: font-family:'<value>'. An attacker who controls the value could inject CSS by using a family name like: a';}body{background:red}// This would break out of the single-quote context and inject arbitrary CSS rules. However, this requires edit_theme_options capability (WordPress administrator). Under WordPress security policy, administrator-level users are explicitly trusted and can already modify CSS arbitrarily through the Theme Editor. This does not cross a privilege boundary and is not a reportable vulnerability.",
+      "affected_file": "includes/customizer/output-css.php",
+      "affected_lines": "44-73",
+      "auth_required": true,
+      "capability_required": "edit_theme_options",
+      "exploitable_unauthenticated": false,
+      "exploitable_by_contributor_or_lower": false
+    },
+    {
+      "id": "ogf-note-002",
+      "class": "observation",
+      "verdict": "CLEAN",
+      "description": "All three AJAX handlers (customizer_clear_cache, customizer_reset, ogf_dismiss_notice, ogf_dismiss_guide) are registered only via wp_ajax_ (not wp_ajax_nopriv_), require nonce verification, and check edit_theme_options capability where relevant. No unauthenticated attack surface exists.",
+      "exploitable_unauthenticated": false
+    },
+    {
+      "id": "ogf-note-003",
+      "class": "observation",
+      "verdict": "CLEAN",
+      "description": "Font file URLs (woff, woff2, ttf, otf) are output via esc_url() in the @font-face src: property. Font weight and style are output with esc_attr(). CSS variables (--font-base, --font-headings, --font-input) are generated via ogf_build_font_stack() which only returns values from a hardcoded font list or esc_attr()-escaped values. No SSRF or injection is possible through these paths.",
+      "exploitable_unauthenticated": false
+    }
+  ],
+  "attack_surface_notes": "Plugin has zero unauthenticated entry points. No REST API routes, no nopriv AJAX hooks, no shortcodes, no file upload handlers accessible without authentication. The only user-input-touching entry points are: (1) the taxonomy term create/edit admin page (requires edit_theme_options), (2) the WordPress Customizer settings (requires edit_theme_options), and (3) the three AJAX handlers (all require authentication and nonces). The plugin's attack surface is entirely bounded to privileged admin users."
+}

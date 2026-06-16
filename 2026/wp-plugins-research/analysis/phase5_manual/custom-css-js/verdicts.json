@@ -1,0 +1,134 @@
+{
+  "plugin": "custom-css-js",
+  "review_date": "2026-06-16",
+  "reviewer": "opus-4.6-agent",
+  "total_findings_reviewed": 11,
+  "confirmed": 0,
+  "false_positive": 11,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "finding_id": "custom-css-js-xss-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The selected() WordPress function compares filter_input(INPUT_GET, 'language_filter') against hardcoded values ('css', 'js', 'html') and returns either an empty string or ' selected=\"selected\"'. The user input is never echoed -- only the comparison result is. The $_lang and $_label values in the echo statement are from the hardcoded $languages array, not user-controlled. Additionally, this runs on the admin list table screen (restrict_manage_posts action) which requires admin access to the custom-css-js post type.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "custom-css-js-xss-002",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $active variable is sanitized by absint() on the code_id, then the value is determined by a ternary that can only produce 'yes' or 'no' (line 592). The echo on line 598 outputs a value constrained to exactly these two strings. Additionally, the handler is registered via wp_ajax_ (requires authentication) and uses check_admin_referer for nonce verification.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "custom-css-js-xss-003",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The mysql2date() calls format $post->post_modified (a database-stored datetime value) using get_option('date_format'). Both the date format option and post_modified are internal WordPress data not directly controllable by external attackers. The date_format option can only be set by administrators. This code runs on the admin post edit screen which requires edit_custom_css capability. Self-XSS by an admin via the date format setting is not a meaningful vulnerability.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "custom-css-js-xss-004",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as xss-003. The mysql2date() output from $post->post_modified formatted with get_option('date_format') is internal WordPress data. Displayed on admin-only edit screen requiring edit_custom_css capability.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "custom-css-js-rce-001",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The preg_replace() call uses user input ($_POST['content']) as the SUBJECT (third argument), not the pattern or replacement. The pattern uses @...@im modifiers -- no /e flag which would enable code execution. This is simple string substitution, not command execution. Additionally, protected by save_post hook which requires edit_custom_css capability and nonce verification.",
+      "vulnerability_class": "rce",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "custom-css-js-rce-002",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as rce-001. preg_replace() with user data as subject only, no /e modifier. The pattern '@/\\*[\\s\\S]*?\\*/@' simply strips multi-line comments. No code execution vector exists.",
+      "vulnerability_class": "rce",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "custom-css-js-rce-003",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same as rce-001 and rce-002. preg_replace() with user data as subject, no /e modifier. Multiple stages of comment stripping but no code execution vector.",
+      "vulnerability_class": "rce",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "custom-css-js-file-001",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The file_put_contents writes $_POST['content'] to CCJ_UPLOAD_DIR with filename constructed as '$post_id . '.' . $options['language']'. The language is validated via in_array() to only allow 'html', 'css', 'js'. The post_id is an integer. The path is therefore not traversable. Writing arbitrary CSS/JS content is the core feature of this plugin and is protected by: (1) save_post hook requiring edit_custom_css capability, (2) nonce verification, (3) post type check. This is intended admin functionality, not a vulnerability.",
+      "vulnerability_class": "file_inclusion",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "custom-css-js-file-002",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The file_put_contents uses sanitize_file_name($slug) for the filename, which strips directory traversal characters (../, etc) and dangerous characters. The file extension is validated to 'css', 'js', or 'html' via in_array(). Protected by same save_post capability and nonce checks as file-001. The slug comes from post meta which is only settable by users with edit_custom_css capability via the wp_ajax_ccj_permalink handler (which also has nonce verification).",
+      "vulnerability_class": "file_inclusion",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "custom-css-js-xss-005",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The sink is 'echo esc_url($permalink)' which IS properly sanitized with esc_url(). The taint analyzer flagged it but missed the sanitizer. On line 1679, the permalink is output with esc_url() in the href and the filename/filetype components use esc_html(). Properly escaped.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "custom-css-js-xss-006",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "On line 1681, $filetype is echoed unescaped in a data-filetype attribute. However, $filetype is validated by in_array($filetype, array('css', 'js')) on line 1642 -- if it doesn't match, the function returns early. So $filetype can only ever be 'css' or 'js' at the point of output. Even when called via wp_ajax_ccj_permalink with $_POST['filetype'], the in_array check on line 1642 prevents any value other than 'css' or 'js'. Additionally, this is an admin-only screen requiring authentication and edit_custom_css capability.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    }
+  ],
+  "summary": "All 11 taint flow findings for custom-css-js are false positives. The plugin has a well-structured security model: (1) No unauthenticated AJAX handlers or REST API routes exist -- all AJAX uses wp_ajax_ prefix requiring login. (2) The custom post type uses custom capabilities (edit_custom_css, etc.) restricted to administrators and the css_js_designer role. (3) Nonce verification is present on all state-changing operations. (4) The XSS findings involve either properly sanitized output (esc_url, esc_html), values constrained to hardcoded options ('yes'/'no', 'css'/'js'), or internal WordPress data (dates, post meta). (5) The RCE findings misidentify preg_replace() usage -- user input is in the subject parameter only, with no /e modifier. (6) The file write operations are the plugin's core intended functionality, with proper path construction using integer post IDs and validated file extensions.",
+  "feedback": "The static taint analyzer has a very high false positive rate on this plugin because: (1) It does not track value constraints from comparison/validation functions like in_array(), selected(), or ternary assignments that constrain output to safe values. (2) It flags preg_replace() as RCE without checking for the /e modifier -- the /e flag was deprecated in PHP 5.5 and removed in PHP 7.0, making this class of finding increasingly irrelevant. (3) It treats post meta and WordPress internal data (post_modified, date_format option) as attacker-controlled taint sources, when these require admin privileges to modify. (4) It correctly identifies the absence of esc_html() in some echo statements but fails to recognize that the echoed values are already constrained to safe literals by prior validation logic."
+}

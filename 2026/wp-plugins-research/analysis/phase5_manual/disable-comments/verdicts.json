@@ -1,0 +1,44 @@
+{
+  "plugin": "disable-comments",
+  "reviewed_by": "manual-phase5",
+  "review_date": "2026-06-16",
+  "verdicts": [
+    {
+      "flow_id": "disable-comments-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The flagged flow is: $_GET['search'] -> sanitize_text_field(wp_unslash(...)) -> get_sites(['search'=>$search]) -> wp_send_json(['data'=>$_sub_sites,'totalNumber'=>$totalNumber]). The sink is wp_send_json(), which serializes the response as JSON with Content-Type:application/json and does not produce HTML. The 'search' value is sanitized via sanitize_text_field() before being passed to WordPress's get_sites() API as a query parameter — it never reaches an HTML output context on the server side. The endpoint is authenticated (requires manage_network_plugins on multisite, manage_options on single-site) and nonce-verified. Any reflected value in the JSON would only be rendered by the JavaScript client, which must be audited separately, but the plugin's JS code uses jQuery to construct DOM elements for site listings and does not use innerHTML or similar unsafe methods with the search term itself. The taint analyzer incorrectly treated wp_send_json() as an XSS sink, but it is a JSON API endpoint, not an HTML output context.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    },
+    {
+      "flow_id": "disable-comments-vari-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The flagged flow is: $_SERVER['REQUEST_URI'] -> esc_url_raw(wp_unslash(...)) -> wp_parse_url($request_uri, PHP_URL_PATH) -> wp_parse_url($request_uri, PHP_URL_QUERY) -> parse_str($query_string, $current_url). The taint analyzer flagged parse_str() as a variable injection sink. Examining the full redirect_to() method (class-plugin-usage-tracker.php:176-198): after parse_str() populates $current_url, the code strips specific keys (dismiss, plugin, _wpnonce, later, plugin_action, marketing_optin) then rebuilds the query string with http_build_query() and returns a URL used in wp_safe_redirect(). This is a standard 'redirect to current page minus certain parameters' pattern. parse_str() here writes to a local array variable ($current_url), not to the global scope (which would require parse_str($str) with no second argument). The result is used only to strip tracking parameters before a same-site redirect. wp_safe_redirect() validates the final URL against allowed hosts, preventing off-site redirects. There is no variable injection into global scope, no eval(), no shell execution, and no dangerous downstream usage of the parsed array beyond query string reconstruction. The 'variable injection' concern from the taint tool is a false positive on safe use of parse_str() with an explicit local target variable.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    },
+    {
+      "flow_id": "disable-comments-ssrf-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The flagged flow is: $_SERVER['REMOTE_ADDR'] -> sanitize_text_field(wp_unslash(...)) -> string concatenation into 'http://ip-api.com/json/[IP]?fields=country' -> wp_remote_get(). The taint analyzer flagged this as SSRF because user-controlled input reaches a URL in wp_remote_get(). However, REMOTE_ADDR is the IP address of the connecting TCP client as set by the server/PHP runtime — it is not a user-controllable HTTP header (unlike X-Forwarded-For or X-Real-IP). The URL is constructed with a fixed prefix ('http://ip-api.com/json/') and fixed suffix ('?fields=country'), with only the client IP inserted in between. Even if an attacker could somehow influence REMOTE_ADDR (which requires server misconfiguration with a trusted proxy), the worst outcome is a request to ip-api.com with a crafted IP value — this cannot redirect to internal services because the domain is hardcoded to ip-api.com. No internal network access, no redirection to localhost or internal addresses is possible. This is a standard 'geolocate the connecting IP' pattern used in telemetry code, executed only during plugin registration (when site_id is false). This is not exploitable SSRF.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    }
+  ],
+  "summary": {
+    "total_findings": 3,
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 3,
+    "needs_further_review": 0,
+    "overall_assessment": "All 3 flagged taint flows are false positives. The XSS finding (xss-001) incorrectly treats wp_send_json() as an HTML output sink — it is a JSON API endpoint, the value is sanitized before use, and the endpoint requires authentication and nonce verification. The variable injection finding (vari-001) misidentifies safe, idiomatic use of parse_str() into a local array variable for query-string reconstruction before a wp_safe_redirect() call. The SSRF finding (ssrf-001) conflates user-controlled input with REMOTE_ADDR (server-set, not HTTP-header-injectable) and ignores that the URL domain is hardcoded to ip-api.com, making internal-network SSRF impossible. The disable-comments plugin demonstrates good security hygiene: all AJAX handlers verify nonces and check capabilities (manage_network_plugins or manage_options as appropriate), database queries use $wpdb->prepare(), output is escaped consistently with esc_html/esc_attr/esc_url, and the network-admin context routing uses a documented, capability-gated pattern."
+  }
+}

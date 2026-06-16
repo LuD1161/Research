@@ -1,0 +1,69 @@
+{
+  "plugin": "wps-hide-login",
+  "review_date": "2026-06-16",
+  "reviewer": "claude-sonnet-4-6-agent",
+  "total_findings_reviewed": 4,
+  "confirmed": 0,
+  "false_positive": 4,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "finding_id": "wps-hide-login-open-001",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "redirect_export_data() at line 474-489 redirects to add_query_arg(..., $this->new_login_url()). The base URL is always new_login_url() which returns home_url()-based path, pinning the redirect to the same origin. add_query_arg() with a fixed absolute base URL cannot redirect to a foreign domain; the supplied GET parameters only modify query string arguments on that same origin. Also, wp_redirect() (not wp_safe_redirect()) is used here, but the destination origin is fixed by the base URL. No open redirect to a third-party domain is possible. The raw $_GET['request_id'] and $_GET['confirm_key'] values passed to add_query_arg are only appended as query string values, not as the base URL, so they cannot change the destination host.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": false,
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wps-hide-login-open-002",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "wp_loaded() at line 561-565 uses wp_safe_redirect() which validates that the destination stays within allowed hosts. The base URL comes from $this->new_login_url() which is derived from home_url(), so it is always the same origin. $_SERVER['QUERY_STRING'] is appended only as a query string suffix (prefixed with '?'), which cannot change the host component of the URL. wp_safe_redirect() would reject any URL pointing to a different host. No open redirect is possible.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": true,
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wps-hide-login-open-003",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "wp_loaded() at line 583-587 uses wp_safe_redirect() with a base from $this->new_login_url() (home_url()-derived) plus $_SERVER['QUERY_STRING'] appended as a query suffix. Same analysis as open-002: wp_safe_redirect() enforces same-origin, the base URL is fixed to home_url(), and the QUERY_STRING is treated as query parameters only and cannot change the destination host. No open redirect is possible.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": true,
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wps-hide-login-open-004",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "wp_loaded() at lines 598-611: $redirect_to is hardcoded to admin_url() (line 598). $requested_redirect_to from $_REQUEST['redirect_to'] is passed only as the second argument to the apply_filters('whl_logged_in_redirect', ...) call (line 608). The default filter return value is the first argument $redirect_to = admin_url(), not $requested_redirect_to. Additionally, wp_safe_redirect() is used (line 609) which restricts the destination to allowed hosts. This code path only executes when is_user_logged_in() is true (line 605). Even if a custom filter used $requested_redirect_to, wp_safe_redirect() prevents cross-domain redirects. The taint tool incorrectly traced $request (from REQUEST_URI parse) through to $logged_in_redirect; the actual redirect target is admin_url() unless a registered filter overrides it.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": true,
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    }
+  ],
+  "additional_observations": [
+    {
+      "area": "dismiss_admin_notice AJAX handler (line 781-795)",
+      "observation": "Authenticated AJAX handler (wp_ajax_dismiss_admin_notice, requires login). Nonce verified via check_ajax_referer('wps-hide-login-dismissible-notice'). Uses sanitize_text_field() on $_POST['option_name'] and $_POST['dismissible_length'] before calling set_site_transient($option_name, ...). A logged-in user could write arbitrary transient keys (e.g., flooding the transients table or overwriting existing transients with known names), but this requires authentication and the impact is low (transient manipulation, not code execution or privilege escalation). Below threshold for reportable finding.",
+      "verdict": "BELOW_THRESHOLD",
+      "auth_required": true
+    },
+    {
+      "area": "Security-by-obscurity architecture",
+      "observation": "The plugin's core protection is renaming the login URL. The plugin correctly blocks direct access to wp-login.php and wp-admin when not logged in. However, this is a defense-in-depth measure; the underlying WordPress authentication is not changed. Plugin does not introduce new authentication bypass vectors.",
+      "verdict": "INFORMATIONAL",
+      "auth_required": false
+    }
+  ]
+}

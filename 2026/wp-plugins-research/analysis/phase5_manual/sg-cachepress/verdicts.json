@@ -1,0 +1,101 @@
+{
+  "plugin": "sg-cachepress",
+  "review_date": "2026-06-16",
+  "reviewer": "opus-4.6-agent",
+  "total_findings_reviewed": 8,
+  "confirmed": 0,
+  "false_positive": 8,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "finding_id": "sg-cachepress-rce-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The 'sink' is preg_replace() which is not an RCE sink. There is no /e modifier. The source is get_option('siteurl') which is admin-only writable. preg_replace without /e simply performs string replacement and cannot execute code.",
+      "vulnerability_class": "rce",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "sg-cachepress-comm-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The data flows from get_option('siteurl') into exec() via sprintf in the switch_protocol() method. However: (1) switch_protocol() is a private method only called from enable() and disable(), (2) those methods are only reachable via REST endpoints that require manage_options capability (checked in Rest.php check_permissions()), (3) the source get_option('siteurl') is itself only writable by administrators, (4) the siteurl value is wrapped in single quotes in the sprintf template. An admin who can change siteurl already has full control over the site. The single-quote wrapping also provides defense-in-depth against injection via the URL value.",
+      "vulnerability_class": "command_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "sg-cachepress-rce-002",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The 'sink' is preg_quote() inside array_map, which is not an RCE sink. preg_quote() escapes regex metacharacters and cannot execute code. The data flows from get_option() into preg_quote() which is a sanitizer, not a dangerous function. The result is used in a preg_match() call which also cannot execute code (no /e modifier).",
+      "vulnerability_class": "rce",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "sg-cachepress-open-001",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The code uses wp_safe_redirect() which validates the redirect target against the allowed_redirect_hosts filter, defaulting to the current site's host only. This is WordPress's built-in protection against open redirects. Additionally, the function is behind a nonce check (wp_verify_nonce with 'sg-cachepress-purge') which prevents CSRF. wp_safe_redirect is the correct and safe way to handle redirects in WordPress.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "sg-cachepress-xss-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The data is output in an admin-only page (registered via add_menu_page with manage_options capability). The $id variable is escaped with esc_html(). The $data array is encoded via wp_json_encode() which properly escapes HTML special characters (including </script> sequences) for safe embedding in script context. All data sources are internal WordPress functions (get_option, get_rest_url, etc.) not user-controlled input. Even if considered an issue, it would only affect admins who already have full control.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "sg-cachepress-rce-003",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The 'sink' is array_map() with a closure that prepends a '/' character. array_map is not an RCE sink - it simply applies a callback to array elements. The data flows from get_option() into string manipulation (substr check and string concatenation) and then update_option(). No code execution, no command execution, no dangerous operations. This is a migration script (Install_5_0_10) that normalizes URL paths.",
+      "vulnerability_class": "rce",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "sg-cachepress-open-002",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The code sets a Content-Type header using get_option('blog_charset'). This option is admin-only writable and is used in a fixed Content-Type header format. The header value is 'Content-Type: application/json; charset=<charset>' which cannot cause an open redirect. Header injection would require CRLF characters in the charset value, but WordPress sanitizes option values and PHP's header() function in modern versions rejects headers with newlines. This is not an open redirect or any other exploitable vulnerability.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "sg-cachepress-comm-002",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $quality_type variable from apply_filters() goes through intval() sanitization and then a strict ternary comparison (1 !== $quality_type ? '' : '-lossy'/'-lossless'). The result can only ever be one of three hardcoded strings: empty string, '-lossy', or '-lossless'. No user-controlled data reaches the exec() call through this variable. The $filepath parameter comes from get_attached_file() which reads from WordPress attachment metadata - filenames are sanitized by WordPress core's sanitize_file_name() during upload. The $quality parameter comes from apply_filters() which requires a malicious plugin to exploit (not a vulnerability in this plugin). While escapeshellarg() should ideally be used on $filepath, the WordPress upload pipeline prevents shell metacharacters in attachment filenames.",
+      "vulnerability_class": "command_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    }
+  ],
+  "summary": "All 8 taint flow findings are false positives. The static analysis tool flagged get_option() calls as taint sources and misidentified safe PHP functions (preg_replace, preg_quote, array_map) as dangerous sinks. The two genuine exec() calls (SSL protocol switch and WebP image conversion) are protected by: (1) REST API permission callbacks requiring manage_options capability, (2) data sources that are admin-only writable (siteurl option), and (3) effective sanitization (intval + ternary reducing filter values to fixed strings). The wp_safe_redirect() usage is correct WordPress practice. The wp_json_encode() output in admin pages is properly contextualized.",
+  "feedback": "The static analysis taint tracker has a very high false positive rate for this plugin because: (1) It treats get_option() as a taint source, but WordPress options are admin-only writable and not user-controlled input. (2) It misidentifies safe PHP functions like preg_replace (without /e), preg_quote, and array_map as dangerous sinks (RCE). (3) It fails to recognize wp_safe_redirect() as a safe redirect function. (4) It does not track WordPress capability checks in REST API permission_callback handlers, missing that all sensitive operations require manage_options. Recommendations: exclude get_option() from taint sources unless the option key is shown to be writable by lower-privileged users; whitelist wp_safe_redirect, preg_quote, array_map as safe sinks; track WordPress REST API permission_callback for auth context."
+}

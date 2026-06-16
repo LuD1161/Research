@@ -1,0 +1,57 @@
+{
+  "plugin": "wp-multibyte-patch",
+  "review_date": "2026-06-16",
+  "reviewer": "security-researcher-agent",
+  "total_findings_reviewed": 4,
+  "confirmed": 0,
+  "false_positive": 4,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "flow_id": "wp-multibyte-patch-open-001",
+      "vulnerability_class": "open_redirect",
+      "severity": "low",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "title": "ETag Header Injection via md5($_GET['ver'])",
+      "reasoning": "The taint analyzer flagged $_GET['ver'] flowing into header(\"Etag: $etag\"). However, the value is first passed through md5(), which produces a fixed 32-character lowercase hexadecimal string ([0-9a-f]{32}) regardless of input. The md5() output cannot contain CRLF sequences, special characters, or anything that could cause header injection. The sink is completely sanitized by the md5() call.",
+      "exploitable": false,
+      "why_not_exploitable": "md5() is a complete sanitizer for HTTP header contexts — its output is always a fixed-length hex string with no injectable characters."
+    },
+    {
+      "flow_id": "wp-multibyte-patch-xss-001",
+      "vulnerability_class": "xss",
+      "severity": "high",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "title": "XSS via $_GET['sd'] controlling file content echoed",
+      "reasoning": "The taint analyzer treated $_GET['sd'] as a taint source because it appears in: $debug_suffix = isset($_GET['sd']) ? '' : '.min'. However, $_GET['sd'] is only checked for existence (isset()), never for value. The variable $debug_suffix is assigned one of two hardcoded string constants: empty string '' or '.min'. The user cannot influence the value of $debug_suffix beyond choosing which constant is used. The resulting file path points to a WordPress core .js file on the server filesystem (wp-includes/js/wplink.js or wplink.min.js), and get_file() uses realpath() + is_file() to validate it exists. The echoed content is a static JavaScript file from WordPress core — not user-controlled. This is not an XSS vulnerability.",
+      "exploitable": false,
+      "why_not_exploitable": "isset() only tests for key existence, not value. $debug_suffix can only be '' or '.min' — both hardcoded. The echoed content comes from a WordPress core JS file, not from user input."
+    },
+    {
+      "flow_id": "wp-multibyte-patch-xss-002",
+      "vulnerability_class": "xss",
+      "severity": "high",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "title": "XSS via $_GET['sd'] (minified branch) controlling file content echoed",
+      "reasoning": "Same root cause as wp-multibyte-patch-xss-001. This is the else-branch (when $_GET['sd'] is not set, $debug_suffix = '.min'). Both branches echo a WordPress core JavaScript file from the server filesystem with a simple string replacement applied. The user has zero control over the content being echoed. The taint tracking was confused by the isset() check being classified as a taint source.",
+      "exploitable": false,
+      "why_not_exploitable": "Duplicate of xss-001 — same false positive root cause. No user-controlled data reaches the echo sink."
+    },
+    {
+      "flow_id": "wp-multibyte-patch-rce-001",
+      "vulnerability_class": "rce",
+      "severity": "high",
+      "verdict": "false_positive",
+      "confidence": "high",
+      "title": "RCE via preg_replace() with user-controlled subject",
+      "reasoning": "The taint analyzer flagged $_GET['s'] flowing into preg_replace(\"/ +/\", \" \", $_GET['s']) as an RCE sink. In PHP <5.5, preg_replace() with the /e modifier in the pattern could execute arbitrary PHP. However: (1) The /e modifier is absent from the fixed literal pattern '/ +/'. (2) The user-controlled value is in the *subject* parameter (third argument), not the pattern (first argument). Even with /e, the subject cannot inject code — only the replacement string could. (3) Modern PHP (5.5+) removed the /e modifier entirely. (4) The function call is preg_replace(fixed_pattern, fixed_replacement, user_input) — safe by construction. The 'missing sanitizer: escapeshellarg()' note is irrelevant since no shell execution occurs. After the preg_replace, wp_slash() is called and the result stays in $_GET['s'] for WordPress search — which WordPress's search handling sanitizes appropriately.",
+      "exploitable": false,
+      "why_not_exploitable": "preg_replace() with a fixed pattern (no /e modifier) and user input only in the subject position is not an RCE vector. The /e modifier exploit requires attacker control over the pattern parameter, not the subject."
+    }
+  ],
+  "summary": "All 4 taint flows are false positives. The plugin is a multibyte character encoding utility for Japanese WordPress installations with a very limited attack surface. Key findings: (1) The ETag header flow is neutralized by md5() which produces only hex characters. (2) The two XSS flows misidentified isset() as a taint source — $_GET['sd'] value is never used, only its presence; $debug_suffix is always a hardcoded constant. (3) The RCE flow confused preg_replace() subject-position input with pattern-position input — the /e modifier exploit requires control of the regex pattern, not the subject string. The wplink.php file serves a WordPress core JavaScript file as a static asset, representing a minimal attack surface. The process_search_terms() function normalizes Japanese kana characters in search queries and is not exploitable.",
+  "feedback": "The taint analyzer has a high false positive rate on this plugin due to: (1) Treating isset($_GET['key']) as a taint source even when the value is never read. (2) Flagging md5() output as tainted despite it being a safe-output hash function. (3) Misclassifying preg_replace() as an RCE sink without checking whether the /e modifier is present and whether attacker control is in the pattern vs. subject position. Future analysis should: track data flow more precisely to distinguish isset() presence checks from actual value reads; mark md5()/sha1()/hash() outputs as sanitized for header injection contexts; restrict preg_replace RCE classification to cases where user input appears in the pattern argument with /e modifier."
+}

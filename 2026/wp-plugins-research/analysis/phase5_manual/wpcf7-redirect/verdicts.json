@@ -1,0 +1,134 @@
+{
+  "plugin": "wpcf7-redirect",
+  "review_date": "2026-06-16",
+  "reviewer": "opus-4.6-agent",
+  "total_findings_reviewed": 11,
+  "confirmed": 0,
+  "false_positive": 11,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "finding_id": "wpcf7-redirect-rce-001",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The taint flow flags array_map('absint', ...) as an RCE sink, but absint() casts values to absolute integers, completely neutralizing any command injection. The bulk-delete action in process_bulk_action() lacks its own nonce check, but this method is called from prepare_items() within a WP_List_Table subclass, which is only instantiated and rendered on admin pages. The delete_customer() method (called with absint IDs) would also need to exist and be dangerous - it's a standard WP_List_Table pattern. No RCE vector exists.",
+      "vulnerability_class": "rce",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wpcf7-redirect-vari-001",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "parse_str() in set_action_menu_order() is protected by current_user_can('wpcf7_edit_contact_form') && wpcf7_validate_nonce(). The parse_str() call uses the two-argument form (parse_str($order_data, $data)) which populates a local $data array rather than overwriting global variables. The resulting values are then passed through intval() before being used in $wpdb->update(). Requires authenticated admin with valid nonce.",
+      "vulnerability_class": "variable_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wpcf7-redirect-sqli-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $wpdb->update() call in set_action_menu_order() uses intval($post_id) for the WHERE clause and an integer $menu_order for the SET clause. WordPress's $wpdb->update() method internally uses prepare() with proper type formatting (%d for integers, %s for strings with escaping). Combined with explicit intval() sanitization and the auth+nonce guard (current_user_can + wpcf7_validate_nonce), SQL injection is not possible.",
+      "vulnerability_class": "sql_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wpcf7-redirect-vari-002",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "parse_str() in make_api_test() is protected by current_user_can('wpcf7_edit_contact_form') && wpcf7_validate_nonce(). Uses two-argument form of parse_str() which writes to local $data array, not global scope. The function is an authenticated AJAX handler (wp_ajax_wpcf7r_make_api_test) requiring admin capability and nonce verification. No variable injection risk for unauthenticated users.",
+      "vulnerability_class": "variable_injection",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wpcf7-redirect-open-001",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The download_file REST endpoint at /wpcf7r/v1/download-file has a permission_callback requiring current_user_can('manage_options'), restricting access to administrators only. The file path comes from get_post_meta() (trusted database data, not direct user input). The filename output in Content-Disposition header is passed through sanitize_file_name(). Path traversal is blocked by strpos() check against the uploads directory. No open redirect or header injection possible.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wpcf7-redirect-open-002",
+      "original_severity": "low",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Same REST endpoint as open-001. The filesize() call uses a path that has been validated to be within the uploads directory (strpos check on line 148) and verified to exist (file_exists on line 152). The Content-Length header receives an integer from filesize(). Admin-only access via permission_callback. No security risk.",
+      "vulnerability_class": "open_redirect",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wpcf7-redirect-file-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The readfile() call in download_file() is protected by: (1) REST API permission_callback requiring manage_options (admin only), (2) file path sourced from get_post_meta() not direct user input, (3) explicit path traversal protection via strpos() check ensuring the normalized path starts with the uploads directory, (4) file_exists() validation. An attacker would need to be an admin AND would need to have previously stored a malicious path in post meta. Since admins can already read any file via other means, this is not a meaningful vulnerability.",
+      "vulnerability_class": "file_inclusion",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wpcf7-redirect-xss-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The $_GET['cf7_form'] value is cast to (int) before use. The only place it appears in output is in a strict comparison ($value === $current_v) which determines whether to add a 'selected' attribute. Since $current_v is an integer and $value comes from a trusted database query of form IDs, this comparison is safe. The actual output values use esc_attr() and esc_html(). Additionally, add_form_filter() is hooked to restrict_manage_posts which only fires for admin users on admin pages. No XSS possible.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wpcf7-redirect-xss-002",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The output uses esc_attr(sanitize_text_field($_GET['cf7_field_meta_key'])) which is proper double sanitization - sanitize_text_field strips tags and extra whitespace, then esc_attr escapes for HTML attribute context. The value is output inside a value=\"\" attribute of an input element. This is correctly sanitized for the context. Also only rendered on admin pages via restrict_manage_posts hook.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wpcf7-redirect-xss-003",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Identical pattern to xss-002. Uses esc_attr(sanitize_text_field($_GET['cf7_field_meta_value'])) for output in an input value attribute. Properly escaped for the HTML attribute context. Only rendered on admin pages.",
+      "vulnerability_class": "xss",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    },
+    {
+      "finding_id": "wpcf7-redirect-ssrf-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The Ext_Accessibe class file (class-ext-accessibe.php) is never included/required from any other PHP file in the plugin - it is an orphaned affiliate extension file. Even if it were loaded: (1) the activate() method is only callable from admin_init() which requires is_admin(), (2) the wp_remote_post URL ($this->api_url) is set from a constant ACCESSIBE_API_URI, not from user input, (3) user-supplied data goes into the POST body (as JSON), not the URL. No SSRF possible since the URL is hardcoded and the file is never loaded.",
+      "vulnerability_class": "ssrf",
+      "auth_required": "admin",
+      "cvss_score": 0.0,
+      "poc_sketch": null
+    }
+  ],
+  "summary": "All 11 taint flow findings in wpcf7-redirect are false positives. The plugin demonstrates generally good security practices: (1) All AJAX handlers are wp_ajax_ (authenticated only, no wp_ajax_nopriv_ handlers) and additionally check current_user_can() + wpcf7_validate_nonce(). (2) REST API endpoints use proper permission_callback with capability checks. (3) User inputs are consistently sanitized with absint/intval/sanitize_text_field/esc_attr. (4) The file download endpoint has path traversal protection via strpos() directory validation. (5) The potentially dangerous parse_str() calls use the two-argument form and are behind auth+nonce. (6) The orphaned accessiBe extension file is never loaded. No confirmed vulnerabilities were found.",
+  "feedback": "The static analysis flagged many false positives due to: (1) treating absint/intval as insufficient sanitization for RCE/SQLi when they fully neutralize these attack vectors, (2) flagging parse_str() without recognizing the two-argument safe form, (3) not tracking WordPress permission_callback in REST route registrations, (4) not recognizing that $wpdb->update() internally parameterizes queries, (5) flagging esc_attr(sanitize_text_field(...)) as missing sanitization, (6) treating get_post_meta() as a taint source equivalent to direct user input. The tooling would benefit from understanding WordPress auth patterns (current_user_can + nonce verification) and recognizing WordPress-specific sanitization functions as effective sinks."
+}

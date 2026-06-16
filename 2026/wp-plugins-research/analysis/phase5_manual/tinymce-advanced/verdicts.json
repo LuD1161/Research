@@ -1,0 +1,63 @@
+{
+  "plugin": "tinymce-advanced",
+  "analysis_date": "2026-06-16",
+  "analyst": "phase5-manual",
+  "summary": {
+    "total_flows_reviewed": 4,
+    "confirmed": 0,
+    "false_positives": 4,
+    "requires_further_review": 0
+  },
+  "verdicts": [
+    {
+      "flow_id": "tinymce-advanced-rce-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "vulnerability_class": "rce",
+      "severity_claimed": "medium",
+      "reasoning": "The taint scanner misidentified array_map() as a dangerous sink. The actual callback is filter_name() (line 912), which applies a strict allowlist regex preg_replace('/[^a-z0-9_]/i', '', $str). This strips everything except alphanumeric and underscore characters. No shell commands, SQL, file paths, or XSS payloads can survive this filter. The resulting values are joined with implode() into a comma-separated string of safe button names. No exploitation path exists.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "sanitizer_analysis": "filter_name() at line 912 uses strict allowlist preg_replace that neutralizes all dangerous payloads"
+    },
+    {
+      "flow_id": "tinymce-advanced-open-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "vulnerability_class": "open_redirect",
+      "severity_claimed": "low",
+      "reasoning": "The taint source is incorrectly identified. $sitename comes from get_bloginfo('name') — a WordPress database option set by the site administrator — not from user-supplied HTTP input. Additionally, the value is further processed with preg_replace('/[ .-]+/', '-', $sitename) and sanitize_file_name() before use. The sink (Content-Disposition header) is used for a file download filename, which is not an open redirect vector. Even if $sitename could be influenced, sanitize_file_name() prevents newline injection that would enable header injection. No exploitation path exists.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "sanitizer_analysis": "sanitize_file_name() applied to value derived from admin-controlled DB option, not request input"
+    },
+    {
+      "flow_id": "tinymce-advanced-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "vulnerability_class": "xss",
+      "severity_claimed": "medium",
+      "reasoning": "The taint scanner flagged echo $form_action without recognizing that $form_action is assigned from esc_url() at line 20. esc_url() encodes/removes dangerous characters including double quotes (%22), single quotes (%27), angle brackets, and all non-URL characters. When echoed inside a double-quoted HTML attribute (action=\"<?php echo $form_action; ?>\"), the only breakout character is double-quote, which esc_url() encodes as %22. Breaking out of the attribute context is not possible. This pattern (esc_url then echo in attribute) is the standard WordPress-recommended safe approach for URL attributes.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "sanitizer_analysis": "esc_url() at source (line 20 of tadv_admin.php) is sufficient for URL output in HTML attribute context; double-quote encoded as %22 prevents attribute breakout"
+    },
+    {
+      "flow_id": "tinymce-advanced-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "vulnerability_class": "xss",
+      "severity_claimed": "medium",
+      "reasoning": "Identical to tinymce-advanced-xss-001 — same source variable $form_action protected by esc_url(), echoed at a second location (line 132 of tadv_admin.php) also within a double-quoted action attribute. Same analysis applies. No exploitation path exists.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "sanitizer_analysis": "esc_url() at source is sufficient for both echo locations (lines 53 and 132 of tadv_admin.php)"
+    }
+  ],
+  "additional_observations": [
+    "The plugin's button ID values echoed in tadv_admin.php (e.g., lines 260, 307, 424, 475) are loaded from WordPress options and passed through validate_settings() which uses strict in_array() whitelist checks before storage — stored XSS via button names is not possible.",
+    "All admin-facing actions are gated behind current_user_can('manage_options') and nonce checks.",
+    "The save_settings() function uses validate_settings() with a whitelist for all toolbar button values before storage in wp_options.",
+    "Overall security posture for this plugin is good — the scanner produced only false positives due to misidentification of sanitizers as sinks and non-request taint sources."
+  ]
+}

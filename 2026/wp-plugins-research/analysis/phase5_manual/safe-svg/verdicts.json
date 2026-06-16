@@ -1,0 +1,71 @@
+{
+  "plugin": "safe-svg",
+  "version": "2.4.0",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "manual-phase5",
+  "verdicts": [
+    {
+      "flow_id": "safe-svg-file-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "confidence": "high",
+      "title": "optimizer.php optimize() — $svg_path is NOT user-controlled; attachment_url_to_postid() returns integer post ID only",
+      "reasoning": "The taint flow claims $svg_url flows through attachment_url_to_postid() to get_attached_file() to file_put_contents(). This misrepresents the data flow. attachment_url_to_postid() is a WordPress core function that performs a DB query using the URL as a lookup key and returns an *integer* post ID (or 0 on failure). That integer post ID — not the URL — is then passed to get_attached_file($attachment_id), which uses the WordPress attachment metadata table to retrieve the stored server path. The attacker cannot influence $svg_path via $svg_url because: (1) attachment_url_to_postid() returns only an integer post ID; (2) get_attached_file() looks up the path from WordPress metadata for that post ID, not from user input. The only user-controlled content that reaches file_put_contents() is the sanitized SVG from $_GET['optimized_svg'], which is processed by enshrined\\svgSanitize\\Sanitizer::sanitize() before writing. Additionally, the function is protected by: (1) current_user_can('edit_post', $attachment_id) capability check at line 161; (2) check_ajax_referer() nonce verification at line 166; (3) the optimizer feature is disabled by default (apply_filters('safe_svg_optimizer_enabled', false) in is_enabled()). The taint scanner incorrectly propagated the URL taint label through attachment_url_to_postid() without recognizing that function returns a type-changed integer, breaking the taint chain.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "references": [
+        "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/safe-svg/includes/optimizer.php#L153-L184"
+      ]
+    },
+    {
+      "flow_id": "safe-svg-manual-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "confidence": "high",
+      "title": "optimizer.php optimize() — optimized_svg content is re-sanitized before write; no sanitizer bypass found",
+      "reasoning": "The $_GET['optimized_svg'] parameter (line 173: $maybe_dirty = stripcslashes($_GET['optimized_svg'])) receives raw user-controlled SVG content from the SVGO JavaScript optimizer. This content is then passed to enshrined\\svgSanitize\\Sanitizer::sanitize() at line 176 before being written to disk. The sanitizer: (1) strips all tags not in the AllowedTags whitelist (script, object, iframe, embed etc. are absent from the allowlist); (2) strips all attributes not in AllowedAttributes whitelist (event handlers like onclick, onerror are absent); (3) validates href/xlink:href values against a safe-scheme allowlist (only #fragment, /, https://, http://, and specific data:image/* types); (4) removes CDATA sections that could smuggle content; (5) handles PHP tag injection with recursive preg_replace. Examined both AllowedTags and AllowedAttributes lists — no dangerous tags (script, object, embed, iframe) or event-handler attributes are present. The 'style' attribute is allowed but within inline SVG in HTML5, CSS expressions are not interpreted by modern browsers. The 'a' tag with 'href' is allowed but href values are validated against the safe-scheme list. No bypass technique was identified. Access requires: authenticated user with edit_post capability on the specific SVG attachment + valid nonce. This is an Author-level+ operation on an SVG they have edit rights on. Not independently exploitable.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "references": [
+        "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/safe-svg/includes/optimizer.php#L173-L182",
+        "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/safe-svg/vendor/enshrined/svg-sanitize/src/Sanitizer.php",
+        "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/safe-svg/vendor/enshrined/svg-sanitize/src/data/AllowedTags.php",
+        "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/safe-svg/vendor/enshrined/svg-sanitize/src/data/AllowedAttributes.php"
+      ]
+    },
+    {
+      "flow_id": "safe-svg-manual-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "confidence": "high",
+      "title": "register.php render_block_callback() — $contents inlined without escaping but is sanitized-on-upload SVG from WP media library",
+      "reasoning": "In register.php line 88, $contents (raw SVG file contents read by file_get_contents()) is passed unescaped as argument %16$s in the sprintf() that builds the block's HTML output. This is intentional inline SVG embedding — escaping would break the SVG rendering. The trust model relies on SVGs being sanitized at upload time by check_for_svg() → sanitize() → Sanitizer::sanitize(). The design assumption is that any SVG stored in the WordPress media library has already been sanitized. Evaluated bypass scenarios: (1) If an SVG was uploaded before the plugin was active — possible, but the plugin can only control its own upload filter; pre-existing files are an inherited risk not a new vulnerability introduced by this code path; (2) If svg_allowed_tags or svg_allowed_attributes filters add dangerous tags — the optimizer specifically disables when these filters are detected (is_enabled() at line 52-62 returns false), and the upload sanitizer always applies these filters so any extension adding script/object tags would be a deliberate developer action; (3) No SSRF/path traversal is possible: get_attached_file() resolves paths from the database for the validated $attributes['imageID']. The block's imageID attribute must reference a valid media attachment of type image/svg+xml. The inline SVG pattern (rendering file contents directly) is the standard approach for SVG blocks and is consistent with the plugin's core purpose.",
+      "auth_required": false,
+      "nonce_verified": false,
+      "references": [
+        "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/safe-svg/includes/blocks/safe-svg/register.php#L33-L94"
+      ]
+    },
+    {
+      "flow_id": "safe-svg-manual-003",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "confidence": "high",
+      "title": "optimize() nonce check ordering — nonce is always checked before write, just after auth check; no bypass",
+      "reasoning": "A code-quality concern exists in optimizer.php::optimize(): the capability check (current_user_can at line 161) comes before the nonce check (check_ajax_referer at line 166). While best practice is to check nonces first, this ordering does not create a security vulnerability. The nonce is always checked when the code path reaches line 166 — the early return at lines 158-163 exits if optimized_svg is empty, attachment_id is empty, or the user lacks capability; these are all conditions that would also cause the subsequent nonce check to be irrelevant (no state-changing operation follows without the nonce). The nonce is checked before file_put_contents() on line 182. No bypass: even if an attacker could reach line 166 without capability (they cannot due to the check at 161), they would still need a valid nonce tied to the current user session. The 'safe-svg-optimizer' nonce is created per-session and not guessable.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "references": [
+        "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/safe-svg/includes/optimizer.php#L153-L184"
+      ]
+    }
+  ],
+  "summary": {
+    "total_flows_reviewed": 4,
+    "confirmed": 0,
+    "false_positives": 4,
+    "needs_more_info": 0,
+    "overall_risk": "low",
+    "notes": "safe-svg 2.4.0 has a small, well-structured attack surface. The optimizer feature is disabled by default. All file-write operations require authenticated users with appropriate capability plus valid nonces. The core SVG sanitization library (enshrined/svg-sanitize) appears robust with no allowlist bypass identified. The inline SVG block relies on upload-time sanitization, which is the correct trust boundary for this plugin's design. No independently exploitable vulnerabilities found."
+  }
+}
