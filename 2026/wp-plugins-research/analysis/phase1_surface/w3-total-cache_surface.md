@@ -1,6 +1,6 @@
 # Attack Surface: w3-total-cache
 
-> Generated: 2026-06-15T02:06:27Z
+> Generated: 2026-06-16T09:13:55Z
 
 ## Section 1: Entry Points
 

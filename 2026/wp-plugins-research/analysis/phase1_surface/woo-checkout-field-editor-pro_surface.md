@@ -1,6 +1,6 @@
 # Attack Surface: woo-checkout-field-editor-pro
 
-> Generated: 2026-06-15T02:06:28Z
+> Generated: 2026-06-16T09:13:55Z
 
 ## Section 1: Entry Points
 

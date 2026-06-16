@@ -1,0 +1,123 @@
+{
+  "plugin_slug": "imagify",
+  "review_date": "2026-06-16",
+  "reviewer": "manual-security-audit",
+  "overall_risk": "low",
+  "confirmed_vulnerabilities": 0,
+  "false_positives": 20,
+  "notes": "Imagify is a well-secured plugin. Despite 20 flagged taint flows, every single one is a false positive. The plugin has consistent nonce + capability checks on all AJAX/admin-post endpoints. The one nopriv AJAX handler (nopriv_imagify_rpc) is a bridge for XML-RPC async jobs and is protected by transient-based user validation + nonce verification. Background processing nopriv handlers are standard wp-background-processing library with nonce checks. One informational finding: SSL verification disabled on API calls.",
+  "informational_findings": [
+    {
+      "id": "imagify-info-001",
+      "title": "SSL Verification Disabled on Imagify API Curl Calls",
+      "severity": "informational",
+      "type": "insecure_transport",
+      "file": "inc/classes/class-imagify.php",
+      "lines": "505-506",
+      "description": "CURLOPT_SSL_VERIFYHOST and CURLOPT_SSL_VERIFYPEER are both set to false in curl_http_call(). This is used when uploading images to the Imagify API (app.imagify.io). The Authorization header containing the API key is sent over this unverified connection. A network-level MitM attacker could intercept API keys. However, this requires network proximity, is not exploitable remotely by an unauthenticated attacker, and the API endpoint is hardcoded (not user-controllable), limiting SSRF risk.",
+      "exploitable_unauthenticated": false
+    }
+  ],
+  "flow_verdicts": {
+    "imagify-sqli-001": {
+      "verdict": "false_positive",
+      "reason": "Data flows from internal DB query results ($wpdb->get_col) through cast_col() and prepare_values_list() (which calls esc_sql()) into another DB query. No user input enters this chain. The function remove_empty_inactive_folders() is only called internally."
+    },
+    "imagify-sqli-002": {
+      "verdict": "false_positive",
+      "reason": "The $folders variable in the query at line 203 of class-imagify-files-list-table.php is constructed from internal database IDs, not from user input. The Files List Table is an admin-only page requiring authentication."
+    },
+    "imagify-xss-001": {
+      "verdict": "false_positive",
+      "reason": "The imagify_check_coupon callback at line 888 has nonce verification (imagify_check_nonce) and capability check (current_user_can 'manage'). The coupon value goes through sanitize_text_field() and the response is JSON (wp_send_json_success), not HTML output. XSS in JSON responses requires the consumer to unsafely render the data."
+    },
+    "imagify-rce-001": {
+      "verdict": "false_positive",
+      "reason": "The imagify_dismiss_ad_callback has nonce check and capability check. The $notice value goes through sanitize_text_field() and is stored in user meta. array_filter() is not an RCE sink. No shell execution anywhere in this chain."
+    },
+    "imagify-rce-002": {
+      "verdict": "false_positive",
+      "reason": "maybe_unserialize() on database meta values is standard WordPress pattern. The data originates from $wpdb->get_results (database), not user input. Object injection via unserialize requires attacker-controlled serialized data in the database, which requires prior SQL injection or DB access -- not available here."
+    },
+    "imagify-obje-001": {
+      "verdict": "false_positive",
+      "reason": "maybe_unserialize() on transient values from wp_options table. Data comes from database via $wpdb->prepare(). No user input controls the serialized data. Standard WordPress transient retrieval pattern."
+    },
+    "imagify-rce-003": {
+      "verdict": "false_positive",
+      "reason": "absint($limit) is not user input -- it is a function parameter. maybe_unserialize() is applied to database results. This is internal admin statistics computation in NextGen Gallery integration, not reachable by unauthenticated users."
+    },
+    "imagify-rce-004": {
+      "verdict": "false_positive",
+      "reason": "The $domain value comes from stored S3 settings (admin-configured option), not from user request input. sanitize_text_field() and preg_replace() are applied. preg_replace() is not an RCE sink (the /e modifier is not used)."
+    },
+    "imagify-rce-005": {
+      "verdict": "false_positive",
+      "reason": "absint() applied to blog IDs from $wpdb->get_col with $wpdb->prepare(). array_map('absint') is a sanitizer, not a sink. No shell execution. Admin-only upgrader code."
+    },
+    "imagify-rce-006": {
+      "verdict": "false_positive",
+      "reason": "Same as rce-005. array_filter() on absint-processed database results is not an RCE vector."
+    },
+    "imagify-xss-002": {
+      "verdict": "false_positive",
+      "reason": "ActionScheduler bundled dependency. absint() on $num_pastdue_actions, esc_url() on URL, wp_kses() on HTML output. Properly escaped. Admin-only notice."
+    },
+    "imagify-rce-007": {
+      "verdict": "false_positive",
+      "reason": "ActionScheduler bundled dependency. $_GET['ID'] is processed through array_map('absint') which converts all values to non-negative integers. Nonce is verified. Not RCE."
+    },
+    "imagify-xss-003": {
+      "verdict": "false_positive",
+      "reason": "ActionScheduler bundled dependency. esc_attr(), esc_url(), esc_html(), and absint() are all applied before output in the sprintf. Properly escaped."
+    },
+    "imagify-rce-008": {
+      "verdict": "false_positive",
+      "reason": "ActionScheduler bundled dependency. array_map with a class method on prepared query results. Not RCE."
+    },
+    "imagify-sqli-003": {
+      "verdict": "false_positive",
+      "reason": "ActionScheduler bundled dependency. $action_ids from $wpdb->prepare() query, then processed through array_map('absint'). The resulting integer-only string is safe for SQL IN clause."
+    },
+    "imagify-rce-009": {
+      "verdict": "false_positive",
+      "reason": "get_option() returns admin-configured data. preg_replace with character whitelist [a-z0-9_-] is sanitization, not a sink. No shell execution."
+    },
+    "imagify-rce-010": {
+      "verdict": "false_positive",
+      "reason": "Database result IDs processed through array_map('absint') and array_unique(). Not user input. Not RCE. Admin-only stats function."
+    },
+    "imagify-sqli-004": {
+      "verdict": "false_positive",
+      "reason": "The $limit_ids variable in the SQL query is built from absint-processed post IDs retrieved from a prior database query. No user input flows into $limit_ids. Internal stats function."
+    },
+    "imagify-rce-011": {
+      "verdict": "false_positive",
+      "reason": "maybe_unserialize() on database query results (post meta _imagify_data). Data is not user-controlled. Standard WordPress meta retrieval in admin stats context."
+    },
+    "imagify-obje-002": {
+      "verdict": "false_positive",
+      "reason": "maybe_unserialize() on option values from wp_options. Same as obje-001 -- standard WordPress option retrieval pattern with no user-controlled serialized input."
+    },
+    "imagify-rce-012": {
+      "verdict": "false_positive",
+      "reason": "Deprecated class. Database result IDs processed through absint and array_filter. Not user input, not RCE."
+    },
+    "imagify-xss-004": {
+      "verdict": "false_positive",
+      "reason": "Deprecated class. wp_send_json_success() outputs JSON, not HTML. Data comes from database (filenames, optimization data). No direct HTML rendering."
+    },
+    "imagify-xss-005": {
+      "verdict": "false_positive",
+      "reason": "The get_bulk_stats AJAX handler at line 569 of Bulk.php checks nonce (imagify-bulk-optimize) first, then filters by context with capability check. The filter_input from GET is authenticated. JSON response, not HTML."
+    },
+    "imagify-rce-013": {
+      "verdict": "false_positive",
+      "reason": "Same pattern as rce-012 but in active Bulk/WP.php class. Database IDs through absint. Not user input, not RCE."
+    },
+    "imagify-rce-014": {
+      "verdict": "false_positive",
+      "reason": "Same as rce-013 but for NextGen size optimization query. Database IDs through absint. Not user input, not RCE."
+    }
+  }
+}

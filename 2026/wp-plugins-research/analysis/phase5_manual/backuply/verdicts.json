@@ -1,0 +1,220 @@
+{
+  "plugin": "backuply",
+  "version": "1.5.3",
+  "review_date": "2026-06-16",
+  "overall_risk": "high",
+  "confirmed_vulnerabilities": [
+    {
+      "id": "BACKUPLY-001",
+      "title": "Unauthenticated Privilege Escalation via Session Creation (backuply_creating_session)",
+      "severity": "critical",
+      "cvss_estimate": 9.8,
+      "type": "authentication_bypass",
+      "unauthenticated": true,
+      "file": "main/ajax.php",
+      "lines": "562-613",
+      "status": "confirmed",
+      "detail_file": "confirmed/001-unauth-session-creation.md"
+    },
+    {
+      "id": "BACKUPLY-002",
+      "title": "Unauthenticated Restore Response Handler Leads to Information Disclosure",
+      "severity": "medium",
+      "cvss_estimate": 5.3,
+      "type": "information_disclosure",
+      "unauthenticated": true,
+      "file": "main/ajax.php",
+      "lines": "344-442",
+      "status": "confirmed",
+      "detail_file": "confirmed/002-unauth-restore-response.md"
+    },
+    {
+      "id": "BACKUPLY-003",
+      "title": "Temporary Restore PHP File Written to Web Root (backuply-restore.php)",
+      "severity": "high",
+      "cvss_estimate": 7.5,
+      "type": "insecure_temporary_file",
+      "unauthenticated": true,
+      "file": "functions.php",
+      "lines": "1703-1710",
+      "status": "confirmed",
+      "detail_file": "confirmed/003-webroot-restore-file.md"
+    },
+    {
+      "id": "BACKUPLY-004",
+      "title": "Weak Custom Token Auth in Restore Flow Enables Replay/Brute-force",
+      "severity": "medium",
+      "cvss_estimate": 6.5,
+      "type": "weak_authentication",
+      "unauthenticated": true,
+      "file": "restore_ins.php",
+      "lines": "160-177",
+      "status": "confirmed",
+      "detail_file": "confirmed/004-weak-restore-key-auth.md"
+    },
+    {
+      "id": "BACKUPLY-005",
+      "title": "Database Credentials Passed in HTTP POST Body During Restore",
+      "severity": "medium",
+      "cvss_estimate": 5.9,
+      "type": "sensitive_data_exposure",
+      "unauthenticated": false,
+      "file": "functions.php",
+      "lines": "1658-1725",
+      "status": "confirmed",
+      "detail_file": "confirmed/005-db-creds-in-restore-post.md"
+    }
+  ],
+  "false_positives": [
+    {
+      "flow_id": "backuply-rce-001",
+      "reason": "PHP_SELF used in preg_replace but only to derive $backup_file_loc path. Not passed to exec/system. The preg_replace uses a safe static pattern (no /e modifier). This is not RCE.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-rce-002",
+      "reason": "Same as rce-001. $backup_file_loc is a path variable derived from PHP_SELF, used for filesystem path construction, not command execution.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-xss-001",
+      "reason": "The echo outputs either empty string or literal 'style=\"display:none\"' based on a boolean check (!empty(...)). No user-controlled content is output. The get_option value is only tested for emptiness.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-xss-002",
+      "reason": "$aws_sse can only be 'checked' or empty string (based on isset check). The output uses esc_attr(). No actual user content reaches output.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-xss-003",
+      "reason": "$backup_sync_infos can only be 'checked' or empty string. Output uses esc_attr(). Not exploitable.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-xss-004",
+      "reason": "Output is either 'checked' or empty string based on boolean check of option value. Not XSS.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-xss-005",
+      "reason": "Same pattern as xss-004. Boolean check on option value, outputs only 'checked' or empty.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-xss-006",
+      "reason": "Outputs 'display:none' or empty string based on string comparison. No user-controlled data in output.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-xss-007",
+      "reason": "$history_page is cast to (int). All outputs use esc_html(), esc_attr(), or esc_url(). Properly sanitized. Not exploitable.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-xss-008",
+      "reason": "$_SERVER['SERVER_SOFTWARE'] is output with esc_html(). Properly escaped. Not exploitable.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-xss-009",
+      "reason": "backuply_check_backup_status requires backuply_ajax_nonce_verify() which checks nonce + current_user_can('activate_plugins'). Authenticated admin-only. The output goes into JSON (wp_send_json). Low risk.",
+      "actual_risk": "informational"
+    },
+    {
+      "flow_id": "backuply-xss-010",
+      "reason": "backuply_get_last_logs requires backuply_ajax_nonce_verify() (nonce + admin capability check). The file_name goes through backuply_sanitize_filename. Log content is read from server files, not user-supplied. Admin-only.",
+      "actual_risk": "informational"
+    },
+    {
+      "flow_id": "backuply-file-001",
+      "reason": "Writes to config file protected by '<?php exit();?>' prefix. Data comes from get_option (admin-controlled). File is chmod 0600. Not exploitable by unauthenticated users.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-file-002",
+      "reason": "Data comes from get_option('backuply_remote_backup_locs') which is admin-set. The fopen is used during backup download which requires auth. Not unauthenticated.",
+      "actual_risk": "informational"
+    },
+    {
+      "flow_id": "backuply-file-003",
+      "reason": "Same as file-002. Admin-controlled option data used in backup operations.",
+      "actual_risk": "informational"
+    },
+    {
+      "flow_id": "backuply-file-004",
+      "reason": "$limit is intval() cast. $db and $table come from the backup process internals, not user input. This is the backup DB dump process that runs during authenticated cron/backup operations.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-file-005",
+      "reason": "Same as file-004. Internal backup process, not user-controllable.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-file-006",
+      "reason": "Same as file-004. Internal backup process.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-ssrf-001",
+      "reason": "The restore_curl_url is constructed by the plugin itself (site_url() + known paths). Not user-controllable. The HTTP request is self-referential to trigger async restore. Not SSRF.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-ssrf-002",
+      "reason": "The URL is admin_url('admin-ajax.php') + action param. Self-referential loopback request to trigger async backup. Cookie forwarding is intentional for auth. Not SSRF.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-ssrf-003",
+      "reason": "Same as ssrf-002. Self-referential async request pattern. URL is admin_url().",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-ssrf-004",
+      "reason": "License check request goes to hardcoded BACKUPLY_API constant URL. The user-supplied license value goes in the body, not the URL. Not SSRF.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-file-007",
+      "reason": "Settings page with nonce_verified=true. Data from admin-only get_option. Requires admin authentication to reach.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-file-008",
+      "reason": "Same as file-007. Admin settings page.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-file-009",
+      "reason": "Same as file-007. Admin settings page.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-file-010",
+      "reason": "Same as file-007. Admin settings page.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-file-011",
+      "reason": "Same as file-007. Admin settings page.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-file-012",
+      "reason": "Same as file-007. Admin settings page.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-file-013",
+      "reason": "Same as file-007. Admin settings page.",
+      "actual_risk": "none"
+    },
+    {
+      "flow_id": "backuply-file-014",
+      "reason": "backuply_get_last_logs requires backuply_ajax_nonce_verify() which enforces admin auth. File name goes through backuply_sanitize_filename (which calls sanitize_file_name). Path traversal mitigated. Admin-only.",
+      "actual_risk": "informational"
+    }
+  ]
+}

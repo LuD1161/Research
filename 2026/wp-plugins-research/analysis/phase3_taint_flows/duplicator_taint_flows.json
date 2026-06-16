@@ -1,0 +1,2463 @@
+{
+  "plugin": "duplicator",
+  "php_files_analyzed": 554,
+  "parse_errors": 0,
+  "total_flows": 46,
+  "by_severity": {
+    "medium": 4,
+    "critical": 6,
+    "high": 36
+  },
+  "by_vulnerability_class": {
+    "ssrf": 3,
+    "rce": 5,
+    "file_inclusion": 14,
+    "sql_injection": 3,
+    "xss": 20,
+    "variable_injection": 1
+  },
+  "flows": [
+    {
+      "flow_id": "duplicator-ssrf-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "duplicator",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$reason_info = isset($_REQUEST['reason_info']) ? stripcslashes(esc_html($_REQUEST['reason_info'])) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/deactivation.php",
+        "line": 418
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 418,
+          "expression": "$reason_info = isset($_REQUEST['reason_info']) ? stripcslashes(esc_html($_REQUEST['reason_info'])) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 420,
+          "expression": "$reason_info = substr($reason_info, 0, 255)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 423,
+          "expression": "$options = array(\n                'product' => $basename,\n                'reason_id' => $reason_id,\n                'reason_info' => $reason_info,\n            )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 430,
+          "expression": "$raw_response = wp_remote_post(\n                'https://snapcreekanalytics.com/wp-content/plugins/duplicator-statistics-plugin/deactivation-feedback/',\n                array(\n                    'method' => 'POST',\n                    'body' => $options,\n                    'timeout' => 15,\n                    // 'sslverify' => FALSE\n                )\n            )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$raw_response = wp_remote_post(\n                'https://snapcreekanalytics.com/wp-content/plugins/duplicator-statistics-plugin/deactivation-feedback/',\n                array(\n                    'method' => 'POST',\n                    'body' => $options,\n                    'timeout' => 15,\n                    // 'sslverify' => FALSE\n                )\n            )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/deactivation.php",
+        "line": 430
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "duplicator-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "explode(',', sanitize_text_field($compatValue))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.database.php",
+        "line": 190
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 190,
+          "expression": "$values = array_map('trim', explode(',', sanitize_text_field($compatValue)))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$values = array_map('trim', explode(',', sanitize_text_field($compatValue)))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.database.php",
+        "line": 190
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-file-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$create             = $wpdb->get_row(\"SHOW CREATE TABLE `{$table}`\", ARRAY_N)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.database.php",
+        "line": 729
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 729,
+          "expression": "$create             = $wpdb->get_row(\"SHOW CREATE TABLE `{$table}`\", ARRAY_N)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 732,
+          "expression": "fwrite($handle, \"{$create_table_query};\\n\\n\")",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "fwrite($handle, \"{$create_table_query};\\n\\n\")",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.database.php",
+        "line": 732
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-file-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$create = $wpdb->get_row(\"SHOW CREATE PROCEDURE `{$procedure}`\", ARRAY_N)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.database.php",
+        "line": 741
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 741,
+          "expression": "$create = $wpdb->get_row(\"SHOW CREATE PROCEDURE `{$procedure}`\", ARRAY_N)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 742,
+          "expression": "fwrite($handle, \"{$create[2]} ;;\\n\")",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "fwrite($handle, \"{$create[2]} ;;\\n\")",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.database.php",
+        "line": 742
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-file-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$create = $wpdb->get_row(\"SHOW CREATE FUNCTION `{$function}`\", ARRAY_N)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.database.php",
+        "line": 752
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 752,
+          "expression": "$create = $wpdb->get_row(\"SHOW CREATE FUNCTION `{$function}`\", ARRAY_N)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 753,
+          "expression": "fwrite($handle, \"{$create[2]} ;;\\n\")",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "fwrite($handle, \"{$create[2]} ;;\\n\")",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.database.php",
+        "line": 753
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-file-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$create = $wpdb->get_row(\"SHOW CREATE VIEW `{$view}`\", ARRAY_N)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.database.php",
+        "line": 761
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 761,
+          "expression": "$create = $wpdb->get_row(\"SHOW CREATE VIEW `{$view}`\", ARRAY_N)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 762,
+          "expression": "fwrite($handle, \"{$create[1]};\\n\\n\")",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "fwrite($handle, \"{$create[1]};\\n\\n\")",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.database.php",
+        "line": 762
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$procedures = $wpdb->get_col($procQuery, 1)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 280
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 280,
+          "expression": "$procedures = $wpdb->get_col($procQuery, 1)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 282,
+          "expression": "$create                              = $wpdb->get_row(\"SHOW CREATE PROCEDURE `\" . $procedures[0] . \"`\", ARRAY_N)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$create                              = $wpdb->get_row(\"SHOW CREATE PROCEDURE `\" . $procedures[0] . \"`\", ARRAY_N)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 282
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-sqli-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$functions = $wpdb->get_col($funcQuery, 1)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 287
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 287,
+          "expression": "$functions = $wpdb->get_col($funcQuery, 1)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 289,
+          "expression": "$create                              = $wpdb->get_row(\"SHOW CREATE FUNCTION `\" . $functions[0] . \"`\", ARRAY_N)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$create                              = $wpdb->get_row(\"SHOW CREATE FUNCTION `\" . $functions[0] . \"`\", ARRAY_N)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 289
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-sqli-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "array(\n                'name' => $this->Name,\n                'hash' => $this->Hash,\n                'status' => DUP_PackageStatus::START,\n                'created' => current_time('mysql', get_option('gmt_offset', 1)),\n                'owner' => isset($current_user->user_login) ? $current_user->user_login : 'unknown',\n                'package' => $packageObj)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 491
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 491,
+          "expression": "$results     = $wpdb->insert($tablePrefix . \"duplicator_packages\", array(\n                'name' => $this->Name,\n                'hash' => $this->Hash,\n                'status' => DUP_PackageStatus::START,\n                'created' => current_time('mysql', get_option('gmt_offset', 1)),\n                'owner' => isset($current_user->user_login) ? $current_user->user_login : 'unknown',\n                'package' => $packageObj))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$results     = $wpdb->insert($tablePrefix . \"duplicator_packages\", array(\n                'name' => $this->Name,\n                'hash' => $this->Hash,\n                'status' => DUP_PackageStatus::START,\n                'created' => current_time('mysql', get_option('gmt_offset', 1)),\n                'owner' => isset($current_user->user_login) ? $current_user->user_login : 'unknown',\n                'package' => $packageObj))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 491
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-file-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 521
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 521,
+          "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 524,
+          "expression": "$row       = $getResult[0]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 525,
+          "expression": "$nameHash  = \"{$row['name']}_{$row['hash']}\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 555,
+          "expression": "unlink($tmpPath . \"/{$nameHash}_database.sql\")",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink($tmpPath . \"/{$nameHash}_database.sql\")",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 555
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-file-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 521
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 521,
+          "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 524,
+          "expression": "$row       = $getResult[0]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 525,
+          "expression": "$nameHash  = \"{$row['name']}_{$row['hash']}\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 556,
+          "expression": "unlink($tmpPath . \"/{$nameHash}_installer\" . DUP_Installer::INSTALLER_SERVER_EXTENSION)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink($tmpPath . \"/{$nameHash}_installer\" . DUP_Installer::INSTALLER_SERVER_EXTENSION)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 556
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-file-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 521
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 521,
+          "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 524,
+          "expression": "$row       = $getResult[0]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 525,
+          "expression": "$nameHash  = \"{$row['name']}_{$row['hash']}\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 557,
+          "expression": "unlink($tmpPath . \"/{$nameHash}_scan.json\")",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink($tmpPath . \"/{$nameHash}_scan.json\")",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 557
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-file-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 521
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 521,
+          "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 524,
+          "expression": "$row       = $getResult[0]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 525,
+          "expression": "$nameHash  = \"{$row['name']}_{$row['hash']}\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 559,
+          "expression": "unlink($tmpPath . \"/{$nameHash}.log\")",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink($tmpPath . \"/{$nameHash}.log\")",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 559
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-file-009",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 521
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 521,
+          "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 524,
+          "expression": "$row       = $getResult[0]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 525,
+          "expression": "$nameHash  = \"{$row['name']}_{$row['hash']}\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 562,
+          "expression": "unlink($ssdPath . \"/{$nameHash}_database.sql\")",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink($ssdPath . \"/{$nameHash}_database.sql\")",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 562
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-file-010",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 521
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 521,
+          "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 524,
+          "expression": "$row       = $getResult[0]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 525,
+          "expression": "$nameHash  = \"{$row['name']}_{$row['hash']}\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 563,
+          "expression": "unlink($ssdPath . \"/{$nameHash}_installer\" . DUP_Installer::INSTALLER_SERVER_EXTENSION)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink($ssdPath . \"/{$nameHash}_installer\" . DUP_Installer::INSTALLER_SERVER_EXTENSION)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 563
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-file-011",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 521
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 521,
+          "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 524,
+          "expression": "$row       = $getResult[0]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 525,
+          "expression": "$nameHash  = \"{$row['name']}_{$row['hash']}\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 564,
+          "expression": "unlink($ssdPath . \"/{$nameHash}_scan.json\")",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink($ssdPath . \"/{$nameHash}_scan.json\")",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 564
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-file-012",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 521
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 521,
+          "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 524,
+          "expression": "$row       = $getResult[0]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 525,
+          "expression": "$nameHash  = \"{$row['name']}_{$row['hash']}\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 568,
+          "expression": "unlink($ssdPath . \"/{$nameHash}.log\")",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink($ssdPath . \"/{$nameHash}.log\")",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 568
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-file-013",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 521
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 521,
+          "expression": "$getResult   = $wpdb->get_results($wpdb->prepare(\"SELECT name, hash FROM `{$tblName}` WHERE id = %d\", $this->ID), ARRAY_A)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 524,
+          "expression": "$row       = $getResult[0]",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 525,
+          "expression": "$nameHash  = \"{$row['name']}_{$row['hash']}\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 569,
+          "expression": "unlink($logsPath . \"/{$nameHash}.log\")",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink($logsPath . \"/{$nameHash}.log\")",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 569
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$rows = $wpdb->get_results($sql . $offset)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 829
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 829,
+          "expression": "$rows = $wpdb->get_results($sql . $offset)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 831,
+          "expression": "$Package = @unserialize($rows[0]->package)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 840,
+          "expression": "call_user_func($callback, $Package)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "call_user_func($callback, $Package)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/classes/package/class.pack.php",
+        "line": 840
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-ssrf-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$url    = filter_var($url, FILTER_VALIDATE_URL)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/installer/dup-installer/classes/class.http.php",
+        "line": 206
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 206,
+          "expression": "$url    = filter_var($url, FILTER_VALIDATE_URL)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 207,
+          "expression": "$handle = curl_init($url)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 221,
+          "expression": "$response = curl_exec($handle)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = curl_exec($handle)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/installer/dup-installer/classes/class.http.php",
+        "line": 221
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$inputCls    = filter_var($classes, FILTER_SANITIZE_SPECIAL_CHARS, FILTER_FORCE_ARRAY)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/installer/dup-installer/classes/view-helpers/class.u.html.php",
+        "line": 362
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 362,
+          "expression": "$inputCls    = filter_var($classes, FILTER_SANITIZE_SPECIAL_CHARS, FILTER_FORCE_ARRAY)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 363,
+          "expression": "$mainClasses = array_merge(array('more-content'), $inputCls)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 368,
+          "expression": "echo implode(' ', $mainClasses);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo implode(' ', $mainClasses);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/installer/dup-installer/classes/view-helpers/class.u.html.php",
+        "line": 368
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-002",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo DUPX_U::esc_html($_SERVER['SERVER_SOFTWARE']);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/installer/dup-installer/templates/default/pages-parts/head/server-details.php",
+        "line": 17
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 17,
+          "expression": "echo DUPX_U::esc_html($_SERVER['SERVER_SOFTWARE']);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo DUPX_U::esc_html($_SERVER['SERVER_SOFTWARE']);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/installer/dup-installer/templates/default/pages-parts/head/server-details.php",
+        "line": 17
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo DUPX_U::esc_html(php_sapi_name());",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/installer/dup-installer/templates/default/pages-parts/head/server-details.php",
+        "line": 19
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 19,
+          "expression": "echo DUPX_U::esc_html(php_sapi_name());",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo DUPX_U::esc_html(php_sapi_name());",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/installer/dup-installer/templates/default/pages-parts/head/server-details.php",
+        "line": 19
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$cpanelURL      = DUPX_U::esc_url('https://' . $_SERVER['SERVER_NAME'] . ':2083')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/installer/dup-installer/templates/default/pages-parts/step1/database-tabs/cpanel-panel.php",
+        "line": 23
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 23,
+          "expression": "$cpanelURL      = DUPX_U::esc_url('https://' . $_SERVER['SERVER_NAME'] . ':2083')",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 39,
+          "expression": "echo $cpanelURL;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $cpanelURL;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/installer/dup-installer/templates/default/pages-parts/step1/database-tabs/cpanel-panel.php",
+        "line": 39
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-005",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_tab = isset($_REQUEST['tab']) ? sanitize_text_field($_REQUEST['tab']) : 'general'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/settings/controller.php",
+        "line": 19
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 19,
+          "expression": "$current_tab = isset($_REQUEST['tab']) ? sanitize_text_field($_REQUEST['tab']) : 'general'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 28,
+          "expression": "echo ($current_tab == 'general') ? 'nav-tab-active' : ''",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ($current_tab == 'general') ? 'nav-tab-active' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/settings/controller.php",
+        "line": 28
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-006",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_tab = isset($_REQUEST['tab']) ? sanitize_text_field($_REQUEST['tab']) : 'general'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/settings/controller.php",
+        "line": 19
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 19,
+          "expression": "$current_tab = isset($_REQUEST['tab']) ? sanitize_text_field($_REQUEST['tab']) : 'general'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 34,
+          "expression": "echo ($current_tab == 'package') ? 'nav-tab-active' : ''",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ($current_tab == 'package') ? 'nav-tab-active' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/settings/controller.php",
+        "line": 34
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-007",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_tab = isset($_REQUEST['tab']) ? sanitize_text_field($_REQUEST['tab']) : 'general'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/settings/controller.php",
+        "line": 19
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 19,
+          "expression": "$current_tab = isset($_REQUEST['tab']) ? sanitize_text_field($_REQUEST['tab']) : 'general'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 40,
+          "expression": "echo ($current_tab == 'storage') ? 'nav-tab-active' : ''",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ($current_tab == 'storage') ? 'nav-tab-active' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/settings/controller.php",
+        "line": 40
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-008",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_tab = isset($_REQUEST['tab']) ? sanitize_text_field($_REQUEST['tab']) : 'general'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/settings/controller.php",
+        "line": 19
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 19,
+          "expression": "$current_tab = isset($_REQUEST['tab']) ? sanitize_text_field($_REQUEST['tab']) : 'general'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 46,
+          "expression": "echo ($current_tab == 'access') ? 'nav-tab-active' : ''",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ($current_tab == 'access') ? 'nav-tab-active' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/settings/controller.php",
+        "line": 46
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-009",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_tab = isset($_REQUEST['tab']) ? sanitize_text_field($_REQUEST['tab']) : 'general'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/settings/controller.php",
+        "line": 19
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 19,
+          "expression": "$current_tab = isset($_REQUEST['tab']) ? sanitize_text_field($_REQUEST['tab']) : 'general'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 53,
+          "expression": "echo ($current_tab == 'misc') ? 'nav-tab-active' : ''",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ($current_tab == 'misc') ? 'nav-tab-active' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/settings/controller.php",
+        "line": 53
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-rce-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "duplicator",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$mysqldump_exe_file = SnapUtil::sanitizeNSCharsNewlineTabs($_POST['package_mysqldump_path'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/settings/packages.php",
+        "line": 28
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 28,
+          "expression": "$mysqldump_exe_file = SnapUtil::sanitizeNSCharsNewlineTabs($_POST['package_mysqldump_path'])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 29,
+          "expression": "$mysqldump_exe_file = preg_match('/^([A-Za-z]\\:)?[\\/\\\\\\\\]/', $mysqldump_exe_file) ? $mysqldump_exe_file : ''",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 30,
+          "expression": "$mysqldump_exe_file = preg_replace('/[\\'\";]/m', '', $mysqldump_exe_file)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 30,
+          "expression": "$mysqldump_exe_file = preg_replace('/[\\'\";]/m', '', $mysqldump_exe_file)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$mysqldump_exe_file = preg_replace('/[\\'\";]/m', '', $mysqldump_exe_file)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/settings/packages.php",
+        "line": 30
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "duplicator-xss-010",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$action     = isset($_POST['action']) ? sanitize_text_field($_POST['action']) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/tools/diagnostics/inc.validator.php",
+        "line": 3
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 3,
+          "expression": "$action     = isset($_POST['action']) ? sanitize_text_field($_POST['action']) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 4,
+          "expression": "$scan_run   = ($action == 'duplicator_recursion') ? true : false",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 31,
+          "expression": "echo $scan_run ? 'block' : 'none';",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $scan_run ? 'block' : 'none';",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/tools/diagnostics/inc.validator.php",
+        "line": 31
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-011",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$refresh = (isset($_POST['refresh']) && $_POST['refresh'] == 1) ? 1 : 0",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/tools/diagnostics/logging.php",
+        "line": 20
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 20,
+          "expression": "$refresh = (isset($_POST['refresh']) && $_POST['refresh'] == 1) ? 1 : 0",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 163,
+          "expression": "echo ($refresh) ? 1 : 0",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ($refresh) ? 1 : 0",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/tools/diagnostics/logging.php",
+        "line": 163
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-012",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$auto    = (isset($_POST['auto'])    && $_POST['auto'] == 1)    ? 1 : 0",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/tools/diagnostics/logging.php",
+        "line": 21
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 21,
+          "expression": "$auto    = (isset($_POST['auto'])    && $_POST['auto'] == 1)    ? 1 : 0",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 164,
+          "expression": "echo ($auto) ? 1 : 0",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ($auto) ? 1 : 0",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/tools/diagnostics/logging.php",
+        "line": 164
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-013",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$package_id  = isset($_REQUEST[\"id\"])  ? sanitize_text_field($_REQUEST[\"id\"]) : 0",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/packages/details/controller.php",
+        "line": 13
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 13,
+          "expression": "$package_id  = isset($_REQUEST[\"id\"])  ? sanitize_text_field($_REQUEST[\"id\"]) : 0",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 69,
+          "expression": "echo absint($package_id);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo absint($package_id);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/packages/details/controller.php",
+        "line": 69
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-014",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_tab = isset($_REQUEST['tab']) ? sanitize_text_field($_REQUEST['tab']) : 'detail'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/packages/details/controller.php",
+        "line": 12
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 12,
+          "expression": "$current_tab = isset($_REQUEST['tab']) ? sanitize_text_field($_REQUEST['tab']) : 'detail'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 69,
+          "expression": "echo ($current_tab == 'detail') ? 'nav-tab-active' : ''",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ($current_tab == 'detail') ? 'nav-tab-active' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/packages/details/controller.php",
+        "line": 69
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-015",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$package_id  = isset($_REQUEST[\"id\"])  ? sanitize_text_field($_REQUEST[\"id\"]) : 0",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/packages/details/controller.php",
+        "line": 13
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 13,
+          "expression": "$package_id  = isset($_REQUEST[\"id\"])  ? sanitize_text_field($_REQUEST[\"id\"]) : 0",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 72,
+          "expression": "echo absint($package_id);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo absint($package_id);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/packages/details/controller.php",
+        "line": 72
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-016",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_tab = isset($_REQUEST['tab']) ? sanitize_text_field($_REQUEST['tab']) : 'detail'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/packages/details/controller.php",
+        "line": 12
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 12,
+          "expression": "$current_tab = isset($_REQUEST['tab']) ? sanitize_text_field($_REQUEST['tab']) : 'detail'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 72,
+          "expression": "echo ($current_tab == 'transfer') ? 'nav-tab-active' : ''",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo ($current_tab == 'transfer') ? 'nav-tab-active' : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/packages/details/controller.php",
+        "line": 72
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-017",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo absint($package->ID);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/packages/details/detail.php",
+        "line": 107
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 107,
+          "expression": "echo absint($package->ID);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo absint($package->ID);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/packages/details/detail.php",
+        "line": 107
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-018",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo absint($Package->ID);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/packages/main/packages.php",
+        "line": 245
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 245,
+          "expression": "echo absint($Package->ID);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo absint($Package->ID);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/packages/main/packages.php",
+        "line": 245
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-xss-019",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo absint($Package->ID);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/packages/main/packages.php",
+        "line": 307
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 307,
+          "expression": "echo absint($Package->ID);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo absint($Package->ID);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/views/packages/main/packages.php",
+        "line": 307
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-rce-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "duplicator",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "wp_unslash($_POST)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/src/Core/Notifications/Notice.php",
+        "line": 300
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 300,
+          "expression": "$post = array_map('sanitize_key', wp_unslash($_POST))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$post = array_map('sanitize_key', wp_unslash($_POST))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/src/Core/Notifications/Notice.php",
+        "line": 300
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "duplicator-xss-020",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "duplicator",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$post = array_map('sanitize_key', wp_unslash($_POST))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/src/Core/Notifications/Notice.php",
+        "line": 300
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 300,
+          "expression": "$post = array_map('sanitize_key', wp_unslash($_POST))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 326,
+          "expression": "wp_send_json_success(\n            array(\n                'id'      => $post['id'],\n                'time'    => time(),\n                'level'   => $level,\n                'notices' => $notices\n            )\n        )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success(\n            array(\n                'id'      => $post['id'],\n                'time'    => time(),\n                'level'   => $level,\n                'notices' => $notices\n            )\n        )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/src/Core/Notifications/Notice.php",
+        "line": 326
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "duplicator-rce-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$_SERVER['REQUEST_URI']",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/src/Libs/Snap/SnapURL.php",
+        "line": 100
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 100,
+          "expression": "$serverUrlSelf = preg_replace('/\\?.*$/', '', $_SERVER['REQUEST_URI'])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$serverUrlSelf = preg_replace('/\\?.*$/', '', $_SERVER['REQUEST_URI'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/src/Libs/Snap/SnapURL.php",
+        "line": 100
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-vari-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "variable_injection",
+      "source": {
+        "expression": "$_SERVER['QUERY_STRING']",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/src/Libs/Snap/SnapURL.php",
+        "line": 127
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 127,
+          "expression": "parse_str($_SERVER['QUERY_STRING'], $result)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "parse_str($_SERVER['QUERY_STRING'], $result)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/src/Libs/Snap/SnapURL.php",
+        "line": 127
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-file-014",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$timepart = $_SERVER['REQUEST_TIME']",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/src/Libs/Snap/SnapLog.php",
+        "line": 105
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 105,
+          "expression": "$timepart = $_SERVER['REQUEST_TIME']",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 108,
+          "expression": "$thread_id = sprintf(\"%08x\", abs(crc32($_SERVER['REMOTE_ADDR'] . $timepart . $_SERVER['REMOTE_PORT'])))",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 110,
+          "expression": "$s = $thread_id . ' ' . date('h:i:s') . \":$s\"",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 116,
+          "expression": "fwrite(self::$logHandle, \"$s\\n\")",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "fwrite(self::$logHandle, \"$s\\n\")",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/src/Libs/Snap/SnapLog.php",
+        "line": 116
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "duplicator-ssrf-003",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "duplicator",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$email = filter_input(INPUT_POST, 'email', FILTER_VALIDATE_EMAIL, FILTER_NULL_ON_FAILURE)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/src/Ajax/ServicesEducation.php",
+        "line": 54
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 54,
+          "expression": "$email = filter_input(INPUT_POST, 'email', FILTER_VALIDATE_EMAIL, FILTER_NULL_ON_FAILURE)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 59,
+          "expression": "$response = wp_remote_post(self::REMOTE_SUBSCRIBE_URL, array(\n            'method'      => 'POST',\n            'timeout'     => 45,\n            'body'        => array('email' => $email)\n        ))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(self::REMOTE_SUBSCRIBE_URL, array(\n            'method'      => 'POST',\n            'timeout'     => 45,\n            'body'        => array('email' => $email)\n        ))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/duplicator/src/Ajax/ServicesEducation.php",
+        "line": 59
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ]
+}

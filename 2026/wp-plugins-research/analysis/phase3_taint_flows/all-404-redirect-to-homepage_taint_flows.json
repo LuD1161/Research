@@ -1,0 +1,995 @@
+{
+  "plugin": "all-404-redirect-to-homepage",
+  "php_files_analyzed": 5,
+  "parse_errors": 0,
+  "total_flows": 18,
+  "by_severity": {
+    "critical": 3,
+    "medium": 13,
+    "low": 2
+  },
+  "by_vulnerability_class": {
+    "sql_injection": 2,
+    "rce": 1,
+    "xss": 13,
+    "open_redirect": 2
+  },
+  "flows": [
+    {
+      "flow_id": "all-404-redirect-to-homepage-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$existing = $wpdb->get_row($wpdb->prepare(\"SELECT * FROM $table_name WHERE url = %s\", $url))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/functions.php",
+        "line": 169
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 169,
+          "expression": "$existing = $wpdb->get_row($wpdb->prepare(\"SELECT * FROM $table_name WHERE url = %s\", $url))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 173,
+          "expression": "$wpdb->update(\n\t\t\t\t$table_name,\n\t\t\t\t[\n\t\t\t\t\t'count' => $existing->count + 1,\n\t\t\t\t\t'last_redirected' => $date\n\t\t\t\t],\n\t\t\t\t['id' => $existing->id]\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->update(\n\t\t\t\t$table_name,\n\t\t\t\t[\n\t\t\t\t\t'count' => $existing->count + 1,\n\t\t\t\t\t'last_redirected' => $date\n\t\t\t\t],\n\t\t\t\t['id' => $existing->id]\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/functions.php",
+        "line": 173
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "all-404-redirect-to-homepage-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$forwarded_hosts = explode(',', $_SERVER['HTTP_X_FORWARDED_HOST'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/functions.php",
+        "line": 475
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 475,
+          "expression": "$forwarded_hosts = explode(',', $_SERVER['HTTP_X_FORWARDED_HOST'])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 476,
+          "expression": "$host = sanitize_text_field(trim($forwarded_hosts[0]))",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 486,
+          "expression": "$request_host = strtolower($host)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 489,
+          "expression": "$request_host_no_port = preg_replace('/:\\d+$/', '', $request_host)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$request_host_no_port = preg_replace('/:\\d+$/', '', $request_host)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/functions.php",
+        "line": 489
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "all-404-redirect-to-homepage-sqli-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$recent_entry = $wpdb->get_row($wpdb->prepare(\"\n            SELECT * FROM {$table_name} \n            WHERE url = %s \n            AND ip_address = %s \n            AND referrer = %s \n            AND last_redirected > %s\n            ORDER BY last_redirected DESC \n            LIMIT 1\n        \", $link, $ip_address, $referrer, date('Y-m-d H:i:s', strtotime('-1 hour'))))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/functions.php",
+        "line": 630
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 630,
+          "expression": "$recent_entry = $wpdb->get_row($wpdb->prepare(\"\n            SELECT * FROM {$table_name} \n            WHERE url = %s \n            AND ip_address = %s \n            AND referrer = %s \n            AND last_redirected > %s\n            ORDER BY last_redirected DESC \n            LIMIT 1\n        \", $link, $ip_address, $referrer, date('Y-m-d H:i:s', strtotime('-1 hour'))))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 648,
+          "expression": "$result = $wpdb->update(\n\t\t\t\t$table_name,\n\t\t\t\tarray(\n\t\t\t\t\t'count' => $recent_entry->count + 1,\n\t\t\t\t\t'last_redirected' => current_time('mysql')\n\t\t\t\t),\n\t\t\t\tarray('id' => $recent_entry->id),\n\t\t\t\tarray('%d', '%s'),\n\t\t\t\tarray('%d')\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$result = $wpdb->update(\n\t\t\t\t$table_name,\n\t\t\t\tarray(\n\t\t\t\t\t'count' => $recent_entry->count + 1,\n\t\t\t\t\t'last_redirected' => current_time('mysql')\n\t\t\t\t),\n\t\t\t\tarray('id' => $recent_entry->id),\n\t\t\t\tarray('%d', '%s'),\n\t\t\t\tarray('%d')\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/functions.php",
+        "line": 648
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "all-404-redirect-to-homepage-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$email = sanitize_email($_POST['email'])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/functions.php",
+        "line": 1558
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1558,
+          "expression": "$email = sanitize_email($_POST['email'])",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1585,
+          "expression": "wp_send_json_success('Test email sent successfully to ' . $email)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success('Test email sent successfully to ' . $email)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/functions.php",
+        "line": 1585
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "all-404-redirect-to-homepage-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$redirect_type = isset($options['p404_redirect_type']) ? intval($options['p404_redirect_type']) : 301",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/all-404-redirect-to-homepage.php",
+        "line": 576
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 576,
+          "expression": "$redirect_type = isset($options['p404_redirect_type']) ? intval($options['p404_redirect_type']) : 301",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 584,
+          "expression": "header(\"HTTP/1.1 $redirect_type \" . ($redirect_type == 301 ? \"Moved Permanently\" : \"Found\"))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "header(\"HTTP/1.1 $redirect_type \" . ($redirect_type == 301 ? \"Moved Permanently\" : \"Found\"))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/all-404-redirect-to-homepage.php",
+        "line": 584
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "all-404-redirect-to-homepage-open-002",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$redirect_type = isset($options['p404_redirect_type']) ? intval($options['p404_redirect_type']) : 301",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/all-404-redirect-to-homepage.php",
+        "line": 576
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 576,
+          "expression": "$redirect_type = isset($options['p404_redirect_type']) ? intval($options['p404_redirect_type']) : 301",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 592,
+          "expression": "header(\"HTTP/1.1 $redirect_type \" . ($redirect_type == 301 ? \"Moved Permanently\" : \"Found\"))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "header(\"HTTP/1.1 $redirect_type \" . ($redirect_type == 301 ? \"Moved Permanently\" : \"Found\"))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/all-404-redirect-to-homepage.php",
+        "line": 592
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "all-404-redirect-to-homepage-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$image_id = isset($options['image_id_p404_redirect_to']) ? absint($options['image_id_p404_redirect_to']) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 312
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 312,
+          "expression": "$image_id = isset($options['image_id_p404_redirect_to']) ? absint($options['image_id_p404_redirect_to']) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 314,
+          "expression": "$image = wp_get_attachment_image_src($image_id)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 317,
+          "expression": "echo esc_url($image[0]);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url($image[0]);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 317
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "all-404-redirect-to-homepage-xss-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$order_by = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'last_redirected'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 534
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 534,
+          "expression": "$order_by = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'last_redirected'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 624,
+          "expression": "echo esc_url(get_column_sort_url('last_redirected', $order_by, $order_dir));",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url(get_column_sort_url('last_redirected', $order_by, $order_dir));",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 624
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "all-404-redirect-to-homepage-xss-004",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$order_by = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'last_redirected'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 534
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 534,
+          "expression": "$order_by = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'last_redirected'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 640,
+          "expression": "echo esc_url(get_column_sort_url('url', $order_by, $order_dir));",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url(get_column_sort_url('url', $order_by, $order_dir));",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 640
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "all-404-redirect-to-homepage-xss-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$order_by = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'last_redirected'",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 534
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 534,
+          "expression": "$order_by = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'last_redirected'",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 656,
+          "expression": "echo esc_url(get_column_sort_url('count', $order_by, $order_dir));",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url(get_column_sort_url('count', $order_by, $order_dir));",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 656
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "all-404-redirect-to-homepage-xss-006",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 530
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 530,
+          "expression": "$current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 717,
+          "expression": "echo (($current_page - 1) * $per_page) + 1;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo (($current_page - 1) * $per_page) + 1;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 717
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "all-404-redirect-to-homepage-xss-007",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 530
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 530,
+          "expression": "$current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 718,
+          "expression": "echo min($current_page * $per_page, $pagination_data['total']);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo min($current_page * $per_page, $pagination_data['total']);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 718
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "all-404-redirect-to-homepage-xss-008",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 530
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 530,
+          "expression": "$current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 539,
+          "expression": "$pagination_data = get_redirects_data($current_page, $per_page, $order_by, $order_dir, $search)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 719,
+          "expression": "echo $pagination_data['total'];",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $pagination_data['total'];",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 719
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "all-404-redirect-to-homepage-xss-009",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 530
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 530,
+          "expression": "$current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 727,
+          "expression": "$prev_page = $current_page - 1",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 733,
+          "expression": "echo $prev_page;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $prev_page;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 733
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "all-404-redirect-to-homepage-xss-010",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 530
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 530,
+          "expression": "$current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 738,
+          "expression": "$start_page = max(1, $current_page - 2)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 741,
+          "expression": "$i = $start_page",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 743,
+          "expression": "echo \"<button onclick='goToPage($i)' class='$class'>$i</button>\";",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo \"<button onclick='goToPage($i)' class='$class'>$i</button>\";",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 743
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "all-404-redirect-to-homepage-xss-011",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 530
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 530,
+          "expression": "$current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 728,
+          "expression": "$next_page = $current_page + 1",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 748,
+          "expression": "echo $next_page;",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $next_page;",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 748
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "all-404-redirect-to-homepage-xss-012",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 530
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 530,
+          "expression": "$current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 539,
+          "expression": "$pagination_data = get_redirects_data($current_page, $per_page, $order_by, $order_dir, $search)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 749,
+          "expression": "echo $pagination_data['pages'];",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo $pagination_data['pages'];",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 749
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "all-404-redirect-to-homepage-xss-013",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "all-404-redirect-to-homepage",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$image = wp_get_attachment_image_src(absint($_POST['misha-img']))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 813
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 813,
+          "expression": "$image = wp_get_attachment_image_src(absint($_POST['misha-img']))",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 820,
+          "expression": "echo esc_url($image_url);",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo esc_url($image_url);",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/all-404-redirect-to-homepage/option_page.php",
+        "line": 820
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": true
+    }
+  ]
+}

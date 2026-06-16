@@ -1,0 +1,67 @@
+{
+  "plugin": "royal-elementor-addons",
+  "version_analyzed": "latest from repo snapshot",
+  "date": "2026-06-16",
+  "total_taint_flows_reviewed": 98,
+  "confirmed_vulnerabilities": 3,
+  "false_positives": 95,
+  "findings": [
+    {
+      "id": "REA-001",
+      "title": "Unauthenticated Stored XSS via Form Submission (HTML field type)",
+      "severity": "HIGH",
+      "cvss_estimate": "6.1",
+      "type": "Stored Cross-Site Scripting (XSS)",
+      "entry_point": "wp_ajax_nopriv_wpr_form_builder_submissions",
+      "file": "classes/modules/forms/wpr-submissions-cpt.php",
+      "line": "46",
+      "auth_required": "none",
+      "nonce_required": "wpr-addons-js (public nonce, available in page source)",
+      "status": "confirmed",
+      "details": "The add_to_submissions() handler accepts form_content from POST. When the field type is 'html', the wpr_sanitize_form_field() method at line 178 uses wp_kses_post() which permits a rich set of HTML tags including <img onerror>, <a href=javascript:>, <details/ontoggle>, and other XSS vectors. The sanitized value is stored as post_meta on a 'wpr_submissions' CPT. When an admin views submissions in wp-admin, the stored payload executes in admin context. The nonce 'wpr-addons-js' is publicly available via wp_localize_script on every frontend page. Premium code check (wpr_fs()->can_use_premium_code()) gates the handler, reducing scope to premium users only."
+    },
+    {
+      "id": "REA-002",
+      "title": "Unauthenticated Taxonomy Name Injection in AJAX Search",
+      "severity": "MEDIUM",
+      "cvss_estimate": "5.3",
+      "type": "Improper Input Validation / Information Disclosure",
+      "entry_point": "wp_ajax_nopriv_wpr_data_fetch",
+      "file": "classes/modules/wpr-ajax-search.php",
+      "line": "49,76,83,107",
+      "auth_required": "none",
+      "nonce_required": "wpr-addons-js (public nonce)",
+      "status": "confirmed",
+      "details": "The data_fetch() AJAX handler uses $_POST['wpr_option_post_type'] and $_POST['wpr_taxonomy_type'] directly as taxonomy names in tax_query arrays without sanitization or validation against registered taxonomies. An attacker can supply arbitrary taxonomy names to enumerate whether private/internal taxonomies exist and potentially probe for posts tagged with private taxonomy terms. Additionally, $_POST['wpr_query_type'] is used to set post_type in WP_Query with only sanitize_text_field applied (line 130/142) -- this allows querying non-public post types like 'shop_coupon' or 'flamingo_inbound' when combined with premium code bypass. The query results return post titles and permalinks, enabling information disclosure of non-public content."
+    },
+    {
+      "id": "REA-003",
+      "title": "Unauthenticated Arbitrary Method Call via REST API Dispatch",
+      "severity": "LOW",
+      "cvss_estimate": "3.7",
+      "type": "Insecure Dispatch Pattern (Defense-in-Depth Weakness)",
+      "entry_point": "REST: /wp-json/wpraddons/v1/ajaxselect2/{action}/",
+      "file": "includes/controls/wpr-ajax-select2/wpr-control-ajax-select2-api.php",
+      "line": "24-25",
+      "auth_required": "none",
+      "nonce_required": "none (REST route with __return_true)",
+      "status": "confirmed",
+      "details": "The REST route callback at line 24-25 dispatches to $this->{$request['action']}($request) where {action} is fully attacker-controlled via the URL path. While all defined handler methods check current_user_can('edit_posts'), this pattern allows calling any public method on the class including inherited methods from stdClass/Object. Calling non-existent methods causes fatal errors (potential DoS). Currently mitigated by individual capability checks in each handler method, but the insecure dispatch pattern is a ticking time bomb -- adding any new method without a capability check would create an unauthenticated vulnerability. This is a defense-in-depth issue."
+    }
+  ],
+  "false_positive_summary": {
+    "file_upload_handler": "Well-implemented with HMAC-signed upload tokens, rate limiting, MIME validation, extension whitelist+blacklist, .htaccess hardening. Nonce is public but the HMAC token is properly bound to the form render context. NOT exploitable.",
+    "woocommerce_wishlist_compare_handlers": "All wishlist/compare/count handlers (add_to_wishlist, remove_from_wishlist, add_to_compare, remove_from_compare, count_wishlist_items, count_compare_items, update_mini_wishlist, update_mini_compare) operate on cookie-based lists without writing to database in exploitable ways. Standard WooCommerce frontend functionality. NOT exploitable.",
+    "form_email_handler": "Uses public nonce but email recipients, subjects, and content templates come from get_option() (admin-configured), not from user input. Form content goes into the email body but this is expected contact-form behavior. The email is sent to admin-configured addresses. NOT exploitable for email injection -- headers use admin-set options.",
+    "form_webhook_handler": "Webhook URL comes from get_option(), not user input. Body content is form data, which is expected. NOT exploitable for SSRF.",
+    "grid_filters_ajax": "Uses public nonce, accepts grid_settings from POST for WP_Query. Has is_allowed_grid_query_post_type() check that restricts unauthenticated users to publicly_queryable post types. Properly mitigated.",
+    "post_likes_handler": "Uses a separate nonce (wpr-post-likes-nonce). Properly validates post_id as numeric. Stores IP/user associations in post meta. NOT exploitable.",
+    "compare_popup_action": "wpr_get_page_content uses public nonce, but checks post_password_required() and requires 'publish' status. Only renders published post content through Elementor. NOT exploitable beyond viewing published content.",
+    "custom_meta_keys": "Uses wpr-addons-editor-js nonce (editor-only, not public). NOT exploitable for unauth.",
+    "mailchimp_subscribe": "Standard subscription handler. API key from server options. NOT exploitable.",
+    "password_protected_content": "Uses separate nonce (wpr_ppc_verify), compares against stored password in Elementor widget data. Cookie-based auth. NOT exploitable.",
+    "widget_builder_endpoints": "All REST routes require manage_options capability. NOT exploitable.",
+    "mega_menu_rest": "Validates item_id, checks post type, checks publish status, checks user capability for non-published items. NOT exploitable.",
+    "form_actions_status": "Uses submission_secret (64-byte random token) for authorization. Properly protected against enumeration."
+  }
+}

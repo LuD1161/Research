@@ -1,6 +1,6 @@
 # Attack Surface: google-site-kit
 
-> Generated: 2026-06-15T02:06:22Z
+> Generated: 2026-06-16T09:13:46Z
 
 ## Section 1: Entry Points
 

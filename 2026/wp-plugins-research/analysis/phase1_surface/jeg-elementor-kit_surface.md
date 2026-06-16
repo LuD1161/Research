@@ -1,6 +1,6 @@
 # Attack Surface: jeg-elementor-kit
 
-> Generated: 2026-06-15T02:06:23Z
+> Generated: 2026-06-16T09:13:47Z
 
 ## Section 1: Entry Points
 

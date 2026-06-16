@@ -1,0 +1,175 @@
+{
+  "plugin": "advanced-custom-fields",
+  "version_analyzed": "6.8.x (latest as of 2026-06-16)",
+  "analyst": "manual-review",
+  "date": "2026-06-16",
+  "summary": "25 taint flows reviewed. 22 are false positives. 2 confirmed vulnerabilities (1 medium, 1 low-medium). 1 informational finding.",
+  "confirmed_vulnerabilities": [
+    {
+      "id": "ACF-2026-001",
+      "title": "Unauthenticated User Enumeration via nopriv AJAX with Leaked Field Nonce",
+      "severity": "medium",
+      "cvss_estimate": 5.3,
+      "type": "information_disclosure",
+      "unauthenticated": true,
+      "condition": "Site must render an ACF User field on a public-facing page (e.g., acf_form() with a user field)",
+      "file": "includes/fields/class-acf-field-user.php",
+      "line": 44,
+      "description": "The wp_ajax_nopriv_acf/fields/user/query handler is registered unconditionally on every ACF install. The nonce required is a per-field nonce embedded in any page rendering the User field. On sites using ACF frontend forms with User fields, an unauthenticated visitor can extract the nonce from page source, then call the AJAX endpoint to enumerate all WordPress usernames, display names, and first/last names. Results are paginated (20/page) with no rate limiting.",
+      "attack_scenario": "1. Visit public page with ACF User field. 2. Extract data-nonce and field_key from HTML. 3. POST to /wp-admin/admin-ajax.php?action=acf/fields/user/query with nonce, field_key, s=a, paged=1. 4. Paginate through all results to enumerate all users.",
+      "remediation": "Register nopriv handlers conditionally (only when ACF frontend forms are active). Add is_user_logged_in() check or require a minimum capability for user enumeration queries."
+    },
+    {
+      "id": "ACF-2026-002",
+      "title": "Open Redirect via acf_form() Frontend Submission (Degraded Crypto Path)",
+      "severity": "low",
+      "cvss_estimate": 3.7,
+      "type": "open_redirect",
+      "unauthenticated": true,
+      "condition": "Site must use acf_form() on frontend AND server must lack OpenSSL extension (rare but possible)",
+      "file": "includes/forms/form-front.php",
+      "line": 435,
+      "description": "The ACF frontend form submission uses wp_redirect() (not wp_safe_redirect()) for the return URL. The return URL is stored inside an encrypted _acf_form POST parameter. The encryption uses AES-256-CBC keyed from wp_hash('acf_encrypt') which depends on AUTH_KEY/AUTH_SALT. However, if OpenSSL is unavailable, the fallback is plain base64 encoding, allowing an attacker to forge arbitrary return URLs. Even with OpenSSL, if wp-config.php keys leak (e.g., via LFI), the redirect is fully controllable.",
+      "remediation": "Use wp_safe_redirect() or validate the return URL against allowed_redirect_hosts filter. Remove the base64 fallback or make it refuse to decrypt form data."
+    }
+  ],
+  "informational": [
+    {
+      "id": "ACF-2026-INFO-001",
+      "title": "Unconditional nopriv AJAX Registration for All Field Type Queries",
+      "severity": "informational",
+      "description": "Seven field-type AJAX query handlers (relationship, select, post_object, page_link, user, taxonomy, oembed) unconditionally register wp_ajax_nopriv_ hooks. While each requires a per-field nonce, these nonces are embedded in page HTML whenever the field is rendered on public-facing pages. This broadens the attack surface unnecessarily - nopriv handlers should only register when ACF frontend forms are actually in use.",
+      "files": [
+        "includes/fields/class-acf-field-relationship.php:45",
+        "includes/fields/class-acf-field-select.php:44",
+        "includes/fields/class-acf-field-oembed.php:47",
+        "includes/fields/class-acf-field-post_object.php:41",
+        "includes/fields/class-acf-field-page_link.php:46",
+        "includes/fields/class-acf-field-user.php:45",
+        "includes/fields/class-acf-field-taxonomy.php:52"
+      ]
+    }
+  ],
+  "false_positives": [
+    {
+      "flow_id": "advanced-custom-fields-sqli-001",
+      "verdict": "false_positive",
+      "reason": "The source is $wpdb->get_row() with prepare() - data comes from DB, not user input. The sink is $wpdb->update() with $data_format and $where_format parameters which handle escaping. Both sides are parameterized. No SQL injection."
+    },
+    {
+      "flow_id": "advanced-custom-fields-rce-001",
+      "verdict": "false_positive",
+      "reason": "acf_maybe_unserialize() uses unserialize() with allowed_classes=>false (PHP 7+), blocking PHP object injection. Source is get_post_meta() which is DB data not user input. The upgrade path runs only once for legacy ACF4 data."
+    },
+    {
+      "flow_id": "advanced-custom-fields-rce-002",
+      "verdict": "false_positive",
+      "reason": "array_filter() and array_values() are not code execution sinks. They are standard PHP array manipulation functions. The data flows through acf_parse_types() and conditional_logic filtering which are data-processing operations, not shell/eval calls."
+    },
+    {
+      "flow_id": "advanced-custom-fields-rce-003",
+      "verdict": "false_positive",
+      "reason": "Same as rce-002. array_filter() with built-in callback 'array_filter' is not a code execution sink."
+    },
+    {
+      "flow_id": "advanced-custom-fields-rce-004",
+      "verdict": "false_positive",
+      "reason": "Same as rce-002/003. array_map('array_values', ...) is not a code execution sink."
+    },
+    {
+      "flow_id": "advanced-custom-fields-rce-005",
+      "verdict": "false_positive",
+      "reason": "array_map('intval', $ids) is actually a SANITIZER not a sink. The function properly converts all values to integers, preventing any injection. Additionally, the handler is protected by nonce verification."
+    },
+    {
+      "flow_id": "advanced-custom-fields-xss-001",
+      "verdict": "false_positive",
+      "reason": "The ajax_move_field() handler at line 519 has both nonce verification (line 536) and capability check via acf_current_user_can_admin() (line 541). The $link output uses esc_html() for the title and admin_url() for the URL. The phpcs:ignore comment is for the $link variable which is pre-escaped. Authenticated admin only."
+    },
+    {
+      "flow_id": "advanced-custom-fields-xss-002",
+      "verdict": "false_positive",
+      "reason": "Same handler as xss-001, same protections apply. Nonce + admin capability required."
+    },
+    {
+      "flow_id": "advanced-custom-fields-xss-003",
+      "verdict": "false_positive",
+      "reason": "echo intval($i + 1) is safe - intval() returns an integer, no XSS possible."
+    },
+    {
+      "flow_id": "advanced-custom-fields-xss-004",
+      "verdict": "false_positive",
+      "reason": "echo intval(get_row_index()) is safe - intval() returns an integer, no XSS possible."
+    },
+    {
+      "flow_id": "advanced-custom-fields-rce-006",
+      "verdict": "false_positive",
+      "reason": "Cookie data flows through str_replace, explode, then array_filter($collapsed, 'is_numeric'). is_numeric is a validation callback not a code exec sink. The result is used for UI state (collapsed rows). No code execution path."
+    },
+    {
+      "flow_id": "advanced-custom-fields-xss-005",
+      "verdict": "false_positive",
+      "reason": "The oembed ajax_query handler requires nonce verification (line 139). wp_send_json() outputs JSON with proper content-type header. The response goes through JSON encoding which prevents XSS in the AJAX response itself."
+    },
+    {
+      "flow_id": "advanced-custom-fields-vari-001",
+      "verdict": "false_positive",
+      "reason": "parse_str($value, $file) uses the two-argument form which writes to $file, not to the global scope. No variable injection in PHP 7+. The $value must also be non-numeric string to reach this code path (line 318 returns false for is_numeric). The result is only used for acf_validate_attachment() which is a validation function."
+    },
+    {
+      "flow_id": "advanced-custom-fields-rce-007",
+      "verdict": "false_positive",
+      "reason": "auth_required is marked true. The handler is inside an admin page that requires manage_options capability. array_filter with a closure is data filtering, not code execution."
+    },
+    {
+      "flow_id": "advanced-custom-fields-rce-008",
+      "verdict": "false_positive",
+      "reason": "Same as rce-007. Admin-only with capability check."
+    },
+    {
+      "flow_id": "advanced-custom-fields-rce-009",
+      "verdict": "false_positive",
+      "reason": "array_map('trim', ...) is not a code execution sink. Admin-only context."
+    },
+    {
+      "flow_id": "advanced-custom-fields-rce-010",
+      "verdict": "false_positive",
+      "reason": "Same pattern as rce-007/008. Admin-only, array_filter with closure is data filtering."
+    },
+    {
+      "flow_id": "advanced-custom-fields-rce-011",
+      "verdict": "false_positive",
+      "reason": "Same as rce-010. Admin-only context."
+    },
+    {
+      "flow_id": "advanced-custom-fields-rce-012",
+      "verdict": "false_positive",
+      "reason": "array_map('trim', ...) is sanitization, not code execution. Admin-only context."
+    },
+    {
+      "flow_id": "advanced-custom-fields-rce-013",
+      "verdict": "false_positive",
+      "reason": "array_filter(array_map('trim', ...)) is data processing. Admin-only."
+    },
+    {
+      "flow_id": "advanced-custom-fields-rce-014",
+      "verdict": "false_positive",
+      "reason": "acf_maybe_unserialize() uses allowed_classes=>false preventing PHP object injection. Data source is get_metadata() from DB."
+    },
+    {
+      "flow_id": "advanced-custom-fields-xss-006",
+      "verdict": "false_positive",
+      "reason": "echo absint($post->ID) is safe - absint() returns an absolute integer. No XSS."
+    },
+    {
+      "flow_id": "advanced-custom-fields-rce-015",
+      "verdict": "false_positive",
+      "reason": "array_map('sanitize_text_field', ...) is a SANITIZER not a code execution sink. absint() on min/max is also safe."
+    },
+    {
+      "flow_id": "advanced-custom-fields-file-001",
+      "verdict": "false_positive",
+      "reason": "The import tool requires manage_options capability (enforced by admin menu registration) and nonce verification (enforced in admin-tools.php check_submit). file_get_contents on tmp_name reads the uploaded file for JSON decoding - standard PHP upload handling. Not accessible to unauthenticated users."
+    }
+  ]
+}

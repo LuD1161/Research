@@ -1,0 +1,129 @@
+{
+  "plugin_slug": "burst-statistics",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "manual-agent",
+  "summary": "All 22 taint flows from automated analysis are false positives. The plugin's unauthenticated attack surface (beacon tracking endpoint, REST /burst/v1/track, wp_ajax_nopriv_burst_tracking_error) is well-defended with proper sanitization, $wpdb->prepare() usage on SQL queries, and safe $wpdb->insert()/$wpdb->update() calls. Admin REST routes all require authentication via permission_callback. No confirmed exploitable unauthenticated vulnerabilities found.",
+  "confirmed_vulnerabilities": [],
+  "false_positives": [
+    {
+      "flow_id": "burst-statistics-open-001",
+      "verdict": "false_positive",
+      "reason": "CORS origin reflection in endpoint.php is guarded by in_array() check against admin-defined allowlist (BURST_ALLOWED_ORIGINS/BURST_HEADLESS_DOMAIN constants). Origin host is extracted via parse_url() before comparison. Only reflects allowed origins."
+    },
+    {
+      "flow_id": "burst-statistics-open-002",
+      "verdict": "false_positive",
+      "reason": "MainWP proxy CORS origin reflection is validated against stored dashboard origin via hash_equals(). Unpaired state only allows CORS on the mainwp-auth endpoint without credentials. Not exploitable."
+    },
+    {
+      "flow_id": "burst-statistics-vari-001",
+      "verdict": "false_positive",
+      "reason": "parse_str() in is_mainwp_auth_endpoint() parses REQUEST_URI query params to check rest_route value via strict string comparison. Parsed params are used only for matching, not for any dangerous operation. No variable injection impact."
+    },
+    {
+      "flow_id": "burst-statistics-sqli-001",
+      "verdict": "false_positive",
+      "reason": "Goal::save() uses $wpdb->update() which internally escapes values. Additionally, this code path requires user_can_manage() authentication. Not reachable unauthenticated. The type, status, url, and conversion_metric fields are validated against allowlists before insertion."
+    },
+    {
+      "flow_id": "burst-statistics-rce-001",
+      "verdict": "false_positive",
+      "reason": "Scanner incorrectly flagged array_filter() as a shell execution sink. array_filter is a PHP array function, not a command execution function. sanitize_title() on $id prevents any injection regardless."
+    },
+    {
+      "flow_id": "burst-statistics-rce-002",
+      "verdict": "false_positive",
+      "reason": "custom_block_rules comes from get_option() (admin-configured). array_filter/array_map/explode are not command execution sinks. The preg_match with user-supplied regex patterns uses @ suppression for invalid patterns, which is safe."
+    },
+    {
+      "flow_id": "burst-statistics-rce-003",
+      "verdict": "false_positive",
+      "reason": "preg_replace() with a hardcoded pattern '(^https?://)' is not RCE. The /e modifier was removed in PHP 7.0. The pattern is not user-controlled."
+    },
+    {
+      "flow_id": "burst-statistics-rce-004",
+      "verdict": "false_positive",
+      "reason": "preg_replace() with hardcoded pattern '/^www\\./i' is not RCE. Same reasoning as rce-003."
+    },
+    {
+      "flow_id": "burst-statistics-vari-002",
+      "verdict": "false_positive",
+      "reason": "parse_str in admin-helper trait. auth_required=true and nonce_verified=true per the taint flow metadata. Requires authenticated admin context."
+    },
+    {
+      "flow_id": "burst-statistics-rce-005",
+      "verdict": "false_positive",
+      "reason": "array_map on database results is not a command execution sink. The query uses $wpdb->prepare() with parameterized values. detect_malicious_data() also requires user_can_manage()."
+    },
+    {
+      "flow_id": "burst-statistics-xss-001",
+      "verdict": "false_positive",
+      "reason": "$slug is sanitize_title(BURST_PLUGIN_NAME) where BURST_PLUGIN_NAME is a hardcoded plugin constant ('Burst Statistics'). Not user-controllable. sanitize_title also strips HTML/special chars."
+    },
+    {
+      "flow_id": "burst-statistics-xss-002",
+      "verdict": "false_positive",
+      "reason": "Same as xss-001. BURST_PLUGIN_NAME is a compile-time constant, not user input."
+    },
+    {
+      "flow_id": "burst-statistics-xss-003",
+      "verdict": "false_positive",
+      "reason": "Same as xss-001. BURST_PLUGIN_NAME is a compile-time constant, not user input."
+    },
+    {
+      "flow_id": "burst-statistics-open-003",
+      "verdict": "false_positive",
+      "reason": "$networkwide is compared with strict === against '1', producing one of two hardcoded redirect slugs ('network/plugins.php' or 'plugins.php'). wp_safe_redirect() + admin_url() prevents any open redirect. auth_required=true."
+    },
+    {
+      "flow_id": "burst-statistics-rce-006",
+      "verdict": "false_positive",
+      "reason": "array_map on $wpdb->get_results() is not a command execution sink. Data stays in PHP arrays. The query is static SQL with no user input."
+    },
+    {
+      "flow_id": "burst-statistics-sqli-002",
+      "verdict": "false_positive",
+      "reason": "get_referrer_options() builds $where clause using $wpdb->prepare('WHERE name LIKE %s', $like) where $like uses $wpdb->esc_like(). The LIKE value is properly parameterized. The empty-string fallback for $where is also safe. Requires user_can_view() authentication."
+    },
+    {
+      "flow_id": "burst-statistics-rce-007",
+      "verdict": "false_positive",
+      "reason": "Search parameter flows through sanitize_text_field -> $wpdb->esc_like -> $wpdb->prepare. array_map on results is not a command execution sink. Requires authentication."
+    },
+    {
+      "flow_id": "burst-statistics-rce-008",
+      "verdict": "false_positive",
+      "reason": "array_filter on database query results is not a command execution sink. get_filter_options() requires user_can_view() authentication."
+    },
+    {
+      "flow_id": "burst-statistics-rce-009",
+      "verdict": "false_positive",
+      "reason": "Same as rce-008. array_map with device name translation is not command execution."
+    },
+    {
+      "flow_id": "burst-statistics-rce-010",
+      "verdict": "false_positive",
+      "reason": "array_filter on get_option() result is not a command execution sink. Options are admin-controlled data."
+    },
+    {
+      "flow_id": "burst-statistics-rce-011",
+      "verdict": "false_positive",
+      "reason": "Same as rce-010. array_filter for token management is not command execution."
+    },
+    {
+      "flow_id": "burst-statistics-ssrf-001",
+      "verdict": "false_positive",
+      "reason": "wp_remote_post() target URL ($this->mailing_list_endpoint) is hardcoded, not user-controlled. User data (last_name from current_user) goes into POST body params, not the URL. Not SSRF."
+    }
+  ],
+  "additional_notes": [
+    "The primary unauthenticated entry points are: (1) endpoint.php beacon via SHORTINIT, (2) REST /burst/v1/track with __return_true permission_callback, (3) wp_ajax_nopriv_burst_tracking_error (debug-only logging).",
+    "The beacon endpoint (endpoint.php) reads raw JSON from php://input, decodes it, and passes through prepare_tracking_data() which applies strict sanitization: sanitize_url() with FILTER_SANITIZE_URL + FILTER_VALIDATE_URL, sanitize_uid() with regex /^[a-z0-9-]+$/, sanitize_fingerprint() with same regex, sanitize_referrer() with FILTER_SANITIZE_URL + parse_url + spam list check.",
+    "User agent data from tracking hits flows through the donatj/UserAgent library. Browser names not in the known Browsers::class constants list are rejected by is_invalid_browser_name(). Device values are fixed set from switch statement (desktop/mobile/tablet/other).",
+    "$wpdb->insert() and $wpdb->update() without explicit format arrays still escape string values internally via wpdb::process_fields(), which applies esc_sql(). This is safe against SQL injection.",
+    "All admin REST routes (goals/set, fields/set, data endpoints) use permission_callback functions requiring user_can_manage() or user_can_view(), which check current_user_can('manage_burst_statistics') or current_user_can('view_burst_statistics').",
+    "The nopriv_burst_tracking_error AJAX handler only logs data when BURST_DEBUG constant is true. It sanitizes all fields before logging. No data is stored in the database.",
+    "The share token feature creates a restricted burst_statistics_viewer user with minimal capabilities. Share routing enforces deny-by-default on unmapped endpoints.",
+    "The custom_block_rules feature allows admin-defined regex patterns that are executed via preg_match against page URLs, referrers, and user agents. Since the regex patterns are admin-configured (stored in options), this is not an unauthenticated attack vector. The @preg_match suppression handles invalid patterns gracefully."
+  ]
+}

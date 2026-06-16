@@ -1,6 +1,6 @@
 # Attack Surface: regenerate-thumbnails
 
-> Generated: 2026-06-15T02:06:25Z
+> Generated: 2026-06-16T09:13:52Z
 
 ## Section 1: Entry Points
 

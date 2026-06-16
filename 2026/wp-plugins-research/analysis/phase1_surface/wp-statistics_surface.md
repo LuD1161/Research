@@ -1,6 +1,6 @@
 # Attack Surface: wp-statistics
 
-> Generated: 2026-06-15T02:06:30Z
+> Generated: 2026-06-16T09:13:58Z
 
 ## Section 1: Entry Points
 

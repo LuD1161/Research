@@ -1,0 +1,164 @@
+{
+  "plugin": "jetpack-boost",
+  "version_analyzed": "latest from repo",
+  "date": "2026-06-16",
+  "analyst": "claude-opus-4-6",
+  "summary": "All 42 taint flows from automated analysis are FALSE POSITIVES. No exploitable unauthenticated vulnerabilities confirmed. The plugin is well-hardened by Automattic's security practices: HMAC-signed endpoints, wp_safe_redirect everywhere, md5 hashing of cache keys, wp_safe_remote_get for outbound requests, and proper capability checks on admin actions.",
+  "stats": {
+    "taint_flows_reviewed": 42,
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 42,
+    "informational_findings": 2
+  },
+  "verdicts": [
+    {
+      "flow_ids": ["jetpack-boost-xss-001", "jetpack-boost-open-001", "jetpack-boost-file-001", "jetpack-boost-file-002"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "Minify service fallback - REQUEST_URI flows",
+      "reasoning": "REQUEST_URI is passed through md5() before being used as a cache filename, making path traversal impossible. Cache content is server-generated CSS/JS, not attacker-controlled. Content-Type headers are set from server-stored metadata. No XSS, no file inclusion, no open redirect."
+    },
+    {
+      "flow_ids": ["jetpack-boost-rce-001"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "preg_replace RCE in minify service",
+      "reasoning": "The preg_replace uses /isU flags, NOT /e modifier. The /e modifier (eval-based RCE) was removed in PHP 7.0. The tainted $dirpath appears in the replacement string only, not the pattern. No RCE possible."
+    },
+    {
+      "flow_ids": ["jetpack-boost-rce-002"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "Module disable via GET parameter",
+      "reasoning": "The $_GET value is passed through sanitize_key() which strips everything except [a-z0-9_-]. The result is used only as an array key for in_array comparison against known module slugs. No code execution path exists."
+    },
+    {
+      "flow_ids": ["jetpack-boost-ssrf-001", "jetpack-boost-xss-002"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "Image Guide proxy SSRF/XSS",
+      "reasoning": "Handler registered via wp_ajax_ (NOT wp_ajax_nopriv_), requires manage_options capability, and verifies nonce. URL is rewritten to Photon CDN domain before fetch. wp_safe_remote_get blocks internal IP targets. Response body is never echoed (only headers returned as JSON). Triple-protected: auth + nonce + CDN rewrite."
+    },
+    {
+      "flow_ids": ["jetpack-boost-ssrf-002", "jetpack-boost-xss-003"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "Critical CSS proxy SSRF/XSS",
+      "reasoning": "Same triple protection as image guide proxy: wp_ajax_ only (admin auth required), nonce verified, wp_safe_remote_get used. URL must end in .css and response Content-Type must contain text/css. Output uses wp_strip_all_tags which prevents style block breakout. Admin-only, not exploitable by unauthenticated users."
+    },
+    {
+      "flow_ids": ["jetpack-boost-ssrf-003", "jetpack-boost-ssrf-004"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "Jetpack Sync dedicated sender SSRF",
+      "reasoning": "The $url is constructed from rest_url() (site's own URL), not from user input. $_COOKIE is passed as the cookies HTTP argument (forwarded as cookies to the loopback request), not as the URL target. This is a standard WordPress loopback request pattern. No SSRF: attacker cannot control the destination."
+    },
+    {
+      "flow_ids": ["jetpack-boost-rce-003"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "Jetpack Sync module SQL/unserialize",
+      "reasoning": "The flagged code is an internal database query using wp_parse_id_list() (which casts all values to integers) and a server-side whitelist of meta keys. The result flows through unserialize_meta which is processing database-stored values, not direct user input. The tool misidentified array_map as an RCE sink."
+    },
+    {
+      "flow_ids": ["jetpack-boost-file-003", "jetpack-boost-file-004"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "Plugin/theme file editor write",
+      "reasoning": "Both flows are in Jetpack Sync modules that OBSERVE WordPress core's plugin/theme editor actions. auth_required=true, nonce_verified=true. These hooks fire AFTER WordPress core has already validated the file write (which requires edit_plugins/edit_themes capability). The Sync module is recording what happened, not initiating the write."
+    },
+    {
+      "flow_ids": ["jetpack-boost-xss-004", "jetpack-boost-xss-005"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "JITM query string / REQUEST_URI echo",
+      "reasoning": "auth_required=true (admin context). The output uses urlencode_deep() which URL-encodes special characters including < > \" preventing XSS. Additionally, JITM is rendered in WordPress admin only (requires authentication)."
+    },
+    {
+      "flow_ids": ["jetpack-boost-obje-001", "jetpack-boost-obje-002"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "Object injection via maybe_unserialize on options",
+      "reasoning": "maybe_unserialize on get_option() is standard WordPress practice. The option values are stored by the plugin itself or by WordPress core. An attacker would need direct database write access to inject a malicious serialized payload, at which point they already have full site compromise. Not an independent vulnerability."
+    },
+    {
+      "flow_ids": ["jetpack-boost-vari-001"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "Variable injection via parse_str in Jetpack Signature",
+      "reasoning": "parse_str() is called with a second argument ($body), writing into a local variable, NOT into the global symbol table. This is part of HMAC signature verification - if the attacker modifies the body, the signature check fails. The parse_str call is safe by design."
+    },
+    {
+      "flow_ids": ["jetpack-boost-rce-004", "jetpack-boost-rce-005", "jetpack-boost-rce-006", "jetpack-boost-rce-007"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "Licensing endpoints - array_map/array_filter as RCE sinks",
+      "reasoning": "The tool misidentified array_map('strval'), array_filter('is_scalar'), and array_map(sanitize_text_field) as RCE sinks because escapeshellarg() was not used. These are data transformation functions, not shell execution. The license values go through sanitize_text_field and are stored as WordPress options. No shell execution anywhere in the chain."
+    },
+    {
+      "flow_ids": ["jetpack-boost-xss-006"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "My Jetpack initializer XSS via $_GET['step']",
+      "reasoning": "The code does $step === 'onboarding' (strict equality), producing a boolean. The output is a hardcoded string literal 'data-route=\"onboarding\"' or empty string. The user-supplied value is NEVER echoed. Additionally, this runs in wp-admin (admin_menu hook) requiring authentication."
+    },
+    {
+      "flow_ids": ["jetpack-boost-rce-008", "jetpack-boost-rce-009"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "Connection notice - $_REQUEST['users'] RCE",
+      "reasoning": "Values go through sanitize_text_field then absint() (cast to non-negative integer). Result is used only in in_array() comparison. Runs in admin_notices context (requires wp-admin authentication). The tool misidentified array_map('absint') as an RCE sink."
+    },
+    {
+      "flow_ids": ["jetpack-boost-rce-010"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "Tracking data via $_REQUEST['tracksEventProp']",
+      "reasoning": "nonce_verified=true. Values go through filter_var() and are passed to Tracks analytics (WordPress.com telemetry). No code execution, no database write with unsanitized data. Admin context."
+    },
+    {
+      "flow_ids": ["jetpack-boost-open-002", "jetpack-boost-open-003", "jetpack-boost-open-004", "jetpack-boost-open-005"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "Open redirect via webhooks class",
+      "reasoning": "All flows use wp_safe_redirect() which calls wp_validate_redirect() internally, restricting redirects to the site's own host plus allowed_redirect_hosts filter (which only adds *.wordpress.com). Cannot redirect to attacker-controlled external domains. The 'from' parameter is only appended as a query parameter value, not as a redirect target."
+    },
+    {
+      "flow_ids": ["jetpack-boost-rce-011"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "Nonce handler - array_filter on DB results",
+      "reasoning": "The code retrieves option_ids from the database using a prepared query, then filters them with array_filter(). These are integer IDs from the options table used for cleanup of expired Jetpack nonces. No user input, no code execution. Tool misidentified array_filter as RCE sink."
+    },
+    {
+      "flow_ids": ["jetpack-boost-rce-012", "jetpack-boost-rce-013"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "SSO User Admin - intval user IDs",
+      "reasoning": "User input goes through intval() immediately (line 682). Result is an integer used with get_user_by('id'). nonce_verified=true. array_filter and array_map on integer user IDs are not RCE sinks."
+    },
+    {
+      "flow_ids": ["jetpack-boost-open-006", "jetpack-boost-open-007"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "SSO force_reauth open redirect",
+      "reasoning": "$reauth = !empty($_GET['force_reauth']) produces a boolean (true/false). This boolean is passed to get_sso_url_or_die() which constructs a URL to WordPress.com SSO. The redirect target is WordPress.com (allowed host), not attacker-controlled. wp_safe_redirect validates the host."
+    },
+    {
+      "flow_ids": ["jetpack-boost-open-008", "jetpack-boost-open-009", "jetpack-boost-open-010"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "SSO cookie-based redirect",
+      "reasoning": "auth_required=true. Cookie value goes through esc_url_raw(). Redirect targets either use admin_url() as base (same-site) or go through wp_safe_redirect + wp_validate_redirect. Attacker-set cookies cannot force redirect to external domains."
+    },
+    {
+      "flow_ids": ["jetpack-boost-open-011"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "SSO redirect_to via GET parameter",
+      "reasoning": "The redirect_to value goes through: esc_url_raw() -> login_redirect filter -> wp_sanitize_redirect() -> wp_validate_redirect(with admin_url() fallback) -> build_authorize_url() -> wp_safe_redirect(). Five layers of redirect validation. Cannot redirect to external attacker domains."
+    },
+    {
+      "flow_ids": ["jetpack-boost-open-012"],
+      "verdict": "FALSE_POSITIVE",
+      "title": "Authorize redirect via dest_url GET parameter",
+      "reasoning": "dest_url goes through esc_url_raw() then wp_safe_redirect(). wp_safe_redirect restricts to same-host or allowed_redirect_hosts. Cannot redirect to arbitrary external domains."
+    }
+  ],
+  "informational_findings": [
+    {
+      "id": "INFO-001",
+      "title": "Cloud CSS stored without content sanitization",
+      "severity": "informational",
+      "description": "The cloud-css/update REST endpoint (protected by Signed_With_Blog_Token HMAC auth) stores CSS content from Jetpack cloud servers without sanitization. The CSS is later output via wp_strip_all_tags() in a <style> block. While wp_strip_all_tags prevents HTML tag injection, CSS-level attacks (expression(), url() data exfil) may work in older browsers. A compromise of Jetpack's cloud infrastructure could push malicious CSS to all connected sites. This is a supply-chain trust boundary issue, not an exploitable vulnerability from the internet.",
+      "file": "app/modules/optimizations/critical-css/class-update-cloud-css.php",
+      "auth_required": "Signed_With_Blog_Token (HMAC)"
+    },
+    {
+      "id": "INFO-002",
+      "title": "Unauthenticated spawn-sync endpoint (DoS potential)",
+      "severity": "informational",
+      "description": "GET /wp-json/jetpack/v4/sync/spawn-sync has permission_callback __return_true but the handler is effectively a no-op (returns WP_Error immediately in both enabled/disabled states). Each request costs one DB option read. No meaningful DoS beyond standard WordPress REST API volume. Not a vulnerability.",
+      "file": "jetpack_vendor/automattic/jetpack-sync/src/class-rest-endpoints.php"
+    }
+  ]
+}

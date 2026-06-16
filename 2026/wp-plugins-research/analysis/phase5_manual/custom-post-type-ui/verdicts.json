@@ -1,0 +1,50 @@
+{
+  "plugin": "custom-post-type-ui",
+  "reviewed_at": "2026-06-16",
+  "total_findings_reviewed": 121,
+  "confirmed": [],
+  "false_positives": [
+    {
+      "flow_id": "custom-post-type-ui-xss-001",
+      "title": "Stored XSS via post type description",
+      "reason": "False positive. The description value is passed through esc_textarea() before output in the textarea (post-types.php:422). The taint scanner did not recognize esc_textarea() as a sanitizer."
+    },
+    {
+      "flow_id": "custom-post-type-ui-xss-002",
+      "title": "Stored XSS via post type labels",
+      "reason": "False positive. All label values are passed through esc_attr() before being placed in input value attributes (post-types.php:434 and similar). Proper output escaping is applied at every call site."
+    },
+    {
+      "flow_id": "taint-flows-general",
+      "title": "All remaining taint flows (119 high-severity XSS flows)",
+      "reason": "False positive. All 119 remaining high-severity taint flows follow the same pattern: values are read from get_option('cptui_post_types') or get_option('cptui_taxonomies'), then displayed in admin-only form fields with proper escaping (esc_attr, esc_textarea, esc_html). The data source requires manage_options capability to modify, and the output pages also require manage_options to access. Even without escaping, this would be admin-only stored XSS which is not exploitable by lower-privilege users."
+    },
+    {
+      "flow_id": "import-no-capcheck",
+      "title": "Import function lacks explicit current_user_can check",
+      "reason": "False positive. While cptui_import_types_taxes_settings() does not call current_user_can() directly, it calls check_admin_referer() which validates a nonce. The nonce is only rendered on admin pages gated by manage_options capability (tools.php:407,451). An attacker cannot obtain the nonce without admin access. Additionally, cptui_do_import_types_taxes() runs on init but the nonce verification in the called function prevents unauthenticated exploitation."
+    },
+    {
+      "flow_id": "register-meta-box-cb",
+      "title": "Arbitrary callback via register_meta_box_cb parameter",
+      "reason": "False positive. The register_meta_box_cb value is stored in cptui_post_types option which requires manage_options to modify. WordPress admins already have the ability to install plugins and edit PHP files, so controlling a callback name does not constitute privilege escalation."
+    },
+    {
+      "flow_id": "rest-controller-class",
+      "title": "Arbitrary class name via rest_controller_class parameter",
+      "reason": "False positive. Same as register_meta_box_cb -- stored in admin-only option. The class name is passed to register_post_type() which handles class instantiation safely. Only admins can set this value."
+    },
+    {
+      "flow_id": "dynamic-admin-notice",
+      "title": "Dynamic function name in admin notice callback",
+      "reason": "False positive. In tools.php:552, the pattern add_action('admin_notices', \"cptui_{$success}_admin_notice\") uses $success which is the return value of cptui_import_types_taxes_settings(), limited to hardcoded strings: 'import_fail', 'import_success', or 'nonce_fail'. Not user-controllable."
+    },
+    {
+      "flow_id": "process-post-type-dynamic-notice",
+      "title": "Dynamic function name in post type processing",
+      "reason": "False positive. In post-types.php:2478, is_callable(\"cptui_{$result}_admin_notice\") uses $result from cptui_update_post_type() or cptui_delete_post_type() which return hardcoded status strings like 'add_success', 'update_success', etc. Not user-controllable."
+    }
+  ],
+  "needs_more_info": [],
+  "summary": "Custom Post Type UI (v1.19.2) has a clean security posture. All admin functionality is properly gated behind manage_options capability checks and nonce verification. The plugin has no AJAX handlers (authenticated or unauthenticated), only one REST API route which requires manage_options, no direct database queries, no file upload handlers, and no frontend-facing attack surface. All 121 taint flows (2 critical + 119 high) flagged by the scanner are false positives -- they represent admin-only stored data being displayed with proper output escaping (esc_attr, esc_textarea, esc_html) on admin-only pages. The import functionality uses check_admin_referer() for CSRF protection and the nonce is only available to admins."
+}

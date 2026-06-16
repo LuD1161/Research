@@ -1,6 +1,6 @@
 # Attack Surface: admin-menu-editor
 
-> Generated: 2026-06-15T02:06:18Z
+> Generated: 2026-06-16T09:13:40Z
 
 ## Section 1: Entry Points
 

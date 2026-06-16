@@ -1,0 +1,61 @@
+{
+  "plugin_slug": "wp-file-manager",
+  "review_date": "2026-06-16",
+  "version_analyzed": "8.0.4",
+  "reviewer": "manual-audit",
+  "overall_risk": "low",
+  "summary": "Version 8.0.4 has significantly hardened the plugin compared to the infamous CVE-2020-25213 era. The standalone connector.minimal.php file (the original RCE vector) has been removed. All ElFinder connector access is now gated behind wp_ajax_mk_file_folder_manager with manage_options + nonce checks. No wp_ajax_nopriv_ handlers exist. All taint flows flagged by automated analysis are behind admin auth + nonce verification. One medium-severity design weakness was found in the backup download REST API endpoint. No confirmed unauthenticated vulnerabilities.",
+  "confirmed_vulnerabilities": [
+    {
+      "id": "WPFM-2026-001",
+      "title": "Backup Download REST Endpoint Uses Weak Static Secret Instead of Capability Check",
+      "severity": "medium",
+      "cvss_estimate": 4.3,
+      "type": "broken_access_control",
+      "unauthenticated": false,
+      "file": "file_folder_manager.php",
+      "lines": "53-66, 1372-1441",
+      "description": "The REST API endpoints /v1/fm/backup/ and /v1/fm/backupall/ use permission_callback '__return_true' and rely solely on a static secret key (fm_key, a 25-char random string stored in wp_options) for authorization. The REST routes are conditionally registered inside rest_api_init only when current_user_can('manage_options') evaluates to true for the requesting user, which means the routes are not discoverable or callable by unauthenticated users. However, this is an unconventional authorization pattern that delegates security to route registration timing rather than the standard permission_callback mechanism. If the fm_key is ever leaked (e.g., via cached HTML, proxy logs, or a separate information disclosure), the backup files (which may contain database dumps with credentials) could be downloaded by anyone who can also trigger route registration.",
+      "exploitation": "Requires: (1) Knowledge of the fm_key value, AND (2) the route to be registered (requires an admin to make a REST API request in the same HTTP lifecycle). In practice, this is defense-in-depth weakness rather than a directly exploitable vulnerability.",
+      "writeup": "confirmed/WPFM-2026-001_backup_rest_weak_auth.md"
+    },
+    {
+      "id": "WPFM-2026-002",
+      "title": "Malformed .htaccess Protection for Backup Directory",
+      "severity": "low",
+      "cvss_estimate": 2.0,
+      "type": "defense_in_depth",
+      "unauthenticated": false,
+      "file": "file_folder_manager.php",
+      "lines": "115-127",
+      "description": "The .htaccess file generated to protect the backup directory at wp-content/uploads/wp-file-manager-pro/fm_backup/ has a mismatched HTML-style tag: opens with <FilesMatch> but closes with </Files>. This may cause Apache to silently ignore the directive, leaving backup ZIP/GZ files directly accessible via their URL on Apache servers. On Nginx servers, .htaccess has no effect at all. Since backups contain database dumps (with user credentials, secret keys) and full site file archives, direct URL access would be critical -- but this requires knowing or guessing the backup filename.",
+      "exploitation": "Attacker must guess or discover the backup filename pattern (timestamp-based). On Nginx, .htaccess is irrelevant. On Apache, the malformed directive may still partially work depending on version. Backup filenames are generated from timestamps, making them guessable within a narrow window if the attacker knows when a backup was taken.",
+      "writeup": "confirmed/WPFM-2026-002_malformed_htaccess.md"
+    }
+  ],
+  "false_positives": [
+    {
+      "flow_ids": ["wp-file-manager-vari-001", "wp-file-manager-vari-002", "wp-file-manager-vari-003", "wp-file-manager-vari-004"],
+      "reason": "All variable_injection flows originate from $_POST['id'] which is cast via intval() and used in $wpdb->prepare() with %d placeholder. The source is sanitized (integer cast) and the SQL query uses prepared statements. The subsequent file operations use database-derived values (backup_name) which are not attacker-controlled. Additionally, all flows require manage_options capability + nonce verification (auth_required: true, nonce_verified: true)."
+    },
+    {
+      "flow_ids": ["wp-file-manager-xss-001", "wp-file-manager-xss-002", "wp-file-manager-xss-003", "wp-file-manager-xss-004", "wp-file-manager-xss-005", "wp-file-manager-xss-006", "wp-file-manager-xss-007", "wp-file-manager-xss-008", "wp-file-manager-xss-009", "wp-file-manager-xss-010", "wp-file-manager-xss-011", "wp-file-manager-xss-012", "wp-file-manager-xss-013", "wp-file-manager-xss-014", "wp-file-manager-xss-015", "wp-file-manager-xss-016", "wp-file-manager-xss-017", "wp-file-manager-xss-018"],
+      "reason": "All XSS flows output data via wp_json_encode() to JSON AJAX responses, not to HTML context. JSON encoding inherently escapes special characters. The values are either intval()-cast integers (bkpid) or sanitize_text_field()-processed strings (database, plugins, themes). These are consumed by JavaScript AJAX callbacks, not rendered as raw HTML. All flows are behind manage_options + nonce checks. Admin-to-admin self-XSS via JSON responses is not exploitable."
+    },
+    {
+      "flow_ids": ["wp-file-manager-file-001", "wp-file-manager-file-002", "wp-file-manager-file-003", "wp-file-manager-file-004", "wp-file-manager-file-005", "wp-file-manager-file-006", "wp-file-manager-file-007", "wp-file-manager-file-008", "wp-file-manager-file-009", "wp-file-manager-file-010"],
+      "reason": "All file_inclusion flows involve unlink() on paths constructed from database-derived backup_name values. The initial ID is intval()-cast and used via prepared statement. The backup_name is not user-controlled at time of deletion -- it was set during backup creation. All operations require manage_options + nonce verification. Admin deleting their own backups is intended functionality."
+    },
+    {
+      "flow_ids": ["wp-file-manager-sqli-001", "wp-file-manager-sqli-002"],
+      "reason": "Both SQL injection flows use $wpdb->delete() with intval()-cast IDs. The $wpdb->delete() method internally uses $wpdb->prepare() for parameterized queries. The input is double-sanitized: first by intval() then by wpdb's parameter binding. Both flows are behind manage_options + nonce checks."
+    }
+  ],
+  "key_findings": {
+    "cve_2020_25213_status": "PATCHED - The standalone connector.minimal.php file has been completely removed. ElFinder connector is now only accessible through WordPress AJAX with manage_options + nonce verification.",
+    "authentication_model": "All file management operations require manage_options capability. All AJAX handlers verify nonces. No wp_ajax_nopriv_ hooks exist. The plugin has no frontend/subscriber-facing functionality in the free version (shortcodes are PRO-only).",
+    "elfinder_connector": "Only instantiated inside mk_file_folder_manager_action_callback() which requires manage_options + wp_verify_nonce('wp-file-manager'). The ElFinder library files (lib/php/) are class definitions without ABSPATH checks but contain no executable code on direct access.",
+    "upload_configuration": "ElFinder upload is configured with uploadAllow: ['image', 'text/plain'] and uploadDeny: []. With order 'deny,allow', this should restrict uploads to images and text files only. However, this is admin-only functionality.",
+    "backup_protection": "Backup directory protected by malformed .htaccess (mismatched tags). No Nginx protection. Backup download via REST API uses static secret key rather than WordPress capability checks."
+  }
+}

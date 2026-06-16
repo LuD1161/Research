@@ -1,0 +1,104 @@
+{
+  "plugin_slug": "updraftplus",
+  "review_date": "2026-06-16",
+  "reviewer": "manual-audit",
+  "overall_risk": "low",
+  "summary": "UpdraftPlus has a well-defended attack surface. All 16 automated taint flows are false positives. The nopriv AJAX restore continuation handler lacks nonce/capability checks but requires knowledge of a 12-hex-character opaque job_id (48-bit entropy), making it impractical to exploit without a separate information leak. Backup download (CVE-2022-0633) has been properly patched with user_can_manage() + nonce.",
+  "confirmed_vulnerabilities": [],
+  "notable_weaknesses": [
+    {
+      "id": "updraftplus-weakness-001",
+      "title": "Unauthenticated Restore Continuation Handler Lacks Proper Auth",
+      "severity": "low",
+      "cvss_estimate": 3.1,
+      "type": "broken_access_control",
+      "description": "The wp_ajax_nopriv_updraft_ajaxrestore_continue handler (admin.php:559) calls updraft_ajaxrestore() which at line 751 only checks the nonce when action='updraft_ajaxrestore'. For the _continue action, the only guard is matching a 12-hex-char job_id against the updraft_restore_in_progress site option (line 5676-5678). No current_user_can() check exists. An attacker who obtains the job_id (via log leak, error message, or side-channel) could resume/continue an admin-initiated restore without authentication.",
+      "file": "admin.php",
+      "lines": "748-753, 5676-5678",
+      "exploitability": "Requires knowledge of active restore job_id (12 hex chars, 48 bits). Cannot initiate a new restore - only continue one already started by an admin. The job_id uses md5(time().wp_rand()) which includes CSPRNG randomness. Practical exploitation requires a separate info leak.",
+      "recommendation": "Add current_user_can('manage_options') check in the updraft_ajaxrestore_continue path, or at minimum add a nonce check."
+    }
+  ],
+  "false_positives": [
+    {
+      "flow_id": "updraftplus-sqli-001",
+      "reason": "Data flows from wpdb->get_row (DB output) to wpdb->update. The source is a database query result, not user input. The table name uses escape_table_name() which backquotes and escapes backticks. Values use wpdb->prepare(). This is a DB-to-DB data flow during restore, not user-controllable SQL injection.",
+      "verdict": "false_positive"
+    },
+    {
+      "flow_id": "updraftplus-sqli-002",
+      "reason": "Same pattern as sqli-001. Data flows from one DB query to another during backup restoration. The wp_rocket_settings value is unserialized safely (allowed_classes=false) and re-serialized. No user input involved in the SQL.",
+      "verdict": "false_positive"
+    },
+    {
+      "flow_id": "updraftplus-obje-001",
+      "reason": "$updraftplus->unserialize() uses Brumann\\Polyfill\\Unserialize with allowed_classes=false by default (class-updraftplus.php:6793-6803). This prevents object instantiation. Data comes from the restored database, not direct user input. No object injection possible on PHP >= 5.3.",
+      "verdict": "false_positive"
+    },
+    {
+      "flow_id": "updraftplus-sqli-003",
+      "reason": "$row['blog_id'] comes from a wpdb->blogs query result and is sanitized with absint() before being passed to wpdb->get_blog_prefix(). The resulting prefix is WP-internal and safe. No user-controllable SQL injection.",
+      "verdict": "false_positive"
+    },
+    {
+      "flow_id": "updraftplus-rce-001",
+      "reason": "The call_user_func($logging_function, $logline) at class-updraftplus.php:1100 is a logging call. The $logging_function is internally set by the plugin (not user-controlled), and $logline contains system information strings (PHP version, MySQL version etc.), not user input. No command execution vector.",
+      "verdict": "false_positive"
+    },
+    {
+      "flow_id": "updraftplus-rce-002",
+      "reason": "The call_user_func at admin.php:1977 is behind updraft_ajax_handler() which requires: (1) wp_verify_nonce at line 1949, (2) user_can_manage() capability check at line 1957. The $subaction is validated via method_exists() on UpdraftPlus_WPAdmin_Commands. Authenticated admin-only, properly protected.",
+      "verdict": "false_positive"
+    },
+    {
+      "flow_id": "updraftplus-xss-001",
+      "reason": "The echo at admin.php:2019 outputs json_encode() result. json_encode() escapes all special HTML characters. Furthermore, this is behind the authenticated updraft_ajax_handler() with nonce + capability checks. Content-Type is JSON. No XSS.",
+      "verdict": "false_positive"
+    },
+    {
+      "flow_id": "updraftplus-xss-002",
+      "reason": "The $curl variable at admin.php:2039 is cast to boolean (empty() check returns true/false). The $request_uri is passed to http_get() which validates it as http/https URL. This is behind authenticated updraft_ajax_handler(). No XSS.",
+      "verdict": "false_positive"
+    },
+    {
+      "flow_id": "updraftplus-xss-003",
+      "reason": "The output at admin.php:3624 uses esc_url() which properly sanitizes URLs. The source is get_site_option('updraftplus_product_key') which is admin-set data, passed through urlencode(). esc_url() strips javascript: and other dangerous schemes. No XSS.",
+      "verdict": "false_positive"
+    },
+    {
+      "flow_id": "updraftplus-xss-004",
+      "reason": "Same as xss-003. The output at admin.php:3676 uses esc_url() on a terms_and_conditions_link which is set via wp_parse_args defaults, not from product_key. Even if it were tainted, esc_url() sanitizes it. No XSS.",
+      "verdict": "false_positive"
+    },
+    {
+      "flow_id": "updraftplus-obje-002",
+      "reason": "$updraftplus->unserialize() with default allowed_classes=false prevents object injection. The data comes from wp_options table (updraft_backup_history), which is admin-controlled. Safe deserialization.",
+      "verdict": "false_positive"
+    },
+    {
+      "flow_id": "updraftplus-sqli-004",
+      "reason": "The $primary_key_field at class-wpadmin-commands.php:867 comes from SHOW COLUMNS result (DB metadata), not user input. The $table_name is also internally constructed. This code is only reachable via the authenticated updraft_ajax_handler. No SQL injection.",
+      "verdict": "false_positive"
+    },
+    {
+      "flow_id": "updraftplus-ssrf-001",
+      "reason": "The pCloud API wp_remote_get at line 370 uses 'https://' prefix with $dwl_url which comes from pCloud API response data (getfilelink API), not user input. The $offset is intval() cast. This is cloud storage download logic triggered during authenticated backup operations. No SSRF.",
+      "verdict": "false_positive"
+    },
+    {
+      "flow_id": "updraftplus-file-001",
+      "reason": "Same flow as ssrf-001. The fwrite() writes downloaded backup data from pCloud to a local archive file during authenticated backup download. The file path and content are not user-controlled. Normal cloud storage download operation.",
+      "verdict": "false_positive"
+    },
+    {
+      "flow_id": "updraftplus-rce-003",
+      "reason": "The call_user_func at central/host.php:115 is behind wp_ajax_updraft_central_ajax (no nopriv variant). It requires nonce verification and current_user_can_ajax() which checks manage_options. The $subaction is restricted to a whitelist of methods. Properly authenticated.",
+      "verdict": "false_positive"
+    },
+    {
+      "flow_id": "updraftplus-ssrf-002",
+      "reason": "The wp_remote_get at central/modules/analytics.php:257 uses $user_id from get_option() (admin-configured Google Analytics token), not from user input. The $auth_endpoint is hardcoded. This is an authenticated UpdraftCentral operation. No SSRF.",
+      "verdict": "false_positive"
+    }
+  ]
+}

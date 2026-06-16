@@ -1,0 +1,206 @@
+{
+  "plugin_slug": "white-label-cms",
+  "priority_score": 29,
+  "metadata": {
+    "php_files": 0,
+    "total_lines": 0
+  },
+  "attack_surface_summary": "# Attack Surface: white-label-cms\n\n> Generated: 2026-06-16T09:13:55Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 91,
+    "total_sinks": 31,
+    "total_sanitizers": 118,
+    "direct_flows": 25,
+    "functions_with_sources": 35,
+    "functions_with_sinks": 18,
+    "files_analyzed": 69,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "white-label-cms-file-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "white-label-cms",
+      "vulnerability_class": "file_inclusion",
+      "source": {
+        "expression": "$temp_file_raw = $_FILES[$import_field]['tmp_name']",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/white-label-cms/includes/classes/Settings.php",
+        "line": 202
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 202,
+          "expression": "$temp_file_raw = $_FILES[$import_field]['tmp_name']",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 203,
+          "expression": "$temp_file = esc_attr($temp_file_raw)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 219,
+          "expression": "unlink($temp_file)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "unlink($temp_file)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/white-label-cms/includes/classes/Settings.php",
+        "line": 219
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "white-label-cms-xss-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "white-label-cms",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$q = isset($_GET['q']) ? $_GET['q'] : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/white-label-cms/includes/classes/Admin_Settings.php",
+        "line": 158
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 158,
+          "expression": "$q = isset($_GET['q']) ? $_GET['q'] : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 159,
+          "expression": "wp_send_json([\n            'results' => wlcms_search_pages($q),\n            'pagination' => ['more' => false]\n        ])",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json([\n            'results' => wlcms_search_pages($q),\n            'pagination' => ['more' => false]\n        ])",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/white-label-cms/includes/classes/Admin_Settings.php",
+        "line": 159
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "white-label-cms-obje-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "white-label-cms",
+      "vulnerability_class": "object_injection",
+      "source": {
+        "expression": "get_option('_wlcms_messages', array())",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/white-label-cms/includes/classes/Messages.php",
+        "line": 15
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 15,
+          "expression": "$messages = maybe_unserialize(get_option('_wlcms_messages', array()))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$messages = maybe_unserialize(get_option('_wlcms_messages', array()))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/white-label-cms/includes/classes/Messages.php",
+        "line": 15
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "white-label-cms-obje-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "white-label-cms",
+      "vulnerability_class": "object_injection",
+      "source": {
+        "expression": "get_option('_wlcms_messages')",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/white-label-cms/includes/classes/Messages.php",
+        "line": 23
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 23,
+          "expression": "$group_messages = maybe_unserialize(get_option('_wlcms_messages'))",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$group_messages = maybe_unserialize(get_option('_wlcms_messages'))",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/white-label-cms/includes/classes/Messages.php",
+        "line": 23
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [],
+  "stats": {
+    "taint_critical": 2,
+    "taint_high": 1,
+    "taint_total": 4,
+    "semgrep_error": 0,
+    "semgrep_warning": 0
+  }
+}

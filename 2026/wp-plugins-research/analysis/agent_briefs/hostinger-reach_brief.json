@@ -1,0 +1,186 @@
+{
+  "plugin_slug": "hostinger-reach",
+  "priority_score": 33,
+  "metadata": {
+    "php_files": 0,
+    "total_lines": 0
+  },
+  "attack_surface_summary": "# Attack Surface: hostinger-reach\n\n> Generated: 2026-06-16T09:13:47Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 316,
+    "total_sinks": 170,
+    "total_sanitizers": 207,
+    "direct_flows": 128,
+    "functions_with_sources": 162,
+    "functions_with_sinks": 130,
+    "files_analyzed": 293,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "hostinger-reach-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "hostinger-reach",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$siteurl = $wpdb->get_var(\n            $wpdb->prepare(\n                \"SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1\",\n                'siteurl'\n            )\n        )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/hostinger-reach/src/Setup/Assets.php",
+        "line": 55
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 55,
+          "expression": "$siteurl = $wpdb->get_var(\n            $wpdb->prepare(\n                \"SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1\",\n                'siteurl'\n            )\n        )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 62,
+          "expression": "$siteurl    = preg_replace( '#^https?://(?:www\\.)?#i', '', $siteurl )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 62,
+          "expression": "$siteurl    = preg_replace( '#^https?://(?:www\\.)?#i', '', $siteurl )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$siteurl    = preg_replace( '#^https?://(?:www\\.)?#i', '', $siteurl )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/hostinger-reach/src/Setup/Assets.php",
+        "line": 62
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "hostinger-reach-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "hostinger-reach",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$wpdb->get_results( $sql )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/hostinger-reach/src/Integrations/WooCommerce/WooCommerceIntegration.php",
+        "line": 235
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 235,
+          "expression": "array_map(\n            function ( stdClass $user ) {\n                return array(\n                    'email'    => $user->email ?? '',\n                    'name'     => $user->first_name ?? '',\n                    'metadata' => array(\n                        'form_id' => wc_get_page_id( 'checkout' ),\n                        'plugin'  => self::INTEGRATION_NAME,\n                        'group'   => self::INTEGRATION_NAME,\n                    ),\n                );\n            },\n            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared\n            $wpdb->get_results( $sql )\n        )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(\n            function ( stdClass $user ) {\n                return array(\n                    'email'    => $user->email ?? '',\n                    'name'     => $user->first_name ?? '',\n                    'metadata' => array(\n                        'form_id' => wc_get_page_id( 'checkout' ),\n                        'plugin'  => self::INTEGRATION_NAME,\n                        'group'   => self::INTEGRATION_NAME,\n                    ),\n                );\n            },\n            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared\n            $wpdb->get_results( $sql )\n        )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/hostinger-reach/src/Integrations/WooCommerce/WooCommerceIntegration.php",
+        "line": 235
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "hostinger-reach-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "hostinger-reach",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$entries = $wpdb->get_results(\n            $wpdb->prepare(\n                'SELECT email, name FROM %i LIMIT %d OFFSET %d',\n                $table_name,\n                $limit,\n                $offset\n            ),\n            ARRAY_A\n        )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/hostinger-reach/src/Integrations/ThriveLeads/ThriveLeadsIntegration.php",
+        "line": 103
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 103,
+          "expression": "$entries = $wpdb->get_results(\n            $wpdb->prepare(\n                'SELECT email, name FROM %i LIMIT %d OFFSET %d',\n                $table_name,\n                $limit,\n                $offset\n            ),\n            ARRAY_A\n        )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 112,
+          "expression": "$entries = array_map(\n            function ( array $entry ) {\n                $contact = new ReachContact(\n                    $entry['email'] ?? '',\n                    $entry['name'] ?? '',\n                    '',\n                    array(\n                        'plugin' => self::INTEGRATION_NAME,\n                        'group'  => self::INTEGRATION_NAME,\n                    )\n                );\n\n                return $contact->to_array();\n            },\n            $entries\n        )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 112,
+          "expression": "$entries = array_map(\n            function ( array $entry ) {\n                $contact = new ReachContact(\n                    $entry['email'] ?? '',\n                    $entry['name'] ?? '',\n                    '',\n                    array(\n                        'plugin' => self::INTEGRATION_NAME,\n                        'group'  => self::INTEGRATION_NAME,\n                    )\n                );\n\n                return $contact->to_array();\n            },\n            $entries\n        )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$entries = array_map(\n            function ( array $entry ) {\n                $contact = new ReachContact(\n                    $entry['email'] ?? '',\n                    $entry['name'] ?? '',\n                    '',\n                    array(\n                        'plugin' => self::INTEGRATION_NAME,\n                        'group'  => self::INTEGRATION_NAME,\n                    )\n                );\n\n                return $contact->to_array();\n            },\n            $entries\n        )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/hostinger-reach/src/Integrations/ThriveLeads/ThriveLeadsIntegration.php",
+        "line": 112
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [],
+  "stats": {
+    "taint_critical": 3,
+    "taint_high": 0,
+    "taint_total": 3,
+    "semgrep_error": 0,
+    "semgrep_warning": 0
+  }
+}

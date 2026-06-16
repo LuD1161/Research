@@ -1,0 +1,138 @@
+{
+  "plugin_slug": "wpcf7-recaptcha",
+  "priority_score": 12,
+  "metadata": {
+    "php_files": 0,
+    "total_lines": 0
+  },
+  "attack_surface_summary": "# Attack Surface: wpcf7-recaptcha\n\n> Generated: 2026-06-16T09:13:58Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 27,
+    "total_sinks": 28,
+    "total_sanitizers": 25,
+    "direct_flows": 8,
+    "functions_with_sources": 6,
+    "functions_with_sinks": 4,
+    "files_analyzed": 3,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "wpcf7-recaptcha-rce-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wpcf7-recaptcha",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$network_wpcf7 = get_site_option( 'network_iqfix_recaptcha' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wpcf7-recaptcha/wpcf7-recaptcha.php",
+        "line": 364
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 364,
+          "expression": "$network_wpcf7 = get_site_option( 'network_iqfix_recaptcha' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 365,
+          "expression": "$network_wpcf7 = array_filter( (array)$network_wpcf7 )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 365,
+          "expression": "$network_wpcf7 = array_filter( (array)$network_wpcf7 )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$network_wpcf7 = array_filter( (array)$network_wpcf7 )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wpcf7-recaptcha/wpcf7-recaptcha.php",
+        "line": 365
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": true,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wpcf7-recaptcha-ssrf-001",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wpcf7-recaptcha",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$request\t= array(\r\n\t\t\t\t'body' => array(\r\n\t\t\t\t\t'secret' => $secret,\r\n\t\t\t\t\t'response' => $response_token,\r\n\t\t\t\t\t'remoteip' => $_SERVER['REMOTE_ADDR'],\r\n\t\t\t\t),\r\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wpcf7-recaptcha/recaptcha-v2.php",
+        "line": 563
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 563,
+          "expression": "$request\t= array(\r\n\t\t\t\t'body' => array(\r\n\t\t\t\t\t'secret' => $secret,\r\n\t\t\t\t\t'response' => $response_token,\r\n\t\t\t\t\t'remoteip' => $_SERVER['REMOTE_ADDR'],\r\n\t\t\t\t),\r\n\t\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 571,
+          "expression": "$response = wp_safe_remote_post( esc_url_raw( $endpoint ), $request )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_safe_remote_post( esc_url_raw( $endpoint ), $request )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wpcf7-recaptcha/recaptcha-v2.php",
+        "line": 571
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [],
+  "stats": {
+    "taint_critical": 0,
+    "taint_high": 2,
+    "taint_total": 2,
+    "semgrep_error": 0,
+    "semgrep_warning": 0
+  }
+}

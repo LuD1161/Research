@@ -1,6 +1,6 @@
 # Attack Surface: astra-sites
 
-> Generated: 2026-06-15T02:06:19Z
+> Generated: 2026-06-16T09:13:41Z
 
 ## Section 1: Entry Points
 

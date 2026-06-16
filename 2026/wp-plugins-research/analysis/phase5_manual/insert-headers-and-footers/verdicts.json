@@ -1,0 +1,241 @@
+{
+  "plugin_slug": "insert-headers-and-footers",
+  "plugin_name": "WPCode - Insert Headers and Footers + Custom Code Snippets",
+  "version_audited": "2.3.6",
+  "active_installs": "2,000,000+",
+  "audit_date": "2026-06-16",
+  "summary": "22 taint flows analyzed (6 critical, 16 high). All flagged RCE and XSS flows are false positives. One genuine design concern exists around the unauthenticated connect process endpoint. No confirmed exploitable unauthenticated vulnerabilities found.",
+  "taint_flow_verdicts": [
+    {
+      "flow_id": "insert-headers-and-footers-xss-001",
+      "verdict": "false_positive",
+      "severity_original": "high",
+      "reason": "echo absint($total_count) — absint() returns a non-negative integer. Cannot contain XSS payload. Integer output does not need esc_html()."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-002",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "reason": "Intentional design: the plugin's core purpose is injecting arbitrary HTML/JS into page headers/footers. The option can only be written by administrators (requires manage_options capability). Output is intentionally unescaped. This is by-design functionality, not a vulnerability."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-003",
+      "verdict": "false_positive",
+      "severity_original": "high",
+      "reason": "All parameters passed to get_upsell_box() are hardcoded translation strings, esc_html__(), esc_url(), and sanitize_title(). No user-controlled data reaches the output. The phpcs:ignore is for the method return value which itself builds escaped HTML."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-004",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "reason": "Authenticated endpoint (wp_ajax_ only) with nonce verification (check_ajax_referer). The $key is sanitize_text_field'd and passed through add_query_arg which URL-encodes it. Output via wp_send_json_success is JSON-encoded. No XSS vector."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-rce-001",
+      "verdict": "false_positive",
+      "severity_original": "critical",
+      "reason": "array_map with a static closure is not RCE. The 'sink' is array_map('callback', $plugins) where callback only reads $plugin['Version']. get_option('active_plugins') returns plugin basenames, get_plugins() returns plugin metadata. No shell execution occurs."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-rce-002",
+      "verdict": "false_positive",
+      "severity_original": "critical",
+      "reason": "usort() with an inline comparison closure is not RCE. The taint tool falsely flagged usort as a dangerous sink. The callback only compares $a['priority'] vs $b['priority'] — no code execution from tainted data."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-005",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "reason": "Authenticated (wp_ajax_ only), nonce-verified (check_ajax_referer), capability-checked (wpcode_edit_snippets). The $term variable is used as a WP_Term_Query parameter, and results return term_id and term name from the DB. Output via wp_send_json is JSON-encoded, not HTML."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-006",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "reason": "Authenticated, nonce-verified, capability-checked. Generator type is looked up against a fixed set of registered types. Output via wp_send_json is JSON-encoded."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-007",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "reason": "Authenticated, nonce-verified, capability-checked. $page is absint'd. $html is built from library data. Output via wp_send_json_success is JSON-encoded."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-008",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "reason": "Authenticated, nonce-verified, capability-checked. snippet_id is absint'd. Output is JSON-encoded via wp_send_json_success."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-009",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "reason": "Authenticated, nonce-verified, capability-checked. snippet_id is absint'd. URL is built with add_query_arg + admin_url. Output is JSON."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-rce-003",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "reason": "array_map('sanitize_key', ...) is not RCE. sanitize_key is a built-in WordPress sanitizer. The taint tool incorrectly flagged array_map as a shell execution sink."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-010",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "reason": "Authenticated importer endpoint with nonce check. $post->post_title comes from a known CPT. Output via wp_send_json_error is JSON-encoded. Even if title contained HTML, JSON encoding prevents XSS."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-rce-004",
+      "verdict": "false_positive",
+      "severity_original": "critical",
+      "reason": "array_map('trim', $site_locations) is not RCE. The taint tool falsely flagged array_map as a shell execution sink. trim() on post_meta values is a normal sanitization operation."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-011",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "reason": "Authenticated admin page, nonce-verified. $selected_log_name goes through sanitize_text_field, then into a URL built with wp_nonce_url + add_query_arg. Output uses esc_url() which is the correct sanitizer for URLs."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-open-001",
+      "verdict": "false_positive",
+      "severity_original": "low",
+      "reason": "Uses wp_safe_redirect() which validates the redirect target against allowed hosts (same-origin by default). REQUEST_URI is the current page URL. This is a standard WordPress pattern for cleaning query args from the current URL."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-012",
+      "verdict": "false_positive",
+      "severity_original": "high",
+      "reason": "echo absint() — integer output cannot contain XSS. absint() always returns a non-negative integer."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-013",
+      "verdict": "false_positive",
+      "severity_original": "high",
+      "reason": "echo absint($index) — integer output, no XSS possible."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-014",
+      "verdict": "false_positive",
+      "severity_original": "high",
+      "reason": "echo absint($index) — integer output, no XSS possible."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-rce-005",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "reason": "preg_replace is not RCE (the /e modifier is not used). This is snippet code processing during save — authenticated, nonce-verified. The code is stored, not executed during save. The taint tool incorrectly flagged preg_replace as a shell sink."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-rce-006",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "reason": "Same as rce-005. preg_replace without /e modifier is safe. Authenticated save handler."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-rce-007",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "reason": "Same as rce-005/006. preg_replace is used for stripping script tags from snippet code during save."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-rce-008",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "reason": "Same as rce-005/006/007. preg_replace for closing script tag removal. No /e modifier."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-rce-009",
+      "verdict": "false_positive",
+      "severity_original": "medium",
+      "reason": "array_map('sanitize_key', ...) is not RCE. Authenticated, nonce-verified snippet save handler."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-015",
+      "verdict": "false_positive",
+      "severity_original": "high",
+      "reason": "absint($height) in CSS output. Integer only, no XSS possible. Admin page only."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-016",
+      "verdict": "false_positive",
+      "severity_original": "high",
+      "reason": "absint($error_line) in printf with %d format specifier. Integer only, no XSS possible. Admin page only."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-017",
+      "verdict": "false_positive",
+      "severity_original": "high",
+      "reason": "absint($this->snippet->get_id()) with %d format specifier. Integer output in admin context. No XSS."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-018",
+      "verdict": "false_positive",
+      "severity_original": "high",
+      "reason": "Admin-only page with sanitize_text_field on input. URL built with add_query_arg + esc_url on output links. The final echo of page_links uses sprintf with esc_url for href attributes. Properly escaped admin context."
+    },
+    {
+      "flow_id": "insert-headers-and-footers-xss-019",
+      "verdict": "false_positive",
+      "severity_original": "high",
+      "reason": "Same pattern as xss-018, continued flow in admin pagination. Properly escaped."
+    }
+  ],
+  "manual_findings": [
+    {
+      "id": "WPCODE-MANUAL-001",
+      "title": "Unauthenticated Plugin Installation via Connect Process (Race-Window RCE)",
+      "verdict": "informational_design_concern",
+      "severity": "low",
+      "cvss_estimate": "N/A",
+      "unauthenticated": true,
+      "file": "includes/lite/admin/class-wpcode-connect.php",
+      "lines": "34, 146-264",
+      "description": "wp_ajax_nopriv_wpcode_connect_process allows unauthenticated callers to install and activate an arbitrary plugin from an attacker-supplied URL. Protection relies on a one-time HMAC token (sha512 + wp_salt). The token is only set when an admin actively initiates the upgrade-to-Pro flow and is deleted after single use. The HMAC cannot be brute-forced. This is a standard pattern used by WPForms, MonsterInsights, and other Awesome Motive plugins.",
+      "exploitation_conditions": "Attacker must obtain the HMAC'd token value, which requires: (1) an existing info-disclosure vuln that leaks the wpcode_connect_token option, or (2) MITM on the admin-to-upgrade.wpcode.com request. Both are unrealistic in normal conditions.",
+      "exploitable": false,
+      "writeup": "confirmed/connect-process-nopriv.md"
+    },
+    {
+      "id": "WPCODE-MANUAL-002",
+      "title": "Missing Nonce on wpcode_verify_ssl AJAX Handler",
+      "verdict": "low_severity_confirmed",
+      "severity": "low",
+      "cvss_estimate": "3.1",
+      "unauthenticated": false,
+      "file": "includes/admin/admin-ajax-handlers.php",
+      "lines": "275-296",
+      "description": "The wpcode_verify_ssl AJAX handler checks current_user_can('wpcode_edit_snippets') but does not verify a nonce. An attacker could craft a CSRF page that causes an authenticated admin to trigger an outbound HTTP POST to https://wpcode.com. Impact is minimal: the request goes to a hardcoded URL and the response is not reflected to the attacker.",
+      "exploitable": false,
+      "writeup": null
+    },
+    {
+      "id": "WPCODE-MANUAL-003",
+      "title": "Weak Suspicious Code Blocklist in Snippet Execution",
+      "verdict": "informational_design_concern",
+      "severity": "informational",
+      "cvss_estimate": "N/A",
+      "unauthenticated": false,
+      "file": "includes/class-wpcode-snippet-execute.php",
+      "lines": "702-713",
+      "description": "The is_code_not_allowed() blocklist only blocks base64_decode/error_reporting/ini_set/eval if they appear >5 times and dns_get_record. Functions like system(), shell_exec(), passthru(), file_put_contents() are unrestricted. However, this is by-design since the plugin's purpose is arbitrary code execution by administrators. The blocklist only targets automated spam/malware patterns, not intentional admin actions.",
+      "exploitable": false,
+      "writeup": null
+    },
+    {
+      "id": "WPCODE-MANUAL-004",
+      "title": "File Cache Accessible on Nginx Servers",
+      "verdict": "informational_design_concern",
+      "severity": "informational",
+      "cvss_estimate": "N/A",
+      "unauthenticated": true,
+      "file": "includes/class-wpcode-file-cache.php",
+      "lines": "205-224",
+      "description": "Cache files in wp-content/uploads/wpcode/cache/ are protected by .htaccess (deny from all) and index.html, which works on Apache but not Nginx. On Nginx servers, JSON cache files (library data, notifications) could be directly accessed. Content is non-sensitive plugin metadata, not snippet code or credentials.",
+      "exploitable": false,
+      "writeup": null
+    }
+  ],
+  "confirmed_vulnerabilities": [],
+  "conclusion": "All 22 automated taint flows are false positives. The scanner produced many false alerts from: (1) absint() output flagged as unescaped XSS, (2) array_map/usort/preg_replace flagged as RCE sinks, (3) JSON API responses flagged as HTML output, (4) authenticated+nonce-verified endpoints flagged as unauth. The single unauthenticated endpoint (connect process) uses a sound cryptographic token scheme. No exploitable unauthenticated vulnerabilities were confirmed."
+}

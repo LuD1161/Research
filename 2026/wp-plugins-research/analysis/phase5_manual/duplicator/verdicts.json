@@ -1,0 +1,105 @@
+{
+  "plugin_slug": "duplicator",
+  "review_date": "2026-06-16",
+  "reviewer": "manual-audit",
+  "overall_risk": "medium",
+  "confirmed_vulnerabilities": [
+    {
+      "id": "DUP-01",
+      "title": "Backup Archives Directly Accessible via Predictable URL (Information Disclosure)",
+      "severity": "medium",
+      "cvss_estimate": 5.3,
+      "vulnerability_class": "information_disclosure",
+      "unauthenticated": true,
+      "file": "classes/utilities/class.u.php:628-650",
+      "description": "Backup .zip archives stored in wp-content/backups-dup-lite/ are served directly by the web server. The .htaccess protection only blocks .php files and sets Content-Disposition on .daf files, but does NOT block direct HTTP access to .zip files. On Nginx servers (no .htaccess support) all files including .daf are exposed. Archive filenames follow the pattern {name}_{hash}_archive.zip where hash includes a timestamp component (YmdHis), making targeted brute-force feasible if attacker knows approximate creation date.",
+      "exploitation_requirements": "Attacker needs to guess/enumerate the backup filename. The hash is random_bytes(8)+mt_rand(1000,9999)_YmdHis, giving 2^64 * 9000 possibilities per timestamp second (infeasible for blind brute-force). However: (1) On Nginx, no .htaccess = directory listing if autoindex is on, (2) The default package name is the site title which is public, (3) The .htaccess has 'Options -Indexes' but can be disabled by admin via storage_htaccess_off setting.",
+      "impact": "Full site backup download including database credentials, user password hashes, secret keys, and complete file system contents.",
+      "confirmed_flow_ids": [],
+      "writeup": "confirmed/DUP-01-backup-file-exposure.md"
+    },
+    {
+      "id": "DUP-02",
+      "title": "Installer Script Exposure - Standalone PHP with CSRF-Only Protection",
+      "severity": "medium",
+      "cvss_estimate": 5.9,
+      "vulnerability_class": "broken_access_control",
+      "unauthenticated": true,
+      "file": "installer/dup-installer/main.installer.php",
+      "description": "The installer (dup-installer/main.installer.php) is a standalone PHP application that operates outside WordPress entirely. It has its own CSRF token system and optional password/archive-name protection. If the installer files are left on the server after migration (a common misconfiguration), the CSRF file-based tokens can be read from the dup-installer directory. The security check uses REMOTE_ADDR whitelist (localhost only) and falls back to archive-name-as-password for overwrite scenarios. The CSRF token generation uses md5(uniqid(rand(),true)) concatenated with md5(REMOTE_ADDR|USER_AGENT) which is deterministic per-client.",
+      "exploitation_requirements": "Installer files must be left on the server post-migration (the plugin warns about this but cannot enforce cleanup). Attacker needs access to the CSRF token file or to guess the archive filename for SECURITY_ARCHIVE mode.",
+      "impact": "Complete site takeover: database replacement, file extraction, wp-config.php modification, admin user creation.",
+      "confirmed_flow_ids": ["duplicator-ssrf-002"],
+      "writeup": "confirmed/DUP-02-installer-exposure.md"
+    }
+  ],
+  "false_positives": [
+    {
+      "flow_ids": ["duplicator-rce-001"],
+      "reason": "The taint source is sanitize_text_field($compatValue) on a value from admin POST data. This is part of the package creation flow which requires wp_ajax_ hook (authenticated) + nonce + 'export' capability. The data flows through array_map('trim', explode(...)) which is not a dangerous sink - 'trim' is not a command execution function."
+    },
+    {
+      "flow_ids": ["duplicator-sqli-001", "duplicator-sqli-002"],
+      "reason": "Second-order SQL injection: procedure/function names from SHOW PROCEDURE STATUS are used in SHOW CREATE PROCEDURE without prepare(). However, procedure names come from the database itself (not user input), and would require a pre-existing malicious DB object name. This is database-to-database flow, not user-to-database. Additionally, this only runs during admin-initiated package creation (authenticated + capability check)."
+    },
+    {
+      "flow_ids": ["duplicator-sqli-003"],
+      "reason": "wpdb->insert() automatically escapes values. The function uses parameterized insert, not raw SQL. $this->Name and $this->Hash are set during authenticated admin operations."
+    },
+    {
+      "flow_ids": ["duplicator-file-001", "duplicator-file-002", "duplicator-file-003", "duplicator-file-004"],
+      "reason": "Database query results (SHOW CREATE TABLE/PROCEDURE/FUNCTION/VIEW) written to SQL dump file via fwrite(). This is expected behavior for a backup plugin. The data source is the database schema, not user input. Only runs during authenticated admin-initiated backup creation."
+    },
+    {
+      "flow_ids": ["duplicator-file-005", "duplicator-file-006", "duplicator-file-007", "duplicator-file-008", "duplicator-file-009", "duplicator-file-010", "duplicator-file-011", "duplicator-file-012", "duplicator-file-013"],
+      "reason": "unlink() calls on files derived from database query (name+hash from duplicator_packages table). The $this->ID is set internally and the query uses $wpdb->prepare with %d. The nameHash is constructed from trusted database values, and the target paths are constrained to the backup directory. Only runs during authenticated package deletion."
+    },
+    {
+      "flow_ids": ["duplicator-rce-002"],
+      "reason": "The @unserialize + call_user_func flow: $Package = @unserialize($rows[0]->package) followed by call_user_func($callback, $Package). The $callback is a hardcoded function reference passed by the caller (e.g., 'package_delete_callback'), NOT from user input. The unserialized object is the $Package parameter, not the callback. While unserialize of DB content is a defense-in-depth concern, the data comes from the plugin's own serialized package objects, and the function is only callable from authenticated admin contexts."
+    },
+    {
+      "flow_ids": ["duplicator-ssrf-001"],
+      "reason": "Deactivation feedback: wp_remote_post to hardcoded URL 'https://snapcreekanalytics.com/...' with user data in POST body. The URL is hardcoded, not user-controlled. The user-supplied reason_info is already processed through esc_html(). This is authenticated (wp_ajax_ handler) and nonce-verified."
+    },
+    {
+      "flow_ids": ["duplicator-xss-001"],
+      "reason": "Installer context (class.u.html.php): $classes parameter uses FILTER_SANITIZE_SPECIAL_CHARS which encodes special chars. Additionally, this is within the standalone installer which has its own CSRF protection. Not reachable from normal WordPress context."
+    },
+    {
+      "flow_ids": ["duplicator-xss-002", "duplicator-xss-003"],
+      "reason": "Installer uses DUPX_U::esc_html() which is the installer's own escaping function equivalent to htmlspecialchars(). $_SERVER['SERVER_SOFTWARE'] and php_sapi_name() are server-controlled values, not user-injectable in practice."
+    },
+    {
+      "flow_ids": ["duplicator-xss-004"],
+      "reason": "Installer context: $_SERVER['SERVER_NAME'] used in cpanel URL with DUPX_U::esc_url(). The SERVER_NAME is typically server-configured and the value is URL-encoded. Only accessible within the standalone installer's CSRF-protected context."
+    },
+    {
+      "flow_ids": ["duplicator-xss-005", "duplicator-xss-006", "duplicator-xss-007", "duplicator-xss-008", "duplicator-xss-009"],
+      "reason": "Settings controller tab switching: The $current_tab value is compared with strict equality (==) to known strings. The echo only outputs the RESULT of the comparison ('nav-tab-active' or ''), NOT the user input itself. Even if $current_tab contains malicious data, the output is always either 'nav-tab-active' or an empty string. This is a textbook false positive."
+    },
+    {
+      "flow_ids": ["duplicator-xss-010"],
+      "reason": "Same pattern as above: $scan_run is set to true/false based on equality comparison, then output is the ternary result 'block' or 'none'. User input never reaches output."
+    },
+    {
+      "flow_ids": ["duplicator-xss-011", "duplicator-xss-012"],
+      "reason": "Same pattern: $refresh and $auto are cast to 1 or 0 via ternary comparison. Output is always integer 1 or 0. Admin page with capability check at top."
+    },
+    {
+      "flow_ids": ["duplicator-xss-013", "duplicator-xss-014", "duplicator-xss-015", "duplicator-xss-016"],
+      "reason": "Package detail controller: $package_id uses absint() before echo (always returns non-negative integer). $current_tab comparison outputs 'nav-tab-active' or empty string. Admin page behind capability check."
+    },
+    {
+      "flow_ids": ["duplicator-rce-003"],
+      "reason": "mysqldump path setting: Admin-only POST handler with nonce verification. The path is validated with regex to require absolute path format, stripped of quotes/semicolons, and stored in options. Even if bypassed, this stores a setting value - actual shell execution would be a separate concern during backup creation (which also requires admin). The sink marked is preg_replace, not a shell execution function."
+    }
+  ],
+  "notes": [
+    "All wp_ajax_ handlers properly use check_ajax_referer() for nonce verification and DUP_Util::hasCapability('export') for authorization checks. No wp_ajax_nopriv_ handlers exist.",
+    "No REST API routes are registered by this plugin.",
+    "The AjaxWrapper class provides a standardized pattern that verifies both nonce and capability before executing callbacks.",
+    "The standalone installer has its own CSRF system using file-based tokens. While not ideal, it provides reasonable protection when properly deployed.",
+    "The main unauthenticated risk is leftover installer files and direct backup file access in the storage directory, which are configuration/deployment issues rather than code-level vulnerabilities."
+  ]
+}

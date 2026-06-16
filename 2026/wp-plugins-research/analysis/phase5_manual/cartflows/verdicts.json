@@ -1,0 +1,82 @@
+{
+  "plugin": "cartflows",
+  "reviewed_by": "manual_agent",
+  "reviewed_at": "2026-06-16",
+  "priority_score": 439,
+  "summary": "CartFlows is well-hardened for an unauthenticated attack surface. All nopriv AJAX handlers verify nonces. The file upload handler uses a strict allowlist and real MIME checking. REST routes require admin capabilities. Most taint flows from the brief are false positives. One low-severity user enumeration issue was confirmed. No critical or high-severity unauthenticated vulnerabilities found.",
+  "confirmed_vulnerabilities": [
+    {
+      "id": "CF-2026-001",
+      "title": "Unauthenticated User Email Enumeration via wcf_check_email_exists AJAX",
+      "severity": "low",
+      "cvss_estimate": "5.3",
+      "type": "information_disclosure",
+      "auth_required": false,
+      "file": "modules/checkout/classes/class-cartflows-checkout-ajax.php",
+      "line": "205-224",
+      "details_file": "confirmed/CF-2026-001-email-enumeration.md"
+    }
+  ],
+  "false_positives": [
+    {
+      "flow_id": "cartflows-rce-001",
+      "reason": "array_map('intval', ...) is not RCE. The callback is a hardcoded string literal 'intval', not user-controlled. The result is an array of integers used to select product indices. Classic FP for array_map with string callback."
+    },
+    {
+      "flow_id": "cartflows-rce-002",
+      "reason": "array_map('sanitize_text_field', ...) from get_option() is not RCE. Source is a DB option (requires admin to set), callback is hardcoded string. No shell execution involved."
+    },
+    {
+      "flow_id": "cartflows-rce-003",
+      "reason": "array_map('trim', explode(',', sanitize_text_field($raw_types))) is not RCE. Hardcoded callback, sanitized input, result validated against allowlist. FP."
+    },
+    {
+      "flow_id": "cartflows-sqli-001",
+      "reason": "$wpdb->insert() with array format auto-escapes values. The $post_id comes from intval($_GET['post']) and $template/$key are hardcoded string literals ('cartflows-canvas', '_wp_page_template'). No user input reaches the DB values. Additionally, this code path requires Elementor preview mode + singular cartflows_step post type + empty post_content, making it admin-context only."
+    },
+    {
+      "flow_id": "cartflows-vari-001",
+      "reason": "parse_str() on sanitize_text_field(POST['post_data']) runs inside WooCommerce's update_order_review AJAX flow. The parsed data is stored in a static class property and passed to do_action hooks. This is standard WooCommerce checkout data processing; the result array is used to read known keys (checkout_id, etc.) with intval(). No variable overwrite vulnerability since it writes to a local $post_data array, not globals."
+    },
+    {
+      "flow_id": "cartflows-vari-002",
+      "reason": "parse_str() on HTTP_REFERER query string is only reachable when cartflows_enable_append_query_string filter returns true (default: false/disabled). Even if enabled, the parsed params are merged into URL query args via add_query_arg() for the next step URL, not used for code execution. The referer is also passed through esc_url_raw() + wp_parse_url() first."
+    },
+    {
+      "flow_id": "cartflows-vari-003",
+      "reason": "parse_str() on Elementor REST response handler. Runs inside a rest_post_dispatch filter for '/elementor/v1/globals' route, which requires Elementor's own REST auth. The parsed value ($query_params['post']) is cast to (int). Not reachable unauthenticated."
+    },
+    {
+      "flow_id": "cartflows-xss-001",
+      "reason": "get_option('wcf_exit_setup_step') output uses esc_url(). The option value is looked up in a hardcoded $steps array, so only valid admin page URLs are possible outputs. Admin-only context (setup wizard page)."
+    },
+    {
+      "flow_id": "cartflows-xss-002",
+      "reason": "Authenticated admin AJAX with nonce verification (auth_required: true, nonce_verified: true). wp_send_json_success() output. sanitize_text_field() applied to input."
+    },
+    {
+      "flow_id": "cartflows-xss-003",
+      "reason": "Admin wizard AJAX handler with auth + nonce. get_site_option() values are admin-controlled. JSON response, not HTML."
+    },
+    {
+      "flow_id": "cartflows-ssrf-001",
+      "reason": "Admin wizard AJAX with nonce. The $target_url is hardcoded to Brainstorm Force API. User-controlled data (email) goes in POST body, not URL. sanitize_email() applied. No SSRF."
+    },
+    {
+      "flow_id": "cartflows-xss-004 through cartflows-xss-010",
+      "reason": "All wizard AJAX handlers require authentication (wp_ajax_ only, no nopriv) and nonce verification. Outputs via wp_send_json which sets Content-Type: application/json. Not exploitable for reflected XSS."
+    },
+    {
+      "flow_id": "cartflows-open-001",
+      "reason": "wp_safe_redirect() restricts to same-host redirects. Source is post_meta (admin-set). Authenticated context."
+    }
+  ],
+  "additional_review_notes": [
+    "All 6 nopriv AJAX handlers (apply_coupon, remove_coupon, remove_cart_product, check_email_exists, woocommerce_login, upload_checkout_file) verify nonces via check_ajax_referer().",
+    "File upload handler (upload_checkout_file) has strong defenses: nonce check, master allowlist of extensions (images/pdf/audio/video only), wp_check_filetype_and_ext() real MIME validation, randomized filename (UUID), field-level size restrictions from post_meta.",
+    "All REST API routes use permission_callback with current_user_can() checks requiring cartflows_manage_flows_steps or cartflows_manage_settings capabilities.",
+    "Login handler (woocommerce_user_login) uses generic error messages to prevent enumeration and fires woocommerce_login_failed action for security plugin integration.",
+    "Thank you page access is protected: requires valid wcf-order + wcf-key params that match an actual WooCommerce order. Test mode data only shown to authenticated admins.",
+    "Template import has meta key prefix allowlisting (get_allowed_import_meta_key_prefixes) and path traversal protection via realpath() + WP_CONTENT_DIR check for custom templates."
+  ]
+}

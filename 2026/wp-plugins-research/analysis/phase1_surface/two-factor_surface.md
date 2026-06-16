@@ -1,6 +1,6 @@
 # Attack Surface: two-factor
 
-> Generated: 2026-06-15T02:06:27Z
+> Generated: 2026-06-16T09:13:54Z
 
 ## Section 1: Entry Points
 

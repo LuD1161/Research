@@ -1,0 +1,124 @@
+{
+  "plugin_slug": "wpvivid-backuprestore",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "manual-audit",
+  "summary": "WPvivid Backup & Restore has one confirmed high-severity vulnerability (unauthenticated file write via migration protocol with leaked/intercepted token), one confirmed medium (SQL injection behind admin auth), and one confirmed medium (backup files accessible on Nginx servers). Most taint flows from automated analysis are false positives due to auth checks (nonce + manage_options) that the scanner missed.",
+  "confirmed_vulnerabilities": [
+    {
+      "id": "WPVIVID-001",
+      "title": "Unauthenticated Arbitrary File Write via Migration Protocol",
+      "severity": "high",
+      "cvss_estimate": 7.5,
+      "vulnerability_class": "arbitrary_file_write",
+      "auth_required": "none (requires leaked migration token/public key)",
+      "file": "includes/customclass/class-wpvivid-send-to-site.php",
+      "lines": "36-62 (entry), 583-706 (file write)",
+      "description": "The plugins_loaded hook dispatches to send_to_site() on any POST with wpvivid_action=send_to_site. No WordPress auth, no nonce, no capability check. The only barrier is RSA decryption using the private key stored in wp_options. The public key (used for encryption) is shared as a URL parameter during migration setup. If an attacker intercepts the migration URL, observes it in logs, or if the token is set to never expire, they can craft valid encrypted payloads to write zip/gz/tar/sql files to the backup directory.",
+      "exploitability": "Requires possession of the migration public key (token parameter in migration URL). Token can be set to never expire. No brute-force protection. File types limited to zip/gz/tar/sql but a malicious backup archive could be used to overwrite site files during a subsequent restore operation.",
+      "flow_ids": [],
+      "writeup": "confirmed/WPVIVID-001_migration_file_write.md"
+    },
+    {
+      "id": "WPVIVID-002",
+      "title": "Backup Files Directly Accessible on Non-Apache Servers",
+      "severity": "medium",
+      "cvss_estimate": 5.3,
+      "vulnerability_class": "information_disclosure",
+      "auth_required": "none",
+      "file": "wpvivid-backuprestore.php (lines 118-124), includes/class-wpvivid-setting.php",
+      "lines": "118-148",
+      "description": "Backup files are stored in wp-content/wpvividbackups/ with .htaccess protection that only works on Apache. On Nginx, LiteSpeed with custom config, or any non-Apache server, backup ZIP files containing full database dumps and site files are directly accessible via HTTP if filenames can be guessed. Filenames use uniqid() which has ~32 bits of entropy based on microsecond timestamps.",
+      "exploitability": "On Nginx servers: attacker needs to guess or enumerate backup filenames. Pattern is wpvivid-{hex13}_{YYYY-MM-DD-HH-MM}_backup_{type}.zip. The hex13 portion is from uniqid() and is timestamp-derived, making it brute-forceable if the backup time is approximately known (e.g., from scheduled backup times).",
+      "flow_ids": ["wpvivid-backuprestore-file-001", "wpvivid-backuprestore-file-002", "wpvivid-backuprestore-file-003"],
+      "writeup": "confirmed/WPVIVID-002_backup_exposure_nginx.md"
+    },
+    {
+      "id": "WPVIVID-003",
+      "title": "SQL Injection in Export Post Type Query (Admin-Only)",
+      "severity": "low",
+      "cvss_estimate": 3.8,
+      "vulnerability_class": "sql_injection",
+      "auth_required": "admin (manage_options + nonce)",
+      "file": "includes/class-wpvivid-export-import.php",
+      "lines": "622, 679",
+      "description": "The export_post_step2 AJAX handler passes $_POST['post_type'] through sanitize_text_field() then directly interpolates it into a SQL query without $wpdb->prepare(). sanitize_text_field does not prevent SQL injection (it only strips tags and extra whitespace). However, the handler requires manage_options capability and a valid nonce.",
+      "exploitability": "Only exploitable by a WordPress admin. Since admins already have full database access, this is a code quality issue rather than a practical security vulnerability. Severity reduced to low.",
+      "flow_ids": ["wpvivid-backuprestore-sqli-001"],
+      "writeup": "confirmed/WPVIVID-003_sqli_export_admin.md"
+    }
+  ],
+  "false_positives": [
+    {
+      "flow_ids": ["wpvivid-backuprestore-file-001", "wpvivid-backuprestore-file-002", "wpvivid-backuprestore-file-003", "wpvivid-backuprestore-file-004", "wpvivid-backuprestore-file-005", "wpvivid-backuprestore-file-006", "wpvivid-backuprestore-file-007", "wpvivid-backuprestore-file-008", "wpvivid-backuprestore-file-009"],
+      "reason": "Source is get_option('wpvivid_local_setting') which is only writable by admins via authenticated AJAX handlers. The taint analysis incorrectly flags wp_options values as untrusted. The mkdir/fopen operations use hardcoded paths under WP_CONTENT_DIR with the option value only controlling a subdirectory name. This runs during plugin activation, not on arbitrary requests."
+    },
+    {
+      "flow_ids": ["wpvivid-backuprestore-file-010", "wpvivid-backuprestore-file-011"],
+      "reason": "The log_file_name flows through sanitize_text_field and _get_log_file, but the callers (MainWP interface and public interface) are gated by MainWP's own authentication. The _log.txt suffix is mandatory, constraining what files can be read. Not exploitable without compromising MainWP auth."
+    },
+    {
+      "flow_ids": ["wpvivid-backuprestore-rce-001", "wpvivid-backuprestore-rce-002"],
+      "reason": "array_map('sanitize_key', ...) is NOT a shell execution sink. The taint analyzer flagged this as RCE because sanitize_key is a string callback passed to array_map, but this is standard WordPress sanitization, not command execution. Both handlers also require admin auth + nonce."
+    },
+    {
+      "flow_ids": ["wpvivid-backuprestore-rce-003", "wpvivid-backuprestore-rce-004"],
+      "reason": "array_map('get_comment', ...) is NOT a shell execution sink. get_comment is a WordPress core function that retrieves comment objects. The data source is $wpdb->get_results with a prepared query. No command injection occurs."
+    },
+    {
+      "flow_ids": ["wpvivid-backuprestore-rce-005"],
+      "reason": "array_map('sanitize_text_field', ...) is standard WordPress sanitization, not a command execution sink. The handler requires admin auth + nonce."
+    },
+    {
+      "flow_ids": ["wpvivid-backuprestore-xss-001", "wpvivid-backuprestore-xss-002", "wpvivid-backuprestore-xss-003", "wpvivid-backuprestore-xss-005", "wpvivid-backuprestore-xss-006", "wpvivid-backuprestore-xss-007", "wpvivid-backuprestore-xss-008"],
+      "reason": "All these flows output via echo wp_json_encode($ret) inside AJAX handlers that require admin auth + nonce. wp_json_encode produces application/json output which is not rendered as HTML. AJAX responses are consumed by JavaScript, not displayed as page content. These are not XSS vulnerabilities."
+    },
+    {
+      "flow_ids": ["wpvivid-backuprestore-xss-004"],
+      "reason": "The SSRF-like flow (wp_remote_post to user-supplied URL) requires admin auth + nonce. The response body is returned via wp_json_encode which is JSON not HTML. The URL is sanitized with sanitize_url()."
+    },
+    {
+      "flow_ids": ["wpvivid-backuprestore-file-012", "wpvivid-backuprestore-file-013"],
+      "reason": "The file download handler (wpvivid_download_export_backup) applies basename() to the user-supplied filename, preventing path traversal. It also requires admin auth + nonce. The file path is constrained to the ImportandExport subdirectory."
+    },
+    {
+      "flow_ids": ["wpvivid-backuprestore-open-001", "wpvivid-backuprestore-open-002"],
+      "reason": "These are header() calls in the file download handler, not redirects. Content-Disposition and Content-Length headers with basename()-sanitized values are not exploitable as open redirects. The handler requires admin auth."
+    },
+    {
+      "flow_ids": ["wpvivid-backuprestore-file-014"],
+      "reason": "The rename from wp_handle_upload path to backup directory uses the upload path from WordPress core's wp_handle_upload, not attacker-controlled paths. The handler requires admin auth + nonce."
+    },
+    {
+      "flow_ids": ["wpvivid-backuprestore-file-015"],
+      "reason": "This is internal post export logic writing WXR data to a local file. The data comes from the WordPress database ($post->post_title etc), not from direct user input. The export runs in an admin-authenticated context."
+    },
+    {
+      "flow_ids": ["wpvivid-backuprestore-file-016"],
+      "reason": "The log file read handler uses sanitize_text_field on the log file name and constrains the path to the log folder with a _log.txt suffix. Requires admin auth + nonce. Limited path traversal risk due to suffix constraint."
+    },
+    {
+      "flow_ids": ["wpvivid-backuprestore-file-017"],
+      "reason": "The rename of backup directory uses esc_attr() on the path value from admin settings. This runs within an admin-authenticated settings update handler. The source is the admin's own settings input."
+    }
+  ],
+  "design_weaknesses": [
+    {
+      "id": "WPVIVID-DW-001",
+      "title": "wp_ajax_nopriv_ Registration for Restore Handlers",
+      "description": "Six restore-related AJAX handlers are registered with wp_ajax_nopriv_ (unauthenticated), though they check nonce + manage_options internally. The design intent is to handle restore continuation when the database has been replaced (destroying sessions). While currently protected by dual checks, this expands the attack surface unnecessarily. If either check is ever weakened, these handlers become exploitable.",
+      "severity": "informational"
+    },
+    {
+      "id": "WPVIVID-DW-002",
+      "title": "Hookable Security Check Filter (wpvivid_ajax_check_security)",
+      "description": "All AJAX handlers pass their capability check through apply_filters('wpvivid_ajax_check_security', $check). Any other plugin or theme can hook this filter and return true, bypassing all capability checks across the entire plugin. This is a dangerous extensibility pattern for security-critical code.",
+      "severity": "informational"
+    },
+    {
+      "id": "WPVIVID-DW-003",
+      "title": "Migration Token Never-Expire Option",
+      "description": "The migration key generation offers a 'Never' expire option, which means the unauthenticated file write endpoint (send_to_site) remains permanently accessible to anyone who has ever seen the migration URL.",
+      "severity": "low"
+    }
+  ]
+}

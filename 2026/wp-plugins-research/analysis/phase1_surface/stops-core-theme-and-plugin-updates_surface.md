@@ -1,6 +1,6 @@
 # Attack Surface: stops-core-theme-and-plugin-updates
 
-> Generated: 2026-06-15T02:06:26Z
+> Generated: 2026-06-16T09:13:53Z
 
 ## Section 1: Entry Points
 

@@ -1,0 +1,125 @@
+{
+  "plugin_slug": "post-duplicator",
+  "priority_score": 22,
+  "metadata": {
+    "php_files": 0,
+    "total_lines": 0
+  },
+  "attack_surface_summary": "# Attack Surface: post-duplicator\n\n> Generated: 2026-06-16T09:13:50Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 65,
+    "total_sinks": 33,
+    "total_sanitizers": 75,
+    "direct_flows": 22,
+    "functions_with_sources": 21,
+    "functions_with_sinks": 16,
+    "files_analyzed": 18,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "post-duplicator-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "post-duplicator",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$post_types[$i] = sanitize_text_field( $pt->labels->singular_name )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/post-duplicator/includes/helpers.php",
+        "line": 33
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 33,
+          "expression": "$post_types[$i] = sanitize_text_field( $pt->labels->singular_name )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 41,
+          "expression": "uasort( $post_types, function( $a, $b ) {\n\t\treturn strcasecmp( $a, $b );\n\t} )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "uasort( $post_types, function( $a, $b ) {\n\t\treturn strcasecmp( $a, $b );\n\t} )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/post-duplicator/includes/helpers.php",
+        "line": 41
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "post-duplicator-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "post-duplicator",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$duplicate_id = absint( $duplicate_id )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/post-duplicator/includes/integrations/simple-custom-post-order.php",
+        "line": 37
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 37,
+          "expression": "$duplicate_id = absint( $duplicate_id )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 69,
+          "expression": "$wpdb->update(\n\t\t$wpdb->posts,\n\t\t[ 'menu_order' => $new_menu_order ],\n\t\t[ 'ID' => $duplicate_id ],\n\t\t[ '%d' ],\n\t\t[ '%d' ]\n\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->update(\n\t\t$wpdb->posts,\n\t\t[ 'menu_order' => $new_menu_order ],\n\t\t[ 'ID' => $duplicate_id ],\n\t\t[ '%d' ],\n\t\t[ '%d' ]\n\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/post-duplicator/includes/integrations/simple-custom-post-order.php",
+        "line": 69
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [],
+  "stats": {
+    "taint_critical": 2,
+    "taint_high": 0,
+    "taint_total": 2,
+    "semgrep_error": 0,
+    "semgrep_warning": 0
+  }
+}

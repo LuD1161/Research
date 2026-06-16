@@ -1,0 +1,172 @@
+{
+  "plugin_slug": "mainwp-child",
+  "review_date": "2026-06-16",
+  "reviewer": "manual-security-audit",
+  "overall_assessment": "The MainWP Child plugin's authentication mechanism (RSA public-key signature verification) is the single chokepoint protecting 50+ admin-level operations including eval(), arbitrary file write, and plugin installation. The auth mechanism itself is sound for already-paired sites, but the initial registration flow on default-configured, unpaired sites is vulnerable to unauthenticated takeover. Most of the 24 flagged taint flows are FALSE POSITIVES because they sit behind the RSA auth gate.",
+  "confirmed_vulnerabilities": [
+    {
+      "id": "MWPC-2026-001",
+      "title": "Unauthenticated Site Takeover via Registration on Default-Configured Unpaired Sites",
+      "severity": "high",
+      "cvss_estimate": "8.1",
+      "vulnerability_class": "authentication_bypass",
+      "file": "class/class-mainwp-connect.php",
+      "lines": "81-168",
+      "description": "On a default install where the site has not yet been paired with a Dashboard (no mainwp_child_pubkey stored), an attacker can POST function=register with any admin username and their own RSA public key. The uniqueId check is skipped because the default is empty string. Password auth is enabled by default (mitigating factor), but if the attacker knows the admin password, or if password auth has been explicitly disabled, registration succeeds and the attacker's public key becomes the trusted key. The attacker then controls the private key and can sign any subsequent API call.",
+      "preconditions": [
+        "Site has MainWP Child activated but not yet paired to a Dashboard",
+        "Attacker knows a valid administrator username",
+        "Attacker knows the admin password OR password auth is disabled (option set to '0')"
+      ],
+      "impact": "Full site compromise: attacker can execute arbitrary PHP (code_snippet), install malicious plugins, create admin users, download database backups, write arbitrary files",
+      "remediation": "Always configure a unique security ID before activating the plugin. Consider requiring uniqueId by default rather than making it optional.",
+      "writeup_file": "confirmed/001-unauthenticated-registration-takeover.md"
+    },
+    {
+      "id": "MWPC-2026-002",
+      "title": "Unauthenticated Information Disclosure via stats No-Auth Endpoint",
+      "severity": "low",
+      "cvss_estimate": "3.7",
+      "vulnerability_class": "information_disclosure",
+      "file": "class/class-mainwp-child-callable.php",
+      "lines": "117-119",
+      "description": "The stats function is explicitly listed in callableFunctionsNoAuth and executes without any signature verification. On unpaired sites, it returns the MainWP Child version, WordPress version, WP Engine status, and hostname. On paired sites, it returns an error. This aids attacker reconnaissance for MWPC-2026-001.",
+      "preconditions": [
+        "Site has MainWP Child activated but not yet paired"
+      ],
+      "impact": "Version fingerprinting and reconnaissance to determine attack viability",
+      "remediation": "Consider rate-limiting or removing version disclosure from the no-auth stats endpoint",
+      "writeup_file": "confirmed/002-unauthenticated-stats-info-disclosure.md"
+    },
+    {
+      "id": "MWPC-2026-003",
+      "title": "Signature Replay — No Nonce Invalidation After Use",
+      "severity": "medium",
+      "cvss_estimate": "5.3",
+      "vulnerability_class": "replay_attack",
+      "file": "class/class-mainwp-connect.php",
+      "lines": "509-525",
+      "description": "The auth() method verifies openssl_verify(function+nonce, signature, pubkey) but the nonce is caller-supplied and never invalidated after use. The mainwp_child_nonce option is set to 0 at registration and never updated. A network-level attacker who captures a valid signed request can replay it indefinitely.",
+      "preconditions": [
+        "Network-level attacker (MITM, shared hosting, log access) who can capture a valid signed request"
+      ],
+      "impact": "Replay of any previously captured authenticated operation",
+      "remediation": "Implement server-side nonce tracking with monotonic counter or timestamp-based expiry",
+      "writeup_file": "confirmed/003-signature-replay-no-nonce-invalidation.md"
+    },
+    {
+      "id": "MWPC-2026-004",
+      "title": "Attacker-Controlled Signature Algorithm Selection",
+      "severity": "low",
+      "cvss_estimate": "3.1",
+      "vulnerability_class": "crypto_weakness",
+      "file": "class/class-mainwp-connect.php",
+      "lines": "515-517",
+      "description": "The $_REQUEST['sign_algo'] parameter allows the caller to select the OpenSSL signature algorithm from an allowlist (SHA1, SHA224, SHA256, SHA384, SHA512). An attacker can downgrade to SHA1. Additionally, the $_REQUEST['verifylib'] parameter switches from openssl_verify to phpseclib3, allowing attacker-controlled choice of crypto library.",
+      "preconditions": [
+        "Attacker has the private key (via MWPC-2026-001 or key compromise)"
+      ],
+      "impact": "SHA1 signature downgrade; crypto library selection by untrusted party",
+      "remediation": "Remove client-controlled algorithm selection; enforce minimum SHA256. Remove verifylib parameter.",
+      "writeup_file": null
+    }
+  ],
+  "false_positives": [
+    {
+      "flow_ids": ["mainwp-child-vari-001", "mainwp-child-vari-002", "mainwp-child-vari-003", "mainwp-child-ssrf-001"],
+      "file": "class/class-mainwp-child-bulk-settings-manager.php",
+      "reason": "All operations in this class are dispatched through MainWP_Child_Callable which requires RSA signature authentication. The parse_str and wp_remote_post calls are intentional admin-level functionality (bulk settings management) reachable only by an authenticated MainWP Dashboard. The automated scanner incorrectly flagged auth_required=false because the plugin uses a custom auth mechanism not based on WordPress nonces."
+    },
+    {
+      "flow_ids": ["mainwp-child-open-001", "mainwp-child-open-002", "mainwp-child-open-003", "mainwp-child-open-004", "mainwp-child-open-005", "mainwp-child-open-006", "mainwp-child-open-007"],
+      "file": "multiple files (back-wp-up, back-up-wordpress, ithemes-security, wp-rocket, timecapsule, branding, back-up-buddy)",
+      "reason": "All wp_safe_redirect calls use get_option('siteurl') concatenated with a hardcoded path '/wp-admin/index.php'. The siteurl is admin-controlled (stored in wp_options), not user-supplied. wp_safe_redirect validates against allowed_redirect_hosts. These are NOT open redirects."
+    },
+    {
+      "flow_ids": ["mainwp-child-xss-001", "mainwp-child-xss-004"],
+      "file": "class-mainwp-child-back-wp-up.php, class-mainwp-child-timecapsule.php",
+      "reason": "The $_SERVER['SERVER_SOFTWARE'] value is properly escaped with esc_html(sanitize_text_field(wp_unslash(...))). Double sanitization makes this safe. The scanner incorrectly flagged it."
+    },
+    {
+      "flow_ids": ["mainwp-child-xss-002"],
+      "file": "class-mainwp-child-back-wp-up.php",
+      "reason": "echo intval($_GET['download_click_id']) — intval() casts to integer, making XSS impossible. No string content can survive intval()."
+    },
+    {
+      "flow_ids": ["mainwp-child-rce-001"],
+      "file": "class-mainwp-child-back-wp-up.php",
+      "reason": "array_filter() with a closure is not RCE. The $is_global variable is intval()-cast. array_filter is a standard PHP function for filtering arrays, not code execution. The scanner incorrectly classified array_filter as an RCE sink."
+    },
+    {
+      "flow_ids": ["mainwp-child-rce-002", "mainwp-child-rce-003"],
+      "file": "class-mainwp-child-back-wp-up.php",
+      "reason": "array_map('trim', ...) and array_map('wp_normalize_path', ...) are not RCE. The callback functions are hardcoded strings ('trim', 'wp_normalize_path'), not user-supplied. The scanner incorrectly flagged array_map as an RCE sink when the callback is fixed."
+    },
+    {
+      "flow_ids": ["mainwp-child-rce-004"],
+      "file": "class-mainwp-child-back-wp-up.php",
+      "reason": "The call_user_func($handler, $setting_value, $job_id) at line 2030 uses $handler from a hardcoded whitelist mapping setting names to handler functions (a switch/map pattern). The handler is NOT user-controlled. The $setting_value from POST is passed as a parameter to a safe handler, not as the callable itself. Behind MainWP auth."
+    },
+    {
+      "flow_ids": ["mainwp-child-rce-005"],
+      "file": "class-mainwp-child-install.php",
+      "reason": "array_filter($themes) with no callback simply removes falsy values. Not RCE. Behind MainWP auth."
+    },
+    {
+      "flow_ids": ["mainwp-child-rce-006", "mainwp-child-rce-007"],
+      "file": "class-mainwp-child-back-up-buddy.php",
+      "reason": "preg_replace with fixed patterns ('/[[:space:]]+/' and '/[^[:print:]]/') is not RCE. No /e modifier is used. These are standard regex sanitization operations. Behind MainWP auth."
+    },
+    {
+      "flow_ids": ["mainwp-child-file-001", "mainwp-child-file-002"],
+      "file": "class-mainwp-child-back-wp-up.php",
+      "reason": "file_get_contents is used on a path constructed from get_site_option (admin-only value) + basename() of user input. basename() strips directory traversal. Behind MainWP auth. The log folder path comes from BackWPup plugin configuration, not direct user input."
+    },
+    {
+      "flow_ids": ["mainwp-child-file-003"],
+      "file": "class-mainwp-backup.php",
+      "reason": "fwrite of SHOW CREATE TABLE output to a backup file is intentional backup functionality. The $table variable comes from $wpdb->get_col('SHOW TABLES'), not user input. Behind MainWP auth."
+    },
+    {
+      "flow_ids": ["mainwp-child-file-004"],
+      "file": "class-mainwp-child-misc.php",
+      "reason": "The rename() operation and wp_remote_get are part of the intentional file upload/management functionality. The file_name is passed through sanitize_file_name(). Behind MainWP auth."
+    },
+    {
+      "flow_ids": ["mainwp-child-ssrf-002"],
+      "file": "class-mainwp-child-misc.php",
+      "reason": "wp_remote_get for file upload is intentional admin functionality for downloading plugins/themes from URLs. Behind MainWP auth."
+    },
+    {
+      "flow_ids": ["mainwp-child-ssrf-003"],
+      "file": "class-mainwp-clone.php",
+      "reason": "wp_remote_get for clone download is intentional site cloning functionality. The URL comes from stored clone site configuration. Behind MainWP auth."
+    },
+    {
+      "flow_ids": ["mainwp-child-sqli-001"],
+      "file": "class-mainwp-child-ithemes-security.php",
+      "reason": "$wpdb->update() with intval($value) as WHERE clause value. intval() prevents SQL injection. $wpdb->update also uses prepare() internally for parameterized queries. Behind MainWP auth."
+    },
+    {
+      "flow_ids": ["mainwp-child-obje-001", "mainwp-child-obje-002", "mainwp-child-obje-003", "mainwp-child-obje-004", "mainwp-child-obje-005"],
+      "file": "class-mainwp-child-timecapsule.php",
+      "reason": "unserialize() calls on values from get_option()/config->get_option() — these are database-stored values set by the WP Time Capsule plugin, not direct user input. While using unserialize on DB values is not ideal (should use maybe_unserialize or json_decode), an attacker would need write access to the options table first, which already implies full site compromise. Behind MainWP auth."
+    },
+    {
+      "flow_ids": ["mainwp-child-xss-003"],
+      "file": "class-mainwp-child-timecapsule.php",
+      "reason": "The file_name is sanitize_text_field'd and passed to a WP Time Capsule method. Behind MainWP auth. The echo is of processed HTML from the WPTC plugin's own method, not raw user input."
+    },
+    {
+      "flow_ids": ["mainwp-child-vari-004"],
+      "file": "class-mainwp-child-back-up-buddy.php",
+      "reason": "The archive_file is used with BackupBuddy's extract method which handles its own path validation. Behind MainWP auth."
+    }
+  ],
+  "taint_flow_summary": {
+    "total_flagged": 28,
+    "confirmed_as_vulnerabilities": 0,
+    "false_positives": 28,
+    "note": "ALL 28 taint flows from the automated scanner are false positives. The scanner could not detect MainWP's custom RSA-based auth mechanism and incorrectly marked all flows as auth_required=false. The real vulnerabilities (MWPC-2026-001 through 004) were found through manual review of the authentication architecture itself, not from the taint flows."
+  }
+}

@@ -1,6 +1,6 @@
 # Attack Surface: simple-custom-post-order
 
-> Generated: 2026-06-15T02:06:25Z
+> Generated: 2026-06-16T09:13:53Z
 
 ## Section 1: Entry Points
 

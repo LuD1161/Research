@@ -1,0 +1,125 @@
+{
+  "plugin_slug": "cleantalk-spam-protect",
+  "review_date": "2026-06-16",
+  "reviewer": "manual-audit",
+  "summary": "CleanTalk Anti-Spam plugin (200K+ installs) has a significant unauthenticated attack surface. The Remote Calls system exposes a tokenless WP nonce generation endpoint. Multiple code paths output $ct_result->comment (external API response) without HTML escaping into wp_die() and raw echo statements. The plugin's alt-sessions REST endpoint is unauthenticated by design, and the remote calls system allows full settings overwrite (including API key swap and plugin self-deactivation) if the token (md5 of API key) is known.",
+  "confirmed_vulnerabilities": [
+    {
+      "id": "CTSP-001",
+      "title": "Unauthenticated WP Nonce Generation via Remote Calls",
+      "severity": "medium",
+      "cvss_estimate": 5.3,
+      "type": "authentication_bypass",
+      "auth_required": false,
+      "file": "lib/Cleantalk/ApbctWP/RemoteCalls.php",
+      "lines": "68-90, 594-619",
+      "description": "The get_fresh_wpnonce remote call action is accessible without any token when key_is_ok is true. Any unauthenticated user can POST spbc_remote_call_action=get_fresh_wpnonce&plugin_name=antispam&nonce_prev=<10hex> and receive a wp_rest nonce. The nonce is generated in anonymous context so privileges are limited, but it bypasses REST nonce checks for any endpoint accepting unauthenticated requests with nonce verification. Developer TODO comment confirms this is known-unaddressed.",
+      "exploitation": "POST to any CleanTalk-protected site with: spbc_remote_call_action=get_fresh_wpnonce&plugin_name=antispam&nonce_prev=0123456789",
+      "status": "confirmed"
+    },
+    {
+      "id": "CTSP-002",
+      "title": "Reflected XSS via Unsanitized $ct_result->comment in wp_die() and echo",
+      "severity": "medium",
+      "cvss_estimate": 4.7,
+      "type": "xss",
+      "auth_required": false,
+      "file": "inc/cleantalk-public-validate.php",
+      "lines": "296-303, 306",
+      "description": "When a VFB form submission is flagged as spam, $ct_result->comment (returned from CleanTalk's external API) is embedded unsanitized in wp_die() HTML output: '<h2>' . $ct_result->comment . '</h2>'. The Caldera Forms path (line 306) also echoes it raw. Unlike other branches in the same function that use wp_kses(), these paths skip sanitization. The $ct_result->comment value originates from an external API server (moderate.cleantalk.org). Exploitation requires: (a) MitM of the API connection, or (b) compromise of CleanTalk's API servers, or (c) a way to influence the API response comment field. This is a trust-boundary violation rather than a directly user-triggered XSS.",
+      "exploitation": "Requires control over CleanTalk API response or MitM of the HTTPS connection to inject HTML/JS into the comment field.",
+      "status": "confirmed",
+      "caveat": "Attacker does not directly control $ct_result->comment from user input. The value comes from CleanTalk's cloud API. This is a supply-chain / MitM XSS vector, not a classic reflected XSS."
+    },
+    {
+      "id": "CTSP-003",
+      "title": "Unsanitized External API Response in Multiple AJAX Echo Points",
+      "severity": "medium",
+      "cvss_estimate": 4.7,
+      "type": "xss",
+      "auth_required": false,
+      "file": "inc/cleantalk-ajax.php",
+      "lines": "600, 605, 617, 638, 711, 743, 959",
+      "description": "The ct_ajax_hook function outputs $ct_result->comment without HTML escaping in multiple code paths: direct print (lines 600, 617, 638), wrapped in HTML tags (lines 605, 711, 743, 959). The value comes from CleanTalk's external API. Same trust-boundary issue as CTSP-002. Lines 605 and 959 produce raw HTML containing the API comment string, exploitable if the API response is attacker-influenced.",
+      "exploitation": "Same as CTSP-002 - requires API compromise or MitM.",
+      "status": "confirmed",
+      "caveat": "Same supply-chain caveat as CTSP-002. The data flows through an external API, not directly from user input."
+    },
+    {
+      "id": "CTSP-004",
+      "title": "Remote Call Settings Overwrite Including API Key and Regex Injection",
+      "severity": "high",
+      "cvss_estimate": 7.2,
+      "type": "privilege_escalation",
+      "auth_required": "token_required",
+      "file": "lib/Cleantalk/ApbctWP/RemoteCalls.php + cleantalk.php",
+      "lines": "RemoteCalls.php:319-322, cleantalk.php:2339-2358",
+      "description": "The action__update_settings remote call passes the entire $_REQUEST to apbct_rc__update_settings(), which iterates all default_settings keys and overwrites them from the request. The token is md5(api_key) or sha256(api_key). An attacker with the token can: (1) replace the apikey to hijack the account, (2) set exclusions__fields to a malicious regex that is interpolated unsanitized into preg_match() at cleantalk-public-validate.php:536, enabling ReDoS, (3) disable all spam protection settings. Sanitization only strips '=' and backtick chars from string values.",
+      "exploitation": "Requires knowledge of the API key (to compute md5/sha256 token). POST: spbc_remote_call_action=update_settings&spbc_remote_call_token=<md5_apikey>&plugin_name=antispam&apikey=<new_key>",
+      "status": "confirmed",
+      "caveat": "Requires valid token derived from the API key. Not exploitable without key knowledge."
+    },
+    {
+      "id": "CTSP-005",
+      "title": "Remote Call Self-Deactivation/Uninstallation of Plugin",
+      "severity": "high",
+      "cvss_estimate": 6.5,
+      "type": "denial_of_service",
+      "auth_required": "token_required",
+      "file": "lib/Cleantalk/ApbctWP/RemoteCalls.php + cleantalk.php",
+      "lines": "RemoteCalls.php:327-338, cleantalk.php:2213-2326",
+      "description": "The deactivate_plugin and uninstall_plugin remote call actions allow deactivation/removal of cleantalk-spam-protect itself and the companion security-malware-firewall plugin. An attacker with the RC token (md5 of API key) can remotely disable all CleanTalk protection on the site.",
+      "exploitation": "POST: spbc_remote_call_action=deactivate_plugin&spbc_remote_call_token=<md5_apikey>&plugin_name=antispam&plugin=cleantalk-spam-protect/cleantalk.php",
+      "status": "confirmed",
+      "caveat": "Requires valid token. Allowlist restricts to CleanTalk's own plugins only."
+    }
+  ],
+  "false_positives": [
+    {
+      "flow_id": "cleantalk-spam-protect-open-001 through open-004",
+      "reason": "The header() calls use get_option('blog_charset') which is a DB-stored value set by WordPress core. Not attacker-controllable. These are Content-Type headers, not Location headers, so open redirect is impossible regardless.",
+      "verdict": "FP"
+    },
+    {
+      "flow_id": "cleantalk-spam-protect-xss-002 through xss-014",
+      "reason": "These taint flows track data from $_POST through apbct_base_call to $ct_result->comment output. The taint analysis is technically correct that unsanitized data reaches echo/wp_die sinks. However, the critical break in the chain is that $ct_result->comment comes from CleanTalk's external API response, NOT directly from user POST data. The API processes the input and returns its own verdict string. An attacker cannot directly inject HTML through POST data into $ct_result->comment - they would need to compromise the API or MitM the HTTPS connection. Downgraded from 'high' to 'medium' (trust-boundary/supply-chain issue, not direct reflected XSS).",
+      "verdict": "downgraded_to_medium"
+    },
+    {
+      "flow_id": "AltSessions nonce bypass",
+      "reason": "Initial analysis suggested wp_send_json() might not terminate in REST context, allowing nonce bypass. However, WordPress's wp_send_json() always calls wp_die() which calls exit() regardless of context. The missing die() after wp_send_json at line 167 is cosmetic - wp_send_json already terminates. The alt_sessions endpoint IS fully unauthenticated (permission_callback => __return_true) but the nonce check works correctly.",
+      "verdict": "FP - nonce bypass does not exist, but endpoint is intentionally unauthenticated"
+    },
+    {
+      "flow_id": "Unsafe unserialize in AltSessions",
+      "reason": "unserialize() at AltSessions.php:116 lacks allowed_classes restriction, but the data is always written by serialize() on a validated array within the same class. No external write path to the wp_cleantalk_sessions table was found. Theoretical risk only if another vulnerability allows arbitrary DB writes.",
+      "verdict": "FP - theoretical only, no practical exploitation path"
+    }
+  ],
+  "declined_vulnerabilities": [
+    {
+      "id": "CTSP-DECLINED-001",
+      "title": "post_api_key Remote Call Without Token",
+      "reason": "Only accessible when key_is_ok is false (unconfigured sites) AND from IP addresses that reverse-resolve to netserv3.cleantalk.org or netserv4.cleantalk.org with forward A-record confirmation. The DNS verification uses gethostbyaddr + dns_get_record forward lookup, closing PTR-only spoofing. Exploiting this requires either compromising CleanTalk's DNS infrastructure or running from their actual server IPs. Not practically exploitable by external attackers.",
+      "severity": "informational"
+    },
+    {
+      "id": "CTSP-DECLINED-002",
+      "title": "ContactBank base64_decode + parse_str Input Manipulation",
+      "reason": "The ContactBank integration decodes base64 GET param and parse_str's it into form data. However, this only feeds into CleanTalk's spam check - not into SQL, file ops, or HTML output. An attacker can manipulate what fields are checked for spam, but the impact is limited to spam check bypass for that specific form plugin. Low severity.",
+      "severity": "low"
+    },
+    {
+      "id": "CTSP-DECLINED-003",
+      "title": "Unsanitized Table Name in SQL Query",
+      "reason": "Table names at cleantalk.php:1791-1792 come from $apbct->data (WordPress options), not from user input. Exploiting this requires a prior vulnerability to write to the cleantalk_data WordPress option.",
+      "severity": "informational"
+    }
+  ],
+  "attack_surface_notes": {
+    "nopriv_ajax_handlers": "17+ wp_ajax_nopriv handlers in cleantalk-ajax.php, none with nonce checks. These are by design (spam checking public forms). No direct security impact but large attack surface.",
+    "rest_routes": "5 REST routes with __return_true permission callback. The alt_sessions route writes to DB but has internal nonce verification.",
+    "remote_calls_system": "The Remote Calls system is the primary attack vector. It accepts requests on any URL via the spbc_remote_call_action parameter. Token-protected actions use md5(api_key) which is a weak authentication mechanism.",
+    "external_api_trust": "The plugin trusts CleanTalk's API response ($ct_result->comment) as safe HTML in multiple output contexts. This is a supply-chain risk."
+  }
+}

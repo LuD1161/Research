@@ -1,0 +1,1328 @@
+{
+  "plugin_slug": "wp-mail-smtp",
+  "priority_score": 98,
+  "metadata": {
+    "php_files": 0,
+    "total_lines": 0
+  },
+  "attack_surface_summary": "# Attack Surface: wp-mail-smtp\n\n> Generated: 2026-06-16T09:13:57Z\n\n## Section 1: Entry Points\n\n### WordPress AJAX Handlers (authenticated)\n```\nNone found\n```\n\n### WordPress AJAX Handlers (unauthenticated)\n```\nNone found\n```\n\n### REST API Routes\n```\nNone found\n```\n\n### Admin Pages / Menu Items\n```\nNone found\n```\n\n### Shortcodes\n```\nNone found\n```\n\n### Cron Jobs\n```\nNone found\n```\n\n### File Upload Handlers\n```\nNone found\n```\n\n## Section 2: Authentication & Authorization\n\n### Capability Checks\n- `current_user_can` calls: **0**\n\n### Nonce Verifications\n- `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**\n\n## Section 3: Dangerous Operations\n\n### Direct Database Queries\n- `$wpdb->(query|get_var|get_row|get_col|get_results)` calls: **0**\n\n### Database Queries Using prepare()\n- `$wpdb->prepare` calls: **0**\n\n### External HTTP Requests\n```\nNone found\n```\n\n### File System Operations (first 30 matches)\n```\nNone found\n```\n\n",
+  "source_sink_summary": {
+    "total_sources": 615,
+    "total_sinks": 450,
+    "total_sanitizers": 865,
+    "direct_flows": 708,
+    "functions_with_sources": 253,
+    "functions_with_sinks": 247,
+    "files_analyzed": 547,
+    "parse_errors": 0
+  },
+  "taint_flows": [
+    {
+      "flow_id": "wp-mail-smtp-xss-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$key = ! empty( $_POST['key'] ) ? sanitize_text_field( wp_unslash( $_POST['key'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Connect.php",
+        "line": 124
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 124,
+          "expression": "$key = ! empty( $_POST['key'] ) ? sanitize_text_field( wp_unslash( $_POST['key'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 158,
+          "expression": "$url = self::generate_url( $key )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 168,
+          "expression": "wp_send_json_success( [ 'url' => $url ] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( [ 'url' => $url ] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Connect.php",
+        "line": 168
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-mail-smtp-open-001",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$redirect_page = isset( $_GET['page'] ) ? sanitize_key( $_GET['page'] ) : Area::SLUG",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/DBRepair.php",
+        "line": 53
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 53,
+          "expression": "$redirect_page = isset( $_GET['page'] ) ? sanitize_key( $_GET['page'] ) : Area::SLUG",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 64,
+          "expression": "$redirect_url = add_query_arg(\n\t\t\t\t\t$query_args,\n\t\t\t\t\twp_mail_smtp()->get_admin()->get_admin_page_url( $redirect_page )\n\t\t\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 69,
+          "expression": "wp_safe_redirect( $redirect_url )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( $redirect_url )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/DBRepair.php",
+        "line": 69
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-mail-smtp-sqli-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "sql_injection",
+      "source": {
+        "expression": "$row_id = absint( $row_id )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Tasks/Meta.php",
+        "line": 267
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 267,
+          "expression": "$row_id = absint( $row_id )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 293,
+          "expression": "$wpdb->update( $this->table_name, $data, array( $where => $row_id ), $column_formats )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$wpdb->update( $this->table_name, $data, array( $where => $row_id ), $column_formats )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Tasks/Meta.php",
+        "line": 293
+      },
+      "missing_sanitizer": "$wpdb->prepare() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-mail-smtp-ssrf-001",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$connection_id = ! empty( $_POST['connection_id'] ) ? sanitize_key( $_POST['connection_id'] ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Providers/Sendlayer/QuickConnect.php",
+        "line": 98
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 98,
+          "expression": "$connection_id = ! empty( $_POST['connection_id'] ) ? sanitize_key( $_POST['connection_id'] ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 109,
+          "expression": "$redirect_args['connection_id'] = $connection_id",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 112,
+          "expression": "$redirect_url = add_query_arg( $redirect_args, wp_mail_smtp()->get_admin()->get_admin_page_url() )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 120,
+          "expression": "$response = wp_remote_post(\n\t\t\t$this->get_marketing_site_url() . '/wp-json/smtp-plugin-connect/v1/start-session',\n\t\t\t[\n\t\t\t\t'timeout' => 30,\n\t\t\t\t'body'    => [\n\t\t\t\t\t'site_url'         => $this->get_site_url(),\n\t\t\t\t\t'return_url'       => $redirect_url,\n\t\t\t\t\t'challenge_secret' => $challenge_secret,\n\t\t\t\t\t'source'           => 'wpms',\n\t\t\t\t],\n\t\t\t]\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(\n\t\t\t$this->get_marketing_site_url() . '/wp-json/smtp-plugin-connect/v1/start-session',\n\t\t\t[\n\t\t\t\t'timeout' => 30,\n\t\t\t\t'body'    => [\n\t\t\t\t\t'site_url'         => $this->get_site_url(),\n\t\t\t\t\t'return_url'       => $redirect_url,\n\t\t\t\t\t'challenge_secret' => $challenge_secret,\n\t\t\t\t\t'source'           => 'wpms',\n\t\t\t\t],\n\t\t\t]\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Providers/Sendlayer/QuickConnect.php",
+        "line": 120
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-mail-smtp-xss-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$connection_id = ! empty( $_POST['connection_id'] ) ? sanitize_key( $_POST['connection_id'] ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Providers/Sendlayer/QuickConnect.php",
+        "line": 98
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 98,
+          "expression": "$connection_id = ! empty( $_POST['connection_id'] ) ? sanitize_key( $_POST['connection_id'] ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 109,
+          "expression": "$redirect_args['connection_id'] = $connection_id",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 112,
+          "expression": "$redirect_url = add_query_arg( $redirect_args, wp_mail_smtp()->get_admin()->get_admin_page_url() )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 120,
+          "expression": "$response = wp_remote_post(\n\t\t\t$this->get_marketing_site_url() . '/wp-json/smtp-plugin-connect/v1/start-session',\n\t\t\t[\n\t\t\t\t'timeout' => 30,\n\t\t\t\t'body'    => [\n\t\t\t\t\t'site_url'         => $this->get_site_url(),\n\t\t\t\t\t'return_url'       => $redirect_url,\n\t\t\t\t\t'challenge_secret' => $challenge_secret,\n\t\t\t\t\t'source'           => 'wpms',\n\t\t\t\t],\n\t\t\t]\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 154,
+          "expression": "$error_code = ! empty( $response_body['code'] )\n\t\t\t\t? $this->sanitize_error_code( $response_body['code'] )\n\t\t\t\t: 'plugin.init_connect.start_session_request_to_site.unexpected_error_response'",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 162,
+          "expression": "wp_send_json_error(\n\t\t\t\t[\n\t\t\t\t\t'message'    => $this->get_generic_error_message(),\n\t\t\t\t\t'error_code' => $error_code,\n\t\t\t\t]\n\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_error(\n\t\t\t\t[\n\t\t\t\t\t'message'    => $this->get_generic_error_message(),\n\t\t\t\t\t'error_code' => $error_code,\n\t\t\t\t]\n\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Providers/Sendlayer/QuickConnect.php",
+        "line": 162
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-mail-smtp-xss-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$connection_id = ! empty( $_POST['connection_id'] ) ? sanitize_key( $_POST['connection_id'] ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Providers/Sendlayer/QuickConnect.php",
+        "line": 98
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 98,
+          "expression": "$connection_id = ! empty( $_POST['connection_id'] ) ? sanitize_key( $_POST['connection_id'] ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 109,
+          "expression": "$redirect_args['connection_id'] = $connection_id",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 112,
+          "expression": "$redirect_url = add_query_arg( $redirect_args, wp_mail_smtp()->get_admin()->get_admin_page_url() )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 120,
+          "expression": "$response = wp_remote_post(\n\t\t\t$this->get_marketing_site_url() . '/wp-json/smtp-plugin-connect/v1/start-session',\n\t\t\t[\n\t\t\t\t'timeout' => 30,\n\t\t\t\t'body'    => [\n\t\t\t\t\t'site_url'         => $this->get_site_url(),\n\t\t\t\t\t'return_url'       => $redirect_url,\n\t\t\t\t\t'challenge_secret' => $challenge_secret,\n\t\t\t\t\t'source'           => 'wpms',\n\t\t\t\t],\n\t\t\t]\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 5,
+          "line": 186,
+          "expression": "$session_id = sanitize_text_field( $response_body['session_id'] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 6,
+          "line": 188,
+          "expression": "$redirect_url = add_query_arg( 'session', $session_id, $this->get_marketing_site_url() . '/smtp-plugin-connect' )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 7,
+          "line": 194,
+          "expression": "$redirect_url = wp_mail_smtp()->get_utm_url( $redirect_url, [ 'source' => 'wpmailsmtpplugin', 'medium' => 'WordPress', 'content' => $utm_content ] )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 8,
+          "line": 196,
+          "expression": "wp_send_json_success(\n\t\t\t[\n\t\t\t\t'redirect_url' => $redirect_url,\n\t\t\t]\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success(\n\t\t\t[\n\t\t\t\t'redirect_url' => $redirect_url,\n\t\t\t]\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Providers/Sendlayer/QuickConnect.php",
+        "line": 196
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-mail-smtp-xss-004",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$challenge_secret = get_transient( 'wp_mail_smtp_sendlayer_quick_connect_challenge_secret' )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Providers/Sendlayer/QuickConnect.php",
+        "line": 235
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 235,
+          "expression": "$challenge_secret = get_transient( 'wp_mail_smtp_sendlayer_quick_connect_challenge_secret' )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 249,
+          "expression": "$signature = hash_hmac( 'sha256', $nonce, $challenge_secret )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 254,
+          "expression": "wp_send_json( [ 'signature' => $signature ] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json( [ 'signature' => $signature ] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Providers/Sendlayer/QuickConnect.php",
+        "line": 254
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-mail-smtp-open-002",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "$return_url = ! empty( $_GET['return_url'] )\n\t\t\t? wp_validate_redirect( esc_url_raw( wp_unslash( $_GET['return_url'] ) ), wp_mail_smtp()->get_admin()->get_admin_page_url() )\n\t\t\t: wp_mail_smtp()->get_admin()->get_admin_page_url()",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Providers/Sendlayer/QuickConnect.php",
+        "line": 278
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 278,
+          "expression": "$return_url = ! empty( $_GET['return_url'] )\n\t\t\t? wp_validate_redirect( esc_url_raw( wp_unslash( $_GET['return_url'] ) ), wp_mail_smtp()->get_admin()->get_admin_page_url() )\n\t\t\t: wp_mail_smtp()->get_admin()->get_admin_page_url()",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 297,
+          "expression": "wp_safe_redirect( $return_url )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( $return_url )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Providers/Sendlayer/QuickConnect.php",
+        "line": 297
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-mail-smtp-ssrf-002",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$exchange_code = isset( $_GET['exchange_code'] )\n\t\t\t? sanitize_text_field( wp_unslash( $_GET['exchange_code'] ) )\n\t\t\t: ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Providers/Sendlayer/QuickConnect.php",
+        "line": 309
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 309,
+          "expression": "$exchange_code = isset( $_GET['exchange_code'] )\n\t\t\t? sanitize_text_field( wp_unslash( $_GET['exchange_code'] ) )\n\t\t\t: ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 318,
+          "expression": "$response = wp_remote_post(\n\t\t\t$this->get_marketing_site_url() . '/wp-json/smtp-plugin-connect/v1/connection',\n\t\t\t[\n\t\t\t\t'timeout' => 30,\n\t\t\t\t'body'    => [\n\t\t\t\t\t'exchange_code' => $exchange_code,\n\t\t\t\t\t'source'        => 'wpms',\n\t\t\t\t],\n\t\t\t]\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$response = wp_remote_post(\n\t\t\t$this->get_marketing_site_url() . '/wp-json/smtp-plugin-connect/v1/connection',\n\t\t\t[\n\t\t\t\t'timeout' => 30,\n\t\t\t\t'body'    => [\n\t\t\t\t\t'exchange_code' => $exchange_code,\n\t\t\t\t\t'source'        => 'wpms',\n\t\t\t\t],\n\t\t\t]\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Providers/Sendlayer/QuickConnect.php",
+        "line": 318
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-mail-smtp-rce-001",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "function ( $email ) {\n\t\t\t\treturn filter_var( $email, FILTER_VALIDATE_EMAIL );\n\t\t\t}",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Providers/PepipostAPI/Mailer.php",
+        "line": 430
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 430,
+          "expression": "$valid_emails = array_filter(\n\t\t\tarray_column( $items, 0 ),\n\t\t\tfunction ( $email ) {\n\t\t\t\treturn filter_var( $email, FILTER_VALIDATE_EMAIL );\n\t\t\t}\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$valid_emails = array_filter(\n\t\t\tarray_column( $items, 0 ),\n\t\t\tfunction ( $email ) {\n\t\t\t\treturn filter_var( $email, FILTER_VALIDATE_EMAIL );\n\t\t\t}\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Providers/PepipostAPI/Mailer.php",
+        "line": 430
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-mail-smtp-rce-002",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$valid_emails = array_filter(\n\t\t\tarray_column( $items, 0 ),\n\t\t\tfunction ( $email ) {\n\t\t\t\treturn filter_var( $email, FILTER_VALIDATE_EMAIL );\n\t\t\t}\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Providers/PepipostAPI/Mailer.php",
+        "line": 430
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 430,
+          "expression": "$valid_emails = array_filter(\n\t\t\tarray_column( $items, 0 ),\n\t\t\tfunction ( $email ) {\n\t\t\t\treturn filter_var( $email, FILTER_VALIDATE_EMAIL );\n\t\t\t}\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 437,
+          "expression": "array_map(\n\t\t\tfunction( $email ) {\n\t\t\t\treturn [ 'email' => $email ];\n\t\t\t},\n\t\t\t$valid_emails\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(\n\t\t\tfunction( $email ) {\n\t\t\t\treturn [ 'email' => $email ];\n\t\t\t},\n\t\t\t$valid_emails\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Providers/PepipostAPI/Mailer.php",
+        "line": 437
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-mail-smtp-xss-005",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$mailer = ! empty( $_POST['mailer'] ) ? sanitize_text_field( wp_unslash( $_POST['mailer'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/SetupWizard.php",
+        "line": 747
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 747,
+          "expression": "$mailer = ! empty( $_POST['mailer'] ) ? sanitize_text_field( wp_unslash( $_POST['mailer'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 773,
+          "expression": "wp_send_json_success( array_merge( [ 'mailer' => $mailer ], $data ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( array_merge( [ 'mailer' => $mailer ], $data ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/SetupWizard.php",
+        "line": 773
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-mail-smtp-xss-006",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$mailer = ! empty( $_POST['mailer'] ) ? sanitize_text_field( wp_unslash( $_POST['mailer'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/SetupWizard.php",
+        "line": 790
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 790,
+          "expression": "$mailer = ! empty( $_POST['mailer'] ) ? sanitize_text_field( wp_unslash( $_POST['mailer'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 807,
+          "expression": "wp_send_json_success( array_merge( [ 'mailer' => $mailer ], $data ) )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( array_merge( [ 'mailer' => $mailer ], $data ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/SetupWizard.php",
+        "line": 807
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-mail-smtp-xss-007",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$slug = ! empty( $_POST['slug'] ) ? sanitize_text_field( wp_unslash( $_POST['slug'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/SetupWizard.php",
+        "line": 874
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 874,
+          "expression": "$slug = ! empty( $_POST['slug'] ) ? sanitize_text_field( wp_unslash( $_POST['slug'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 983,
+          "expression": "wp_send_json_success(\n\t\t\t\t\t[\n\t\t\t\t\t\t'slug'         => $slug,\n\t\t\t\t\t\t'is_installed' => true,\n\t\t\t\t\t\t'is_activated' => true,\n\t\t\t\t\t]\n\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success(\n\t\t\t\t\t[\n\t\t\t\t\t\t'slug'         => $slug,\n\t\t\t\t\t\t'is_installed' => true,\n\t\t\t\t\t\t'is_activated' => true,\n\t\t\t\t\t]\n\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/SetupWizard.php",
+        "line": 983
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-mail-smtp-xss-008",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$slug = ! empty( $_POST['slug'] ) ? sanitize_text_field( wp_unslash( $_POST['slug'] ) ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/SetupWizard.php",
+        "line": 874
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 874,
+          "expression": "$slug = ! empty( $_POST['slug'] ) ? sanitize_text_field( wp_unslash( $_POST['slug'] ) ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 991,
+          "expression": "wp_send_json_success(\n\t\t\t\t\t[\n\t\t\t\t\t\t'slug'         => $slug,\n\t\t\t\t\t\t'is_installed' => true,\n\t\t\t\t\t\t'is_activated' => false,\n\t\t\t\t\t]\n\t\t\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success(\n\t\t\t\t\t[\n\t\t\t\t\t\t'slug'         => $slug,\n\t\t\t\t\t\t'is_installed' => true,\n\t\t\t\t\t\t'is_activated' => false,\n\t\t\t\t\t]\n\t\t\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/SetupWizard.php",
+        "line": 991
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-mail-smtp-xss-009",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "$license_key = ! empty( $_POST['license_key'] ) ? sanitize_key( $_POST['license_key'] ) : ''",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/SetupWizard.php",
+        "line": 1186
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1186,
+          "expression": "$license_key = ! empty( $_POST['license_key'] ) ? sanitize_key( $_POST['license_key'] ) : ''",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1192,
+          "expression": "$url = Connect::generate_url(\n\t\t\t$license_key,\n\t\t\t'',\n\t\t\tadd_query_arg( 'upgrade-redirect', '1', self::get_site_url() ) . '#/step/license'\n\t\t)",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1202,
+          "expression": "wp_send_json_success( [ 'redirect_url' => $url ] )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_send_json_success( [ 'redirect_url' => $url ] )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/SetupWizard.php",
+        "line": 1202
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-mail-smtp-ssrf-003",
+      "severity": "medium",
+      "confidence": "medium",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "ssrf",
+      "source": {
+        "expression": "$data = ! empty( $_POST['data'] ) ? json_decode( wp_unslash( $_POST['data'] ), true ) : []",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/SetupWizard.php",
+        "line": 1310
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 1310,
+          "expression": "$data = ! empty( $_POST['data'] ) ? json_decode( wp_unslash( $_POST['data'] ), true ) : []",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 1312,
+          "expression": "$feedback   = ! empty( $data['feedback'] ) ? sanitize_textarea_field( $data['feedback'] ) : ''",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 1315,
+          "expression": "wp_remote_post(\n\t\t\t'https://wpmailsmtp.com/wizard-feedback/',\n\t\t\t[\n\t\t\t\t'user-agent' => Helpers::get_default_user_agent(),\n\t\t\t\t'body' => [\n\t\t\t\t\t'wpforms' => [\n\t\t\t\t\t\t'id'     => 87892,\n\t\t\t\t\t\t'fields' => [\n\t\t\t\t\t\t\t'1' => $feedback,\n\t\t\t\t\t\t\t'2' => $permission ? wp_get_current_user()->user_email : '',\n\t\t\t\t\t\t\t'3' => wp_mail_smtp()->get_license_type(),\n\t\t\t\t\t\t\t'4' => WPMS_PLUGIN_VER,\n\t\t\t\t\t\t],\n\t\t\t\t\t],\n\t\t\t\t],\n\t\t\t]\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_remote_post(\n\t\t\t'https://wpmailsmtp.com/wizard-feedback/',\n\t\t\t[\n\t\t\t\t'user-agent' => Helpers::get_default_user_agent(),\n\t\t\t\t'body' => [\n\t\t\t\t\t'wpforms' => [\n\t\t\t\t\t\t'id'     => 87892,\n\t\t\t\t\t\t'fields' => [\n\t\t\t\t\t\t\t'1' => $feedback,\n\t\t\t\t\t\t\t'2' => $permission ? wp_get_current_user()->user_email : '',\n\t\t\t\t\t\t\t'3' => wp_mail_smtp()->get_license_type(),\n\t\t\t\t\t\t\t'4' => WPMS_PLUGIN_VER,\n\t\t\t\t\t\t],\n\t\t\t\t\t],\n\t\t\t\t],\n\t\t\t]\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/SetupWizard.php",
+        "line": 1315
+      },
+      "missing_sanitizer": "esc_url() / wp_http_validate_url() not used",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "wp-mail-smtp-xss-010",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo absint( $option );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/DashboardWidget.php",
+        "line": 499
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 499,
+          "expression": "echo absint( $option );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo absint( $option );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/DashboardWidget.php",
+        "line": 499
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-mail-smtp-rce-003",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$events_data = $wpdb->get_results(\n\t\t\t$wpdb->prepare( \"SELECT id, content, initiator, event_type, created_at  FROM {$table} WHERE id IN ( {$placeholders} )\", $ids )\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/DebugEvents/DebugEvents.php",
+        "line": 254
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 254,
+          "expression": "$events_data = $wpdb->get_results(\n\t\t\t$wpdb->prepare( \"SELECT id, content, initiator, event_type, created_at  FROM {$table} WHERE id IN ( {$placeholders} )\", $ids )\n\t\t)",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 263,
+          "expression": "array_map(\n\t\t\tfunction ( $event_item ) {\n\t\t\t\t$event = new Event( $event_item );\n\n\t\t\t\treturn $event->get_short_details();\n\t\t\t},\n\t\t\t$events_data\n\t\t)",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map(\n\t\t\tfunction ( $event_item ) {\n\t\t\t\t$event = new Event( $event_item );\n\n\t\t\t\treturn $event->get_short_details();\n\t\t\t},\n\t\t\t$events_data\n\t\t)",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/DebugEvents/DebugEvents.php",
+        "line": 263
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-mail-smtp-rce-004",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$dates = (array) explode( ' - ', sanitize_text_field( wp_unslash( $_REQUEST['date'] ) ) )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/DebugEvents/Table.php",
+        "line": 287
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 287,
+          "expression": "$dates = (array) explode( ' - ', sanitize_text_field( wp_unslash( $_REQUEST['date'] ) ) )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 289,
+          "expression": "array_map( 'sanitize_text_field', $dates )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "array_map( 'sanitize_text_field', $dates )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/DebugEvents/Table.php",
+        "line": 289
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-mail-smtp-open-003",
+      "severity": "low",
+      "confidence": "medium",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "open_redirect",
+      "source": {
+        "expression": "sanitize_text_field( wp_unslash( $_POST['_wp_http_referer'] ) ) . $connection_settings->get_scroll_to()",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/Pages/SettingsTab.php",
+        "line": 430
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 430,
+          "expression": "wp_safe_redirect( sanitize_text_field( wp_unslash( $_POST['_wp_http_referer'] ) ) . $connection_settings->get_scroll_to() )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "wp_safe_redirect( sanitize_text_field( wp_unslash( $_POST['_wp_http_referer'] ) ) . $connection_settings->get_scroll_to() )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Admin/Pages/SettingsTab.php",
+        "line": 430
+      },
+      "missing_sanitizer": "no sanitizer applied",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-mail-smtp-rce-005",
+      "severity": "critical",
+      "confidence": "high",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "rce",
+      "source": {
+        "expression": "$part_message = str_replace( sanitize_title( $part_response ), '', $part_message )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/UsageTracking/ErrorStats.php",
+        "line": 164
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 164,
+          "expression": "$part_message = str_replace( sanitize_title( $part_response ), '', $part_message )",
+          "action": "taint_source",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 2,
+          "line": 168,
+          "expression": "$part_message = str_replace( sanitize_title( $part_code ), '', $part_message )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 3,
+          "line": 171,
+          "expression": "$part_message = preg_replace( '/-{2,}/', '-', $part_message )",
+          "action": "taint_propagation",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        },
+        {
+          "step": 4,
+          "line": 171,
+          "expression": "$part_message = preg_replace( '/-{2,}/', '-', $part_message )",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "$part_message = preg_replace( '/-{2,}/', '-', $part_message )",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/UsageTracking/ErrorStats.php",
+        "line": 171
+      },
+      "missing_sanitizer": "escapeshellarg() not used",
+      "auth_required": false,
+      "nonce_verified": false
+    },
+    {
+      "flow_id": "wp-mail-smtp-xss-011",
+      "severity": "high",
+      "confidence": "high",
+      "plugin": "wp-mail-smtp",
+      "vulnerability_class": "xss",
+      "source": {
+        "expression": "echo intval( $width );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Reports/Emails/Summary.php",
+        "line": 354
+      },
+      "chain": [
+        {
+          "step": 1,
+          "line": 354,
+          "expression": "echo intval( $width );",
+          "action": "sink_reached",
+          "active_labels": [
+            "cmd",
+            "path",
+            "sql",
+            "url",
+            "xss"
+          ]
+        }
+      ],
+      "sink": {
+        "expression": "echo intval( $width );",
+        "file": "/Users/aseemshrey/Repos/Research/2026/wp-plugins-research/plugins/src/wp-mail-smtp/src/Reports/Emails/Summary.php",
+        "line": 354
+      },
+      "missing_sanitizer": "esc_html() / esc_attr() not applied before output",
+      "auth_required": false,
+      "nonce_verified": false
+    }
+  ],
+  "semgrep_findings": [],
+  "stats": {
+    "taint_critical": 6,
+    "taint_high": 3,
+    "taint_total": 23,
+    "semgrep_error": 0,
+    "semgrep_warning": 0
+  }
+}

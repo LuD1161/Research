@@ -1,6 +1,6 @@
 # Attack Surface: wordpress-popular-posts
 
-> Generated: 2026-06-15T02:06:29Z
+> Generated: 2026-06-16T09:13:56Z
 
 ## Section 1: Entry Points
 
