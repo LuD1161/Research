@@ -1,0 +1,58 @@
+{
+  "plugin_slug": "wp-whatsapp",
+  "reviewed_at": "2026-06-16T00:00:00Z",
+  "reviewer": "phase5-manual",
+  "priority_score": 6,
+  "summary": {
+    "total_taint_flows_evaluated": 1,
+    "confirmed": 0,
+    "false_positives": 1,
+    "needs_more_info": 0
+  },
+  "verdicts": [
+    {
+      "flow_id": "wp-whatsapp-ssrf-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "vulnerability_class": "ssrf",
+      "confidence": 1.0,
+      "reasoning": "The taint flow misidentifies the sink. The flagged expression '$request = wp_remote_post($this->api_url, [..., \"body\" => $api_params])' uses $this->api_url as the destination URL — this is a hardcoded value set at construction time from the plugin's adapter config (https://yaycommerce.com/). The user-controlled value $_REQUEST['slug'] after sanitize_text_field() flows only into the POST *body* parameter array ($api_params), not into the URL. WordPress's wp_remote_post() does not use body parameters as the destination URL. Additionally, show_changelog() is guarded by current_user_can('update_plugins'), restricting it to site administrators. No SSRF is present.",
+      "taint_flow_reanalysis": {
+        "source": "$_REQUEST['slug'] via sanitize_text_field()",
+        "propagation": "into $api_params['slug'] key (POST body array)",
+        "sink": "wp_remote_post($this->api_url, ['body' => $api_params])",
+        "url_argument": "$this->api_url — hardcoded store URL, NOT user-controlled",
+        "user_controlled_argument": "POST body only — cannot redirect the HTTP request",
+        "auth_gate": "current_user_can('update_plugins') — administrator-only"
+      }
+    }
+  ],
+  "additional_manual_findings": [
+    {
+      "id": "wp-whatsapp-manual-001",
+      "title": "workHours startTime/endTime stored without sanitization",
+      "verdict": "FALSE_POSITIVE",
+      "file": "includes/PostType.php",
+      "line": 201,
+      "reasoning": "The daysOfWeekWorking[*][workHours][*][startTime] and endTime values from $_POST are stored raw in post meta via update_post_meta(). In meta-accounts.php (line 84/87), these are passed to Helper::buildTimeSelector() which only uses the $default parameter for a string equality comparison ('$time == $default') to determine whether to add 'selected' attribute. The $default value is never echoed into HTML directly; only the fixed H:i formatted time values from date() are interpolated into the option elements. No XSS is achievable through this path.",
+      "impact": "None"
+    },
+    {
+      "id": "wp-whatsapp-manual-002",
+      "title": "AJAX handlers lack explicit capability check (rely on nonce only)",
+      "verdict": "FALSE_POSITIVE",
+      "file": "includes/Settings.php",
+      "lines": [306, 329, 362, 375, 389, 403, 428, 441, 473],
+      "reasoning": "All AJAX handlers (save_display_setting, save_design_setting, save_woocommerce_setting, save_analytics_setting, save_url_setting, save_user_role_setting, set_account_position, load_accounts_ajax, set_account_status) are registered exclusively via 'wp_ajax_' hooks (not 'wp_ajax_nopriv_'), meaning WordPress itself enforces the login requirement. They rely on check_ajax_referer('njt-wa-nonce') but do not call current_user_can(). The nonce 'njt-wa-nonce' is only generated via admin_enqueue_scripts, which fires only on plugin-specific admin pages that already require 'nta_wa_manage' capability. A subscriber-level user cannot ordinarily obtain this nonce through the normal application flow. While any logged-in user can theoretically compute WordPress nonces for any action (the nonce seed depends only on user_id, session token, action, and time), this would require a targeted offline computation. The practical exploit path is insufficiently concrete to confirm as a live vulnerability."
+    },
+    {
+      "id": "wp-whatsapp-manual-003",
+      "title": "Dynamic post meta key via user-controlled $type in set_account_position and set_account_status",
+      "verdict": "FALSE_POSITIVE",
+      "file": "includes/Settings.php",
+      "lines": [434, 489],
+      "reasoning": "The $type parameter from $_POST is sanitized via sanitize_text_field() and interpolated into the meta key as 'nta_wa_{$type}'. This means an attacker with valid nonce access (authenticated admin) could write to any post meta key beginning with 'nta_wa_'. However: (1) post meta key injection cannot achieve code execution or privilege escalation through meta key manipulation alone; (2) the value ($index/$status) is also sanitized; (3) the nonce gate limits this to admin-context users. Low-impact meta pollution at most. Not a confirmable vulnerability."
+    }
+  ],
+  "confirmed_findings": []
+}

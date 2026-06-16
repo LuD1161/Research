@@ -1,0 +1,24 @@
+{
+  "plugin_slug": "presto-player",
+  "analysis_date": "2026-06-16",
+  "analyst": "claude-sonnet-4-6",
+  "total_flows_reviewed": 1,
+  "confirmed_vulnerabilities": 0,
+  "false_positives": 1,
+  "summary": "One taint flow was flagged by automated static analysis (presto-player-xss-001). After exhaustive manual tracing of all REST endpoints, AJAX handlers, shortcodes, template files, model layer, video streamer, and admin notices, zero confirmed vulnerabilities were found. The sole flagged flow (AdminNotice.php unescaped echo) is a dead code path in the free plugin — the AdminNotice class is declared but never hooked to admin_notices and has no callers anywhere in the free plugin source. The REST API controllers all have proper permission_callbacks with capability checks (upload_files, edit_others_posts, manage_options). SQL queries are parameterized via $wpdb->prepare() or use $wpdb->insert()/$wpdb->update() with typed format arrays. Template outputs are properly escaped with esc_attr(), esc_html(), esc_url(), sanitize_html_class(). The video streaming endpoint (Attachment::checkAndLoadStream) enforces login, nonce verification, and a per-user transient allowlist before serving any file. No SQL injection, auth bypass, path traversal, CSRF, or stored XSS exploitable by less-than-admin users was identified.",
+  "verdicts": [
+    {
+      "flow_id": "presto-player-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "inc/Services/AdminNotice.php",
+      "source_line": 10,
+      "sink_file": "inc/Services/AdminNotice.php",
+      "sink_line": 15,
+      "reasoning": "AdminNotice::displayAdminNotice() reads $option['message'] and $option['notice-level'] from get_option('presto_player_temp_admin_notice') and echoes them unescaped into an HTML div. However, the method is NEVER hooked to admin_notices in the free plugin — no add_action() call routes to it anywhere in inc/, and it is not listed in inc/config/app.php components. The AdminNotice class has no callers in the free plugin source. The class appears to exist for Pro plugin use only. Even if it were hooked, the only way to write this option is via AdminNotice::updateOption(), which itself is only callable from Pro plugin code requiring admin-level access. The code quality issue (missing esc_html/esc_attr) is real and should be fixed as a defense-in-depth measure, but there is no exploitable path for any attacker in the free plugin context."
+    }
+  ],
+  "additional_manual_findings": [],
+  "feedback": "Static analysis produced only one taint flow for this 35k-line, 301-file plugin. Manual audit extended coverage to: (1) all 8 REST API controllers and their permission_callback chains, (2) shortcode handlers including the private video access gate (maybeUnauthorizedFallback), (3) Model base class SQL construction (fetch/create/update/delete — all parameterized), (4) video streaming pipeline (login + nonce + transient allowlist required), (5) AJAX handler (nonce + edit_posts capability), (6) template output escaping in video.php and Attachment::showNotice(). No additional vulnerabilities found beyond the dead-code AdminNotice quality issue."
+}

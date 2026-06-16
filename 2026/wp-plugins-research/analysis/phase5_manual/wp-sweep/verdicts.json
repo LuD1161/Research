@@ -1,0 +1,82 @@
+{
+  "plugin_slug": "wp-sweep",
+  "review_date": "2026-06-16",
+  "reviewer": "expert-manual",
+  "total_taint_flows_reviewed": 1,
+  "total_semgrep_findings_reviewed": 0,
+  "additional_findings": 1,
+  "confirmed_count": 1,
+  "false_positive_count": 1,
+  "verdicts": [
+    {
+      "flow_id": "wp-sweep-sqli-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": 0.98,
+      "vulnerability_class": "sql_injection",
+      "severity": "N/A",
+      "reasoning": "The automated tool flagged SHOW TABLES output flowing into OPTIMIZE TABLE $tables. However, SHOW TABLES returns only table names that exist in the current MySQL database — these are database-native identifiers, not user-controlled input. There is no mechanism by which an external attacker can inject arbitrary values into SHOW TABLES results. The table names are set by WordPress core and plugins at install time. This is a false positive: the 'taint source' is database-controlled, not user-controlled, and cannot be weaponized for SQL injection.",
+      "auth_required": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "wp-sweep-xss-001",
+      "verdict": "CONFIRMED",
+      "confidence": 0.92,
+      "vulnerability_class": "stored_xss",
+      "severity": "medium",
+      "cvss_score": 5.4,
+      "cvss_vector": "AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+      "title": "Stored XSS via unescaped Details panel — comment_author rendered as HTML",
+      "affected_file_server": "inc/class-wpsweep.php",
+      "affected_file_client": "js/wp-sweep.js",
+      "affected_lines_server": "413-419 (details(), unapproved_comments / spam_comments / deleted_comments cases return comment_author)",
+      "affected_lines_client": "54-57 (loop builds HTML via string concatenation, inserted with .html())",
+      "description": "The ajax_sweep_details AJAX handler (wp_ajax_sweep_details) returns raw database values via wp_send_json_success(). The JavaScript Details handler (js/wp-sweep.js lines 50-61) renders each returned item using jQuery .html() with no escaping: `html += '<li>' + n + '</li>'`. For the sweep types unapproved_comments, spam_comments, and deleted_comments the returned items are comment_author values fetched directly from the database. Because comment submission is unauthenticated (or low-privilege), an attacker can craft a comment with a malicious script in the author field. When an administrator opens the Details panel for any of those sweep types, the payload executes in the admin context.",
+      "taint_path": [
+        "Attacker submits comment with author = '<img src=x onerror=alert(document.cookie)>'",
+        "Comment stored in wp_comments table (unapproved/spam/deleted)",
+        "Admin visits Tools > Sweep, clicks Details for Unapproved/Spam/Deleted Comments",
+        "JS sends GET wp-admin/admin-ajax.php?action=sweep_details&sweep_name=unapproved_comments&_wpnonce=...",
+        "PHP: ajax_sweep_details() -> details('unapproved_comments') -> SELECT comment_author FROM comments WHERE comment_approved='0'",
+        "wp_send_json_success() returns comment_author values with no escaping",
+        "JS: $.each(data.data, ...) builds html += '<li>' + n + '</li>' then .html(html)",
+        "XSS payload executes in admin browser session"
+      ],
+      "affected_sweep_names": [
+        "unapproved_comments",
+        "spam_comments",
+        "deleted_comments"
+      ],
+      "also_potentially_affected": [
+        "revisions (post_title - stored by contributor+)",
+        "auto_drafts (post_title)",
+        "deleted_posts (post_title)",
+        "transient_options (option_name - if option name injection is possible)",
+        "orphan_postmeta / orphan_commentmeta / orphan_usermeta / orphan_termmeta (meta_key values)",
+        "unused_terms (t.name - term names, stored by editor+)"
+      ],
+      "auth_required_to_trigger": "activate_plugins (admin) clicks Details",
+      "auth_required_to_plant": "None (unauthenticated comment submission for comment_author vector)",
+      "impact": "Arbitrary JavaScript execution in WordPress admin context. Can be used to create rogue admin accounts, steal session cookies, install malicious plugins, or perform any action the admin can perform.",
+      "false_positive_reasons_considered": [
+        "WordPress sanitizes comment_author on output in front-end with esc_html — but this AJAX handler returns raw DB values",
+        "The nonce requirement prevents CSRF to trigger the Details view — but the admin may legitimately click Details",
+        "comment_approved='0' means comments awaiting moderation, so admins who review comments may naturally click Details"
+      ],
+      "recommendation": "In js/wp-sweep.js, replace `html += '<li>' + n + '</li>'` with `html += '<li>' + $('<span>').text(n).html() + '</li>'` to HTML-encode each item before insertion. Alternatively, use `.text()` in DOM manipulation rather than string concatenation. On the server side, apply esc_html() to all values returned by details() before passing them to wp_send_json_success().",
+      "fix_server_side": "In WPSweep::details() or WPSweep_Api::details(), apply esc_html() to each element of $details before returning.",
+      "fix_client_side": "In js/wp-sweep.js line 55: replace `html += '<li>' + n + '</li>'` with `var $li = $('<li>').text(n); html += $li[0].outerHTML;` or use DOM methods instead of string concatenation."
+    }
+  ],
+  "summary": {
+    "key_finding": "One confirmed stored XSS (medium severity) that can be planted by unauthenticated users via comment submission and triggered when an admin views the sweep Details panel. The automated critical finding (SHOW TABLES -> OPTIMIZE TABLE) is a false positive — no user-controlled data in that flow.",
+    "risk_assessment": "Low-to-medium overall risk. Plugin requires admin access to trigger, but the plant vector is unauthenticated. Impact is admin-context XSS which is serious but bounded by the Details panel being a rarely-used admin tool.",
+    "notable_security_positives": [
+      "AJAX handlers properly check both nonce (check_admin_referer) AND capability (activate_plugins)",
+      "REST API routes use is_sweep_name_valid() whitelist preventing arbitrary sweep name injection",
+      "Database queries use $wpdb->prepare() throughout for parameterized queries",
+      "admin.php management page capability enforced by WordPress menu system",
+      "No file operations, no external HTTP requests, no deserialization"
+    ]
+  }
+}

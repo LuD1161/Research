@@ -1,0 +1,50 @@
+{
+  "plugin_slug": "header-and-footer-scripts",
+  "review_date": "2026-06-16",
+  "reviewer": "manual-security-review",
+  "summary": {
+    "total_flows_reviewed": 4,
+    "confirmed": 0,
+    "false_positives": 4,
+    "notes": "All flagged taint flows are intentional by-design behavior. Plugin purpose is raw script injection into page head/body/footer. All write paths properly gate on manage_options (admin) or unfiltered_html capability. No privilege escalation or bypass identified."
+  },
+  "verdicts": [
+    {
+      "flow_id": "header-and-footer-scripts-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": 0.98,
+      "rationale": "get_option('jamify_hfs_insert_header') echoed raw to wp_head — this is the plugin's explicit purpose. Write access requires manage_options (administrator). WordPress administrators already possess the ability to execute arbitrary code via plugin/theme editors, WP-CLI, direct DB access, etc. No privilege escalation exists. phpcs:ignore comment confirms intentional acknowledged bypass.",
+      "exploitation_path": null,
+      "cvss": null
+    },
+    {
+      "flow_id": "header-and-footer-scripts-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": 0.97,
+      "rationale": "get_post_meta(_inpost_head_script) echoed raw to wp_head for singular posts. Write access at post_meta_save() (line 295-345) triple-gated: (1) nonce verified at line 299-302, (2) edit_post/edit_page capability checked at lines 305-317, (3) unfiltered_html capability checked at line 320. Authors/Contributors can only use this if an admin explicitly grants them unfiltered_html via plugin settings — a documented, warned, admin-controlled decision. No bypass of any gate identified.",
+      "exploitation_path": null,
+      "cvss": null
+    },
+    {
+      "flow_id": "header-and-footer-scripts-xss-003",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": 0.98,
+      "rationale": "get_option('jamify_hfs_insert_body') echoed raw to wp_body_open — identical to flow-001 analysis. By-design raw output. Write requires manage_options (admin). No bypass.",
+      "exploitation_path": null,
+      "cvss": null
+    },
+    {
+      "flow_id": "header-and-footer-scripts-xss-004",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": 0.98,
+      "rationale": "get_option('jamify_hfs_insert_footer') echoed raw after convert_smilies() and do_shortcode() processing — by-design raw output. Write requires manage_options (admin). The additional do_shortcode() call does not widen the attack surface meaningfully since admins control shortcode registration. No bypass.",
+      "exploitation_path": null,
+      "cvss": null
+    }
+  ],
+  "privilege_escalation_analysis": {
+    "finding": "The plugin can grant Author/Contributor roles the unfiltered_html capability via update_role_author() and update_role_contributor(). This is a privilege expansion but it is: (a) admin-only-controlled, (b) explicitly documented with security warnings in the UI, (c) standard WordPress capability design. Not classified as a vulnerability.",
+    "verdict": "INFORMATIONAL"
+  },
+  "confirmed_count": 0
+}

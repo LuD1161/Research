@@ -1,0 +1,60 @@
+{
+  "plugin_slug": "easy-fancybox",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "manual-expert",
+  "priority_score": 6,
+  "summary": {
+    "total_automated_findings": 1,
+    "confirmed": 0,
+    "false_positives": 1,
+    "needs_more_info": 0
+  },
+  "verdicts": [
+    {
+      "flow_id": "easy-fancybox-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": 0.97,
+      "title": "get_option('efb_opted_in') taint to echo — not a real XSS",
+      "reasoning": "The automated scanner flagged taint propagation from get_option('efb_opted_in') through $opt_in_link to an echo statement. On manual trace: $opted_in is used only as a boolean condition in a ternary expression. When falsy, $opt_in_link is assigned a developer-controlled hard-coded HTML anchor string (no interpolation of the option value). When truthy, $opt_in_link is assigned an empty string ''. The actual option value stored under 'efb_opted_in' (either 'true'/'1' or falsy) is never interpolated into the echoed output. The echo at line 211 outputs $opt_in_link which is always either '' or a static literal '<a id=\"fancybox-open-modal\" ...>Get email updates</a>'. No user-controlled data reaches the sink.",
+      "false_positive_reasons": [
+        "option value used only as boolean condition, not interpolated into output",
+        "echoed string is always a developer-controlled literal or empty string",
+        "the sink value has no tainted data path from any external input"
+      ],
+      "source_file": "inc/class-easyfancybox-admin.php",
+      "source_line": 198,
+      "sink_file": "inc/class-easyfancybox-admin.php",
+      "sink_line": 211
+    }
+  ],
+  "additional_manual_checks": [
+    {
+      "check": "Inline JS injection via admin settings options",
+      "locations": [
+        "inc/fancybox-classic.php (prepare_inline)",
+        "inc/fancybox-legacy.php (prepare_inline)",
+        "inc/fancybox-2.php (prepare_inline_scripts)"
+      ],
+      "verdict": "FALSE_POSITIVE",
+      "reasoning": "Admin options (colors, selectors, etc.) are read from DB via get_option() and interpolated into inline JS/CSS. However: (1) all options are registered with Settings API sanitize_callbacks (sanitize_hex_color, colorval(), sanitize_text_field, intval, sanitize_number, wp_validate_boolean) before storage; (2) the autoExclude selector is passed through wp_json_encode() before JS insertion; (3) all option writes require manage_options capability + nonce verification; (4) CSS values go through wp_strip_all_tags() before inline style output. The sanitizers are appropriate for their contexts. No unauthenticated or low-privilege attack path exists."
+    },
+    {
+      "check": "render_settings_fields() - unescaped $optionvalue in select options (line 670)",
+      "verdict": "FALSE_POSITIVE",
+      "reasoning": "The $optionvalue in the select rendering loop comes from $args['options'] which is populated exclusively from the hard-coded $efb_options PHP array in fancybox-options.php. All option labels are developer-defined string literals and __() translation function calls. No user input ever flows into these values. Even if a translation were somehow influenced, translations require filesystem access."
+    },
+    {
+      "check": "process_efb_optin_action() - user PII sent to external AWS endpoint",
+      "verdict": "INFORMATIONAL_ONLY",
+      "reasoning": "When a logged-in admin clicks 'Allow and continue', their WordPress profile first/last name and email are sent to https://h2776ox0tf.execute-api.us-east-1.amazonaws.com/EasyFancyboxMailchimpAPI/. This is an intentional feature (email marketing opt-in). The action is protected by check_admin_referer() + current_user_can('manage_options'). Values are sanitized with esc_html() before use. No security vulnerability; privacy policy concern only, out of scope for this review."
+    },
+    {
+      "check": "CSS injection via fancybox_overlayColor / fancybox_overlayColor2 options",
+      "verdict": "FALSE_POSITIVE",
+      "reasoning": "fancybox_overlayColor uses sanitize_text_field callback; fancybox_overlayColor2 also uses sanitize_text_field. These are inserted into CSS inline styles via wp_strip_all_tags(). While sanitize_text_field does not validate CSS color syntax, (1) changing these settings requires manage_options capability, (2) an admin-level CSS injection has no meaningful privilege escalation in WordPress, (3) the output is wrapped in wp_strip_all_tags() removing any HTML breakout attempt."
+    }
+  ],
+  "attack_surface_notes": "Plugin has no AJAX handlers, no REST endpoints, no shortcodes, and no file upload functionality accessible to unauthenticated or subscriber-level users. All potentially dangerous operations (settings save, optin action, review action) are protected by nonce verification and manage_options capability checks. The attack surface is extremely limited to admin users only.",
+  "overall_risk": "LOW",
+  "recommendation": "No remediation required for confirmed vulnerabilities — none found. Optional hardening: apply esc_html() to option values used as CSS property values in inline styles (defense-in-depth against admin-level CSS injection), though this is not a meaningful security risk."
+}

@@ -1,0 +1,53 @@
+{
+  "plugin": "adminimize",
+  "review_date": "2026-06-16",
+  "reviewer": "manual-expert",
+  "total_findings_reviewed": 2,
+  "confirmed": 0,
+  "false_positive": 2,
+  "needs_info": 0,
+  "verdicts": [
+    {
+      "flow_id": "adminimize-xss-001",
+      "original_severity": "low",
+      "original_confidence": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "verdict_confidence": "high",
+      "vulnerability_class": "xss",
+      "file": "inc-setup/import.php",
+      "line": 57,
+      "reasoning": "The taint source is $finfo->file($_FILES['import_file']['tmp_name']), which calls PHP's finfo extension on the server-side temporary file to detect its MIME type from magic bytes. This returns values like 'image/jpeg', 'application/pdf', 'text/html', etc. — strings controlled by the PHP runtime, not by user-supplied data. An attacker can influence which MIME category is detected by crafting file bytes, but all valid MIME type strings returned by finfo are safe identifiers that cannot break out of the <code>...</code> wrapper to inject HTML. The esc_attr__() call on the surrounding translated string does not escape $extension, but $extension values from finfo are restricted to MIME type format strings (alpha/alpha-dash). No exploitable XSS path exists.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "attack_complexity": "not_applicable"
+    },
+    {
+      "flow_id": "adminimize-path-001",
+      "original_severity": "medium",
+      "original_confidence": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "verdict_confidence": "high",
+      "vulnerability_class": "path_traversal",
+      "file": "inc-setup/import.php",
+      "line": 76,
+      "reasoning": "$path is sourced from $_FILES['import_file']['tmp_name'], which is the PHP-engine-generated temporary file path (e.g. /tmp/phpXXXXXX). PHP itself creates and manages this value; it is not a user-controlled string. The user cannot inject path traversal sequences into tmp_name — PHP always sets this to a randomly-named file in the system temp directory. The esc_attr() wrapper is redundant but does not affect the outcome. unlink($path) therefore only ever deletes the PHP-managed temp file, which is expected behavior. No path traversal vulnerability exists.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "attack_complexity": "not_applicable"
+    }
+  ],
+  "additional_findings": [
+    {
+      "id": "adminimize-css-inject-001",
+      "severity": "low",
+      "vulnerability_class": "css_injection_stored",
+      "status": "NOT_CONFIRMED_ADMIN_ONLY",
+      "description": "The JSON import path (_mw_adminimize_import_json -> _mw_adminimize_update_option) stores option values including 'mw_adminimize_disabled_global_option_*_items' and '_mw_adminimize_own_values' using only stripslashes_deep(), without the wp_strip_all_tags() sanitization applied by the normal form save path (_mw_adminimize_update). These values are later echoed unescaped into <style> blocks in every admin page (adminimize.php lines 765-778, 837-843, 887-892, 963-968, 1015-1020, 1067-1072, 1119-1124). A malicious JSON file containing '</style><script>alert(1)</script>' in these fields would execute on all admin pages for all users. However, exploiting this requires manage_options capability (administrator), making this an admin-to-admin attack. In the standard WordPress security model administrators are fully trusted and this does not cross a meaningful privilege boundary. Not confirmed as a vulnerability in the context of this research.",
+      "auth_required": true,
+      "capability_required": "manage_options",
+      "nonce_verified": true
+    }
+  ],
+  "summary": "Both automated taint flows are false positives. Flow 001 (XSS via $extension) is FP because finfo->file() returns MIME type strings controlled by PHP, not user input. Flow 002 (path traversal via unlink) is FP because PHP controls the tmp_name value. One additional finding was identified manually: the JSON import path bypasses wp_strip_all_tags() sanitization applied in the normal form save, allowing an administrator to store CSS-breaking payloads that execute as stored XSS in admin pages. This is not confirmed as a vulnerability because it requires manage_options (full administrator) and is therefore admin-to-admin with no privilege escalation.",
+  "feedback": "Automated scanner correctly identified the two most suspicious data flows but both are FPs due to misidentifying PHP-internal values as user-controlled. The scanner missed the more interesting discrepancy between the JSON import sanitization path vs. the normal form save path. Future scanner improvement: track whether $_FILES['tmp_name'] flows through PHP-controlled vs. user-controlled paths."
+}

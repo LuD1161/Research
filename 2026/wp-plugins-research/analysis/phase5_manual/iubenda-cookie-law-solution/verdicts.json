@@ -1,0 +1,102 @@
+{
+  "plugin_slug": "iubenda-cookie-law-solution",
+  "review_date": "2026-06-16",
+  "reviewer": "claude-manual-review",
+  "verdicts": [
+    {
+      "finding_id": "IUB-001",
+      "title": "SSRF false positive - $_POST data forwarded as JSON body to hardcoded iubenda API endpoint",
+      "original_flow_ids": ["iubenda-cookie-law-solution-ssrf-001"],
+      "verdict": "false_positive",
+      "severity": "informational",
+      "vulnerability_class": "ssrf",
+      "cvss_estimate": "N/A",
+      "attack_vector": "The automated scanner flagged class-iubenda-forms.php:102-114 where $_POST is JSON-encoded into $data['proofs'][0]['content'] and then passed as the body of wp_remote_post(). The scanner classified this as SSRF because $data flows into a wp_remote_post() call. However, the URL passed to wp_remote_post() is iubenda()->options['cons']['cons_endpoint'], which is hardcoded at iubenda_cookie_solution.php:126 as 'https://consent.iubenda.com/public/consent'. This value is set as a plugin constant default and is not modifiable by user input. The attacker controls only the body content, not the target URL. Furthermore, this function (process_entry_for_wp_forms) is a WPForms hook callback fired on non-AJAX form submissions where a public_api_key is configured. The $_POST data embedded in the proof is intended behavior - it records the original form submission as evidence of consent. This is by-design consent logging to iubenda's own API.",
+      "auth_required": "none (WPForms submission hook, but no ability to redirect the request)",
+      "affected_file": "plugins/src/iubenda-cookie-law-solution/includes/class-iubenda-forms.php",
+      "affected_lines": "69-114",
+      "evidence": "wp_remote_post(\n    iubenda()->options['cons']['cons_endpoint'], // hardcoded: 'https://consent.iubenda.com/public/consent'\n    ...\n);\n// iubenda_cookie_solution.php:126: 'cons_endpoint' => 'https://consent.iubenda.com/public/consent'",
+      "remediation": "No remediation needed. URL is hardcoded, not attacker-controlled. Consider noting that the full raw $_POST (including any crafted fields) is forwarded as proof content - this is intentional but may be documented as a privacy consideration rather than a security issue."
+    },
+    {
+      "finding_id": "IUB-002",
+      "title": "Admin-only SSRF via check_frontend_auto_blocking_status AJAX handler - insufficient URL host validation",
+      "original_flow_ids": [],
+      "verdict": "false_positive",
+      "severity": "informational",
+      "vulnerability_class": "ssrf",
+      "cvss_estimate": "N/A",
+      "attack_vector": "The wp_ajax_check_frontend_auto_blocking_status handler (class-auto-blocking.php:223) calls iub_verify_ajax_request() requiring manage_options capability (administrator only). It reads $code from $_REQUEST['code'] without sanitization (iub_get_request_parameter with $with_sanitize=false). If the code contains a <script> tag with a src attribute containing 'embeds.iubenda.com/widgets/', the extract_embed_url_with_dom() function returns that src value and passes it to wp_remote_get(). The strpos check on the URL string (not just the host) means a URL like https://attacker.com/embeds.iubenda.com/widgets/foo.js would pass the check. HOWEVER: (1) This requires administrator (manage_options) access - WordPress treats admins as fully trusted, (2) WordPress's wp_http_class has built-in protections against requests to loopback IPs and private ranges by default (safe_ports check, loopback check), (3) SSRF from an admin-only action is generally out of scope for WordPress plugin security since admins can install arbitrary plugins. This is marked false_positive due to admin-only requirement.",
+      "auth_required": "admin (manage_options)",
+      "affected_file": "plugins/src/iubenda-cookie-law-solution/includes/class-auto-blocking.php",
+      "affected_lines": "223-251, 261-311",
+      "evidence": "public function check_frontend_auto_blocking_by_code() {\n    iub_verify_ajax_request( 'check_frontend_auto_blocking_status', 'iub_nonce' );\n    // requires manage_options - admin only\n    $code = iub_get_request_parameter( 'code', null, false ); // unsanitized\n    if ( $this->is_unified_embed_format( $code ) ) {\n        wp_send_json( $this->is_unified_autoblocking_enabled( $code ) );\n        // is_unified_autoblocking_enabled calls wp_remote_get($embed_url) where\n        // $embed_url extracted from $code only requires strpos($src, 'embeds.iubenda.com/widgets/')\n    }\n}",
+      "remediation": "If defense-in-depth is desired: validate that the extracted embed_url host is strictly embeds.iubenda.com using wp_parse_url() host comparison rather than strpos on the full URL string. Example: $parsed = wp_parse_url($embed_url); if ('embeds.iubenda.com' !== $parsed['host']) { return false; }"
+    },
+    {
+      "finding_id": "IUB-003",
+      "title": "No nonce verification for WPForms consent submission hook - by design, cannot be exploited",
+      "original_flow_ids": [],
+      "verdict": "false_positive",
+      "severity": "informational",
+      "vulnerability_class": "csrf",
+      "cvss_estimate": "N/A",
+      "attack_vector": "The process_entry_for_wp_forms hook at class-iubenda-forms.php:69 is fired by wpforms_process_complete and has a phpcs:ignore comment for missing nonce verification. Since this hook is triggered by WPForms after it has already validated its own nonce and processed the form, adding a second nonce check would be redundant. The hook callback sends the processed consent data to iubenda's API server as a side-effect. Since the endpoint URL is hardcoded and the API key is a public key by design (it's a 'public_api_key'), the worst case from CSRF would be false consent records sent to iubenda's API, which is a privacy/integrity issue rather than a security vulnerability against the WordPress site itself.",
+      "auth_required": "none",
+      "affected_file": "plugins/src/iubenda-cookie-law-solution/includes/class-iubenda-forms.php",
+      "affected_lines": "69-114",
+      "evidence": "// phpcs:ignore WordPress.Security.NonceVerification.Missing\n$form_id = isset( $_POST['wpforms']['id'] ) ? absint( $_POST['wpforms']['id'] ) : 0;\n// WPForms already validates nonce before calling wpforms_process_complete",
+      "remediation": "No remediation needed for the WordPress site's security. Nonce verification is already handled by WPForms before this hook fires."
+    },
+    {
+      "finding_id": "IUB-004",
+      "title": "All AJAX handlers properly protected with nonce + capability checks",
+      "original_flow_ids": [],
+      "verdict": "confirmed_secure",
+      "severity": "informational",
+      "vulnerability_class": "auth_bypass",
+      "cvss_estimate": "N/A",
+      "attack_vector": "All registered AJAX handlers (synchronize_products, quick_generator_api, integrate_setup, toggle_services, auto_detect_forms, cs_ajax_save, pp_ajax_save, cons_ajax_save, tc_ajax_save, save_plugin_settings_options, radar_percentage_reload, frontpage_main_box, check_frontend_auto_blocking_status, force_reload_radar_config, dashboard_compliance) use iub_verify_ajax_request() which calls check_ajax_referer() AND current_user_can('manage_options'). None are registered as nopriv (wp_ajax_nopriv_*). The iub_verify_ajax_request function (functions.php:105) properly dies with 403 if either nonce or capability check fails.",
+      "auth_required": "admin (manage_options)",
+      "affected_file": "plugins/src/iubenda-cookie-law-solution/includes/functions.php",
+      "affected_lines": "105-112",
+      "evidence": "function iub_verify_ajax_request( $action, $query_arg = false, $capability = 'manage_options', $should_die = false ) {\n    if (\n        ! check_ajax_referer( $action, $query_arg, $should_die ) ||\n        ! current_user_can( apply_filters( 'iubenda_cookie_law_cap', $capability ) )\n    ) {\n        wp_die( esc_html__( 'Sorry, you are not authorized to perform this action.' ), 403 );\n    }\n}",
+      "remediation": "No remediation needed."
+    },
+    {
+      "finding_id": "IUB-005",
+      "title": "No frontend XSS vectors found - all public-facing output is from admin-stored, sanitized data",
+      "original_flow_ids": [],
+      "verdict": "confirmed_secure",
+      "severity": "informational",
+      "vulnerability_class": "xss",
+      "cvss_estimate": "N/A",
+      "attack_vector": "The plugin outputs iubenda cookie consent scripts and configuration. Public output paths: (1) The cookie solution JS embed code is stored by admins and output via wp_enqueue_script or direct echo with a // phpcs:disable comment acknowledging intentional unescaped output of admin-supplied code. (2) The AMP template at class-iubenda-amp.php:366 echoes $configuration which is wp_json_encode($configuration_raw) — admin-stored data processed through the configuration parser. (3) Frontend shortcodes tc_button_shortcode/pp_button_shortcode output admin-stored embed codes that are cleaned by Iubenda_Code_Extractor->clean_tampered_scripts(). None of these output user-submitted (non-admin) data directly. The forms frontend JS (frontend.js) handles user input client-side and sends data to iubenda's API directly.",
+      "auth_required": "N/A",
+      "affected_file": "plugins/src/iubenda-cookie-law-solution/includes/class-quick-generator-service.php",
+      "affected_lines": "213-218, 225-258, 260-310",
+      "evidence": "public function add_footer() {\n    if (...) {\n        echo esc_html( $this->pp_button() ); // esc_html on button output\n    }\n}",
+      "remediation": "No remediation needed for XSS."
+    }
+  ],
+  "summary": {
+    "total_reviewed": 5,
+    "confirmed": 0,
+    "false_positives": 3,
+    "confirmed_secure": 2,
+    "needs_investigation": 0,
+    "critical_findings": 0,
+    "high_findings": 0,
+    "medium_findings": 0,
+    "low_findings": 0,
+    "informational_findings": 5,
+    "notes": [
+      "The sole automated taint finding (iubenda-cookie-law-solution-ssrf-001) is a false positive. The URL in wp_remote_post() is hardcoded to https://consent.iubenda.com/public/consent and is not attacker-controllable.",
+      "The plugin's attack surface scanner incorrectly reported zero AJAX handlers - there are 14 authenticated AJAX handlers, all properly protected with nonce + manage_options capability checks via iub_verify_ajax_request().",
+      "The check_frontend_auto_blocking_status AJAX handler has a weakly-validated SSRF path (strpos host check bypassable) but requires admin access making it out-of-scope per standard WordPress threat model.",
+      "No unauthenticated code execution, unauthenticated data modification, or stored XSS paths were identified.",
+      "Public-facing output (cookie consent scripts, AMP templates, shortcodes) outputs only admin-stored configuration data, not unvalidated user input.",
+      "The WooCommerce block checkout consent handler (class-woocommerce-form-consent.php) sends order data to iubenda's hardcoded API endpoint - this is by-design behavior for consent recording."
+    ]
+  }
+}

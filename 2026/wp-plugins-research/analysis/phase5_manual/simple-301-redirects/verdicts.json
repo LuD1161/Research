@@ -1,0 +1,63 @@
+{
+  "plugin_slug": "simple-301-redirects",
+  "analysis_date": "2026-06-16",
+  "analyst": "claude-sonnet-4-6",
+  "total_flows_reviewed": 2,
+  "confirmed_vulnerabilities": 0,
+  "false_positives": 2,
+  "manual_findings_count": 1,
+  "summary": "Both taint flows from automated analysis are false positives. One additional finding (unserialize over plain HTTP in Helper::get_remote_plugin_data()) was identified during manual review — it is a real PHP object injection vector but requires admin auth + nonce AND network-level MITM, making exploitation extremely constrained. Rated LOW severity. No confirmed exploitable vulnerabilities.",
+  "verdicts": [
+    {
+      "flow_id": "simple-301-redirects-path-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "path_traversal",
+      "source_file": "includes/Admin/Tools.php",
+      "source_line": 51,
+      "sink_file": "includes/Admin/Tools.php",
+      "sink_line": 53,
+      "reasoning": "The taint analyzer flagged $_FILES['upload_file'] -> fopen($file['tmp_name'], 'r') as path traversal. This is incorrect: PHP sets 'tmp_name' to a server-generated temporary path entirely outside user control — the client controls the uploaded file content and the original filename ($file['name']), but NOT $file['tmp_name']. The fopen() reads the temp file content for CSV parsing, not a user-specified path. Extension validation ('csv' === pathinfo($file['name'])['extension']) plus admin capability check (current_user_can('manage_options')) and nonce verification (check_ajax_referer) are all present. No path traversal is possible here.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "simple-301-redirects-ssrf-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "ssrf",
+      "source_file": "includes/Admin/WPDev/PluginUsageTracker.php",
+      "source_line": 451,
+      "sink_file": "includes/Admin/WPDev/PluginUsageTracker.php",
+      "sink_line": 451,
+      "reasoning": "The code uses wp_remote_get('http://ip-api.com/json/' . $_SERVER['REMOTE_ADDR'] . '?fields=country'). SSRF requires control of the host or protocol; here REMOTE_ADDR only controls the URL path segment. The host is always hardcoded as 'ip-api.com'. Additionally, $_SERVER['REMOTE_ADDR'] is set by the TCP layer (web server), not supplied via HTTP headers — a client cannot spoof it without a network-level attack. Per standard SSRF exclusion criteria (path-only control is not SSRF), this is a false positive. This code executes only in a server-side cron/admin context as part of the usage tracker's initial registration flow.",
+      "auth_required": false,
+      "nonce_verified": false,
+      "exploitable": false
+    }
+  ],
+  "manual_findings": [
+    {
+      "finding_id": "simple-301-redirects-manual-001",
+      "title": "PHP Object Injection via unserialize() on HTTP Response from WordPress.org API",
+      "verdict": "CONFIRMED_LOW",
+      "severity": "low",
+      "cvss_score": 3.0,
+      "cvss_vector": "CVSS:3.1/AV:N/AC:H/PR:H/UI:N/S:U/C:L/I:L/A:L",
+      "vulnerability_class": "deserialization",
+      "source_file": "includes/Helper.php",
+      "source_line": 57,
+      "sink_expression": "return unserialize(wp_remote_retrieve_body($response));",
+      "auth_required": true,
+      "nonce_verified": true,
+      "exploitable": true,
+      "description": "Helper::get_remote_plugin_data() performs a wp_remote_post() to 'http://api.wordpress.org/plugins/info/1.0/' over plain HTTP (no TLS) and immediately calls unserialize() on the response body. A network attacker with a MITM position on the HTTP connection (e.g., same LAN, rogue AP, or ISP-level interception) can inject a crafted PHP serialized object in the response body, triggering PHP Object Injection (POI). The presence of suitable POP (Property-Oriented Programming) gadget chains in WordPress core or installed plugins can escalate this to arbitrary file write or remote code execution. The trigger requires: (1) an authenticated admin user invokes the 'simple301redirects/admin/install_plugin' AJAX handler with a valid nonce AND (2) a network MITM on the HTTP request to api.wordpress.org.",
+      "attack_scenario": "Admin clicks 'Install Plugin' in the Simple 301 Redirects admin UI. The server makes an HTTP (not HTTPS) POST to http://api.wordpress.org/plugins/info/1.0/. A MITM attacker on the network path intercepts this response and replaces the body with a malicious serialized PHP object (e.g., exploiting Guzzle's POP chain or a WordPress-specific gadget). PHP deserializes the attacker's object, triggering __wakeup/__destruct magic methods. With common gadget chains in WordPress environments, this can lead to arbitrary file write and ultimately RCE.",
+      "remediation": "1. Use HTTPS: change 'http://api.wordpress.org/plugins/info/1.0/' to 'https://api.wordpress.org/plugins/info/1.0/'. 2. Replace unserialize() with json_decode() — WordPress.org API also supports JSON responses via the 'application/json' Accept header with the newer /info/1.2/ endpoint. 3. If PHP serialization must be used, validate the class of the returned object before processing.",
+      "notes": "Exploitation requires admin privilege + nonce + network MITM. Low practical risk for most deployments but non-zero. Modern WordPress.org responses are signed only at the TLS layer; there is no content signature on the serialized body itself."
+    }
+  ],
+  "redirect_header_injection_note": "The redirect() function in wp-simple-301-redirects.php uses header('Location: ' . $do_redirect) at line 156. The $do_redirect value comes from admin-stored options. Even if an admin stored a destination containing CRLF characters, PHP 5.4+ blocks header injection in header() calls by design (raises E_WARNING and truncates). Not a practical vulnerability.",
+  "feedback": "Plugin has a small attack surface. The two scanner-identified taint flows are both false positives. One real (but low severity) concern is the use of unserialize() on an HTTP-fetched response body — this should be fixed by switching to HTTPS and using JSON. No unauthenticated attack surface exists."
+}

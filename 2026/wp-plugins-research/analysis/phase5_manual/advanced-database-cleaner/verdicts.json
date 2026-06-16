@@ -1,0 +1,50 @@
+{
+  "plugin": "advanced-database-cleaner",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "manual-phase5",
+  "priority_score": 11,
+  "overall_verdict": "NO_CONFIRMED_VULNERABILITIES",
+  "taint_flows_reviewed": [
+    {
+      "flow_id": "advanced-database-cleaner-path-001",
+      "automated_severity": "critical",
+      "automated_confidence": "high",
+      "vulnerability_class": "path_traversal",
+      "source": "get_option('aDBc_security_folder_code') at class-adbc-migration.php:998",
+      "sink": "unlink($aDBc_upload_dir . '/' . $file) at class-adbc-migration.php:1006",
+      "manual_verdict": "FALSE_POSITIVE",
+      "false_positive_reason": "The method delete_old_pro_data() is declared private static and is only called from run() (line 236/238) and run_pro_migration() (line 332/334) during admin-triggered plugin migration. The option 'aDBc_security_folder_code' is written by the plugin itself (not from HTTP input). An attacker would need admin-level DB write access to poison this option value, at which point they have full site control already. Additionally, the path is constructed as a subdirectory of wp_upload_dir()['basedir'] and the loop only iterates files returned by readdir() on that directory — limiting actual file deletion to the legitimate upload directory. No HTTP-reachable attack vector exists.",
+      "auth_required_to_exploit": true,
+      "exploitability": "none"
+    }
+  ],
+  "additional_manual_findings": [
+    {
+      "area": "Table name SQL interpolation in class-adbc-tables.php",
+      "lines": [496, 502, 528, 554, 557, 580, 588, 612, 706, 913, 948, 954, 985, 988, 1000, 1075, 1078],
+      "pattern": "Backtick-quoted table names interpolated directly into SQL (e.g., DROP TABLE `{$table_name}`)",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "All destructive table operations (delete, empty, optimize, repair, convert, analyze) receive table names only after passing through remove_inexistent_tables_names() in class-adbc-selected-items-validator.php, which cross-references them against information_schema via a prepared statement. The get_table_rows and get_table_structure endpoints validate table existence via is_table_exists() (SHOW TABLES LIKE %s with prepare()). Backtick quoting prevents SQL injection for standard table names. An attacker would need MySQL CREATE TABLE privilege to pre-create a maliciously named table to exploit the backtick escape, which is entirely out of scope for plugin-level attacks.",
+      "auth_required_to_exploit": true
+    },
+    {
+      "area": "REST API authentication gate in class-adbc-routes.php",
+      "lines": [147, 168],
+      "pattern": "All REST endpoints share a single permission_callback: rest_security_check()",
+      "verdict": "SECURE",
+      "reason": "rest_security_check() enforces: (1) HTTP_X_WP_NONCE header presence, (2) wp_verify_nonce() validation against 'wp_rest' action, (3) is_user_logged_in(), and (4) current_user_can('manage_options'). All four gates must pass. No authentication bypass identified."
+    },
+    {
+      "area": "sort_by injection in get_table_rows (class-adbc-tables.php:943-944)",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "sort_by is validated against the actual column names of the target table via get_table_columns() before being used in ORDER BY. sort_order is whitelisted to ASC/DESC only."
+    },
+    {
+      "area": "CASE expression construction in get_tables_list_batch (class-adbc-tables.php:178-184)",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "$prefix values come from ADBC_Sites::get_all_prefixes() (WordPress site metadata, not HTTP input). They are escaped with $wpdb->esc_like() before interpolation. Not user-controlled."
+    }
+  ],
+  "confirmed_vulnerabilities": [],
+  "summary": "After full taint flow tracing of the single flagged automated finding and manual audit of all REST endpoints, SQL operations, and file operations, no exploitable vulnerabilities were confirmed. The plugin implements solid defense-in-depth: all REST routes require manage_options + nonce, table names are validated against the real database before SQL operations, and the only file operation flagged is gated behind admin-only migration flows."
+}

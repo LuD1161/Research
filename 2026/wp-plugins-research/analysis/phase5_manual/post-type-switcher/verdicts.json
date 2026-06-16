@@ -1,0 +1,53 @@
+{
+  "plugin": "post-type-switcher",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "expert-manual-review",
+  "reviewer_notes": "Full taint trace of all 1 automated finding. Examined all 3 source files: post-type-switcher.php (968 lines), assets/js/block.js, assets/js/quickedit.js. No confirmed vulnerabilities found.",
+  "verdicts": [
+    {
+      "flow_id": "post-type-switcher-sqli-001",
+      "original_severity": "critical",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "vuln_class": "sql_injection",
+      "reasoning": "The automated scanner incorrectly classified a DB-read value as a taint source and a parameterized update as a sink. Full trace: (1) $trid is obtained via $wpdb->prepare() + $wpdb->get_var() at line 642 using a parameterized %d placeholder for $post_id — this is correctly sanitized, and the RESULT is a database integer value, not attacker-controlled input. (2) The $trid integer is then used in $wpdb->update() WHERE clause at line 649 — $wpdb->update() internally uses $wpdb->prepare() to escape all values, so there is no injection path even if $trid were somehow tainted. (3) The DATA side of the update sets 'element_type' => 'post_' . $post_type — $post_type is sanitized via sanitize_key() at line 638 within wpml_sync_type() itself, and also at the call sites in handle_ajax() (line 483) and override_type() (line 555). sanitize_key() restricts to lowercase alphanumeric characters and hyphens, which are safe in SQL string context. (4) $wpdb->update() does not accept raw SQL in data or where arrays — it uses wpdb->prepare() internally. No SQL injection is possible.",
+      "auth_required": true,
+      "nonce_verified": true,
+      "notes": "The automated scanner appears to have followed taint from DB output ($trid from get_var) as if it were user input. This is a scanner limitation, not a real vulnerability."
+    }
+  ],
+  "additional_findings": [],
+  "independent_review_notes": [
+    {
+      "area": "handle_ajax() — null dereference on invalid post type",
+      "lines": [484, 492],
+      "observation": "If an authenticated user submits a valid nonce but a non-existent post_type value, get_post_type_object() returns null and accessing ->cap->publish_posts at line 492 causes a PHP fatal error (500). Excluded per instructions (DoS).",
+      "excluded_reason": "DoS / service disruption — excluded per review scope"
+    },
+    {
+      "area": "override_type() — nonce check after capability checks",
+      "lines": [576, 582, 586],
+      "observation": "Nonce is verified at line 586, after current_user_can() checks at lines 576 and 582. Best practice is nonce-first, but this is not exploitable: an attacker cannot bypass capability checks by failing the nonce, and an authorized user with a valid nonce is properly blocked. No security impact.",
+      "excluded_reason": "Not exploitable — defense-in-depth ordering concern only"
+    },
+    {
+      "area": "select_box() — unescaped echo of $selected",
+      "line": 452,
+      "observation": "echo $selected with comment '// Do not escape'. The $selected value originates from WordPress core function selected() which returns either empty string or ' selected=\"selected\"' — not user-controlled. Safe.",
+      "excluded_reason": "Not user-controlled — WordPress core output"
+    },
+    {
+      "area": "wpml_sync_type() — authorization for sibling translations",
+      "lines": [656, 669],
+      "observation": "set_post_type() is called on sibling WPML translation posts without per-post capability checks. However, the entire wpml_sync_type() function is only reached after the caller (handle_ajax or override_type) has already verified nonce + edit_post + publish_posts capability for the primary post. The sibling posts are fetched by trid from the WPML database — an attacker cannot inject arbitrary post IDs here without already being authorized.",
+      "excluded_reason": "Not exploitable given upstream authorization gates"
+    }
+  ],
+  "summary": {
+    "total_reviewed": 1,
+    "false_positives": 1,
+    "confirmed": 0,
+    "new_findings": 0,
+    "new_confirmed": 0
+  }
+}

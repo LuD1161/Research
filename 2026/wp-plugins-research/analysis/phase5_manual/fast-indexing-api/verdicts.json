@@ -1,0 +1,43 @@
+{
+  "plugin_slug": "fast-indexing-api",
+  "review_date": "2026-06-16",
+  "reviewer": "phase5-manual",
+  "priority_score": 6,
+  "summary": {
+    "taint_flows_reviewed": 1,
+    "confirmed": 0,
+    "false_positives": 1,
+    "total_findings": 0
+  },
+  "verdicts": [
+    {
+      "flow_id": "fast-indexing-api-path-001",
+      "original_severity": "high",
+      "original_confidence": "high",
+      "verdict": "FALSE_POSITIVE",
+      "verdict_confidence": "high",
+      "vulnerability_class": "path_traversal",
+      "file": "includes/class-instant-indexing.php",
+      "line": 843,
+      "expression": "$json = file_get_contents( $_FILES['json_file']['tmp_name'] )",
+      "reasoning": "The tmp_name field in $_FILES is a PHP-generated server-side temporary filepath created by the PHP upload handler — it cannot be controlled by an attacker to point to arbitrary filesystem paths. This is not a path traversal. Additionally, the code is fully guarded by nonce verification (wp_verify_nonce on _wpnonce with 'giapi-save' action) and capability check (current_user_can('manage_options')) in save_settings() at lines 810-816 before save_google_settings() is ever reached. Even if the tmp_name could be influenced, the content is stored as a JSON key string in wp_options — it is not executed or included as code.",
+      "auth_context": "admin-only (manage_options), nonce protected",
+      "exploitation_path": "N/A — tmp_name is server-controlled, not attacker-controlled"
+    }
+  ],
+  "additional_manual_findings": [
+    {
+      "id": "fast-indexing-api-manual-001",
+      "verdict": "FALSE_POSITIVE",
+      "verdict_confidence": "medium",
+      "vulnerability_class": "stored_xss",
+      "file": "views/indexnow-history.php",
+      "line": 32,
+      "description": "URL and status values from rank_math_indexnow_log option are output without per-value escaping, relying on wp_kses_post() applied to the entire accumulated HTML string.",
+      "reasoning": "The rank_math_indexnow_log option is populated by the Rank Math SEO plugin's IndexNow API module. The 'url' values originate from get_permalink() calls on WordPress posts — canonical WordPress-generated URLs — not raw user input. The 'status' values come from IndexNow API HTTP response codes. wp_kses_post() is applied to the entire output string, which strips <script> tags and javascript: pseudo-protocols. While per-value escaping is a best practice, the trust boundary here means attacker-controlled values cannot realistically reach the log. A compromised Rank Math SEO plugin or a database-level write could inject payloads, but that's outside the plugin's threat model.",
+      "auth_context": "admin-only page",
+      "exploitation_path": "Would require prior admin-level access or direct database manipulation to inject malicious log entries"
+    }
+  ],
+  "confirmed_findings": []
+}

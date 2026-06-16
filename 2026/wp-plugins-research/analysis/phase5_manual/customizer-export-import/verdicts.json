@@ -1,0 +1,82 @@
+{
+  "plugin": "customizer-export-import",
+  "reviewed_by": "manual_expert",
+  "review_date": "2026-06-16",
+  "overall_verdict": "NO_CONFIRMED_VULNERABILITIES",
+  "summary": "All three automated taint flows are false positives. The plugin is well-structured with proper capability checks (install_plugins for import, edit_theme_options for export), nonce verification on both export and import paths, and unserialize() called with allowed_classes => false to prevent object injection. No exploitable vulnerability was found.",
+  "findings": [
+    {
+      "flow_id": "customizer-export-import-path-001",
+      "original_class": "path_traversal",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": 0.95,
+      "reasoning": "unlink($_FILES['cei-import-file']['tmp_name']) operates on the PHP-managed temporary upload path, not an attacker-controlled path. PHP's $_FILES['tmp_name'] is always a server-side temp file path set by PHP itself, not derived from user input. No path traversal is possible here.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "customizer-export-import-path-002",
+      "original_class": "path_traversal",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": 0.95,
+      "reasoning": "wp_handle_upload() moves the uploaded file to the WP uploads directory and returns the server-side path in $file['file']. The resulting path is fully controlled by WordPress, not the attacker. file_get_contents($file['file']) reads a WP-managed path. No path traversal is possible.",
+      "exploitable": false
+    },
+    {
+      "flow_id": "customizer-export-import-path-003",
+      "original_class": "path_traversal",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": 0.95,
+      "reasoning": "unlink($file['file']) deletes the WP-managed upload path returned by wp_handle_upload(). Identical to path-002: the path is server-controlled, not user-controlled. No path traversal is possible.",
+      "exploitable": false
+    }
+  ],
+  "additional_manual_findings": [
+    {
+      "id": "CEI-MANUAL-001",
+      "title": "Unserialize with allowed_classes=false - NOT exploitable",
+      "class": "insecure_deserialization",
+      "verdict": "NOT_EXPLOITABLE",
+      "reasoning": "Line 294 calls unserialize($raw, ['allowed_classes' => false]). The allowed_classes => false option (available since PHP 7.0) prevents any PHP objects from being instantiated during deserialization, blocking all known PHP object injection chains. Only arrays and scalar values are produced. This is the correct mitigation.",
+      "exploitable": false
+    },
+    {
+      "id": "CEI-MANUAL-002",
+      "title": "$cei_error echo into alert() without escaping - NOT exploitable",
+      "class": "xss",
+      "verdict": "NOT_EXPLOITABLE",
+      "reasoning": "Line 80 echoes $cei_error directly into <script>alert(\"...\");</script> without escaping. However, all code paths that set $cei_error use either (a) __() translated static strings, or (b) $file['error'] from wp_handle_upload() which generates internal WP error messages not incorporating user-supplied data. No user-controlled string can reach this sink.",
+      "exploitable": false
+    },
+    {
+      "id": "CEI-MANUAL-003",
+      "title": "SSRF via sideload_image with attacker-controlled URLs",
+      "class": "ssrf",
+      "verdict": "LOW_SEVERITY_POST_AUTH",
+      "reasoning": "When cei-import-images is enabled, image URLs from the deserialized .dat file are passed to download_url(). An attacker with install_plugins capability could craft a .dat file with internal/metadata URLs (e.g., http://169.254.169.254/). However: (1) requires install_plugins capability which grants near-admin access anyway, (2) WordPress itself uses download_url() internally and accepts arbitrary URLs, (3) preg_match('/[^\\?]+\\.(jpe?g|jpe|gif|png)\\b/i', $file, $matches) requires the URL to contain an image extension, limiting but not blocking SSRF against targets with image extensions in their path. Low impact given the privilege requirement.",
+      "exploitable": true,
+      "severity": "LOW",
+      "cvss_estimate": "2.7",
+      "auth_required": true,
+      "capability_required": "install_plugins"
+    },
+    {
+      "id": "CEI-MANUAL-004",
+      "title": "Arbitrary option import via CEI_Option->import()",
+      "class": "privilege_escalation",
+      "verdict": "NOT_EXPLOITABLE",
+      "reasoning": "Lines 321-329 iterate over $data['options'] and call CEI_Option->import($value) for arbitrary option keys. CEI_Option extends WP_Customize_Setting and calls $this->update($value) which invokes update_option(). This could theoretically allow writing arbitrary WP options. However: (1) requires install_plugins capability, (2) WP_Customize_Setting::update() applies sanitize_callback first, (3) a user with install_plugins can already write arbitrary options via many other paths including direct plugin code execution. Not an escalation beyond existing privilege.",
+      "exploitable": false
+    },
+    {
+      "id": "CEI-MANUAL-005",
+      "title": "do_action with user-controlled key suffix",
+      "class": "action_injection",
+      "verdict": "NOT_EXPLOITABLE",
+      "reasoning": "Line 345: do_action('customize_save_' . $key, $wp_customize) where $key is from the deserialized mods array. An attacker could fire arbitrary customize_save_* dynamic actions. In practice, WP's customize_save_ hooks are fired by WP itself during normal save operations so this is by design. No privilege escalation results from firing these hooks with controlled key names since hooks execute registered PHP callbacks that can already be triggered legitimately.",
+      "exploitable": false
+    }
+  ],
+  "confirmed_vulnerabilities": [],
+  "false_positive_count": 3,
+  "total_flows_reviewed": 3
+}

@@ -1,0 +1,56 @@
+{
+  "plugin_slug": "custom-post-type-permalinks",
+  "review_date": "2026-06-16",
+  "reviewer": "manual-expert",
+  "priority_score": 6,
+  "summary": {
+    "total_automated_findings": 1,
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 1,
+    "verdict": "CLEAN"
+  },
+  "verdicts": [
+    {
+      "flow_id": "custom-post-type-permalinks-xss-001",
+      "automated_severity": "high",
+      "automated_confidence": "high",
+      "manual_verdict": "FALSE_POSITIVE",
+      "manual_confidence": 0.98,
+      "vulnerability_class": "xss",
+      "file": "CPTP/Module/Admin.php",
+      "line": 191,
+      "reason": "The automated scanner flagged the echo statement on line 191 as an XSS sink. The expression is: echo '<input ... ' . checked( true, get_option( 'add_post_type_for_tax' ), false ) . ' /> '. The WordPress checked() function compares two values and returns either the fixed string \" checked='checked'\" or an empty string ''. It never echoes user-supplied content. The get_option() return value is compared as a boolean against true — the actual database value is only used in a boolean comparison inside checked(), never interpolated into HTML output. There is no taint path from user input to the sink. This is a false positive.",
+      "taint_trace": "get_option('add_post_type_for_tax') -> boolean comparison inside checked() -> fixed attribute string output. No user data reflected.",
+      "exploitation_possible": false
+    }
+  ],
+  "additional_manual_findings": [
+    {
+      "id": "cptp-manual-001",
+      "area": "GetArchives.php SQL concatenation",
+      "file": "CPTP/Module/GetArchives.php",
+      "lines": [64, 86],
+      "assessment": "FALSE_POSITIVE",
+      "reason": "Lines 64 and 86 concatenate $r['taxonomy']['name'] and $r['taxonomy']['termid'] directly into SQL WHERE/JOIN clauses without prepare(). However, $r is the argument array passed to wp_get_archives() by theme/plugin PHP code, not from any HTTP request. The getarchives_where and getarchives_join filters receive $r from WordPress core's wp_get_archives() internals. There is no path by which a remote unauthenticated or authenticated attacker can control $r['taxonomy'] values through an HTTP request. This is a developer API misuse risk, not an exploitable remote vulnerability."
+    },
+    {
+      "id": "cptp-manual-002",
+      "area": "Option.php save_options nonce and capability",
+      "file": "CPTP/Module/Option.php",
+      "lines": [38, 43, 47],
+      "assessment": "SECURE",
+      "reason": "save_options() verifies wp_verify_nonce with 'update-permalink' action and checks _wp_http_referer contains 'options-permalink.php'. The permalink settings page is already restricted to administrators via WordPress core. Structure values are sanitized via esc_attr() before update_option(). No exploitable issue."
+    },
+    {
+      "id": "cptp-manual-003",
+      "area": "Admin.php wp_localize_script with hardcoded HTML content",
+      "file": "CPTP/Module/Admin.php",
+      "lines": [206, 207, 208, 214],
+      "assessment": "SECURE",
+      "reason": "The $content variable passed to wp_localize_script is built entirely from hardcoded translatable strings (__()). No user-supplied data is included. wp_localize_script JSON-encodes the data before embedding in the page. No XSS risk."
+    }
+  ],
+  "attack_surface_notes": "This plugin has a minimal attack surface. It has no AJAX handlers (authenticated or unauthenticated), no REST API endpoints, no file upload handlers, no direct database queries using $wpdb, and no external HTTP requests. All admin UI is restricted to the Permalinks settings page which requires administrator capability. The plugin's primary functionality is registering rewrite rules and filtering permalink outputs — both of which operate on server-side WordPress data with no direct HTTP input taint paths.",
+  "confirmed_dir": "analysis/phase5_manual/custom-post-type-permalinks/confirmed/",
+  "confirmed_files": []
+}

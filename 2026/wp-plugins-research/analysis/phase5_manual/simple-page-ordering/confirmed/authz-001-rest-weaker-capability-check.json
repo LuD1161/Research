@@ -1,0 +1,33 @@
+{
+  "finding_id": "simple-page-ordering-authz-001",
+  "plugin_slug": "simple-page-ordering",
+  "review_date": "2026-06-16",
+  "severity": "MEDIUM",
+  "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:N",
+  "cvss_score": 4.3,
+  "vulnerability_class": "authorization_bypass",
+  "cwe": "CWE-285",
+  "title": "REST API uses weaker capability check than AJAX path — Authenticated (Author) users can reorder all posts of any type",
+  "affected_file": "class-simple-page-ordering.php",
+  "affected_lines": {
+    "vulnerable_permission_check": 858,
+    "rest_permission_callback": "854-876",
+    "ajax_correct_check": 517,
+    "sibling_modification": "663-714"
+  },
+  "description": "The plugin exposes two paths for page reordering: an AJAX handler and a REST API endpoint. The AJAX handler (ajax_simple_page_ordering, line 517) correctly requires the edit_others_posts capability via check_edit_others_caps(), which restricts the operation to Editors and above. The REST endpoint's permission callback (rest_page_ordering_permissions_check, line 858) only checks current_user_can('edit_post', $post_id), which is satisfied by Authors/Contributors who own the specified post. The core page_ordering() function then calls wp_update_post() on all sibling posts without any per-post authorization check, modifying menu_order on posts the authenticated user does not own.",
+  "taint_trace": [
+    "POST /wp-json/simple-page-ordering/v1/page_ordering",
+    "-> rest_page_ordering_permissions_check() [line 854]: checks edit_post on $post_id only",
+    "-> rest_page_ordering() [line 883]: passes params to page_ordering()",
+    "-> page_ordering() [line 573]: loops over siblings",
+    "-> wp_update_post(sibling->ID, menu_order) [lines 663-714]: no cap check on sibling"
+  ],
+  "exploit_scenario": "1. Attacker has Author role on a WordPress site with simple-page-ordering installed. 2. Attacker owns any published/draft post. 3. Attacker sends: POST /wp-json/simple-page-ordering/v1/page_ordering with body: {id: <attacker_owned_post_id>, previd: false, nextid: <any_other_post_id>}. 4. Permission check passes (attacker can edit their own post). 5. page_ordering() queries all siblings of $post_id and calls wp_update_post() on each, updating menu_order to new values. Result: attacker scrambles the ordering of all pages/posts on the site, including administrator-owned content.",
+  "false_positive_analysis": "Confirmed true positive. The capability discrepancy between AJAX (edit_others_posts) and REST (edit_post) paths is concrete and unambiguous. The rest_page_ordering_permissions_check function explicitly uses current_user_can('edit_post', $post_id) at line 858 while the AJAX equivalent at line 517 uses check_edit_others_caps(). WordPress Author role has edit_post capability on their own posts but not edit_others_posts. The REST API is publicly documented and easily discoverable.",
+  "recommended_fix": "In rest_page_ordering_permissions_check(), after resolving the post type, replace the edit_post check with a check equivalent to check_edit_others_caps():\n\n// Replace:\nif ( ! current_user_can( 'edit_post', $post_id ) ) {\n    return false;\n}\n\n// With:\n$post_type = get_post_type( $post_id );\n// ... (existing post type resolution) ...\nif ( ! current_user_can( $post_type_obj->cap->edit_others_posts ) ) {\n    return false;\n}\n\nOr simply call self::check_edit_others_caps($post_type) after resolving the post type.",
+  "references": [
+    "WordPress Roles and Capabilities: https://wordpress.org/documentation/article/roles-and-capabilities/",
+    "CWE-285: Improper Authorization"
+  ]
+}

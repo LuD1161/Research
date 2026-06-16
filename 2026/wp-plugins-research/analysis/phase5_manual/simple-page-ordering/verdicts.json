@@ -1,0 +1,47 @@
+{
+  "plugin_slug": "simple-page-ordering",
+  "review_date": "2026-06-16",
+  "reviewer": "security-review-agent",
+  "taint_flow_verdicts": [
+    {
+      "flow_id": "simple-page-ordering-sqli-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": 0.98,
+      "rationale": "$post_id is immediately cast to (int) on line 504 before being used. The taint chain is broken by this integer cast. Furthermore, $post_id does not appear in the $wpdb->update() WHERE clause on line 557 — the WHERE clause uses $post_type, not $post_id. No SQL injection is possible."
+    },
+    {
+      "flow_id": "simple-page-ordering-sqli-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": 0.98,
+      "rationale": "$post_type is sanitized via sanitize_text_field(wp_unslash()) on line 545. More importantly, WordPress $wpdb->update() always internally uses prepare() with the format specifier array('%s') provided as the 5th argument — this is safe parameterized query construction. No SQL injection is possible."
+    }
+  ],
+  "manual_findings": [
+    {
+      "finding_id": "simple-page-ordering-authz-001",
+      "severity": "MEDIUM",
+      "confidence": 0.90,
+      "vulnerability_class": "authorization_bypass",
+      "title": "REST API endpoint uses weaker capability check than AJAX equivalent, allowing Authors/Contributors to reorder others' posts",
+      "file": "class-simple-page-ordering.php",
+      "lines": {
+        "permission_check": 854,
+        "capability_check": 858,
+        "ajax_equivalent_check": 517,
+        "sibling_update": "663-695"
+      },
+      "description": "The AJAX handler ajax_simple_page_ordering() (line 517) calls check_edit_others_caps() which requires the edit_others_posts capability (Editor role or higher). The REST endpoint rest_page_ordering_permissions_check() (line 858) only checks current_user_can('edit_post', $post_id), which passes for Authors/Contributors who own the specific post. The page_ordering() function subsequently calls wp_update_post() on sibling posts without any per-sibling authorization check. This means a lower-privileged user (Author role) can call POST /wp-json/simple-page-ordering/v1/page_ordering with a post ID they own to reorder all sibling posts, including those owned by other users, by modifying their menu_order field.",
+      "exploit_scenario": "1. Attacker registers as Author on a WordPress site with simple-page-ordering. 2. Attacker creates a page (becomes its owner). 3. Attacker sends POST /wp-json/simple-page-ordering/v1/page_ordering with id=<their_post_id>&previd=false&nextid=<admin_post_id>. 4. The permission check passes (they can edit their own post). 5. page_ordering() runs and calls wp_update_post() on all sibling posts (including admin-owned pages) to update their menu_order. The attacker can scramble the ordering of all pages/posts on the site.",
+      "impact": "Authenticated (Author/Contributor level) privilege escalation — can modify menu_order of any post of the same type, disrupting site navigation and page ordering set by administrators.",
+      "fix": "The REST permission callback should use check_edit_others_caps() (or its equivalent) rather than just edit_post on the specific post ID, consistent with the AJAX handler. Change line 858 to check: current_user_can($post_type_obj->cap->edit_others_posts) or call self::check_edit_others_caps($post_type)."
+    }
+  ],
+  "summary": {
+    "taint_flows_reviewed": 2,
+    "taint_flows_confirmed": 0,
+    "taint_flows_false_positive": 2,
+    "manual_findings": 1,
+    "confirmed_vulnerabilities": 1,
+    "overall_severity": "MEDIUM"
+  }
+}

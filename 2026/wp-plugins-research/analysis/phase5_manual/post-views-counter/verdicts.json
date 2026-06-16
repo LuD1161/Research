@@ -1,0 +1,52 @@
+{
+  "plugin": "post-views-counter",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "manual-expert",
+  "taint_flows_reviewed": 3,
+  "confirmed": 0,
+  "false_positives": 3,
+  "notes": "All three automated taint flows are false positives. The plugin has a real code-quality issue in save_bulk_post_views (undefined $pvc variable at line 394 of class-columns.php) but this is an application bug, not an exploitable security vulnerability — the nonce check fires first (line 375) which is correctly validated. No confirmed vulnerabilities.",
+  "verdicts": [
+    {
+      "flow_id": "post-views-counter-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source is $_POST['ids'] split by comma. At line 59, every element is immediately cast to int via array_map('intval', $ids). The sink echo wp_json_encode([...]) at line 74 outputs a JSON-encoded array of integers. wp_json_encode produces safe JSON output; integer arrays cannot carry XSS payload. The flow tracker missed that the intval cast eliminates all taint."
+    },
+    {
+      "flow_id": "post-views-counter-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Source is $_POST['period'] filtered by preg_replace('/[^a-z0-9_|]/', '', ...) — only lowercase alphanumeric, underscore, and pipe characters survive. The sink is echo wp_json_encode(...) which produces safe JSON. The sanitized $period value only participates as an array element inside wp_json_encode; it is never interpolated into HTML. Endpoint also requires authentication (current_user_can('publish_posts')) and a valid nonce via check_ajax_referer. No XSS vector exists."
+    },
+    {
+      "flow_id": "post-views-counter-xss-003",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Identical pattern to flow-002 — $_POST['period'] is whitelist-filtered to [a-z0-9_|] characters only, then used only inside wp_json_encode output. The $args array containing $period is passed through apply_filters('pvc_dashboard_post_most_viewed_data', ...) but the result is still encoded via wp_json_encode before echoing. Same authentication and nonce requirements apply. No XSS vector exists."
+    }
+  ],
+  "additional_findings": [
+    {
+      "type": "code_bug_not_security",
+      "file": "includes/class-columns.php",
+      "line": 394,
+      "description": "In save_bulk_post_views(), $pvc is referenced (line 394-400) before being defined. The function registers as wp_ajax_save_bulk_post_views (authenticated only). The nonce check at line 375 fires first and exits on failure, so an attacker cannot reach the undefined variable. If a valid nonce holder triggers this, WordPress will generate a PHP Notice/Warning/Fatal depending on PHP version. This is a latent bug (authorization logic for $allow_edit bypassed by PHP error) but the per-post current_user_can('edit_post', $post_id) check at line 407 still runs per-iteration, mitigating privilege escalation risk."
+    }
+  ],
+  "sql_injection_notes": "db_prepare_insert() at line 1985 uses sprintf('(%d, %d, \"%s\", %d)', ...) without $wpdb->prepare(). However, $period values are exclusively server-generated from PHP date() calls (in count_visit()) or from object cache keys written by the same server code path (in flush_cache_to_db()). No user-controlled data reaches $period in db_prepare_insert(). Not exploitable.",
+  "attack_surface_summary": {
+    "unauthenticated_endpoints": [
+      "wp_ajax_nopriv_pvc-view-posts (nonce-protected, ids cast to int)",
+      "wp_ajax_nopriv_pvc-check-post (nonce-protected, post_id cast to int, storage_data sanitized via sanitize_storage_payload_set)",
+      "REST /post-views-counter/view-post/ (requires rest_api counter_mode enabled, storage data fully sanitized)"
+    ],
+    "authenticated_endpoints": [
+      "wp_ajax_pvc_dashboard_post_views_chart (nonce + publish_posts cap, period whitelist-filtered)",
+      "wp_ajax_pvc_dashboard_post_most_viewed (nonce + publish_posts cap, period whitelist-filtered)",
+      "wp_ajax_pvc_dashboard_user_options (nonce, inputs sanitized via map_deep/sanitize_text_field)",
+      "wp_ajax_save_bulk_post_views (nonce + per-post edit_post cap, post_views cast to int)",
+      "wp_ajax_pvc_column_chart (nonce, period stripped to [0-9] only)"
+    ]
+  }
+}

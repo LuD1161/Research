@@ -1,0 +1,49 @@
+{
+  "plugin": "xml-sitemap-feed",
+  "review_date": "2026-06-16",
+  "reviewer": "senior-security-engineer",
+  "summary": {
+    "total_taint_flows_reviewed": 1,
+    "confirmed": 0,
+    "false_positives": 1,
+    "notes": "Plugin has 125 PHP files, 13k LOC. One taint flow was flagged (xss-001). Manual trace shows it is a false positive. All other output in admin views uses proper WP escaping functions. Feed templates use esc_xml/esc_url throughout. No SQLi, path traversal, CSRF, or auth bypass issues found."
+  },
+  "verdicts": [
+    {
+      "flow_id": "xml-sitemap-feed-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": 0.95,
+      "vulnerability_class": "xss",
+      "file": "views/admin/field-news-categories.php",
+      "line": 50,
+      "original_claim": "get_option('xmlsf_news_tags') tainted value flows through wp_terms_checklist() into echo $cat_list without escaping.",
+      "analysis": {
+        "taint_source": "get_option('xmlsf_news_tags') -> $options['categories'] (array of integer category IDs)",
+        "sink": "echo $cat_list (line 50)",
+        "why_false_positive": [
+          "wp_terms_checklist() is a WordPress core function (wp-admin/includes/template.php) that uses Walker_Category_Checklist internally.",
+          "Walker_Category_Checklist::start_el() calls esc_html() on term names and esc_attr() on IDs and other attributes before generating HTML.",
+          "The function is designed to return pre-escaped HTML safe for direct output — this is its documented usage pattern.",
+          "The $selected_categories array contains only integer category IDs (from saved DB option), which are safely used as checked= comparisons, not rendered as HTML.",
+          "The str_replace() only substitutes a fixed attribute name string, introducing no attacker-controlled content.",
+          "The phpcs:ignore comment (WordPress.Security.EscapeOutput.OutputNotEscaped) is appropriate here because PHPCS cannot introspect core function return values.",
+          "To inject a malicious category name an attacker would need administrator access to create/edit taxonomy terms — at which point they already have full site control.",
+          "Reviewed analogous pattern: WordPress's own post editor echoes wp_terms_checklist() output directly in edit-form-advanced.php without additional escaping."
+        ],
+        "attack_path_exists": false
+      }
+    }
+  ],
+  "additional_findings": [],
+  "areas_audited": [
+    "views/admin/field-news-categories.php - taint flow (FP)",
+    "views/admin/section-ping-log.php - echo $advanced (safe: pre-escaped in caller)",
+    "views/feed-sitemap-news.php - all output uses esc_xml/esc_url (safe)",
+    "views/feed-sitemap.php - all output uses esc_xml/esc_url (safe)",
+    "inc/admin/class-sanitize.php - sanitization functions (adequate)",
+    "inc/admin/class-main.php - admin actions (nonce-checked)",
+    "inc/admin/class-sitemap-news-settings.php - settings/actions (nonce-checked, tabs allowlisted)",
+    "inc/class-sitemap-news.php - request filtering, SQL WHERE clause (safe via sanitize_number)",
+    "views/admin/*.php - output escaping audit (all use esc_html/esc_attr/esc_url)"
+  ]
+}

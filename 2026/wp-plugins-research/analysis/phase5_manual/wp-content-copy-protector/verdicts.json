@@ -1,0 +1,121 @@
+{
+  "plugin_slug": "wp-content-copy-protector",
+  "review_date": "2026-06-16",
+  "reviewer": "manual-security-review",
+  "priority_score": 3,
+  "total_taint_flows_reviewed": 3,
+  "confirmed_count": 1,
+  "false_positive_count": 2,
+  "verdicts": [
+    {
+      "flow_id": "wp-content-copy-protector-xss-001",
+      "verdict": "CONFIRMED",
+      "severity": "medium",
+      "cvss_score": 4.8,
+      "cvss_vector": "CVSS:3.1/AV:N/AC:H/PR:H/UI:R/S:C/C:L/I:L/A:N",
+      "vulnerability_class": "xss",
+      "subtype": "reflected",
+      "title": "Reflected XSS via unescaped REQUEST_URI in admin notice href (dismiss link)",
+      "file": "notifications.php",
+      "line": 144,
+      "description": "In wccp_free_review_notice_message(), $_SERVER['REQUEST_URI'] is concatenated with a query string suffix and passed through wp_nonce_url(). The resulting $dismiss_url is echoed directly into an href attribute without esc_url() sanitization. wp_nonce_url() only appends the _wpnonce parameter to the URL; it does not HTML-encode the URL for safe output in an href context. An attacker who induces an admin to visit a crafted admin URL can inject arbitrary content into the href attribute, enabling JavaScript execution.",
+      "taint_chain": [
+        "Line 123: $scheme derived from wp_parse_url($_SERVER['REQUEST_URI']) — taint source",
+        "Line 124: $url = $_SERVER['REQUEST_URI'] . $scheme . 'wccp_free_review_dismiss=yes' — taint propagation",
+        "Line 125: $dismiss_url = wp_nonce_url($url, 'wccp_free_review-nonce') — taint propagation (wp_nonce_url does not esc_url)",
+        "Line 144: echo $dismiss_url — raw echo in href= attribute context — SINK"
+      ],
+      "exploit_scenario": "An attacker crafts a URL pointing to any admin page but with a REQUEST_URI containing a JavaScript URI or attribute-breaking sequence, e.g.: /wp-admin/index.php/%22%20onmouseover=%22alert(document.cookie). When the authenticated admin browses this URL and the review notice banner is displayed (after 5 days of activation), the injected content appears inside the href attribute, enabling XSS. Because this is an admin-context admin_notices hook, the attacker must socially engineer the admin to click the crafted link.",
+      "auth_required": "admin (manage_options)",
+      "nonce_verified": true,
+      "attack_complexity": "high",
+      "exploitation_conditions": [
+        "Plugin must have been active for >5 days (432000 seconds) OR development_mode=true",
+        "Review notice must not have been previously dismissed",
+        "Authenticated admin must follow a crafted URL"
+      ],
+      "false_positive_analysis": "NOT a false positive. wp_nonce_url() wraps add_query_arg() which does not HTML-encode the URL. The output at line 144 is a raw echo with no esc_url() wrapper. The href context is exploitable via attribute injection or javascript: protocol.",
+      "fix": "Wrap all URL outputs in esc_url(): echo esc_url($dismiss_url) and echo esc_url($later_url). Also consider sanitizing $_SERVER['REQUEST_URI'] with esc_url() before use.",
+      "references": [
+        "https://developer.wordpress.org/reference/functions/esc_url/",
+        "https://developer.wordpress.org/reference/functions/wp_nonce_url/"
+      ]
+    },
+    {
+      "flow_id": "wp-content-copy-protector-xss-002",
+      "verdict": "CONFIRMED",
+      "severity": "medium",
+      "cvss_score": 4.8,
+      "cvss_vector": "CVSS:3.1/AV:N/AC:H/PR:H/UI:R/S:C/C:L/I:L/A:N",
+      "vulnerability_class": "xss",
+      "subtype": "reflected",
+      "title": "Reflected XSS via unescaped REQUEST_URI in admin notice href (later link)",
+      "file": "notifications.php",
+      "line": 145,
+      "description": "Identical to xss-001 but for the $later_url variable built from $_SERVER['REQUEST_URI']. At line 127: $_later_link = $_SERVER['REQUEST_URI'] . $scheme . 'wccp_free_review_later=yes'; line 128: $later_url = wp_nonce_url($_later_link, 'wccp_free_review-nonce'); line 145: echo $later_url — unescaped in href context.",
+      "taint_chain": [
+        "Line 123: $scheme derived from wp_parse_url($_SERVER['REQUEST_URI']) — taint source",
+        "Line 127: $_later_link = $_SERVER['REQUEST_URI'] . $scheme . 'wccp_free_review_later=yes' — taint propagation",
+        "Line 128: $later_url = wp_nonce_url($_later_link, 'wccp_free_review-nonce') — taint propagation",
+        "Line 145: echo $later_url — raw echo in href= attribute context — SINK"
+      ],
+      "exploit_scenario": "Same as xss-001. Appears in the 'Will Rate Later' link of the review notice banner.",
+      "auth_required": "admin (manage_options)",
+      "nonce_verified": true,
+      "attack_complexity": "high",
+      "false_positive_analysis": "NOT a false positive. Same root cause as xss-001.",
+      "fix": "Use echo esc_url($later_url).",
+      "dedup_note": "Same root cause as xss-001; both share the same line 123 taint source and same missing esc_url() fix."
+    },
+    {
+      "flow_id": "wp-content-copy-protector-xss-003",
+      "verdict": "CONFIRMED",
+      "severity": "medium",
+      "cvss_score": 4.8,
+      "cvss_vector": "CVSS:3.1/AV:N/AC:H/PR:H/UI:R/S:C/C:L/I:L/A:N",
+      "vulnerability_class": "xss",
+      "subtype": "reflected",
+      "title": "Reflected XSS via unescaped REQUEST_URI in admin notice href (dismiss link, second instance)",
+      "file": "notifications.php",
+      "line": 146,
+      "description": "A third instance of the same $dismiss_url echo appears at line 146 for the 'Hide Forever' link. Shares the exact same taint flow as xss-001.",
+      "taint_chain": [
+        "Line 123: $scheme derived from wp_parse_url($_SERVER['REQUEST_URI']) — taint source",
+        "Line 124: $url = $_SERVER['REQUEST_URI'] . $scheme . 'wccp_free_review_dismiss=yes'",
+        "Line 125: $dismiss_url = wp_nonce_url($url, 'wccp_free_review-nonce')",
+        "Line 146: echo $dismiss_url — raw echo in href= attribute — SINK"
+      ],
+      "exploit_scenario": "Same as xss-001.",
+      "auth_required": "admin (manage_options)",
+      "nonce_verified": true,
+      "attack_complexity": "high",
+      "false_positive_analysis": "NOT a false positive. Same root cause as xss-001.",
+      "fix": "Use echo esc_url($dismiss_url). Note: xss-001 and xss-003 are the same variable echoed twice; fixing esc_url($dismiss_url) in one place covers both.",
+      "dedup_note": "Same $dismiss_url as xss-001; differs only in which link element it appears in."
+    }
+  ],
+  "additional_findings": [
+    {
+      "id": "manual-001",
+      "verdict": "FALSE_POSITIVE",
+      "description": "echo $wccp_settings['smessage'] at preventer-index.php:292 (inside div in admin footer). smessage is sanitized on save via wccp_sanitize($val, 'textbox') which applies stripslashes(htmlentities($val, ENT_QUOTES)). HTML entities are stored in DB and output renders as escaped literal text. Not exploitable.",
+      "file": "preventer-index.php",
+      "line": 292
+    },
+    {
+      "id": "manual-002",
+      "verdict": "FALSE_POSITIVE",
+      "description": "echo $wccp_settings['prnt_scr_msg'] at preventer-index.php:320 inside CSS content property. prnt_scr_msg is sanitized on save via wccp_sanitize($val, 'text') = stripslashes(htmlentities($val, ENT_QUOTES)). The double-quote character is encoded as &quot; which cannot terminate the CSS string quote, preventing CSS injection.",
+      "file": "preventer-index.php",
+      "line": 320
+    },
+    {
+      "id": "manual-003",
+      "verdict": "FALSE_POSITIVE",
+      "description": "echo $admin_email_wccp at admin-core.php:140. Value comes from get_bloginfo('admin_email') which is the site admin email address — trusted WP option, not user-controlled taint from HTTP request.",
+      "file": "admin-core.php",
+      "line": 140
+    }
+  ],
+  "notes": "Plugin has very limited attack surface (no AJAX handlers, REST endpoints, or file uploads). The three confirmed findings all share one root cause: missing esc_url() on $_SERVER['REQUEST_URI']-derived URLs echoed into href attributes in the admin review notice. All require admin authentication and activation for 5+ days. Priority score of 3 (low) is appropriate; real-world exploitability is constrained by the social engineering requirement and admin-only scope."
+}

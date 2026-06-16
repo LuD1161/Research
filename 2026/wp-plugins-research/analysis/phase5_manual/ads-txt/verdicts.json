@@ -1,0 +1,52 @@
+{
+  "plugin": "ads-txt",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "manual-phase5",
+  "priority_score": 1,
+  "overall_verdict": "NO_CONFIRMED_VULNERABILITIES",
+  "taint_flows_reviewed": [
+    {
+      "flow_id": "ads-txt-ssrf-001",
+      "automated_severity": "medium",
+      "automated_confidence": "medium",
+      "vulnerability_class": "ssrf",
+      "source": "$adstxt_type = sanitize_text_field( $_POST['adstxt_type'] ) at inc/admin.php:555",
+      "sink": "$response = wp_remote_request( home_url( $file_name ) ) at inc/admin.php:564",
+      "manual_verdict": "FALSE_POSITIVE",
+      "false_positive_reason": "The taint flow is broken at step 2. The user-supplied $adstxt_type is immediately subjected to a strict whitelist check at line 557: if it is not exactly 'adstxt' or 'app-adstxt', wp_die() is called. If the whitelist passes, $file_name is then unconditionally assigned a hardcoded literal ('/ads.txt' or '/app-ads.txt') at line 561 — no user data flows into $file_name. The final URL passed to wp_remote_request() is home_url('/ads.txt') or home_url('/app-ads.txt'), both of which always resolve to the site's own domain. This is a same-origin loopback check (detecting whether a physical ads.txt file exists on the server) with zero attacker-controlled URL components. No SSRF exists. Additionally, the endpoint requires admin capability (ADS_TXT_MANAGE_CAPABILITY) and a valid nonce (check_admin_referer('adstxt_save')), making it unavailable to unauthenticated or lower-privileged attackers.",
+      "auth_required_to_exploit": true,
+      "exploitability": "none"
+    }
+  ],
+  "additional_manual_findings": [
+    {
+      "area": "Open redirect via _wp_http_referer in save.php:107",
+      "lines": [107],
+      "pattern": "wp_safe_redirect( esc_url_raw( $_post['_wp_http_referer'] ) . '&updated=true' )",
+      "verdict": "FALSE_POSITIVE",
+      "reason": "wp_safe_redirect() enforces that the target URL belongs to the current site (or an allowed_redirect_hosts list). Off-host redirect attempts are silently rewritten to the home URL. The _wp_http_referer field is also a nonce-protected hidden input set by wp_nonce_field() during form rendering, so the value is trusted. No exploitable open redirect exists."
+    },
+    {
+      "area": "CSRF protection on all write actions",
+      "verdict": "SECURE",
+      "reason": "Both save() (save.php:20) and adstxts_check_for_existing_file() (admin.php:552) call check_admin_referer('adstxt_save') before any state-changing operation. All admin pages also require ADS_TXT_MANAGE_CAPABILITY (administrator-only). No CSRF vector identified."
+    },
+    {
+      "area": "XSS in settings screen output (admin.php:276-336)",
+      "verdict": "SECURE",
+      "reason": "All user-originated content rendered in the admin screen is escaped: post_content via esc_textarea() (line 348), error line numbers via esc_html() (line 453), error values via esc_html() (line 449), combined messages via wp_kses_post() (line 455). The Underscore.js template at lines 382-419 renders server-provided error type strings (from get_error_messages() — entirely static, hardcoded PHP strings) as plain text via PHP esc_html(), not as raw HTML. No XSS path identified."
+    },
+    {
+      "area": "SQL injection via wp_insert_post / wp_get_post_revisions (save.php:89)",
+      "verdict": "SECURE",
+      "reason": "No raw $wpdb queries are used anywhere in the plugin. All database interaction goes through WordPress high-level API functions (wp_insert_post, get_post, get_option, update_option, get_post_meta, delete_post_meta) which use parameterized queries internally. User-supplied ads.txt content is further sanitized through validate_line() / wp_strip_all_tags() before storage."
+    },
+    {
+      "area": "Ads.txt content output in helpers.php (display_ads_txt)",
+      "verdict": "SECURE",
+      "reason": "The publicly accessible /ads.txt and /app-ads.txt endpoints at helpers.php:41 and helpers.php:68 output post_content wrapped in esc_html(). The content was sanitized via wp_strip_all_tags() at save time. No injection into rendered HTML — Content-Type is text/plain, so XSS is not applicable regardless."
+    }
+  ],
+  "confirmed_vulnerabilities": [],
+  "summary": "Full manual review of all 5 PHP source files (1,154 lines total). The single automated taint flow (ads-txt-ssrf-001) is a false positive: the user-controlled variable never reaches the URL sink because a hardcoded string is assigned after a strict whitelist check. All four additional areas audited (CSRF, XSS, SQLi, public endpoint output) are properly secured. The plugin follows WordPress security best practices throughout: nonce verification on all write operations, capability checks restricting all admin actions to administrators, and consistent use of WordPress escaping/sanitization APIs on all output paths. Priority score of 1 is appropriate — this plugin has a minimal attack surface and no confirmed vulnerabilities."
+}

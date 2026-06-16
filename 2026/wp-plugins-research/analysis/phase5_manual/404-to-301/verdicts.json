@@ -1,0 +1,59 @@
+{
+  "plugin_slug": "404-to-301",
+  "reviewed_at": "2026-06-16T00:00:00Z",
+  "reviewer": "manual-phase5",
+  "priority_score": 12,
+  "summary": {
+    "total_flagged_by_pipeline": 2,
+    "confirmed": 0,
+    "false_positives": 2,
+    "needs_more_investigation": 0
+  },
+  "verdicts": [
+    {
+      "flow_id": "404-to-301-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": 1.0,
+      "original_claim": "XSS via $options['redirect_link'] echoed without esc_html",
+      "analysis": "The pipeline flagged the sink as 'echo esc_url( $options[\"redirect_link\"] )' — but esc_url() IS present at settings.php line 55. The value is inside a type=\"url\" input value attribute. esc_url() is appropriate here and correctly neutralises any XSS payload. No vulnerability exists.",
+      "file": "includes/admin/views/settings.php",
+      "line": 55
+    },
+    {
+      "flow_id": "404-to-301-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": 1.0,
+      "original_claim": "XSS via get_option('admin_email') echoed without esc_html",
+      "analysis": "settings.php line 84 outputs get_option('admin_email') into a placeholder=\"\" HTML attribute without esc_attr(). The admin_email WordPress option is set exclusively by administrators and contains a validated email address; it cannot be injected by unprivileged users. This is an admin-context page protected by capability checks (JJ4T3_ACCESS). Even if admin_email were somehow malicious, exploiting a placeholder attribute requires a separate injection step. This is a hardening concern, not an exploitable vulnerability.",
+      "file": "includes/admin/views/settings.php",
+      "line": 84
+    }
+  ],
+  "additional_findings_from_manual_review": [
+    {
+      "id": "404-to-301-manual-001",
+      "verdict": "FALSE_POSITIVE",
+      "title": "Positional placeholder misuse in $wpdb->prepare()",
+      "description": "class-jj4t3-404-actions.php:246 uses 'SELECT redirect, options FROM %1$s WHERE url = \\'%2$s\\'' with JJ4T3_TABLE and $this->url as positional %Ns args. WordPress prepare() does not quote/escape %1$s-style positional args the same way as %s. However: (1) JJ4T3_TABLE is a constant defined at plugin activation, not user-controlled; (2) $this->url is passed through esc_url_raw() before use, stripping special characters needed for SQL injection. The same pattern appears in get_error_logs() for groupby/orderby, but those values are validated against strict allowlists (url/ref/ip/ua for groupby; date/url/ref/ip for orderby) before being injected. Not exploitable in practice.",
+      "file": "includes/public/class-jj4t3-404-actions.php",
+      "line": 246
+    },
+    {
+      "id": "404-to-301-manual-002",
+      "verdict": "FALSE_POSITIVE",
+      "title": "column_default() returns unescaped DB data",
+      "description": "class-jj4t3-log-listing.php:431 returns $item[$column_name] without HTML escaping from column_default(). WP_List_Table echoes this directly. However, all standard table columns (date, url, ref, ip, ua, redirect, cb) have dedicated column_*() methods that perform proper escaping (esc_url, sanitize_text_field, etc.). column_default() only fires for unrecognised column names. Since no non-standard columns exist in the default configuration, this code path is not reached by attacker-controlled data.",
+      "file": "includes/admin/class-jj4t3-log-listing.php",
+      "line": 431
+    },
+    {
+      "id": "404-to-301-manual-003",
+      "verdict": "FALSE_POSITIVE",
+      "title": "maybe_unserialize() on options column from DB",
+      "description": "Both set_options() (class-jj4t3-404-actions.php:252) and open_redirect() (class-jj4t3-log-listing.php:927) call maybe_unserialize() on the 'options' column from the database. The only write path for this column is save_redirect() (class-jj4t3-log-listing.php:965-1006), which serializes an array of four intval()-cast integer values. No user-supplied strings reach the serialized payload. PHP object injection via maybe_unserialize() requires attacker-controlled serialized strings; this condition cannot be met here.",
+      "file": "includes/admin/class-jj4t3-log-listing.php",
+      "line": 927
+    }
+  ],
+  "conclusion": "No confirmed vulnerabilities. All 2 pipeline-flagged taint flows are false positives. Three additional patterns identified during manual review are also false positives. The plugin correctly applies esc_url(), esc_attr(), esc_html(), sanitize_text_field(), and allowlist validation throughout. The admin-facing pages are protected by WordPress capability checks (JJ4T3_ACCESS). The plugin is low-risk."
+}

