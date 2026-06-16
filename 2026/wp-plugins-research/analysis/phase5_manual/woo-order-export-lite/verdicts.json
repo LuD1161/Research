@@ -1,0 +1,108 @@
+{
+  "plugin": "woo-order-export-lite",
+  "reviewed_at": "2026-06-16",
+  "reviewer_notes": "Manual taint-trace of all 5 automated findings plus independent discovery of CSRF and Stored XSS vectors.",
+  "verdicts": [
+    {
+      "flow_id": "woo-order-export-lite-xss-001",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "The taint scanner marks $settings = WC_Order_Export_Manage::use_ready_or_prepare_settings($_POST) as a source and echo json_encode(...) as a sink. However: (1) check_nonce() is called at line 11 before any processing — this calls wp_verify_nonce() with the 'woe_nonce' nonce, and the gate also requires current_user_can('view_woocommerce_reports'). (2) The echo json_encode() at line 31 outputs numeric data ($total = integer result of build_file) and $html (HTML preview content). (3) json_encode() escapes JSON-special characters, so there is no raw HTML injection via the JSON envelope itself. (4) The HTML preview content ($html) could carry unsanitized HTML from order data or from user-controlled settings fields like header_text/footer_text — but this is a separate and more specific vulnerability (see CONFIRMED finding woo-order-export-lite-stored-xss-NEW-001) that the original flow_id did not accurately describe. The original flow as stated (POST -> build_file -> json_encode sink) is not directly exploitable as described.",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woo-order-export-lite-xss-002",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "Same structural false positive as xss-001. The sink is echo json_encode(array('total' => $total)) where $total is the return value of WC_Order_Export_Engine::build_file() in 'estimate' mode — this returns an integer (count of matching orders). An integer wrapped in json_encode produces safe JSON. No user-controlled string is reflected. nonce is verified, auth required.",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woo-order-export-lite-xss-003",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "Sink is echo json_encode(array('total' => $result['total'], 'file_id' => $file_id, 'max_line_items' => $result['max_line_items'], 'max_coupons' => $result['max_coupons'])). The values are: $result['total'] (integer), $file_id = current_time('timestamp') (integer timestamp set by server), $result['max_line_items'] and $result['max_coupons'] (integers). None of these values carry user-controlled strings. Nonce verified, auth required.",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woo-order-export-lite-xss-004",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "Source is $start = isset($_POST['start']) ? intval(sanitize_text_field(wp_unslash($_POST['start']))) : 0. The value is explicitly cast to integer via intval(). The sink is echo json_encode(array('start' => $start + $main_settings['ajax_orders_per_step'])). Adding two integers and json_encoding produces a numeric JSON value — not exploitable for XSS under any browser model. Nonce also verified.",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "woo-order-export-lite-xss-005",
+      "original_severity": "high",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "vuln_class": "xss",
+      "reasoning": "Source is $settings = WC_Order_Export_Manage::make_new_settings($_POST). Sink is echo json_encode($error ? array('error' => $error) : array('id' => $id)). The success path outputs $id which is an integer (return of save_export_settings). The error path outputs $error = $ex->getMessage() where $ex is a PHP Exception thrown internally by save_export_settings — this method does not incorporate user-controlled values into exception messages (it performs DB reads/writes and scheduling). Furthermore, the JS at buttons.js:402 does inject response.error via jQuery.html(), which would be concerning if $error carried user input — but it does not (save_export_settings cannot throw exceptions with attacker-controlled messages). Additionally, nonce is verified via check_nonce() before any processing. False positive.",
+      "auth_required": true,
+      "nonce_verified": true
+    }
+  ],
+  "additional_findings": [
+    {
+      "flow_id": "woo-order-export-lite-stored-xss-NEW-001",
+      "severity": "medium",
+      "confidence": "high",
+      "vuln_class": "stored_xss",
+      "status": "CONFIRMED",
+      "title": "Stored XSS via HTML Export header_text / footer_text in Preview",
+      "description": "When generating an HTML-format export preview (ajax_preview action), the HTML formatter (class-woe-formatter-html.php) writes $this->settings['header_text'] and $this->settings['footer_text'] directly into HTML output without sanitization (lines 69, 86, 151, 176, 196). These settings values originate from $_POST['settings']['header_text'] etc., which flow through make_new_settings() without sanitization. The resulting HTML is captured via ob_get_contents() and returned as response.html in the JSON response. The JavaScript at buttons.js:20 inserts this value via jQuery('#output_preview').html(html) — a direct innerHTML injection. An attacker with sufficient privilege (view_woocommerce_reports + valid nonce) can inject arbitrary HTML/JS via header_text or footer_text in a crafted preview request, causing XSS in the admin's browser.",
+      "affected_file_php": "classes/formats/class-woe-formatter-html.php",
+      "affected_lines_php": [69, 86, 151, 176, 196],
+      "affected_file_js": "assets/js/buttons.js",
+      "affected_line_js": 20,
+      "entry_point": "ajax_preview (AJAX action=order_exporter&method=preview&tab=<any_tab>)",
+      "taint_source": "$_POST['settings']['header_text'] / footer_text",
+      "taint_sink": "jQuery('#output_preview').html(response.html)",
+      "auth_required": true,
+      "capability_required": "view_woocommerce_reports (WooCommerce role, NOT admin-only)",
+      "nonce_required": true,
+      "nonce_obtainable": "Yes — the nonce 'woe_nonce' is embedded in settings_form.woe_nonce in page source for any authenticated user visiting the plugin admin page",
+      "stored_or_reflected": "Reflected (in preview mode, settings are not saved). Can become stored XSS if a malicious export profile is saved with malicious header_text and another admin previews it.",
+      "exploitability": "Medium — requires authentication and nonce, but nonce is accessible to any authenticated user who can visit WooCommerce admin. Escalation path: shop manager injects JS that captures nonces/cookies of viewing admins.",
+      "cvss_v3": "6.8 (CVSS:3.1/AV:N/AC:L/PR:L/UI:R/S:C/C:L/I:L/A:N)",
+      "poc_sketch": "POST /wp-admin/admin-ajax.php with action=order_exporter&method=preview&tab=export&woe_nonce=<valid_nonce>&json={\"settings\":{\"format\":\"HTML\",\"header_text\":\"<img src=x onerror=alert(document.cookie)>\", ... }}"
+    },
+    {
+      "flow_id": "woo-order-export-lite-csrf-NEW-002",
+      "severity": "medium",
+      "confidence": "high",
+      "vuln_class": "csrf",
+      "status": "CONFIRMED",
+      "title": "CSRF on ajax_export_download_bulk_file — Missing Nonce for No-Tab Ajax Route",
+      "description": "In ajax_gate() (class-wc-order-export-admin.php:512), the routing logic has two branches: (a) if $tab is not set or not a valid tab key, the request is routed to WC_Order_Export_Ajax::$method() WITHOUT any nonce check; (b) if $tab is a valid tab, check_admin_referer('woe_nonce', 'woe_nonce') is called. The ajax_export_download_bulk_file method in WC_Order_Export_Ajax has no internal nonce check (contrast with ajax_run_one_job which calls check_ajax_referer). Only the capability check (view_woocommerce_reports or export_woocommerce_orders) remains. This means any page that can trick an authenticated WooCommerce manager/admin into visiting it can forge a cross-site request that triggers a full order export. The plugin is registered as wp_ajax_order_exporter (authenticated only), so unauthenticated attackers cannot exploit this.",
+      "affected_file": "classes/class-wc-order-export-admin.php",
+      "affected_lines": [530, 537],
+      "entry_point": "GET /wp-admin/admin-ajax.php?action=order_exporter&method=export_download_bulk_file&export_bulk_profile=now",
+      "auth_required": true,
+      "capability_required": "view_woocommerce_reports",
+      "nonce_required": false,
+      "impact": "An attacker can trigger order data export for a logged-in WooCommerce admin/manager. If the export destination is configured as browser download, the file goes to the victim's browser (limited impact in CSRF). If export destination is FTP/email (Pro feature), an attacker could potentially redirect exports to attacker-controlled infrastructure by manipulating profile settings first.",
+      "exploitability": "Low-Medium — practical impact is limited in the free plugin (browser download only). Elevated in Pro with remote export destinations.",
+      "cvss_v3": "4.3 (CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:L/I:N/A:N)"
+    }
+  ],
+  "summary": {
+    "total_reviewed": 5,
+    "false_positives": 5,
+    "confirmed": 0,
+    "new_findings": 2,
+    "new_confirmed": 2
+  }
+}

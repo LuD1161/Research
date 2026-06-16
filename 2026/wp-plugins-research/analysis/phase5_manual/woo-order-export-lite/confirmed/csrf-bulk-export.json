@@ -1,0 +1,52 @@
+{
+  "id": "woo-order-export-lite-csrf-NEW-002",
+  "plugin": "woo-order-export-lite",
+  "title": "CSRF on Bulk Order Export — No Nonce for Non-Tab AJAX Route",
+  "severity": "medium",
+  "cvss_v3_score": 4.3,
+  "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:L/I:N/A:N",
+  "vuln_class": "cross_site_request_forgery",
+  "status": "confirmed",
+  "reviewed_at": "2026-06-16",
+
+  "vulnerability_description": "The ajax_gate() method in class-wc-order-export-admin.php routes AJAX requests based on whether a 'tab' parameter matches a registered tab key. For requests WITHOUT a valid tab parameter, the request is forwarded to WC_Order_Export_Ajax without any nonce verification. The ajax_export_download_bulk_file method within WC_Order_Export_Ajax has no nonce check of its own. Only a capability check (view_woocommerce_reports or export_woocommerce_orders) is enforced. An attacker who can trick a logged-in WooCommerce manager/admin into visiting a malicious page can trigger a full order export via cross-site request forgery.",
+
+  "affected_component": {
+    "file": "classes/class-wc-order-export-admin.php",
+    "function": "ajax_gate",
+    "lines": [530, 537],
+    "description": "No nonce check before calling WC_Order_Export_Ajax methods when tab is empty/invalid"
+  },
+
+  "code_evidence": {
+    "vulnerable_path": "if ( ! isset( $this->tabs[ $tab ] ) ) { $ajax_handler = apply_filters(..., new WC_Order_Export_Ajax()); if ( ! method_exists( $ajax_handler, $method ) ) { die(...); } $ajax_handler->$method(); die(); }",
+    "nonce_check_location": "Only on line 546: if (! check_admin_referer('woe_nonce', 'woe_nonce')), which is ONLY reached when $tab IS a valid registered tab — this is the else branch.",
+    "contrast_with_ajax_run_one_job": "ajax_run_one_job (line 17) calls check_ajax_referer('woe_nonce', 'woe_nonce') — correctly protected. ajax_export_download_bulk_file has no such check."
+  },
+
+  "auth_context": {
+    "authentication_required": true,
+    "minimum_capability": "view_woocommerce_reports",
+    "nonce_required": false,
+    "exploitable_via_csrf": true
+  },
+
+  "attack_scenario": {
+    "description": "Attacker creates a page with an img tag or auto-submitting form that sends a GET/POST to /wp-admin/admin-ajax.php?action=order_exporter&method=export_download_bulk_file&export_bulk_profile=now. When a logged-in WooCommerce manager visits the attacker's page, the browser sends the request with the victim's cookies. The server exports all orders matching the 'Export Now' profile.",
+    "impact_browser_download": "The exported file is sent as a file download to the victim's browser — the attacker does not directly receive the file. Impact is indirect (forcing export, potential UI confusion).",
+    "impact_with_pro_destinations": "If the export profile is configured to send to FTP/email/HTTP endpoint (Pro feature), CSRF could trigger exfiltration of order data to an attacker-controlled server — but that requires the profile to be pre-configured with an attacker destination, which requires prior access.",
+    "realistic_impact": "Low in free tier (file goes to victim's browser). Medium concern in enterprise deployments with remote export destinations."
+  },
+
+  "poc": {
+    "method": "GET",
+    "url": "/wp-admin/admin-ajax.php?action=order_exporter&method=export_download_bulk_file&export_bulk_profile=now",
+    "notes": "No nonce parameter needed. The request triggers a full WooCommerce order export when made by an authenticated user with view_woocommerce_reports capability."
+  },
+
+  "remediation": {
+    "recommendation": "Add a nonce check at the top of the no-tab branch in ajax_gate(), OR add an explicit nonce check at the top of WC_Order_Export_Ajax::ajax_export_download_bulk_file(). The check should call check_ajax_referer('woe_nonce', 'woe_nonce') and die on failure.",
+    "fix_location": "classes/class-wc-order-export-admin.php line ~530, before $ajax_handler->$method() is called",
+    "example_fix": "if (!check_ajax_referer('woe_nonce', 'woe_nonce', false)) { wp_send_json_error('Nonce verification failed'); }"
+  }
+}

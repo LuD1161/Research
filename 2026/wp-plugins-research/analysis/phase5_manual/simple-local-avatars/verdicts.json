@@ -1,0 +1,41 @@
+{
+  "plugin": "simple-local-avatars",
+  "version_reviewed": "2.8.6",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "phase5-manual",
+  "summary": {
+    "total_taint_flows_reviewed": 2,
+    "confirmed": 0,
+    "false_positives": 2,
+    "additional_findings": 0
+  },
+  "verdicts": [
+    {
+      "flow_id": "simple-local-avatars-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "reasoning": "The taint engine incorrectly flagged this as a missing sanitizer. At line 1569, the output IS wrapped in esc_attr(): `echo ! empty( $default_avatar_file_id ) ? esc_attr( $default_avatar_file_id ) : '';`. The value from get_option() is an integer attachment ID (saved via FILTER_SANITIZE_NUMBER_INT at line 1596 in save_default_avatar_file_id). esc_attr() is the correct and sufficient escape function for an HTML attribute context. No XSS possible.",
+      "sink_line": 1569,
+      "sink_file": "includes/class-simple-local-avatars.php",
+      "sanitizer_present": "esc_attr()",
+      "auth_context": "The option 'simple_local_avatar_default' is only written by save_default_avatar_file_id() which requires: (1) valid nonce for 'simple_local_avatar_default', (2) current_user_can('manage_options'). Stored value is always an integer attachment ID."
+    },
+    {
+      "flow_id": "simple-local-avatars-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "reasoning": "The taint engine incorrectly flagged this as a missing sanitizer. At line 1570, the output IS wrapped in esc_url(): `echo ! empty( $default_avatar_file_url ) ? esc_url( $default_avatar_file_url ) : '';`. The value flows through wp_get_attachment_image_url() which returns a URL from WordPress's own media system, then esc_url() is correctly applied at the point of output. No XSS possible.",
+      "sink_line": 1570,
+      "sink_file": "includes/class-simple-local-avatars.php",
+      "sanitizer_present": "esc_url()",
+      "auth_context": "wp_get_attachment_image_url() returns an internal WordPress media URL. esc_url() is the correct escape function for URL contexts."
+    }
+  ],
+  "manual_review_notes": {
+    "ajax_assign_simple_local_avatar_media": "CLEAN. Lines 1201-1224. Verifies: (1) user_id and media_id non-empty, (2) current_user_can('upload_files'), (3) current_user_can('edit_user', user_id), (4) nonce 'assign_simple_local_avatar_nonce'. Casts both inputs to int. Validates media is an image via wp_attachment_is_image().",
+    "action_remove_simple_local_avatar": "CLEAN. Lines 1178-1196. Verifies nonce 'remove_simple_local_avatar_nonce' and current_user_can('edit_user', user_id). user_id cast to int.",
+    "edit_user_profile_update": "CLEAN. Lines 1085-1163. Verifies nonce 'simple_local_avatar_nonce'. MIME type validated against image/* prefix and WordPress allowed MIME types. File size checked. Avatar upload uses media_handle_upload() with restricted mimes list (jpg/gif/png only). Rating value validated against known rating keys array. WordPress core already checks capability before firing these hooks.",
+    "set_avatar_rest": "CLEAN. Lines 1353-1379. Uses register_rest_field on 'user' endpoint - WordPress core enforces that only the user themselves or an admin can update the user object. Plugin adds additional check: attachment must exist, be an image, and post_author must match the user's ID. Prevents one user from assigning another user's attachment.",
+    "sla_clear_user_cache": "CLEAN. Lines 1459-1519. check_ajax_referer() + current_user_can('manage_options'). Step parameter cast to int via intval().",
+    "save_default_avatar_file_id": "CLEAN. Lines 1583-1602. Verifies nonce and current_user_can('manage_options'). File ID retrieved via FILTER_SANITIZE_NUMBER_INT.",
+    "file_deletion_in_avatar_delete": "CLEAN. Lines 1232-1277. Before unlinking files, validates the path starts with the uploads baseurl (line 1254), preventing directory traversal. Only deletes resized cache copies (media_id and full keys are excluded from deletion at lines 1240-1241)."
+  }
+}

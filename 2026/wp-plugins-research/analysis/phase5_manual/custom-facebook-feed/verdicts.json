@@ -1,0 +1,115 @@
+{
+  "plugin": "custom-facebook-feed",
+  "reviewed_by": "manual-phase5",
+  "review_date": "2026-06-16",
+  "verdicts": [
+    {
+      "flow_id": "custom-facebook-feed-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The sink is `echo json_encode(CFF_Feed_Saver_Manager::import_feed(...))`. The `import_feed()` function (CFF_Feed_Saver_Manager.php:610) decodes the POST JSON, applies `sanitize_text_field()` to all source fields, and returns a plain PHP array with boolean `success` and integer `feed_id` fields. `json_encode()` on a simple array produces properly escaped JSON — no HTML characters survive unescaped. The consumer (JavaScript) parses the JSON response; there is no direct browser HTML rendering of this echo output. No XSS path exists.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    },
+    {
+      "flow_id": "custom-facebook-feed-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "`process_connecting_source_data()` (CFF_Source.php:85) always returns `CFF_Utils::cff_json_encode(...)` — JSON-encoded data. The `echo $return` at line 72 emits a JSON string. The `$source_data['name']` was already passed through `sanitize_text_field()` at line 67, and critically, `process_connecting_source_data()` overwrites `$source_data['name']` with `$header_details->name` (the Facebook API response at line 120) rather than the POST value. The final return is always JSON-encoded and consumed by JavaScript as structured data, not rendered as HTML. No XSS path exists.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    },
+    {
+      "flow_id": "custom-facebook-feed-xss-003",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "`get_page()` (CFF_Source.php:195) passes `$_POST['page']` into `CFF_Db::source_query()`. Inside `source_query()` (CFF_Db.php:41-43), the `page` argument is immediately cast to `(int)`: `$page = (int)$args['page'] - 1`. This integer cast neutralizes any SQL injection. The integer is then used in `OFFSET $offset` where `$offset = max(0, $page * 20)` — always a non-negative integer. The output via `cff_json_encode($source_data)` is also JSON-encoded data from the database, not raw POST input echoed. Both the SQL injection and XSS concerns are false positives.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    },
+    {
+      "flow_id": "custom-facebook-feed-xss-004",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "`get_featured_post_preview()` (CFF_Source.php:219) echoes `$data = CFF_Source::fetch_featured($id, ...)`. The `$id` is derived from `CFF_Source::extract_id($url_or_post_id, 'album')` — an ID extraction function, not raw POST output. The `$data` is the raw Facebook Graph API JSON response (from `wp_remote_get()`), not user-supplied input echoed back. While this response is not HTML-escaped, it represents Facebook API data, not attacker-controlled content. The `$_POST['url_or_id']` passes through `extract_id()` which extracts a numeric/alphanumeric ID segment; if no valid ID is found, the code returns an error JSON instead (line 249-251). The XSS label is a false positive — the echo output is Facebook API JSON, not POST data reflected.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    },
+    {
+      "flow_id": "custom-facebook-feed-xss-005",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "Same pattern as xss-004. `get_playlist_post_preview()` echoes `$data = CFF_Source::fetch_playlist($id, $access_token)` where `$id` is extracted via `extract_id($_POST['url_or_id'], 'playlist')`. The `$data` is the Facebook Graph API response, not reflected POST input. The access_token comes from the database (keyed by `source_id` after a DB lookup), not from POST. This is not a reflected XSS path.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    },
+    {
+      "flow_id": "custom-facebook-feed-path-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The `cff_export_settings_json()` method in `CFF_Support.php` is registered as `wp_ajax_cff_export_settings_json` (line 58). However, `CFF_Global_Settings.php` registers an identically-named AJAX handler for the same action (line 89), and `CFF_Global_Settings` is instantiated first (Custom_Facebook_Feed.php line 399 vs 402). The `CFF_Global_Settings::cff_export_settings_json()` version always calls `exit` at its end (line 544) unconditionally, so the `CFF_Support.php` version never executes. Even if it did, `$feed_id` is cast with `FILTER_SANITIZE_NUMBER_INT` making it a safe integer, and `$feed_name` comes from the database (not from GET/POST directly). The path traversal concern requires writing a malicious feed_name to the DB first, which requires admin access. Impact is limited to the tmp directory. Not exploitable by external attackers.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null,
+      "notes": "The CFF_Support.php version is unreachable dead code due to the CFF_Global_Settings.php handler registering first and calling exit unconditionally. The safe version uses php://memory and quoted Content-Disposition filename."
+    },
+    {
+      "flow_id": "custom-facebook-feed-path-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "`cff_import_settings_json()` in CFF_Global_Settings.php uses `file_get_contents($_FILES['file']['tmp_name'])` to read an uploaded file. The `tmp_name` is a server-generated temporary path created by PHP's file upload handling — it is NOT user-controlled (PHP generates a random temp path in the upload dir). The user cannot control where this file is written or what path `tmp_name` refers to. This is standard PHP file upload processing. The content is then parsed as JSON by `import_feed()`. Not a path traversal vulnerability.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    },
+    {
+      "flow_id": "custom-facebook-feed-ssrf-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The `cff_locale` option value is injected into the `locale` query parameter of a hardcoded `https://graph.facebook.com/v23.0/...` URL. The attacker cannot control the host or protocol — only the `locale` query parameter value. Per SSRF exclusion rules: 'SSRF vulnerabilities that only control the path [or query parameters] are not a concern. SSRF is only a concern if it can control the host or protocol.' Additionally, even if an admin modified the `cff_locale` option, they could only add extra query params to the Facebook API URL, which Facebook's API would likely reject. The brief also notes `auth_required: false, nonce_verified: false` but examination of the code shows the `cff_locale` is a WordPress option, not directly writable by unauthenticated users via this code path.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    },
+    {
+      "flow_id": "custom-facebook-feed-ssrf-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The license key from `$_POST['license_key']` is added as a query parameter to a hardcoded `self::CHECK_URL` (Smash Balloon's own license server). `wp_safe_remote_get()` is used — WordPress's safe HTTP function that validates the URL against allowed hosts and protocols, preventing arbitrary SSRF. The user only controls the `key` query parameter value, not the host or protocol. Per SSRF exclusion rules, this is not a valid SSRF finding.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    },
+    {
+      "flow_id": "custom-facebook-feed-xss-006",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The `admin/templates/locator-summary.php` template is not included from any PHP file found in the plugin's source tree. Exhaustive search (`grep -rn 'locator.summary'` and `grep -rn 'admin/templates'`) confirms no PHP file includes this template. It appears to be dead code or a template exclusively used by the premium plugin version not present in this codebase. Even if this template were active, the locator-summary data originates from `get_option('cff_style_settings')` (database-stored settings), requires admin privileges to modify, and would only render in the WordPress admin panel. The `$comma_separated` variable at line 74 is unescaped when `strlen <= 31`, but this comes from `feed_type_and_terms_display()` which uses `urldecode($account_info['name'])` from a connected Facebook account name — not directly from a web request parameter. Not an exploitable web XSS.",
+      "exploitable": false,
+      "auth_required": true,
+      "poc": null
+    }
+  ],
+  "summary": {
+    "total_findings": 10,
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 10,
+    "needs_further_review": 0,
+    "overall_assessment": "All 10 flagged taint flows are false positives. The plugin follows WordPress security conventions throughout: nonces are verified, capability checks are in place, and AJAX endpoints require authentication. Key dismissal reasons: (1) XSS-001/002/003 — outputs are JSON-encoded by json_encode() or cff_json_encode(), preventing HTML injection; (2) XSS-003 also has integer cast protection against SQL injection; (3) XSS-004/005 — echo outputs are Facebook Graph API responses, not reflected POST input; (4) PATH-001 — the vulnerable CFF_Support export function is unreachable dead code, pre-empted by the safe CFF_Global_Settings version that calls exit first; (5) PATH-002 — $_FILES['tmp_name'] is server-generated and not attacker-controlled; (6) SSRF-001/002 — only query parameters are user-influenced, not host/protocol (excluded by SSRF rules); (7) XSS-006 — template file is dead code not included from any active PHP file. The plugin (custom-facebook-feed by Smash Balloon) is a well-maintained plugin with consistent security patterns. No exploitable vulnerabilities found."
+  }
+}

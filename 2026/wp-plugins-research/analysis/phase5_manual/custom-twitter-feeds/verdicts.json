@@ -1,0 +1,87 @@
+{
+  "plugin": "custom-twitter-feeds",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "phase5-manual",
+  "summary": {
+    "total_flows_reviewed": 10,
+    "confirmed": 1,
+    "false_positive": 8,
+    "needs_more_info": 1
+  },
+  "verdicts": [
+    {
+      "flow_id": "custom-twitter-feeds-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "reasoning": "$last_id_data is tainted from $_POST, but at step 2 it is reduced to a boolean via 'empty($last_id_data) ? 0 : 1'. The value passed to getItemSetHtml() is always integer 0 or 1, not any user-controlled string. The method uses that value only as an offset/count, not in HTML output. No user-controlled data reaches the sink.",
+      "notes": "Taint tracker incorrectly propagated labels through the boolean reduction. Classic FP from naive taint propagation that ignores value-narrowing operations."
+    },
+    {
+      "flow_id": "custom-twitter-feeds-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "reasoning": "custom_js from ctf_options is output unescaped inside a <script> block intentionally. Setting this value requires current_user_can('unfiltered_html') (CTF_Global_Settings.php line 139). Admins with unfiltered_html can already inject arbitrary JS via post content; this does not grant privilege escalation. WordPress policy treats admin-to-admin JS injection as by-design.",
+      "notes": "This is intentional 'custom JavaScript' functionality gated behind unfiltered_html. Not a reportable vulnerability under standard WP security policy unless the plugin has subscribers or editors who can set this option — which they cannot here."
+    },
+    {
+      "flow_id": "custom-twitter-feeds-xss-003",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "reasoning": "Same as xss-002. custom_css output inside a <style> tag without escaping, but saving this value requires unfiltered_html capability. Admin-only stored CSS injection is considered by-design in WordPress.",
+      "notes": "CSS injection inside <style> is lower severity than JS injection. Still admin-only."
+    },
+    {
+      "flow_id": "custom-twitter-feeds-xss-004",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "reasoning": "importer() is protected by check_ajax_referer('ctf-admin') and current_user_can(manage_options). The output is json_encode() of the import result — the input $_POST['feed_json'] is parsed as JSON and processed by import_feed(). Even if malicious data is stored, retrieval and re-output via json_encode does not create XSS. JSON encoding escapes HTML special characters by default in PHP.",
+      "notes": "json_encode does not produce XSS on its own unless the response is rendered as HTML without Content-Type: application/json. Requires admin privileges."
+    },
+    {
+      "flow_id": "custom-twitter-feeds-xss-005",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "reasoning": "feed_customizer_fly_preview() is protected by check_ajax_referer('ctf-admin') and current_user_can(manage_options). Output is via wp_json_encode() which properly encodes HTML special characters. The response is consumed by admin JavaScript in the feed builder, not rendered as raw HTML.",
+      "notes": "wp_json_encode with JSON_HEX_TAG encoding prevents XSS. Admin-only endpoint."
+    },
+    {
+      "flow_id": "custom-twitter-feeds-xss-006",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "reasoning": "The Twitter API connect endpoint is protected by check_ajax_referer('ctf-admin') and current_user_can(manage_options). The consumer_key, etc. are sanitized with sanitize_text_field(). The response via json_encode() is JSON data consumed by admin JavaScript. Even though the account_avatar URL flows through, json_encode safely encodes it.",
+      "notes": "Admin-only endpoint. json_encode output does not constitute XSS."
+    },
+    {
+      "flow_id": "custom-twitter-feeds-path-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "reasoning": "$_FILES['file']['tmp_name'] is the PHP-generated server-side temp file path assigned by PHP/OS, not a path controlled by the attacker. The attacker controls the file content, not the tmp_name. This is not a path traversal vulnerability. The function has proper nonce and capability checks.",
+      "notes": "Classic FP: taint analysis marks $_FILES['tmp_name'] as user-controlled for the path, but PHP itself controls this value. The actual uploaded content is handled by import_feed() which processes it as JSON."
+    },
+    {
+      "flow_id": "custom-twitter-feeds-path-002",
+      "verdict": "CONFIRMED",
+      "severity": "LOW",
+      "reasoning": "CTF_Support::ctf_export_settings_json() calls check_privilege() without nonce verification (check_privilege called with default $check_nonce=false). The feed_name read from the DB (not from the GET request) is used in fopen('/tmp/' . $filename) and the Content-Disposition header. While an admin must first set a malicious feed_name, the header injection risk exists: if feed_name contains CRLF (\\r\\n), it can inject arbitrary HTTP response headers. The CTF_Global_Settings.php duplicate of this function uses quoted filename and php://memory (safe), but CTF_Support.php line 760 writes to /tmp/ and uses an unquoted Content-Disposition header. Severity is low because: (a) requires admin to set a malicious feed_name first, (b) the endpoint itself requires manage_options, (c) impact is limited to header injection affecting the downloading admin.",
+      "confirmed_file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/custom-twitter-feeds/inc/Admin/CTF_Support.php",
+      "confirmed_lines": [757, 758, 760, 765],
+      "vulnerability_class": "header_injection",
+      "attack_vector": "Authenticated admin sets a feed_name containing CRLF characters. When exporting that feed via wp-admin/admin-ajax.php?action=ctf_export_settings_json&feed_id=X, the Content-Disposition header is injected with attacker-controlled lines.",
+      "notes": "The CTF_Global_Settings.php version of this function is safe (uses quoted filename and php://memory). Only the CTF_Support.php version is affected. Impact is very limited as it requires admin privileges to exploit."
+    },
+    {
+      "flow_id": "custom-twitter-feeds-ssrf-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "reasoning": "CTF_STORE_URL is a PHP constant (hardcoded at plugin level), not derived from user input. The license key from the DB is appended as a query parameter via add_query_arg() to a fixed base URL. The attacker cannot control the target URL. This is not SSRF — the destination is always the hardcoded vendor store URL.",
+      "notes": "The license key value is appended as a query string parameter, not as the URL itself. add_query_arg() properly encodes parameter values. No SSRF possible."
+    },
+    {
+      "flow_id": "custom-twitter-feeds-ssrf-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "reasoning": "CHECK_URL is a class constant ('https://connect.smashballoon.com/activate/check.php'). The license key is appended as a query param via add_query_arg(). The destination is hardcoded. Additionally, the endpoint requires current_user_can('install_plugins') and nonce verification. Not SSRF.",
+      "notes": "Same pattern as ssrf-001. add_query_arg() encodes the parameter value; cannot redirect to attacker-controlled host."
+    }
+  ]
+}

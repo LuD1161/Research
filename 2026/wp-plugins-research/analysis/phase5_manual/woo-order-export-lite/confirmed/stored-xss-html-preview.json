@@ -1,0 +1,84 @@
+{
+  "id": "woo-order-export-lite-stored-xss-NEW-001",
+  "plugin": "woo-order-export-lite",
+  "title": "Stored/Reflected XSS via Unsanitized header_text/footer_text in HTML Export Preview",
+  "severity": "medium",
+  "cvss_v3_score": 6.8,
+  "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:R/S:C/C:L/I:L/A:N",
+  "vuln_class": "cross_site_scripting",
+  "variant": "stored_and_reflected",
+  "status": "confirmed",
+  "reviewed_at": "2026-06-16",
+
+  "vulnerability_description": "The HTML export formatter writes user-controlled settings values (header_text, footer_text) into the generated HTML document without any sanitization. When a user triggers the 'Preview' action in the plugin admin UI, the server generates an HTML document containing these values and returns it in the JSON response field 'html'. The front-end JavaScript injects this directly into the admin page DOM using jQuery.html(), causing any embedded JavaScript to execute in the admin's browser context.",
+
+  "affected_components": [
+    {
+      "file": "classes/formats/class-woe-formatter-html.php",
+      "lines": [69, 86, 151, 176, 196],
+      "description": "header_text and footer_text inserted into HTML output without escaping"
+    },
+    {
+      "file": "assets/js/buttons.js",
+      "line": 20,
+      "description": "response.html injected via jQuery.html() (innerHTML)"
+    },
+    {
+      "file": "classes/admin/tabs/ajax/trait-wc-order-export-admin-tab-abstract-ajax-export.php",
+      "lines": [10, 31],
+      "description": "ajax_preview entry point returning $html from ob_get_contents()"
+    }
+  ],
+
+  "taint_flow": {
+    "source": "$_POST['settings']['header_text'] (or footer_text)",
+    "step1": "make_new_settings($_POST) -> $settings['header_text'] = $_POST['settings']['header_text'] (no sanitization)",
+    "step2": "WC_Order_Export_Engine::build_file($settings, 'estimate_preview', ...) -> instantiates WOE_Formatter_Html with $settings",
+    "step3": "WOE_Formatter_Html::finish() -> fwrite($handle, '<div class=\"header\">' . $this->settings['header_text'] . '</div>')",
+    "step4": "ob_get_contents() captures the HTML including the unsanitized header_text into $html",
+    "step5": "echo json_encode(array('total' => $total, 'html' => $html)) sends it as JSON",
+    "step6": "JavaScript: jQuery('#output_preview').html(response.html) — DOM XSS sink"
+  },
+
+  "auth_context": {
+    "authentication_required": true,
+    "minimum_capability": "view_woocommerce_reports",
+    "capability_notes": "view_woocommerce_reports is granted to WooCommerce Shop Manager role — not administrator-only",
+    "nonce_required": true,
+    "nonce_action": "woe_nonce",
+    "nonce_obtainable": "Yes — embedded in JavaScript on any WooCommerce admin page the user can access (settings_form.woe_nonce)"
+  },
+
+  "attack_scenarios": [
+    {
+      "scenario": "Reflected XSS in current session",
+      "description": "A Shop Manager crafts a preview AJAX request with malicious header_text. The XSS executes in their own browser. Limited impact unless used in a CSRF chain.",
+      "severity": "low"
+    },
+    {
+      "scenario": "Stored XSS across admin accounts",
+      "description": "A Shop Manager saves an export profile (via ajax_save_settings) with malicious header_text in the settings. When any Administrator views the preview of that profile, the stored XSS fires in the Administrator's browser, potentially stealing session cookies or performing privileged actions.",
+      "severity": "medium",
+      "privilege_escalation": true
+    }
+  ],
+
+  "poc": {
+    "method": "POST",
+    "endpoint": "/wp-admin/admin-ajax.php",
+    "parameters": {
+      "action": "order_exporter",
+      "method": "preview",
+      "tab": "export",
+      "woe_nonce": "<valid_woe_nonce_from_page>",
+      "json": "{\"settings\":{\"format\":\"HTML\",\"header_text\":\"<img src=x onerror=alert(document.domain)>\",\"footer_text\":\"\",\"display_column_names\":true, ...other_required_fields... }}"
+    },
+    "notes": "The format must be HTML (not CSV/XLS/etc.) because the JS at buttons.js:13-21 uses jQuery.text() for flat formats and jQuery.html() only for non-flat formats. HTML is the only format that reaches the .html() sink."
+  },
+
+  "remediation": {
+    "recommendation": "Apply wp_kses() or esc_html() to header_text and footer_text before writing them to the HTML output in WOE_Formatter_Html. Alternatively, escape them in make_new_settings() before storing in $settings.",
+    "affected_setting_keys": ["header_text", "footer_text", "custom_css"],
+    "note_on_custom_css": "custom_css is also inserted into a <style> block without sanitization. This allows CSS injection. While CSS injection is less severe than JS XSS, consider sanitizing or restricting this field to admins only."
+  }
+}

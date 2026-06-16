@@ -1,0 +1,57 @@
+{
+  "plugin": "block-bad-queries",
+  "review_date": "2026-06-16",
+  "reviewer": "manual-security-agent",
+  "summary": {
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 2,
+    "total_findings_reviewed": 2,
+    "overall_risk": "low"
+  },
+  "verdicts": [
+    {
+      "flow_id": "block-bad-queries-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "rationale": "The taint analyzer incorrectly flagged get_option('bbq-block-count', 0) as an XSS source. The value is passed directly into number_format(), which accepts a numeric argument and always returns a string consisting only of digits, commas, and decimal/thousands separators — characters that have no HTML significance. Even if an attacker could somehow corrupt the database option to contain a non-numeric string, number_format() would coerce it to 0 and output '0'. No XSS vector exists here.",
+      "file": "bbq-settings.php",
+      "line": 83,
+      "taint_path": "get_option('bbq-block-count', 0) -> number_format() -> echo",
+      "why_not_exploitable": "number_format() always produces a numeric-only string; cannot contain HTML/JS payloads."
+    },
+    {
+      "flow_id": "block-bad-queries-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "rationale": "The taint analyzer flagged $bbq_options from get_option('bbq_options_free', ...) flowing into an echo as XSS. However, the value is passed through esc_html() at line 193 before being stored in $version and echoed at line 195. esc_html() encodes <, >, &, \", and ' as HTML entities, fully preventing XSS. The taint analysis did not account for esc_html() as a sanitizer that clears the XSS taint label.",
+      "file": "bbq-settings.php",
+      "line": 195,
+      "taint_path": "get_option('bbq_options_free') -> $bbq_options[$id] -> esc_html() -> $version -> echo",
+      "why_not_exploitable": "esc_html() is applied at line 193 before the value reaches the echo sink, neutralizing any HTML special characters."
+    }
+  ],
+  "additional_manual_findings": [
+    {
+      "id": "manual-note-001",
+      "area": "bbq_print_js_admin() - JS inline output",
+      "finding": "The function uses _e() (untranslated echo) to output i18n strings into JavaScript variable assignments inside a <script> block without escaping for a JS string context (should use esc_js()). However, translation strings are loaded from server-side .po/.mo files, not from user-supplied input at request time. An attacker cannot inject custom translation strings via HTTP, so this is not exploitable as a web vulnerability. It is a coding best-practice violation only.",
+      "verdict": "NOT_EXPLOITABLE",
+      "cvss": "N/A"
+    },
+    {
+      "id": "manual-note-002",
+      "area": "bbq_callback_test() - unescaped URL output",
+      "finding": "At line 205, $href (the result of add_query_arg()) is echoed into an href attribute without esc_url(). However, both arguments to add_query_arg() are hardcoded string literals ('bbq-test' and 'eval('), and get_home_url() returns the site's own URL. There is no user-controlled input in the URL construction, so this is not exploitable.",
+      "verdict": "NOT_EXPLOITABLE",
+      "cvss": "N/A"
+    },
+    {
+      "id": "manual-note-003",
+      "area": "bbq_core() - firewall bypass via apply_filters",
+      "finding": "The firewall pattern arrays ($request_uri_array, $query_string_array, etc.) are all exposed via apply_filters() hooks, allowing other plugins or themes to modify the ruleset. A malicious or compromised plugin/theme could clear all patterns and disable the firewall. This is by design (extensibility) and is only a risk if another installed plugin is malicious. It is not a remotely exploitable vulnerability.",
+      "verdict": "BY_DESIGN",
+      "cvss": "N/A"
+    }
+  ],
+  "conclusion": "The block-bad-queries plugin (BBQ Firewall) has no confirmed exploitable vulnerabilities. Both taint flows flagged by the automated scanner are false positives: flow-001 is neutralized by number_format() making HTML injection impossible, and flow-002 is neutralized by an esc_html() call that the scanner failed to credit as a sanitizer. The firewall logic itself reads server superglobals ($_SERVER, $_POST) but only to match against patterns and then exit — no user input is ever reflected back to a browser. The settings page output is consistently escaped. Overall security posture for this plugin is strong."
+}

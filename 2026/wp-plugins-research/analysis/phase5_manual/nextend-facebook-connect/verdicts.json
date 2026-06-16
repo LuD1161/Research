@@ -1,0 +1,63 @@
+{
+  "plugin": "nextend-facebook-connect",
+  "reviewed_at": "2026-06-16",
+  "reviewer": "phase5-manual",
+  "summary": {
+    "total_flagged": 4,
+    "confirmed": 0,
+    "false_positives": 4
+  },
+  "verdicts": [
+    {
+      "flow_id": "nextend-facebook-connect-ssrf-001",
+      "verdict": "false_positive",
+      "severity_original": "high",
+      "vulnerability_class": "ssrf",
+      "rationale": "The taint analysis misidentified the sink. The wp_remote_post() URL argument is $this->endpointAccessToken which is a hardcoded class property set to the provider's token endpoint (e.g. https://graph.facebook.com/oauth/access_token) — it is never user-controlled. The $_GET['code'] value flows only into the POST body 'code' parameter, which is an OAuth authorization code sent back to the legitimate provider. This is normal, expected OAuth 2.0 behavior. There is no URL injection, and no SSRF vector exists. Additionally, a CSRF state token is validated via validateState() before this code is reached.",
+      "exploitable": false,
+      "auth_required": null,
+      "affected_file": "includes/oauth2.php",
+      "affected_line": 138,
+      "taint_chain_accurate": false
+    },
+    {
+      "flow_id": "nextend-facebook-connect-xss-001",
+      "verdict": "false_positive",
+      "severity_original": "high",
+      "vulnerability_class": "xss",
+      "rationale": "The echo of str_replace('www.', '', $_SERVER['HTTP_HOST']) without esc_html() is a real missing sanitizer, but the page is only reachable by users with the manage_options capability. The page is registered via add_options_page() in admin_menu(), and WordPress enforces the capability check before the callback fires. An administrator who can control the HTTP_HOST header already has full site control. There is no privilege-escalation or lateral-movement scenario here: attacking other admins via HTTP_HOST poisoning in their own browser is impractical (requires MITM or DNS poisoning). Classified as informational — missing esc_html() is a coding standard issue but not an exploitable vulnerability in context.",
+      "exploitable": false,
+      "auth_required": "manage_options (administrator)",
+      "affected_file": "providers/google/admin/getting-started.php",
+      "affected_line": 26,
+      "taint_chain_accurate": true,
+      "notes": "Would be a low-severity Reflected XSS if the page were accessible to lower-privilege roles, but the capability gate makes it a FP for practical exploitation."
+    },
+    {
+      "flow_id": "nextend-facebook-connect-xss-002",
+      "verdict": "false_positive",
+      "severity_original": "high",
+      "vulnerability_class": "xss",
+      "rationale": "Same root cause as xss-001: echo of $_SERVER['HTTP_HOST'] without escaping in an admin page gated behind manage_options via add_options_page(). Identical reasoning applies. Not exploitable in practice.",
+      "exploitable": false,
+      "auth_required": "manage_options (administrator)",
+      "affected_file": "providers/facebook/admin/getting-started.php",
+      "affected_line": 34,
+      "taint_chain_accurate": true,
+      "notes": "Duplicate of xss-001 pattern for the Facebook provider getting-started template."
+    },
+    {
+      "flow_id": "nextend-facebook-connect-lfi-001",
+      "verdict": "false_positive",
+      "severity_original": "critical",
+      "vulnerability_class": "local_file_inclusion",
+      "rationale": "The taint analysis tracked $_GET['subview'] to an include() sink but ignored the whitelist guard on line 20. The code does: $subview = (!empty($_GET['subview']) && in_array($_GET['subview'], $allowedSubviews)) ? $_GET['subview'] : 'general'. The $allowedSubviews array contains exactly 11 fixed string literals. in_array() with a strict string comparison means $subview can only ever be one of those 11 known-safe values before it reaches include(). Path traversal sequences like '../' are not in the whitelist and will fall through to the default 'general'. No LFI is possible.",
+      "exploitable": false,
+      "auth_required": "manage_options (administrator)",
+      "affected_file": "admin/templates/global-settings.php",
+      "affected_line": 65,
+      "taint_chain_accurate": false,
+      "notes": "The whitelist check on line 20 is effective. The taint engine did not model the conditional assignment properly and treated $subview as still tainted after the in_array guard."
+    }
+  ]
+}

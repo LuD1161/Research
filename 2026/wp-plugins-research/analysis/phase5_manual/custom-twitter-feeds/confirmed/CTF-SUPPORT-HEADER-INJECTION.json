@@ -1,0 +1,56 @@
+{
+  "id": "custom-twitter-feeds-header-injection-001",
+  "plugin": "custom-twitter-feeds",
+  "title": "Authenticated Admin Header Injection via Unsanitized Feed Name in Content-Disposition",
+  "severity": "LOW",
+  "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:N/I:L/A:N",
+  "cvss_score": 2.7,
+  "vulnerability_class": "HTTP Header Injection",
+  "auth_required": true,
+  "required_capability": "manage_options (Administrator)",
+  "nonce_required": false,
+  "affected_file": "inc/Admin/CTF_Support.php",
+  "affected_lines": [757, 758, 760, 765],
+  "affected_function": "CTF_Support::ctf_export_settings_json()",
+  "ajax_action": "ctf_export_settings_json",
+
+  "description": "The ctf_export_settings_json() method in CTF_Support.php retrieves a feed_name from the database and uses it unsanitized in both an fopen() call to /tmp/ and in a Content-Disposition HTTP response header. If a feed name contains CRLF characters (\\r\\n), additional HTTP headers can be injected into the download response.",
+
+  "vulnerable_code": [
+    "// CTF_Support.php lines 757-765:",
+    "$feed_name = strtolower( $feed_info[0]['feed_name'] );",
+    "$filename = 'ctf-feed-' . $feed_name . '.json';",
+    "$file = fopen( '/tmp/' . $filename, 'w' );",
+    "// ...",
+    "header( \"Content-disposition: attachment; filename = \" . $filename );",
+    "// Note: NO quotes around $filename in Content-Disposition"
+  ],
+
+  "safe_counterpart": {
+    "file": "inc/Admin/CTF_Global_Settings.php",
+    "lines": [456, 463],
+    "note": "CTF_Global_Settings.php version of this same function uses php://memory (no filesystem write) and wraps filename in double-quotes in Content-Disposition header, making it safe."
+  },
+
+  "attack_scenario": [
+    "1. Admin navigates to feed builder and sets a feed name containing CRLF: e.g., 'myfeed\\r\\nX-Injected: evil'",
+    "2. Admin (or attacker with admin credentials) requests: /wp-admin/admin-ajax.php?action=ctf_export_settings_json&feed_id=<id>",
+    "3. The response includes the injected header: 'X-Injected: evil'",
+    "4. In older PHP/web server combinations, CRLF header injection can lead to response splitting"
+  ],
+
+  "limitations": [
+    "Requires administrator-level access to set the malicious feed name in the first place",
+    "Modern PHP (7.3+) blocks header injection with CRLF via header() — throws a warning and ignores the extra line",
+    "Impact is limited to the downloading administrator's browser session",
+    "The CTF_Global_Settings.php duplicate of this function is safe",
+    "No privilege escalation possible"
+  ],
+
+  "remediation": "Sanitize feed_name before using it in headers and filesystem paths. Use sanitize_file_name() or basename() on the filename. Wrap the filename in double quotes in the Content-Disposition header, consistent with the CTF_Global_Settings.php implementation. Use php://memory instead of /tmp/ to avoid filesystem writes.",
+
+  "references": [
+    "https://owasp.org/www-community/attacks/HTTP_Response_Splitting",
+    "CWE-113: Improper Neutralization of CRLF Sequences in HTTP Headers"
+  ]
+}

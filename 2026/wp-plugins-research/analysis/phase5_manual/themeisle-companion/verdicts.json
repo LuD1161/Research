@@ -1,0 +1,77 @@
+{
+  "plugin_slug": "themeisle-companion",
+  "analysis_date": "2026-06-16",
+  "analyst": "claude-sonnet-4-6",
+  "total_flows_reviewed": 6,
+  "confirmed_vulnerabilities": 1,
+  "false_positives": 5,
+  "summary": "Five of six flagged flows are false positives. Flow xss-001 (social-sharing render_view) is a FP because the view template fully escapes all output with esc_attr/esc_url/esc_html. Flows xss-003/004/005/006 (header-footer-scripts frontend echo) are intentional behavior: this feature is explicitly designed to inject arbitrary scripts into page head/footer, and write access requires unfiltered_html capability or edit_theme_options. Flow xss-002 is confirmed: the render_control() metabox at line 299 echoes stored post meta unescaped inside a <textarea> tag in the admin edit screen without escaping; content like </textarea><script> breaks out and executes. While only unfiltered_html users can write this meta, the metabox is rendered for any post editor, creating a multisite super-admin-to-site-admin stored XSS vector. In a single-site context this is admin-to-admin (won't-fix per WP policy); in multisite it is a legitimate privilege boundary crossing.",
+  "verdicts": [
+    {
+      "flow_id": "themeisle-companion-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "obfx_modules/social-sharing/init.php",
+      "source_line": 213,
+      "sink_file": "obfx_modules/social-sharing/init.php",
+      "sink_line": 227,
+      "reasoning": "The scanner flagged echo of render_view() return value without escaping. However, the view template (views/social-sharing-tpl.php) properly escapes all output: esc_attr() for CSS classes and icon names, esc_url() for href links, esc_html() for network names. The data array ($data) contains plugin options and computed CSS class strings. No user-controlled unsanitized data reaches HTML output."
+    },
+    {
+      "flow_id": "themeisle-companion-xss-002",
+      "verdict": "CONFIRMED",
+      "severity": "low",
+      "vulnerability_class": "stored-xss",
+      "source_file": "obfx_modules/header-footer-scripts/init.php",
+      "source_line": 293,
+      "sink_file": "obfx_modules/header-footer-scripts/init.php",
+      "sink_line": 299,
+      "reasoning": "The render_control() method retrieves post meta via get_post_meta() and echoes it unescaped inside a <textarea> tag in the admin Scripts metabox (line 299, phpcs:ignore comment confirms the intentional bypass). A value like </textarea><script>alert(1)</script> would break out of the textarea and execute. Write access to this meta requires unfiltered_html capability (enforced in save_meta() at line 320 and check_post_metadata() at line 148). In single-site WordPress all admins have unfiltered_html, so this is admin-to-admin (WP won't-fix). In multisite, only super admins have unfiltered_html while site admins do not, making this a super-admin-to-site-admin XSS vector. The metabox is rendered for any user who can edit posts/pages (add_meta_box with no capability restriction at line 243). The is_meta_protected filter only affects REST/custom-fields UI, not direct get_post_meta() calls. Classified as low severity due to requiring unfiltered_html to plant."
+    },
+    {
+      "flow_id": "themeisle-companion-xss-003",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "obfx_modules/header-footer-scripts/init.php",
+      "source_line": 379,
+      "sink_file": "obfx_modules/header-footer-scripts/init.php",
+      "sink_line": 379,
+      "reasoning": "The unescaped echo of obfx-header-scripts post meta on the frontend is intentional feature behavior. The Header Footer Scripts module is explicitly designed to inject arbitrary HTML/JS into page head/footer. Write access requires unfiltered_html capability (enforced in save_meta() at line 320 and check_post_metadata() filter). Users who can write this meta are trusted to inject scripts. This is the declared purpose of the feature, not a vulnerability."
+    },
+    {
+      "flow_id": "themeisle-companion-xss-004",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "obfx_modules/header-footer-scripts/init.php",
+      "source_line": 383,
+      "sink_file": "obfx_modules/header-footer-scripts/init.php",
+      "sink_line": 385,
+      "reasoning": "Same as xss-003. get_option('woocommerce_shop_page_id') returns a post ID (integer), used as a key for get_post_meta(). The shop page post meta is subject to the same unfiltered_html write gate. The shop_id integer itself cannot be used for XSS. The subsequent echo of post meta is intentional script-injection behavior. False positive."
+    },
+    {
+      "flow_id": "themeisle-companion-xss-005",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "obfx_modules/header-footer-scripts/init.php",
+      "source_line": 412,
+      "sink_file": "obfx_modules/header-footer-scripts/init.php",
+      "sink_line": 412,
+      "reasoning": "The unescaped echo of obfx-footer-scripts post meta on the frontend is intentional feature behavior, same as xss-003. The Footer Scripts feature is designed to inject arbitrary HTML/JS before </body>. Write access is gated to unfiltered_html capability. Not a vulnerability."
+    },
+    {
+      "flow_id": "themeisle-companion-xss-006",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "obfx_modules/header-footer-scripts/init.php",
+      "source_line": 416,
+      "sink_file": "obfx_modules/header-footer-scripts/init.php",
+      "sink_line": 419,
+      "reasoning": "Same as xss-004/005. The WooCommerce shop page footer scripts echo is intentional feature behavior. The shop_id from get_option() is an integer used as a post ID lookup key. The meta value echo is gated to unfiltered_html write access. Not a vulnerability."
+    }
+  ]
+}

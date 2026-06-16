@@ -1,0 +1,102 @@
+{
+  "plugin": "simple-cloudflare-turnstile",
+  "reviewed_at": "2026-06-16",
+  "reviewer_notes": "All six taint flows from the brief were manually traced against source. Zero exploitable vulnerabilities confirmed.",
+  "verdicts": [
+    {
+      "flow_id": "simple-cloudflare-turnstile-ssrf-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_actual": "none",
+      "confidence": "high",
+      "vuln_class_claimed": "ssrf",
+      "vuln_class_actual": "none",
+      "reasoning": "The tainted value ($recaptcha_secret from get_option) flows into the POST *body* array as the 'secret' field, not into the URL argument. The URL is hardcoded as 'https://www.google.com/recaptcha/api/siteverify'. wp_remote_post() with a fixed URL and user-controlled body fields is not SSRF — the attacker cannot redirect the request to an arbitrary server. The taint tracker incorrectly flagged wp_remote_post as a URL sink when the tainted variable only touches the body parameter. No vulnerability exists.",
+      "file": "inc/failsafe.php",
+      "line": 86,
+      "auth_required": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "simple-cloudflare-turnstile-ssrf-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity_actual": "none",
+      "confidence": "high",
+      "vuln_class_claimed": "ssrf",
+      "vuln_class_actual": "none",
+      "reasoning": "Identical issue as SSRF-001. The tainted $postdata (sanitized POST field 'cf-turnstile-response') flows into the body array as the 'response' field. The URL is hardcoded to 'https://challenges.cloudflare.com/turnstile/v0/siteverify'. Attacker controls only a POST body field value, not the destination URL. Not SSRF. The data is also sanitized via sanitize_text_field() before propagation, though this does not matter given the architectural non-issue.",
+      "file": "inc/turnstile.php",
+      "line": 232,
+      "auth_required": false,
+      "exploitable": false
+    },
+    {
+      "flow_id": "simple-cloudflare-turnstile-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_actual": "none",
+      "confidence": "high",
+      "vuln_class_claimed": "xss",
+      "vuln_class_actual": "none",
+      "reasoning": "The unescaped echo implode(', ', $ProductsNeedingCaptcha) at line 1846 of admin-options.php appears inside the cfturnstile_settings_page() function, which is registered as a WordPress admin submenu page with 'manage_options' capability. WordPress enforces this capability check before rendering the page. The option 'cfturnstile_mepr_product_ids' is saved via the standard WordPress Settings API (register_setting + settings_fields nonce), which also requires manage_options. Therefore only site administrators can write to or read this value. An admin writing XSS into their own admin page gains nothing they do not already have. This is the well-known 'Admin can do XSS' non-issue that WordPress's own security policy explicitly excludes from the scope of vulnerabilities.",
+      "file": "inc/admin/admin-options.php",
+      "line": 1846,
+      "auth_required": true,
+      "capability_required": "manage_options",
+      "exploitable": false
+    },
+    {
+      "flow_id": "simple-cloudflare-turnstile-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity_actual": "none",
+      "confidence": "high",
+      "vuln_class_claimed": "xss",
+      "vuln_class_actual": "none",
+      "reasoning": "The taint analysis chain is broken/wrong. The 'source' is $log['date'] (a date formatted string). The 'sink' the scanner reported is the echo of $log['success'] — a boolean — formatted as a hardcoded span tag ('Yes'/'No'). The actual date value on the same row IS properly escaped with esc_html($log['date']) at line 2143. All other columns are also escaped: esc_html($error_val), esc_html($log['ip']), esc_html($log['page']). No unescaped output exists. Additionally, the log display is on the admin settings page (manage_options required) and logs are written server-side from sanitized/internal values. No exploitable XSS path exists.",
+      "file": "inc/admin/admin-options.php",
+      "line": 2144,
+      "auth_required": true,
+      "capability_required": "manage_options",
+      "exploitable": false
+    },
+    {
+      "flow_id": "simple-cloudflare-turnstile-xss-003",
+      "verdict": "FALSE_POSITIVE",
+      "severity_actual": "none",
+      "confidence": "high",
+      "vuln_class_claimed": "xss",
+      "vuln_class_actual": "none",
+      "reasoning": "The export handler at export-import.php:52 sends JSON via 'echo $json' but: (1) it is gated by current_user_can('manage_options') + check_admin_referer('cfturnstile_export_settings'), (2) the Content-Type header is 'application/json; charset=...' and (3) the Content-Disposition header is 'attachment; filename=...' forcing a file download rather than browser rendering. JSON served as a download with application/json content-type is not an XSS vector. The browser will never parse it as HTML.",
+      "file": "inc/admin/export-import.php",
+      "line": 52,
+      "auth_required": true,
+      "capability_required": "manage_options",
+      "nonce_verified": true,
+      "exploitable": false
+    },
+    {
+      "flow_id": "simple-cloudflare-turnstile-path-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_actual": "none",
+      "confidence": "high",
+      "vuln_class_claimed": "path_traversal",
+      "vuln_class_actual": "none",
+      "reasoning": "The sink is file_get_contents($file['tmp_name']). PHP's $_FILES['...']['tmp_name'] is the server-chosen temporary file path assigned by PHP's file upload mechanism — it is not a user-controlled string. PHP's upload handler writes the uploaded file to a secure temp directory and places the real OS path in tmp_name. An attacker cannot set tmp_name to an arbitrary path like '/etc/passwd'. The handler is also protected by manage_options + check_admin_referer('cfturnstile_import_settings'), making it admin-only. Furthermore the code immediately validates the file content as JSON and only writes to known WordPress option keys in an allowlist. Not a path traversal vulnerability.",
+      "file": "inc/admin/export-import.php",
+      "line": 87,
+      "auth_required": true,
+      "capability_required": "manage_options",
+      "nonce_verified": true,
+      "exploitable": false
+    }
+  ],
+  "summary": {
+    "total_flows_reviewed": 6,
+    "confirmed": 0,
+    "false_positives": 6,
+    "notable_fp_patterns": [
+      "SSRF mislabeled: tainted data in POST body not URL — scanner conflated body and URL parameters for wp_remote_post",
+      "XSS-001/003: admin-only context dismissed per WordPress security policy (admin-can-do-XSS non-issue)",
+      "XSS-002: scanner's chain source/sink mismatch — actual output at sink line uses esc_html()",
+      "path-001: $_FILES['tmp_name'] is PHP-controlled, not user-controlled path"
+    ]
+  }
+}

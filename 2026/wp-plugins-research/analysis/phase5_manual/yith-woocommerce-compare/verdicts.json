@@ -1,0 +1,76 @@
+{
+  "plugin": "yith-woocommerce-compare",
+  "reviewed_at": "2026-06-16",
+  "reviewer_notes": "All 7 taint flows from automated analysis reviewed. Zero confirmed vulnerabilities. Every finding is a false positive due to incorrect taint-label propagation, missed allowlist checks, context-appropriate sanitizers, or admin-only access gates.",
+  "summary": {
+    "total_flows_reviewed": 7,
+    "confirmed": 0,
+    "false_positives": 7,
+    "needs_more_analysis": 0
+  },
+  "verdicts": [
+    {
+      "flow_id": "yith-woocommerce-compare-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_if_real": "high",
+      "confidence": "high",
+      "reasoning": "The sink is 'echo wc_esc_json(wp_json_encode($data))' inside an HTML data-item attribute. wc_esc_json() is WooCommerce's dedicated function for safely embedding JSON in HTML attributes — it calls _wp_specialchars() which HTML-encodes angle brackets, quotes, and ampersands. The output is correctly escaped for the data-attribute context. Additionally, the values in $data include $item->post_title (post title, which WordPress already sanitizes on save) and $layout (post meta, arbitrary string). Even if $layout contained '<script>', wc_esc_json would encode the < and > making it inert in the attribute context. No XSS possible.",
+      "file": "includes/admin/class-yith-woocompare-admin-shortcodes-table.php",
+      "line": 212
+    },
+    {
+      "flow_id": "yith-woocommerce-compare-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity_if_real": "medium",
+      "confidence": "high",
+      "reasoning": "This AJAX handler (do_shortcode) is gated by: (1) check_ajax_referer('gutenberg-ajax-action', 'security') — valid nonce required; (2) a $has_access check requiring either current_user_can('edit_theme_options') or current_user_can('edit_post', $post_id) — editor-level or above. The shortcode input is also sanitize_text_field'd before being passed to do_shortcode(). Allowing authenticated editors to run shortcodes is WordPress by-design behavior, not a vulnerability. Even without sanitize_text_field, running shortcodes as an editor is an expected privilege.",
+      "file": "plugin-fw/includes/builders/gutenberg/class-yith-gutenberg.php",
+      "line": 300
+    },
+    {
+      "flow_id": "yith-woocommerce-compare-xss-003",
+      "verdict": "FALSE_POSITIVE",
+      "severity_if_real": "medium",
+      "confidence": "high",
+      "reasoning": "handle_iframe_preview() is protected by: (1) check_admin_referer('yith-plugin-fw-block-preview', 'yith-plugin-fw-block-preview-nonce') — admin nonce required (CSRF proof); (2) current_user_can('edit_posts') — editor-level minimum. The $block value from GET is sanitize_text_field'd and then used as 'yith/{$block}' in render_block(). WordPress's render_block() looks up the block name in its registered block registry. An unregistered block name simply renders nothing — it does not allow arbitrary PHP/HTML injection. The block registry acts as an additional allowlist.",
+      "file": "plugin-fw/includes/builders/gutenberg/class-yith-gutenberg.php",
+      "line": 390
+    },
+    {
+      "flow_id": "yith-woocommerce-compare-xss-004",
+      "verdict": "FALSE_POSITIVE",
+      "severity_if_real": "high",
+      "confidence": "high",
+      "reasoning": "The taint analyzer incorrectly traced $value (from get_option) through to $element['desc']. However, $element['desc'] is sourced from the $elements array within $field — this is a static plugin-defined field configuration array, not derived from the option value $value. The option value is only used to set $element['value'] (line 71/73). The $element['desc'] echoed at line 80 is from the plugin's own field definition and is trusted developer data. This is a taint label propagation error by the automated scanner.",
+      "file": "plugin-fw/templates/fields/toggle-element-fixed.php",
+      "line": 80
+    },
+    {
+      "flow_id": "yith-woocommerce-compare-xss-005",
+      "verdict": "FALSE_POSITIVE",
+      "severity_if_real": "high",
+      "confidence": "high",
+      "reasoning": "At line 16, $current_tab is constrained to valid keys in $tabs via array_key_exists(): '$current_tab = array_key_exists($current_tab, $tabs) ? $current_tab : array_key_first($tabs)'. The $tabs array is hardcoded by the plugin (keys: 'main', 'php-info', 'db-info', 'error-log'). At the sink (line 32), the output is the ternary expression '$current_tab === $tab_key ? \"yith-plugin-fw--active\" : \"\"' — which outputs only the static string 'yith-plugin-fw--active' or empty string, NEVER the user-controlled value. No XSS possible.",
+      "file": "plugin-fw/templates/sysinfo/system-information-panel.php",
+      "line": 32
+    },
+    {
+      "flow_id": "yith-woocommerce-compare-lfi-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_if_real": "critical",
+      "confidence": "high",
+      "reasoning": "The automated scanner flagged this as critical LFI. However, line 16 applies an array_key_exists() allowlist check that constrains $current_tab to exactly the four hardcoded keys in $tabs: 'main', 'php-info', 'db-info', 'error-log'. The resulting $template_path is then: $base_path . '/templates/sysinfo/tabs/<one-of-four-valid-keys>.php'. An attacker cannot inject path traversal sequences (sanitize_key() strips them) and cannot choose a key outside the $tabs allowlist. The four tab files all exist in the tabs/ directory. There is no LFI possible. Additionally, this page is admin-only (capability 'manage_options' required via add_submenu_page on line 165 in class-yith-system-status.php).",
+      "file": "plugin-fw/templates/sysinfo/system-information-panel.php",
+      "line": 101
+    },
+    {
+      "flow_id": "yith-woocommerce-compare-xss-006",
+      "verdict": "FALSE_POSITIVE",
+      "severity_if_real": "high",
+      "confidence": "high",
+      "reasoning": "The attributes.php template (which contains 'defined(YITH_WOOCOMPARE) || exit') is an admin-only settings page. The sink is 'echo implode(\",\", array_keys($checkboxes))' where array_keys come from the merged $checkboxes which is derived from $supported_fields (plugin-defined field slugs like 'title', 'image', etc.) merged with $option_value. In practice, the only keys present in $checkboxes are those intersecting $supported_fields (loop at lines 22-26 only sets keys from $supported_fields). Any attacker-controlled keys in $option_value would be skipped by the 'if (!isset($supported_fields[$slug])) continue' check at line 49. Even without that, writing to wp_options requires administrator privilege, making this an admin-to-admin scenario which is outside the WordPress security model.",
+      "file": "templates/admin/fields/attributes.php",
+      "line": 87
+    }
+  ]
+}

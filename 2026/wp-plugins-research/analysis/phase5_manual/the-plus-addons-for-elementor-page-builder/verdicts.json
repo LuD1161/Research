@@ -1,0 +1,122 @@
+{
+  "plugin": "the-plus-addons-for-elementor-page-builder",
+  "reviewed_at": "2026-06-16",
+  "reviewer_notes": "All 13 taint flows traced manually. esc_url() is the correct escaping function for href/src URL contexts and does strip javascript: protocol — flows xss-001 through xss-009 are admin-only meta-box renders with proper escaping. Flow xss-012 has a dead code bug that makes the get_post_meta path unreachable. The SSRF (ssrf-001) gets its URL from WordPress.org's themes API, not directly from user input. tpae_api_call has a robust SSRF guard (tpae_is_safe_outbound_url). Net result: 0 confirmed exploitable vulnerabilities.",
+  "total_flows_reviewed": 13,
+  "confirmed_count": 0,
+  "false_positive_count": 13,
+  "verdicts": [
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-ssrf-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "The URL reaching wp_remote_get() ($theme_zip_url) comes from themes_api()->download_link, which is a response field returned by the wordpress.org Themes API — not directly from user-supplied POST data. The attacker controls the theme slug (POST['name'], sanitized via sanitize_text_field), but the download_link in the response is sourced from wordpress.org's trusted server, not reflected from the slug. Additionally: (1) the outer AJAX handler already requires manage_options (line 85); (2) tpae_theme_install() adds a second gate requiring install_themes capability (line 737). No SSRF primitive exists because the fetched URL is from a trusted third party.",
+      "secondary_observation": "sanitize_text_field() does NOT strip forward slashes or dots, so a slug like '../../evil' would survive into $theme_slug used at line 794 (WP_CONTENT_DIR.'/themes/'.$theme_slug.'.zip'). However: (a) themes_api() would return a WP_Error for a non-existent slug, hitting the error branch at line 773 before the filesystem write; (b) even if it did not, exploitation requires install_themes admin privilege. Not a reportable path traversal.",
+      "auth_required": true,
+      "min_role": "administrator"
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "Sink is 'echo esc_url($custom_url)' inside the value attribute of <input type='url'>. esc_url() is the correct and sufficient sanitizer for URL values in HTML attributes — it strips invalid characters, encodes dangerous sequences, and removes the javascript: protocol. The scanner flagged this because esc_html() was not also applied, but esc_url() alone is appropriate here. Furthermore this is an admin meta-box (render_team_member_meta_box), accessible only to users with edit_post capability.",
+      "auth_required": true,
+      "min_role": "editor"
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "Same pattern as xss-001. 'echo esc_url($website_url)' in value attribute of admin meta-box input. esc_url() is the correct sanitizer for URL contexts. Admin-only meta-box.",
+      "auth_required": true,
+      "min_role": "editor"
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-003",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "Same pattern. 'echo esc_url($facebook_link)' in value attribute. esc_url() is correct for URL context. Admin meta-box.",
+      "auth_required": true,
+      "min_role": "editor"
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-004",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "Same pattern. 'echo esc_url($google_link)'. esc_url() correct. Admin meta-box.",
+      "auth_required": true,
+      "min_role": "editor"
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-005",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "Same pattern. 'echo esc_url($instagram_link)'. esc_url() correct. Admin meta-box.",
+      "auth_required": true,
+      "min_role": "editor"
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-006",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "Same pattern. 'echo esc_url($twitter_link)'. esc_url() correct. Admin meta-box.",
+      "auth_required": true,
+      "min_role": "editor"
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-007",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "Same pattern. 'echo esc_url($linkedin_link)'. esc_url() correct. Admin meta-box.",
+      "auth_required": true,
+      "min_role": "editor"
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-008",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "Sink is 'echo esc_url($client_url)' in an <input type='url' value='...'> (clients_options.php line 131). esc_url() is the correct escaping function here. The scanner incorrectly flags esc_url() as an insufficient sanitizer; it is sufficient for URL attribute contexts. The fallback path at line 100-104 reads from meta key '_theplus_clients_url' and calls update_post_meta to sync it, after which it is echoed with esc_url(). This is an admin meta-box with nonce verification (line 95).",
+      "auth_required": true,
+      "min_role": "editor"
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-009",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "Sink is 'echo esc_url($logo)' in value of <input type='text'> for logo URL in testimonial admin meta-box (testimonial_option.php line 155). esc_url() is appropriate. Admin-only meta-box with nonce (line 95).",
+      "auth_required": true,
+      "min_role": "editor"
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-010",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "post-meta-title.php line 27: <a href='<?php echo esc_url($client_url); ?>'>. esc_url() is the correct and sufficient escaping function for href attributes — it validates the URL scheme, encodes entities, and blocks javascript: protocol injection. The scanner's 'missing_sanitizer' claim (esc_html/esc_attr) is wrong: esc_attr would also work but esc_url is more appropriate and equally safe for href values. No XSS is possible through esc_url() output in an href.",
+      "auth_required": false,
+      "min_role": "none",
+      "note": "While this is a front-end template (no auth required to render), the stored value itself can only be written by editors/admins via the meta box (save_clients_meta_data checks capability and nonce), and it is properly escaped on output."
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-011",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "client-style-1.php line 29: same as xss-010. <a href='<?php echo esc_url($client_url); ?>'>. esc_url() is correct for href context. The data saved via save_clients_meta_data uses esc_url_raw() (clients_options.php line 154), which is appropriate at save time. Double protection: sanitized on save and escaped on output with esc_url().",
+      "auth_required": false,
+      "min_role": "none"
+    },
+    {
+      "flow_id": "the-plus-addons-for-elementor-page-builder-xss-012",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reason": "post-meta-logo.php has a dead code bug: the condition on line 12 ('elseif (tlrepeater === $con_from)') is identical to the if-condition on line 10. This makes the get_post_meta() branch at line 13 unreachable — $testimonial_logo can only be set from $testi_logo (repeater data) which comes from Elementor widget settings, not from database post meta. The taint flow the scanner traced (get_post_meta -> echo esc_url) can never actually execute. Even if it could, esc_url() would be the correct sanitizer for the img src context.",
+      "auth_required": false,
+      "min_role": "none"
+    }
+  ],
+  "additional_findings": [],
+  "manual_surface_notes": {
+    "tpae_api_call_ssrf": "The tpae_api_call function (line 814) has a robust SSRF prevention function (tpae_is_safe_outbound_url, line 874) that: validates scheme is http/https, rejects credentials in URL, resolves hostname and blocks RFC1918/loopback ranges using FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE, and calls wp_http_validate_url(). This is a well-implemented SSRF guard. Requires manage_options. Not flagged by scanner but manually reviewed.",
+    "svg_upload_mcp": "SVG icon abilities (class-svg-icon-abilities.php) writes SVG content via file_put_contents but sanitizes through Elementor's SVG sanitizer and validates for script tags. This is an MCP tool triggered via the WordPress AI abilities API (wp_abilities_api_init hook), which likely requires authentication. Not a clear exploit path.",
+    "theme_install_path": "tpae_theme_install uses $theme_slug (from sanitize_text_field) in a filesystem path. sanitize_text_field does not strip dots or slashes, but: (1) themes_api() returns WP_Error for invalid slugs, preventing execution of the write path; (2) requires install_themes admin privilege. Not exploitable."
+  }
+}

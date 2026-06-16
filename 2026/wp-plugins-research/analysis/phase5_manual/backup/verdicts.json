@@ -1,0 +1,39 @@
+{
+  "plugin_slug": "backup",
+  "analysis_date": "2026-06-16",
+  "analyst": "claude-sonnet-4-6",
+  "total_flows_reviewed": 2,
+  "confirmed_vulnerabilities": 0,
+  "false_positives": 2,
+  "summary": "Both taint flows flagged by static analysis are false positives. Flow backup-xss-001 is blocked by two independent guards: (1) the restore template file is only reachable via a dynamically generated PHP file with a 24-character random suffix in the filename, prepended at runtime by PreRestore.php — the template itself is never directly web-accessible; (2) more critically, the $queue_id value (after sanitize_text_field) is validated against the database via QueueItem::loadByUniqueId() before reaching the echo — an attacker cannot supply an arbitrary XSS payload because any value that is not a real queue ID causes the script to die with 'Queue not found'. The echo at line 53 can only be reached with a valid, pre-existing queue ID, and that ID is stored in the DB as a server-generated UUID. Flow backup-path-002 is in the bundled phpseclib3 library: $address comes from $_ENV['SSH_AUTH_SOCK'], an OS-controlled environment variable set by the SSH agent daemon, not from any HTTP request parameter. This is not user-tainted input.",
+  "verdicts": [
+    {
+      "flow_id": "backup-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "xss",
+      "source_file": "src/JetBackup/Restore/restore.template.php",
+      "source_line": 26,
+      "sink_file": "src/JetBackup/Restore/restore.template.php",
+      "sink_line": 53,
+      "reasoning": "The echo at line 53 (`queue_id: '<?php echo $queue_id; ?>'`) is only reachable if a legitimate restore queue exists and the supplied ID matches. The guard at line 32 calls QueueItem::loadByUniqueId($queue_id) and immediately dies if no matching record is found ('Queue not found'). This means an attacker cannot inject an XSS payload as the queue_id: any non-UUID or malicious string will fail the DB lookup and terminate execution before the echo. Additionally, the template file itself requires the constant __JETBACKUP_RESTORE__ to be defined (line 2 guard); this constant is prepended at runtime by PreRestore.php when generating a randomly-named restore PHP file. The raw template is never directly web-accessible. sanitize_text_field() does not strip single-quotes, so in theory a JS breakout is syntactically possible — but the DB lookup gate makes it unexploitable without controlling the database."
+    },
+    {
+      "flow_id": "backup-path-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity": null,
+      "vulnerability_class": "path_traversal",
+      "source_file": "src/JetBackup/3rdparty/phpseclib3/System/SSH/Agent.php",
+      "source_line": 127,
+      "sink_file": "src/JetBackup/3rdparty/phpseclib3/System/SSH/Agent.php",
+      "sink_line": 144,
+      "reasoning": "The taint source is $_ENV['SSH_AUTH_SOCK'], an OS environment variable set by the SSH authentication agent daemon (e.g. ssh-agent or gpg-agent) at process start time. This is not an HTTP request parameter and is not controllable by a remote attacker via any web request. The taint analyzer incorrectly treats all $_ENV reads as user-controlled, but SSH_AUTH_SOCK is a socket path configured by the server process environment — it is no more attacker-controlled than PHP_SELF or SCRIPT_FILENAME. Additionally, the fsockopen call uses the 'unix://' scheme prefix, limiting it to Unix domain sockets. This is third-party library code (phpseclib3) implementing standard SSH agent forwarding, and the 'taint' originates from the server environment, not from attacker-supplied data."
+    }
+  ],
+  "additional_analysis": {
+    "ajax_handlers": "The plugin registers wp_ajax_jetbackup_api and wp_ajax_jetbackup_heartbeat (Init.php:122,126). Both require current_user_can('manage_options') AND Wordpress::verifyNonce() (Ajax.php:52-56). No nopriv AJAX handlers found.",
+    "cron_endpoint": "public/cron/cron.php is a standalone PHP file accessible via web. When called via HTTP (detected via HTTP_TE/HTTP_COOKIE/HTTP_ACCEPT headers), it enforces a token check: Factory::getConfig()->getCronToken() must match a GET parameter 'token' (line 33-35). The token is a server-generated secret. Token is compared with `!=` (not strict `!==`), but since both sides are strings this is acceptable.",
+    "capability_checks": "All admin operations require current_user_can('manage_options') (administrator level). No privilege escalation paths found.",
+    "attack_surface": "The effective attack surface for unauthenticated users is: (1) the cron endpoint with token-gated access; (2) restore status pages with 24-character random filename + valid queue ID requirement. Neither offers a practical unauthenticated attack vector."
+  }
+}

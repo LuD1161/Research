@@ -1,0 +1,90 @@
+{
+  "plugin": "essential-blocks",
+  "reviewed_at": "2026-06-16",
+  "reviewer_notes": "Manually traced all 7 taint flows from the automated scan. All flagged flows are false positives. No exploitable vulnerabilities confirmed.",
+  "summary": {
+    "total_flows_reviewed": 7,
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 7
+  },
+  "verdicts": [
+    {
+      "flow_id": "essential-blocks-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The sink is 'echo esc_url(wp_get_attachment_url(...))'. The output is wrapped in esc_url() which is the correct and sufficient escaping function for URL contexts. esc_url() strips any characters not valid in a URL and prevents XSS. The taint analyzer incorrectly flagged this because it expected esc_html()/esc_attr() rather than esc_url(), but esc_url() is the appropriate escaper here. Additionally, the handler verifies nonce (admin-nonce) and requires current_user_can('upload_files').",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "essential-blocks-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Sink is 'echo esc_url($mediaUrl)' on line 211. esc_url() is the correct output escaper for URL values. The $mediaUrl value was already passed through sanitize_url() on input. Double-protection via esc_url() on output makes this safe for URL context. The automated scanner incorrectly expected esc_html()/esc_attr() but URLs must use esc_url().",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "essential-blocks-xss-003",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Identical to xss-002 analysis — sink is 'echo esc_url($mediaUrl)' on line 215 (the else branch when user lacks upload_files capability). esc_url() is the correct and sufficient escaper for URL output. No XSS possible.",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "essential-blocks-sqli-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The flagged sink is '$wpdb->update($table_name, $data, $where)'. WordPress's $wpdb->update() method uses internally parameterized queries — it does NOT require $wpdb->prepare() because it escapes all $data values and $where values internally using esc_sql(). The taint analyzer incorrectly treated this as a raw query, but $wpdb->update() is a safe abstraction. Additionally, $form_title is passed through sanitize_text_field() before being placed in $data. The handler also verifies admin-nonce and requires current_user_can('edit_posts').",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "essential-blocks-ssrf-001",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The sink uses wp_safe_remote_get() — the 'safe' variant explicitly designed to prevent SSRF. WordPress's wp_safe_remote_get() blocks requests to: localhost, 127.0.0.1, ::1, 10.x.x.x, 172.16-31.x.x, 192.168.x.x, 169.254.x.x, and other private/link-local ranges. The automated scanner flagged it because esc_url() was not called, but esc_url_raw() + wp_safe_remote_get() is the correct WordPress SSRF-prevention pattern. Additionally, the handler requires admin-nonce verification and current_user_can('upload_files').",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "essential-blocks-ssrf-002",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "Identical pattern to ssrf-001 — uses wp_safe_remote_get() in Admin.php's eb_save_ai_generated_image() handler. Full nonce verification (admin-nonce) and current_user_can('upload_files') check present. wp_safe_remote_get() blocks internal IP ranges, preventing SSRF exploitation even if an attacker somehow provides a controlled URL.",
+      "auth_required": true,
+      "nonce_verified": true
+    },
+    {
+      "flow_id": "essential-blocks-ssrf-003",
+      "verdict": "FALSE_POSITIVE",
+      "confidence": "high",
+      "reasoning": "The Insights.php send_data() uses wp_remote_get() (not the safe variant) with a URL containing $_SERVER['REMOTE_ADDR']. However: (1) $_SERVER['REMOTE_ADDR'] is set by PHP from the actual TCP connection IP and cannot be spoofed by HTTP headers — unlike HTTP_X_FORWARDED_FOR it reflects the real client address as seen by the server; (2) sanitize_text_field() is applied, stripping control characters; (3) the URL is always of the form 'http://ip-api.com/json/{IP}?fields=country' — an attacker would need to control REMOTE_ADDR at the TCP/IP layer which is not feasible for an HTTP-based attack; (4) this code runs in a scheduled cron context, not in an HTTP request handling context; (5) even if REMOTE_ADDR were tampered with, the target is always ip-api.com (a hardcoded host prefix) — the value is appended to a fixed URL, so a crafted IP like '127.0.0.1/../../evil' would need to pass sanitize_text_field() which strips non-printable chars and HTML. The SSRF surface here is extremely limited and not practically exploitable.",
+      "auth_required": false,
+      "nonce_verified": false,
+      "additional_context": "The send_data() function is only called after is_tracking_allowed() returns true (user opted in) and is_time_to_track() passes. The REMOTE_ADDR check also filters out '127.0.0.1' explicitly. The wp_remote_get() call would need the crafted IP to route to an internal resource, which would require REMOTE_ADDR manipulation at the TCP layer — not feasible for external attackers."
+    }
+  ],
+  "additional_observations": [
+    {
+      "observation": "SQL injection in get_form_settings() via unparameterized $field column name",
+      "location": "includes/Integrations/Form.php:311",
+      "code": "return $wpdb->get_row($wpdb->prepare(\"SELECT $field FROM $table_name WHERE block_id = %s\", $form_id))",
+      "verdict": "FALSE_POSITIVE",
+      "reasoning": "The $field value passed to get_form_settings() via fetch_form_data() is processed with sanitize_key() before use. sanitize_key() strips everything except a-z, 0-9, underscore, and dash — this removes spaces, commas, quotes, semicolons, and any SQL metacharacters. An injection attempt like 'block_id, (SELECT ...) FROM' would become 'block_id-select-from' which is an invalid column name that would cause a SQL error, not injection. The restricted character set from sanitize_key() prevents any meaningful SQL injection."
+    },
+    {
+      "observation": "unserialize() calls on database data from fetch_form_data()",
+      "location": "includes/Integrations/Form.php:205-211",
+      "verdict": "INFORMATIONAL",
+      "reasoning": "fetch_form_data() unserializes data fetched from the database (fields, form_options, settings). This is only a security concern if an attacker can write arbitrary serialized data to the database. The write path (save_form_data) requires auth + nonce + edit_posts capability, and the serialized data comes from JSON-decoded form field arrays (not raw user PHP objects). PHP object injection via unserialize() would require gadget chains and the data stored is form configuration (simple arrays/objects), not attacker-controlled arbitrary PHP. Risk is very low but this pattern should be noted."
+    },
+    {
+      "observation": "Email body renders field values without HTML escaping in HTML email",
+      "location": "includes/Integrations/Form.php:117-124",
+      "verdict": "INFORMATIONAL",
+      "reasoning": "The email body is constructed by inserting sanitized form field values (via sanitize_text_field/sanitize_email/sanitize_textarea_field) into an HTML table via sprintf(). sanitize_text_field() does strip HTML tags but does not HTML-encode entities for safe insertion into HTML contexts. A value like '<b>bold</b>' would have tags stripped. However if a field value contained '&lt;script&gt;' (HTML entity), it would pass sanitize_text_field() and render in an HTML email. This is an edge case in HTML email rendering but not an exploitable server-side vulnerability. The email recipient's mail client renders it, which is a different threat model."
+    }
+  ]
+}

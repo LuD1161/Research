@@ -1,0 +1,107 @@
+{
+  "plugin": "microsoft-clarity",
+  "reviewed_by": "manual-phase5",
+  "review_date": "2026-06-16",
+  "verdicts": [
+    {
+      "flow_id": "microsoft-clarity-ssrf-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The taint analyzer flagged $oauth_token (from $_GET) reaching wp_remote_post() as SSRF, but the URL passed to wp_remote_post() is NOT derived from user input. The URL is built as: $clarity_server_url . '/woocommerce/fetch-secret', where $clarity_server_url comes from BrandAgent_Config::get_clarity_server_url() — a static private property returning the hardcoded string 'https://clarity.microsoft.com' (brandagent-config.php line 146). The $oauth_token only flows into the POST body as JSON ('oauth_token' key via wp_json_encode). The attacker cannot redirect the HTTP request to an arbitrary host. No SSRF.",
+      "exploitable": false,
+      "auth_required": false,
+      "poc": null
+    },
+    {
+      "flow_id": "microsoft-clarity-ssrf-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "Identical pattern to ssrf-001 in the brandagent_handle_refresh_credentials_callback() function (clarity-page.php lines 197-266). The wp_remote_post() URL is again hardcoded via BrandAgent_Config::get_clarity_server_url() + '/woocommerce/fetch-secret'. The $oauth_token from $_GET is sanitized via sanitize_text_field() and only placed in the JSON POST body. No user-controlled URL component exists. No SSRF.",
+      "exploitable": false,
+      "auth_required": false,
+      "poc": null
+    },
+    {
+      "flow_id": "microsoft-clarity-xss-001",
+      "verdict": "CONFIRMED",
+      "severity_override": "low",
+      "confidence": "high",
+      "rationale": "clarity_section_iframe_callback() (clarity-page.php lines 296-353) outputs $iframe_src into an HTML attribute without escaping: <iframe src=\"<?php echo $iframe_src ?>\">. The $iframe_src is built from get_option('clarity_project_id') with no sanitization on output (line 340: $iframe_src .= '&project=' . $clarity_project_id_option; then echoed bare). If a Clarity project ID contains special HTML characters such as '\">' or javascript: schemes, this could allow breaking out of the attribute context. However, exploitability is severely limited: (1) clarity_project_id is only writable by administrators via nonce-verified AJAX (edit_clarity_project_id, lines 484-518) requiring manage_options capability; (2) this callback is only invoked on the admin menu page (add_menu_page requires 'edit_posts'); (3) an attacker who can write arbitrary options as admin already has full site compromise. This is an admin-only stored XSS — real bug, but minimal practical impact within WordPress's security model.",
+      "exploitable": true,
+      "auth_required": true,
+      "auth_level": "administrator (manage_options)",
+      "poc": "1. As administrator, call wp-admin/admin-ajax.php?action=edit_clarity_project_id with POST: nonce=<valid_nonce>&new_value=\"><script>alert(1)</script>  2. Visit wp-admin/admin.php?page=microsoft-clarity — the script executes in the admin's browser.",
+      "notes": "The $iframe_src also incorporates $_GET['iframeRedirect'] (line 345-346), but that is rawurlencode()'d and sanitize_text_field()'d before appending, so it cannot break the attribute. The project_id path is the only viable injection point."
+    },
+    {
+      "flow_id": "microsoft-clarity-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The taint analyzer marked escape_value_for_script($clarity_project_id) as a missing-sanitizer sink, but escape_value_for_script() is defined in clarity.php (lines 276-279) as: return htmlspecialchars($value, ENT_QUOTES, 'UTF-8'); This converts <, >, \", ', & to their HTML entities. The output lands inside a JavaScript string literal: (function(...) { ... })(window, document, \"clarity\", \"script\", \"<?php echo escape_value_for_script($clarity_project_id); ?>\"). ENT_QUOTES escapes double-quotes, preventing breakout from the JS string and the HTML attribute. No XSS is possible.",
+      "exploitable": false,
+      "auth_required": false,
+      "poc": null
+    },
+    {
+      "flow_id": "microsoft-clarity-ssrf-003",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The taint analyzer flagged $_SERVER['HTTP_USER_AGENT'] flowing into wp_remote_get() as SSRF. However, HTTP_USER_AGENT is placed into the 'User-Agent' request header (config_headers array, line 118), not into the URL argument of wp_remote_get(). The URL ($config_url_with_params) is constructed from BrandAgent_Config::get_backend_base_url() — which fetches a URL from the hardcoded Microsoft endpoint 'https://clarity.microsoft.com/woocommerce/brandagent/config'. The user controls request query parameters via $_GET (line 71: $config_query = $_GET) but HTTP_USER_AGENT is not the SSRF vector here. The real concern is the unauthenticated parameter passthrough described in the additional findings, not SSRF via User-Agent header.",
+      "exploitable": false,
+      "auth_required": false,
+      "poc": null
+    },
+    {
+      "flow_id": "microsoft-clarity-xss-003",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "The taint chain traces HTTP_USER_AGENT through wp_remote_get() to wp_remote_retrieve_body() to echo $config_body. The theory is that User-Agent controls the backend response body which is then echoed. In practice: (1) the User-Agent is passed as an HTTP request header to Microsoft's controlled backend — Microsoft's API is not going to reflect arbitrary User-Agent strings as executable content in the response body; (2) the response is echoed with Content-Type: application/json (header set at line 139), so even if content were reflected, browsers would not execute it as HTML; (3) the taint propagation through a remote HTTP response is speculative and requires server-side reflection by a third-party service. No realistic XSS.",
+      "exploitable": false,
+      "auth_required": false,
+      "poc": null
+    },
+    {
+      "flow_id": "microsoft-clarity-ssrf-004",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "Same analysis as ssrf-003. HTTP_USER_AGENT goes into the User-Agent header for wp_remote_get($init_url_with_params, ...). The $init_url_with_params is built from BrandAgent_Config::get_backend_base_url() . '/api/v1/init' — a URL derived from the hardcoded Microsoft config endpoint. User-Agent injection into a request header is not SSRF.",
+      "exploitable": false,
+      "auth_required": false,
+      "poc": null
+    },
+    {
+      "flow_id": "microsoft-clarity-xss-004",
+      "verdict": "FALSE_POSITIVE",
+      "severity_override": null,
+      "confidence": "high",
+      "rationale": "Mirror of xss-003 for the handle_init() path. HTTP_USER_AGENT → User-Agent header → wp_remote_get → echo $init_body with Content-Type: text/event-stream. Even less XSS-viable than xss-003: the response is a Server-Sent Events stream, and browsers treat text/event-stream as a structured data format, not as HTML. The User-Agent header is not reflected in SSE stream content by Microsoft's backend.",
+      "exploitable": false,
+      "auth_required": false,
+      "poc": null
+    },
+    {
+      "flow_id": "microsoft-clarity-unauthproxy-001",
+      "verdict": "CONFIRMED",
+      "severity_override": "medium",
+      "confidence": "high",
+      "rationale": "The BrandAgent proxy endpoints /a/msba/api/config/read and /a/msba/api/v1/init are registered via rewrite rules (clarity.php line 514-518) and handled in brandagent_handle_custom_endpoint() (line 535-540) with NO authentication check. Any unauthenticated visitor can trigger server-side HTTP requests from the WordPress server to Microsoft's BrandAgent backend. The handle_config_read() and handle_init() functions (brandagent-endpoint.php) pass ALL of the requester's $_GET parameters to the backend URL: $config_query = $_GET (line 71), $init_query = $_GET (line 176). This allows arbitrary query parameter injection into authenticated (HMAC-signed) requests to Microsoft's backend service. Additionally, the HMAC credentials (client_id, HMAC-signed signature) are attached to these requests — an unauthenticated user can cause the WordPress server to make HMAC-authenticated calls on behalf of the store. While the destination host is fixed, the parameter injection combined with no authentication gate represents an information disclosure / abuse risk.",
+      "exploitable": true,
+      "auth_required": false,
+      "poc": "GET /a/msba/api/config/read?clientId=<any>&<arbitrary_params>=<values> HTTP/1.1\nHost: victim-wordpress-site.com\n\nThe server will proxy this to <backend_base_url>/api/config/read?clientId=<any>&<arbitrary_params>=<values> with a valid HMAC signature attached. No credentials required.",
+      "notes": "The api/config/status and api/config/update sub-paths do not have this issue: config/status is intentionally public read-only, and config/update verifies an incoming HMAC signature from the backend server. Only config/read and api/v1/init are unauthenticated proxy endpoints."
+    }
+  ],
+  "summary": {
+    "total_findings": 8,
+    "confirmed_vulnerabilities": 2,
+    "false_positives": 6,
+    "needs_further_review": 0,
+    "overall_assessment": "Six of the eight taint-flow findings are false positives. Both SSRF findings (ssrf-001, ssrf-002) are FP because the destination URL is hardcoded in a private static class property; user input only reaches the POST body. The XSS-002 finding is FP because escape_value_for_script() applies htmlspecialchars(ENT_QUOTES) which is a correct sanitizer. SSRF-003, SSRF-004, XSS-003, and XSS-004 are all FP because User-Agent header injection into an outgoing request is not SSRF, and the response content is not realistically controlled by the attacker. Two real vulnerabilities were identified: (1) XSS-001 — admin-only stored XSS via unescaped clarity_project_id in an iframe src attribute; severity is Low due to admin-only precondition. (2) An uninvestigated finding (unauthproxy-001) — the /a/msba/api/config/read and /a/msba/api/v1/init proxy endpoints require no authentication, allowing any visitor to trigger HMAC-authenticated backend calls with arbitrary injected GET parameters."
+  }
+}

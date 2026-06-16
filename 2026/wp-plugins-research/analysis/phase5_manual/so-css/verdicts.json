@@ -1,0 +1,77 @@
+{
+  "plugin": "so-css",
+  "analyst": "phase5-manual",
+  "date": "2026-06-16",
+  "summary": {
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 2,
+    "total_reviewed": 2
+  },
+  "verdicts": [
+    {
+      "flow_id": "so-css-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity": "N/A",
+      "title": "date() output in revisions list not XSS-exploitable",
+      "location": "so-css.php:785",
+      "analysis": "The taint analyzer flagged `echo date('j F Y @ H:i:s', $time + get_option('gmt_offset') * 60 * 60)` because it treats get_option() as a taint source. However, `$time` here is the integer array key from the CSS revisions array stored in WordPress options — it is always a Unix timestamp integer, not a user-supplied string. The PHP date() function with the format 'j F Y @ H:i:s' produces output consisting only of digits, English month names, spaces, '@', and ':'. None of these characters are HTML special characters (<, >, ', \", &), so XSS via this output is impossible regardless of the input value. Furthermore, even if an attacker could influence the stored revisions (which requires edit_theme_options capability via an authenticated request with nonce), the format string constrains the output to safe characters.",
+      "exploitability": "none",
+      "auth_required": true,
+      "notes": "The admin AJAX handler admin_action_get_revisions_list() that invokes custom_css_revisions_list() requires a valid nonce (get_revisions_list) and is only accessible to logged-in users. The page.php template path also requires edit_theme_options capability to reach."
+    },
+    {
+      "flow_id": "so-css-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity": "N/A",
+      "title": "printf with unescaped $revision_date not XSS-exploitable",
+      "location": "tpl/page.php:16,33",
+      "analysis": "The taint analyzer flagged `printf(esc_html__('Editing revision dated %s. Click %sRevert to this revision%s to keep using it.', 'so-css'), $revision_date, '<em>', '</em>')` because `$revision_date` is passed as an unescaped argument to printf. While it is true that esc_html__() only escapes the translation wrapper string and not the %s substitution arguments, the value of $revision_date is derived from `date('j F Y @ H:i:s', $current_revision + get_option('gmt_offset') * 60 * 60)` where `$current_revision` is obtained via `filter_input(INPUT_GET, 'time', FILTER_VALIDATE_INT)`. The FILTER_VALIDATE_INT filter ensures $current_revision is strictly an integer. The date() format 'j F Y @ H:i:s' produces only digits, English month names, spaces, '@', and ':' — none are HTML special characters. XSS is structurally impossible here.",
+      "exploitability": "none",
+      "auth_required": true,
+      "notes": "The display_admin_page() function that sets $current_revision is only reachable from the admin menu page registered with edit_theme_options capability. The underlying concern about printf + unescaped %s arguments is a valid code quality observation, but the specific data flowing through this path is fully safe due to the integer constraint and date() format string."
+    }
+  ],
+  "additional_surface_review": {
+    "ajax_handlers": [
+      {
+        "action": "socss_hide_getting_started",
+        "auth": "wp_verify_nonce('hide'), authenticated only",
+        "verdict": "secure"
+      },
+      {
+        "action": "socss_get_post_css",
+        "auth": "wp_verify_nonce('get_post_css'), authenticated only",
+        "verdict": "secure — returns CSS stored in options/postmeta, no injection surface"
+      },
+      {
+        "action": "socss_get_revisions_list",
+        "auth": "wp_verify_nonce('get_revisions_list'), authenticated only",
+        "verdict": "secure — date() output only, see flow so-css-xss-001"
+      },
+      {
+        "action": "socss_save_css",
+        "auth": "wp_verify_nonce('so-css-ajax') + current_user_can('edit_theme_options')",
+        "verdict": "secure — sanitize_css() applied before saving; capability-gated"
+      }
+    ],
+    "form_save": {
+      "handler": "action_admin_menu() on POST siteorigin_custom_css",
+      "auth": "current_user_can('edit_theme_options') + check_admin_referer('custom_css', '_sononce')",
+      "verdict": "secure — double-checked capability and nonce, sanitize_css() applied"
+    },
+    "file_operations": {
+      "css_file_name": "so-css-{theme}_{post_id}.css in uploads/so-css/",
+      "verdict": "secure — theme slug is basename(get_template_directory()), post_id is FILTER_VALIDATE_INT; no traversal possible"
+    },
+    "preview_mode": {
+      "trigger": "?so_css_preview=1 on frontend",
+      "auth": "current_user_can('edit_theme_options') checked in enqueue_inspector_scripts(), inspector_templates(), inline_inspector_scripts(), disable_ngg_resource_manager()",
+      "verdict": "secure — unauthenticated users cannot access inspector functionality"
+    },
+    "css_sanitization": {
+      "function": "sanitize_css()",
+      "location": "so-css.php:~870",
+      "verdict": "removes script/style tags and comments; adequate for CSS-only content stored in options and output in <style> tags"
+    }
+  }
+}

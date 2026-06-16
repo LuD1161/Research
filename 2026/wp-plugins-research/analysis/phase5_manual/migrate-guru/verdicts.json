@@ -1,0 +1,51 @@
+{
+  "plugin": "migrate-guru",
+  "analysis_date": "2026-06-16",
+  "analyst": "security-research-agent",
+  "plugin_version": "6.28",
+  "summary": {
+    "total_taint_flows_reviewed": 2,
+    "confirmed": 0,
+    "false_positives": 2,
+    "notes": "Both flagged taint flows are false positives. The callback system (wings) is protected by RSA public-key signature verification using Blogvault's key. No unauthenticated exploitable paths were found."
+  },
+  "verdicts": [
+    {
+      "flow_id": "migrate-guru-path-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_claimed": "critical",
+      "vulnerability_class": "path_traversal",
+      "description": "Flagged flow: $_FILES['myfile']['tmp_name'] -> move_uploaded_file($myfile['tmp_name'], $ofile) in callback/wings/fs_write.php:342-366. The $ofile destination path comes from $params['ofile'] (fs_write.php:381), which originates from $request->params. These params are set only after authenticate() returns 1 (migrateguru.php:131-144) AND after processParams() verifies the HMAC-SHA256 of the bvprms blob using the per-account secret. The secret itself is established during the initial site setup with Blogvault's service. Authentication requires a valid RSA signature (openssl_verify with Blogvault's public key stored in public_keys/m_public.pub). An attacker without Blogvault's private RSA key cannot forge a valid signature and cannot reach this code path. Additionally, move_uploaded_file() itself is PHP-safe against path traversal when used with a PHP-managed tmp_name - the vulnerability would require controlling $ofile, which requires auth.",
+      "auth_gate": {
+        "mechanism": "RSA public-key signature (openssl_verify, OPENSSL_ALGO_SHA256 or SHA1)",
+        "verified_in": "callback/request.php:authenticate() -> verify()",
+        "gate_location": "migrateguru.php:131",
+        "assessment": "SOUND - requires Blogvault's private key to forge"
+      },
+      "false_positive_reason": "All filesystem write operations in the 'fswrt' wing require passing RSA signature authentication against a bundled public key. The attack requires knowledge of the per-account HMAC secret AND ability to forge an RSA signature, neither of which is feasible without Blogvault server access.",
+      "additional_notes": "The design is intentional: migrate-guru is a SaaS migration plugin where Blogvault's servers act as the orchestrator and the plugin acts as an agent. The callback system is the legitimate remote-management channel, secured by asymmetric cryptography."
+    },
+    {
+      "flow_id": "migrate-guru-ssrf-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_claimed": "medium",
+      "vulnerability_class": "ssrf",
+      "description": "Flagged flow: $_POST['site_info'] -> array_merge($api_data, $site_info) -> wp_remote_post($api_url, ...) in wp_admin.php:298-342. The $api_url is NOT derived from user input. It is constructed as $this->bvinfo->appUrl() . '/migration/execute' (wp_admin.php:335), which is a hardcoded Blogvault service URL. The $site_info array is merged into the POST body, not the URL. There is no SSRF because the destination URL cannot be influenced by the attacker. Additionally, this AJAX handler (ajaxInitiateMigration) is admin-only (registered via add_action('wp_ajax_mg_initiate_migration', ...)), requires a valid nonce (wp_verify_nonce on mg_onboarding_nonce, line 289), and requires being logged in as an admin.",
+      "auth_gate": {
+        "mechanism": "WordPress nonce (wp_verify_nonce) + admin-only AJAX hook (wp_ajax_*)",
+        "verified_in": "wp_admin.php:289",
+        "gate_location": "migrateguru.php:92",
+        "assessment": "SOUND - requires authenticated admin session with valid nonce"
+      },
+      "false_positive_reason": "The URL passed to wp_remote_post is hardcoded, not derived from $site_info. The $site_info content is sent as POST body parameters to a fixed, trusted Blogvault API endpoint. sanitize_text_field() is applied to all site_info array elements before use. Even if the body content could influence a vulnerable Blogvault API endpoint, that would be a server-side issue, not a WordPress plugin SSRF.",
+      "additional_notes": "The taint scanner incorrectly flagged the POST body as a URL sink. wp_remote_post($api_url, array('body' => $api_data)) does not use $api_data as the URL - $api_url is the URL and it is hardcoded."
+    }
+  ],
+  "additional_analysis": {
+    "callback_security_architecture": "The plugin implements a remote-agent callback pattern used by Blogvault/MigrateGuru SaaS. All dangerous operations (file read/write/delete, directory manipulation, database operations) are gated behind RSA signature verification. The bundled public key (public_keys/m_public.pub) corresponds to Blogvault's private key held on their servers. The pubkey_name parameter is sanitized via MGAccount::sanitizeKey() (preg_replace('/[^a-zA-Z0-9_\\-]/', '', $key)) preventing directory traversal in the key file path.",
+    "replay_attack_mitigation": "The bvLastRecvTime check (request.php:223-225) prevents replay attacks by rejecting requests older than bvLastRecvTime - 300 seconds.",
+    "hmac_on_params": "Even after RSA auth passes, the bvprms (actual command parameters) are further protected by HMAC-SHA1 or HMAC-SHA256 (request.php:133-138), using the per-account shared secret. Params are only accepted if the MAC matches.",
+    "curlFile_ssrf_consideration": "The curlFile() and streamCopyFile() methods in fs_write.php accept arbitrary URLs ($ifile_url) and write to arbitrary paths ($ofile). These are powerful primitives but only reachable after full RSA+HMAC authentication. No bypass identified.",
+    "overall_security_posture": "The plugin's security model is sound for its intended use as a SaaS-controlled migration agent. The dual-layer auth (RSA signature + HMAC params) is robust. No exploitable unauthenticated or low-privilege attack surface was identified."
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "plugin": "popup-builder",
+  "analyst": "manual-review",
+  "review_date": "2026-06-16",
+  "summary": {
+    "total_flows_reviewed": 4,
+    "confirmed_vulnerabilities": 0,
+    "false_positives": 4,
+    "notes": "All four taint flows from automated analysis are false positives. The plugin demonstrates solid security hygiene on its attack surface: all admin AJAX handlers verify nonces and check manage_options, public-facing AJAX handlers verify nonces, user input is sanitized before storage, and output is escaped. No exploitable vulnerabilities were found."
+  },
+  "verdicts": [
+    {
+      "flow_id": "popup-builder-xss-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_original": "high",
+      "severity_actual": "none",
+      "vulnerability_class": "xss",
+      "file": "com/libs/ListTable.php",
+      "line": 564,
+      "reasoning": "The automated scanner incorrectly flagged this as a taint flow from $_GET['m'] to printf output. At line 564, $_GET['m'] is immediately cast to (int): '$m = isset($_GET['m']) ? (int) sanitize_text_field(wp_unslash($_GET['m'])) : 0'. The integer $m is passed only to selected() as the comparand (not echoed directly), and the printf output uses esc_attr() on the value and esc_html() on the label. The cast to (int) destroys any XSS payload before any further processing. No XSS is possible."
+    },
+    {
+      "flow_id": "popup-builder-lfi-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_original": "medium",
+      "severity_actual": "none",
+      "vulnerability_class": "local_file_inclusion",
+      "file": "com/classes/Ajax.php",
+      "lines": [182, 195],
+      "reasoning": "The sgpbAutosave AJAX handler at line 147 requires: (1) check_ajax_referer(SG_AJAX_NONCE, 'nonce') — nonce verified; (2) current_user_can('manage_options') — admin-only. Even if a bypass were possible, the path construction uses getPopupClassNameFormType($type) which transforms $type via ucfirst(strtolower($type)) and appends 'Popup.php', then checks file_exists() before requiring. Furthermore, getPopupTypeClassPath($type) constrains the base directory to a fixed plugin path. In WordPress's security model, users with manage_options (admins) are already fully trusted — admin-level LFI is not a reportable vulnerability since admins can install arbitrary plugins/themes. This is a design-level trust boundary issue, not an exploitable bug."
+    },
+    {
+      "flow_id": "popup-builder-ssrf-001",
+      "verdict": "FALSE_POSITIVE",
+      "severity_original": "medium",
+      "severity_actual": "none",
+      "vulnerability_class": "ssrf",
+      "file": "com/classes/Ajax.php",
+      "line": 821,
+      "reasoning": "The checkSameOrigin handler at line 802 requires: (1) check_ajax_referer(SG_AJAX_NONCE, 'nonce') — nonce verified; (2) current_user_can('manage_options') — admin-only. The $url is processed through esc_url_raw(wp_unslash($_POST['iframeUrl'])) before being passed to wp_remote_get(). This is an admin-only feature intentionally designed to check cross-origin iframe policies. In WordPress's security model, admin-level SSRF is not a reportable vulnerability — admins can already add arbitrary URLs to iframes, install plugins, etc. The function also only checks response headers (x-frame-options) and a status code, providing minimal attack surface even if the endpoint were reachable."
+    },
+    {
+      "flow_id": "popup-builder-xss-002",
+      "verdict": "FALSE_POSITIVE",
+      "severity_original": "high",
+      "severity_actual": "none",
+      "vulnerability_class": "xss",
+      "file": "public/views/license.php",
+      "line": 20,
+      "reasoning": "The automated scanner flagged get_option('sgpb-license-status-'.$key) as a taint source flowing to echo. However, the echo statement is: 'echo ($status !== false && $status == 'valid') ? 'active' : 'inactive''. The ternary expression outputs ONLY the static string 'active' or 'inactive' — the value of $status is never echoed. The result is determined by a boolean comparison, not by the value of $status itself. No XSS is possible regardless of what $status contains. This is a scanner over-approximation of taint propagation through ternary expressions."
+    }
+  ],
+  "additional_findings": [],
+  "manual_investigation_notes": {
+    "nopriv_ajax_handlers": "Three unauthenticated AJAX handlers exist (addToCounter, subscriptionSubmission, sgpbSubsciptionFormSubmittedAction). All three call check_ajax_referer(SG_AJAX_NONCE, 'nonce'). The nonce is legitimately exposed to frontend visitors via wp_localize_script in SgpbPopupExtension::getFrontendScripts() -> PopupBuilder.js -> SGPB_JS_PARAMS.nonce. These handlers are intended for public use (popup open counting and subscription form submission). All use prepared statements for database operations and sanitize_text_field/sanitize_email for input.",
+    "subscriber_display": "Subscriber data in the admin table (Subscribers.php) is output via wp_kses($item, AdminHelper::allowed_html_tags()). The allowed_html_tags() function includes 'script' tags by default, which appears overly permissive. However, subscriber input (firstName, lastName, email) goes through sanitize_text_field()/sanitize_email() before database storage, stripping HTML tags at input time. The liberal allowed_html_tags() is used for rendering popup templates in admin context, not subscriber data.",
+    "sql_queries": "All database queries use $wpdb->prepare() with typed placeholders (%d, %s, %i). No raw SQL interpolation found in sensitive paths.",
+    "popup_content": "HTML popup content is stored as raw HTML (intentional — admins control popup content). Access to create/edit popups requires manage_options capability."
+  }
+}
