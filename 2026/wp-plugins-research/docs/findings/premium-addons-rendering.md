@@ -15,6 +15,18 @@
 
 ---
 
+## Attack Flow
+
+```mermaid
+graph LR
+    A["Attacker"] --> B["GET admin-ajax.php\n?action=get_elementor_template_content\n&templateID=123"]
+    B --> C["No nonce check\nNo auth check"]
+    C --> D["Full Elementor\ncontent rendered"]
+    D --> E["Content disclosure\nof any published post"]
+```
+
+---
+
 ## Description
 
 The cross-cutting unauthenticated template rendering audit (`analysis/phase5_manual/unauth-template-rendering-audit.md`) identified that Premium Addons for Elementor registers AJAX handlers that render saved Elementor templates without verifying the caller's authentication status.

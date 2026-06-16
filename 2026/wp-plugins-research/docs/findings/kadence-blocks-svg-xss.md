@@ -15,6 +15,18 @@
 
 ---
 
+## Attack Flow
+
+```mermaid
+graph TD
+    A["Visitor submits\nKadence form"] --> B["Uploads SVG file\nwith JS payload"]
+    B --> C["File saved to\nwp-content/uploads/kadence_form/"]
+    C --> D["SVG served\nwith JS intact"]
+    D --> E["Visitor/admin opens\nSVG URL → XSS"]
+```
+
+---
+
 ## Finding 1: Unauthenticated SVG XSS
 
 Kadence Blocks allows SVG file uploads for block icons via an unauthenticated AJAX handler. Uploaded SVG files are stored in the WordPress uploads directory without sanitizing active SVG content.

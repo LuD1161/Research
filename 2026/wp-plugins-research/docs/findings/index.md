@@ -7,6 +7,38 @@
 
 ---
 
+## Attack Flow Overview
+
+```mermaid
+graph TD
+    subgraph "Unauthenticated Vectors"
+        A["Anonymous Visitor"] --> B{"nopriv AJAX\nor Public REST?"}
+        B -->|"Yes"| C{"Nonce Required?"}
+        C -->|"No"| D["Direct Access\n(WP Google Maps, Premium Addons)"]
+        C -->|"Leaked on frontend"| E["Harvest Nonce\n(EAEL, ElementsKit, Forminator)"]
+        C -->|"Yes, not leaked"| F["Blocked"]
+    end
+    
+    subgraph "Exploitation"
+        D --> G{"Dangerous Sink?"}
+        E --> G
+        G -->|"File Upload"| H["Upload Webshell\n(Forminator, Metform, Kadence)"]
+        G -->|"unserialize()"| I["Object Injection\n(Ninja Forms, Redirection)"]
+        G -->|"echo raw HTML"| J["Stored XSS → Admin\n(Ninja Forms, TEC)"]
+        G -->|"Class Instantiation"| K["Data Exposure\n(WP Google Maps)"]
+    end
+
+    subgraph "Impact"
+        H --> L["RCE"]
+        I --> L
+        J --> M["Admin Session Theft"]
+        M --> L
+        K --> N["Data Breach"]
+    end
+```
+
+---
+
 ## Summary Table
 
 | # | Plugin | Finding ID | Vulnerability Class | CVSS | Auth Required | Status |

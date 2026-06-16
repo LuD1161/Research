@@ -15,6 +15,20 @@
 
 ---
 
+## Attack Flow
+
+```mermaid
+graph TD
+    A["Unauthenticated\nAttacker"] --> B{"Kirki REST API\npermission_callback: true"}
+    B --> C["Form submission\n(data write)"]
+    B --> D["File upload\n(arbitrary files)"]
+    B --> E["Webhook trigger\n(SSRF)"]
+    B --> F["Email sending\n(spam/phishing)"]
+    B --> G["Collaboration actions\n(no nonce check)"]
+```
+
+---
+
 ## Confirmed Vulnerabilities
 
 ### KIRKI-VULN-001: Unauthenticated AJAX Data Exposure (CVSS 7.5)

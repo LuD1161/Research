@@ -57,6 +57,42 @@
 
 ---
 
+## Research Pipeline Overview
+
+```mermaid
+graph LR
+    A["155 Plugins\n70K PHP Files\n12.8M LOC"] --> B["Layer 1\nSemgrep + ripgrep\n6,454 findings"]
+    B --> C["Layer 2\nAST Source-Sink\n29K sources\n17K sinks"]
+    C --> D["Layer 3\nTaint Analysis\n~4,500 flows"]
+    D --> E["Layer 4\nAgent Review\n80+ Opus/Sonnet agents"]
+    E --> F["49 Confirmed\n4 Working PoCs"]
+```
+
+## Findings Severity Distribution
+
+```mermaid
+pie title Findings by Severity
+    "Critical (RCE)" : 2
+    "High" : 8
+    "Medium" : 15
+    "Low/Info" : 3
+```
+
+## Vulnerability Class Breakdown
+
+```mermaid
+pie title Vulnerability Classes
+    "XSS (Stored)" : 12
+    "Missing Auth / Broken Access" : 8
+    "Object Injection" : 4
+    "File Upload" : 3
+    "RCE" : 2
+    "SSRF" : 2
+    "Other" : 5
+```
+
+---
+
 ## Quick Navigation
 
 <div class="grid cards" markdown>

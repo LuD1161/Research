@@ -4,6 +4,22 @@ This page covers the three confirmed findings that are classified Low severity o
 
 ---
 
+## Defense-in-Depth Model
+
+```mermaid
+graph TD
+    A["Code Defect Exists"] --> B{"WP Core\nProtection?"}
+    B -->|"Yes"| C["Not Directly\nExploitable"]
+    B -->|"No"| D["Exploitable"]
+    C --> E["Should Still Fix\n(Defense in Depth)"]
+    
+    F["Jetpack XSS-047\nterm name unescaped"] --> B
+    G["Jetpack OBJE-005\ninternal-only data"] --> H["Not Exploitable\n(data never user-controlled)"]
+    I["WooCommerce RCE-028\nconstrained dispatch"] --> J["Not Exploitable\n(24 safe methods only)"]
+```
+
+---
+
 ## Jetpack — Missing Output Escaping in Breadcrumbs (JET-047)
 
 **Finding ID:** JET-047

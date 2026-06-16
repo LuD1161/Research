@@ -13,6 +13,19 @@
 
 ---
 
+## Attack Flow
+
+```mermaid
+graph LR
+    A["Contributor\ncreates event"] --> B["Sets _EventErrorSave\npost meta with XSS"]
+    B --> C["Admin opens\nevent editor"]
+    C --> D["unescaped echo\nin script block"]
+    D --> E["JavaScript executes\nin admin context"]
+    E --> F["Session theft\nor admin creation"]
+```
+
+---
+
 ## TEC-012: Stored XSS in Post Editor Error Display (CVSS 5.4) — Highest Severity
 
 **Auth Required:** Contributor (to write post meta on their own event posts)

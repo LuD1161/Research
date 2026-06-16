@@ -15,6 +15,20 @@
 
 ---
 
+## Attack Flow
+
+```mermaid
+graph TD
+    A["Attacker calls\neael_get_token"] --> B["Receives valid\nWP nonce"]
+    B --> C{"Use nonce on\nany handler"}
+    C --> D["product_quickview_popup\n(content disclosure)"]
+    C --> E["load_more\n(data enumeration)"]
+    C --> F["register_user\n(account creation)"]
+    C --> G["checkout_update\n(cart manipulation)"]
+```
+
+---
+
 ## Primary Finding: EAEL-001 — Unauthenticated Nonce Vending (CVSS 6.5)
 
 ### Description

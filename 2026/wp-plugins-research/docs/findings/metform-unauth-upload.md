@@ -15,6 +15,22 @@
 
 ---
 
+## Attack Flow
+
+```mermaid
+graph TD
+    A["Attacker"] --> B["REST API\npermission_callback:\n__return_true"]
+    B --> C["Upload file via\nform endpoint"]
+    C --> D{"WP MIME check"}
+    D -->|"Allowed types\n(.jpg, .png, etc)"| E["File stored in\nuploads/metform/"]
+    D -->|"Blocked types\n(.php, .exe)"| F["Rejected"]
+    E --> G{"Server config?"}
+    G -->|"Misconfigured"| H["PHP execution\n= RCE"]
+    G -->|"Properly configured"| I["Stored but\nnot executable"]
+```
+
+---
+
 ## Description
 
 The Metform (Elementor Form Builder) plugin registers a REST API file upload endpoint with the following registration:

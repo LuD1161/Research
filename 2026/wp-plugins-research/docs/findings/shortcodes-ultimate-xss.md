@@ -15,6 +15,18 @@
 
 ---
 
+## Attack Flow
+
+```mermaid
+graph LR
+    A["Author creates\npost with\n[su_button]"] --> B["onclick attribute\npassed through\nesc_attr()"]
+    B --> C["esc_attr doesn't\nprevent JS in\nevent handlers"]
+    C --> D["Visitor views\npost, clicks button"]
+    D --> E["Arbitrary JS\nexecutes"]
+```
+
+---
+
 ## Description
 
 Shortcodes Ultimate ships with an "Unsafe Features" setting that, when enabled (the default state per SCU-VULN-008), allows arbitrary HTML attributes inside shortcodes. The `onclick` attribute of the `[su_button]` shortcode is echoed directly into the rendered HTML output without any context-correct output escaping.

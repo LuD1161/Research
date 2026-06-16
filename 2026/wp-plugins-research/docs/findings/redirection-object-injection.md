@@ -15,6 +15,20 @@
 
 ---
 
+## Attack Flow
+
+```mermaid
+graph TD
+    A["Admin creates\nredirect rule"] --> B["action_data stored\nas serialized PHP"]
+    B --> C["Any visitor\nhits matched URL"]
+    C --> D["unserialize()\nwithout allowed_classes"]
+    D --> E{"POP gadget\nchain available?"}
+    E -->|"Yes"| F["Arbitrary code\nexecution (RCE)"]
+    E -->|"No"| G["DoS / Info leak\nvia __destruct"]
+```
+
+---
+
 ## Description
 
 The Redirection plugin stores redirect rule match conditions in the database in serialized PHP format. When redirect rules are evaluated during request processing, the stored data is deserialized using `unserialize()` without restricting the allowed classes:

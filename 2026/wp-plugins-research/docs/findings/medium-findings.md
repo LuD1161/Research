@@ -4,6 +4,29 @@ This page consolidates the medium-severity confirmed findings for plugins not co
 
 ---
 
+## Finding Categories Overview
+
+```mermaid
+graph TD
+    subgraph "Nonce/Auth Bypass"
+        A1["Ad Inserter\ncommented-out nonce"]
+        A2["MonsterInsights\nempty-key HMAC"]
+        A3["MailPoet\nweak cron token"]
+    end
+    subgraph "Data Injection"
+        B1["Facebook for WooCommerce\nevent injection"]
+        B2["WP Statistics\nconditional unauth REST"]
+        B3["Popup Maker\noptional signature"]
+    end
+    subgraph "XSS / Content"
+        C1["TablePress\nstored XSS + CSV injection"]
+        C2["SpeedyCache\nvar_export config injection"]
+        C3["Post SMTP\nemail log exposure"]
+    end
+```
+
+---
+
 ## Ad Inserter — Nopriv AJAX with Commented-Out Nonce
 
 **Finding ID:** AI-001
