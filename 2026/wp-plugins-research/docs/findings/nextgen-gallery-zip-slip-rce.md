@@ -1,0 +1,1 @@
+../../analysis/phase5_manual/nextgen-gallery/confirmed/zip-slip-rce-poc.md

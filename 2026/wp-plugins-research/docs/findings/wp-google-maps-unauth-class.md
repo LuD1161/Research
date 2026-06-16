@@ -1,0 +1,1 @@
+../../analysis/phase5_manual/wp-google-maps/confirmed/unauth-class-instantiation-poc.md
