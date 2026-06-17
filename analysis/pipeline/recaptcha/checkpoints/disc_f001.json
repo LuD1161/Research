@@ -1,0 +1,33 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "stored_xss",
+      "location": "WPCaptcha_AJAX::get_locks_logs(), libs/ajax.php line 352",
+      "severity": "medium",
+      "reachability": "authenticated admin only — the AJAX handler enforces manage_options; the injected payload is rendered in the admin Activity tab DataTable",
+      "justification": "The `reason` column value fetched from `wpcatcha_accesslocks` is appended to the JSON output array as raw HTML (`$row[] = $aRow->$col`) with no escaping; the DataTable renders it as innerHTML, so a stored payload injected into the reason field (e.g. via a crafted lockdown trigger) executes in the admin browser."
+    },
+    {
+      "vuln_class": "stored_xss",
+      "location": "WPCaptcha_Functions::captcha_fields(), libs/functions.php line 597",
+      "severity": "medium",
+      "reachability": "any visitor who reaches a page with the built-in captcha form; the payload is set by an admin via the captcha_challenge_text option",
+      "justification": "The admin-controlled option `captcha_challenge_text` is echoed directly into the public HTML label without any escaping: `$output .= '<p><label ...>' . !empty($options['captcha_challenge_text'])?$options['captcha_challenge_text']:'Are you human?...'`, allowing an admin to store arbitrary HTML/script that executes for every visitor who sees the captcha form."
+    },
+    {
+      "vuln_class": "css_injection",
+      "location": "WPCaptcha_Functions::login_head(), libs/functions.php lines 929 and 962-964",
+      "severity": "low",
+      "reachability": "login page visitors; payload injected by an admin via design_background_image or design_form_background_image options",
+      "justification": "Both `design_background_image` and `design_form_background_image` are output inside CSS `url()` values using `esc_attr()` (e.g., `echo 'body.login {background-image:url(' . esc_attr($options['design_background_image']) . ')...'`), which does not prevent CSS injection; an attacker controlling the option value could break out of the url() context to inject arbitrary CSS rules."
+    },
+    {
+      "vuln_class": "sensitive_data_exposure",
+      "location": "WPCaptcha_AJAX::get_activity_logs(), libs/ajax.php lines 482-486",
+      "severity": "medium",
+      "reachability": "authenticated admin via the Activity tab AJAX call",
+      "justification": "When `log_passwords` is enabled, the `failed_pass` column — which stores actual attempted passwords submitted by users — is returned in the AJAX response and rendered in the admin DataTable, exposing potentially reused credentials to any admin with access to the Activity log view."
+    }
+  ]
+}
