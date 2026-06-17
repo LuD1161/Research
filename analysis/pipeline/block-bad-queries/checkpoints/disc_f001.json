@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "xss_reflected",
+      "location": "bbq_callback_test(), line 205",
+      "severity": "low",
+      "reachability": "Admin-only (rendered inside Settings page callback, requires manage_options to reach the settings page). Arguments to add_query_arg are hard-coded, so no attacker-controlled data flows into the URL in this file; however the pattern is exploitable in similar code.",
+      "justification": "add_query_arg() output is echoed directly into an href attribute without esc_url(), violating the WordPress security standard that every URL in HTML context must be wrapped in esc_url(); although arguments are hard-coded here, get_home_url() is filterable and the pattern is a canonical source of XSS in WordPress plugins when callers pass $_SERVER or $_GET values.",
+      "detection_pattern": {
+        "grep_pattern": "add_query_arg\\([^)]*\\)\\s*[^;]*(?:echo|print|href=)",
+        "anti_pattern": "esc_url\\s*\\(\\s*add_query_arg",
+        "section_name": "XSS: add_query_arg output without esc_url",
+        "description": "Finds echo/print or href assignments where add_query_arg result is used without esc_url(); this is the most common XSS pattern in WordPress plugins because add_query_arg may propagate attacker-controlled REQUEST_URI when called without explicit $url."
+      }
+    },
+    {
+      "vuln_class": "xss_stored",
+      "location": "bbq_print_js_admin(), lines 334-337",
+      "severity": "low",
+      "reachability": "Admin-only (guarded by screen_id check on line 330). Exploitable only if attacker can supply or modify a translation (.mo/.po) file for the block-bad-queries text domain, e.g. via file-write access, malicious translation plugin, or a compromised supply chain.",
+      "justification": "_e() outputs translated strings directly into bare JavaScript string literals without esc_js() or wp_json_encode(); a translation value containing a single-quote or back-slash can break out of the JS string and execute arbitrary JavaScript in any admin's browser.",
+      "detection_pattern": {
+        "grep_pattern": "<script[^>]*>[\\s\\S]*?_e\\s*\\(",
+        "anti_pattern": "esc_js\\s*\\(\\s*__\\s*\\(|wp_json_encode\\s*\\(__",
+        "section_name": "XSS: _e() or __() inside JavaScript string literal",
+        "description": "Finds translation function calls (_e/__) used directly inside <script> blocks; without esc_js() or wp_json_encode() wrapping, a translation value with special characters breaks JS string context and enables XSS."
+      }
+    },
+    {
+      "vuln_class": "broken_access_control",
+      "location": "bbq_dismiss_notice_save_option(), lines 408-424",
+      "severity": "low",
+      "reachability": "Any logged-in user who can load any admin_init page and who obtains a valid nonce for action 'bbq_dismiss_notice'. The capability check at line 412 fires only after nonce passes, meaning nonce is evaluated for all logged-in users regardless of role.",
+      "justification": "The capability check (current_user_can) is placed inside the nonce-verified branch rather than before it; WordPress best practice is to check capabilities first and then verify the nonce, because verifying a nonce for a low-privilege user wastes server side nonce table state and leaks timing information; in this case the state-mutation (update_option) is correctly gated by the inner capability check so practical impact is negligible, but the ordering is a defensive weakness.",
+      "detection_pattern": {
+        "grep_pattern": "wp_verify_nonce\\s*\\([^)]+\\)[^{]*\\{[^}]*current_user_can",
+        "anti_pattern": "current_user_can[^;]+;[\\s\\S]{0,200}wp_verify_nonce",
+        "section_name": "Auth: capability check after nonce verification",
+        "description": "Flags handlers where current_user_can appears inside the block opened by wp_verify_nonce rather than before it; correct order is capability check first to fail-fast before spending nonce verification resources."
+      }
+    },
+    {
+      "vuln_class": "open_redirect",
+      "location": "bbq_dismiss_notice_save_option(), line 420",
+      "severity": "low",
+      "reachability": "Admin-only (gated by nonce + manage_options). Redirect target is built via admin_url() which is safe, so not exploitable here; risk materialises if redirect target is later changed to incorporate user input.",
+      "justification": "wp_redirect() is used instead of wp_safe_redirect(); while the destination is constructed from admin_url() and is not user-controlled, using wp_redirect() (which allows off-site redirects) instead of wp_safe_redirect() (which restricts to same-site) violates the principle of using the safest available API; if the location construction is later modified to include user input the redirect becomes exploitable.",
+      "detection_pattern": {
+        "grep_pattern": "wp_redirect\\s*\\(",
+        "anti_pattern": "wp_safe_redirect\\s*\\(",
+        "section_name": "Open Redirect: wp_redirect instead of wp_safe_redirect",
+        "description": "Flags use of wp_redirect() in plugin code; wp_safe_redirect() should be preferred for admin-side redirects because it restricts destinations to the same host, preventing open redirect vulnerabilities if the location argument ever incorporates attacker-controlled data."
+      }
+    }
+  ]
+}
