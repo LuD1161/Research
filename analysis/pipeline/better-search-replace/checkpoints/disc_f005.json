@@ -1,0 +1,70 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "sql_injection",
+      "location": "get_columns(), line 158",
+      "severity": "medium",
+      "reachability": "Admin-only. The $table argument flows from AJAX-submitted select_tables[] (class-bsr-ajax.php line 123), is validated by table_exists() (in_array against SHOW TABLES), then passed to get_columns() which runs 'DESCRIBE ' . $table with no escaping and no backtick quoting. The table_exists() whitelist is the sole guard. If a DB table with a crafted name exists (e.g., created externally), the DESCRIBE query could be exploited. On typical setups, no attacker-controlled table names exist, reducing practical risk.",
+      "justification": "Line 158 concatenates $table directly into 'DESCRIBE ' . $table without esc_sql() or $wpdb->prepare(). Unlike get_pages_in_table() which wraps the name in backticks (line 114), get_columns() does not, making it vulnerable to second-order SQL injection if a table name contains SQL metacharacters.",
+      "detection_pattern": {
+        "grep_pattern": "DESCRIBE\\s+['\"\\$]?\\$",
+        "anti_pattern": "prepare\\s*\\(\\s*['\"]DESCRIBE",
+        "section_name": "SQL Injection: DESCRIBE without prepare()",
+        "description": "Matches DESCRIBE queries that interpolate a PHP variable directly into the SQL string. WordPress's $wpdb->prepare() should be used, or the table name should be enclosed in backticks with esc_sql()."
+      }
+    },
+    {
+      "vuln_class": "sql_injection",
+      "location": "srdb(), lines 279 and 291",
+      "severity": "medium",
+      "reachability": "Admin-only. The UPDATE SQL at line 291 is built by concatenating: (1) $table (esc_sql'd at line 189, backtick-wrapped at line 220 but NOT at 291), (2) $column names from get_columns() (unquoted, no esc_sql), (3) $this->mysql_escape_mimic($edited_data) for values. Column names from DESCRIBE are not attacker-controlled under normal conditions, but the UPDATE statement at line 291 builds 'UPDATE ' . $table . ' SET ' . implode(', ', $update_sql) where $table is NOT backtick-wrapped (unlike line 220) and column names in $update_sql have no backtick quoting.",
+      "justification": "The final UPDATE query at line 291 uses $wpdb->query($sql) with a manually assembled SQL string. $table has no backtick quoting (contrast with SELECT at line 220 which uses `$table`). Column names are concatenated unquoted. mysql_escape_mimic() is used instead of $wpdb->prepare(). Any column name containing SQL-significant characters (e.g., a column named 'x` = 1 OR `y') would break the query or allow injection.",
+      "detection_pattern": {
+        "grep_pattern": "wpdb->query\\s*\\(\\s*['\"]UPDATE",
+        "anti_pattern": "wpdb->prepare\\s*\\(\\s*['\"]UPDATE",
+        "section_name": "SQL Injection: wpdb->query() with manually built UPDATE",
+        "description": "Matches direct wpdb->query() calls with UPDATE statements. These bypass $wpdb->prepare() and are vulnerable if any interpolated value is not properly escaped. Should use prepare() or at minimum backtick-quote table/column names and use esc_sql()."
+      }
+    },
+    {
+      "vuln_class": "sql_injection",
+      "location": "srdb(), line 220",
+      "severity": "low",
+      "reachability": "Admin-only. $start and $end are derived from $page * $this->page_size where $page = absint($_REQUEST['bsr_page']) and $page_size = absint(get_option('bsr_page_size')). Both are cast through absint() making them safe integers. $table is esc_sql'd and backtick-quoted. This specific query is safe, but the pattern of direct interpolation without prepare() is worth flagging.",
+      "justification": "Line 220: 'SELECT * FROM `$table` LIMIT $start, $end' - $start and $end are integer-safe via absint(), and $table is backtick-quoted with esc_sql(). No actual vulnerability here, but the practice of not using $wpdb->prepare() creates risk if the code is modified.",
+      "detection_pattern": {
+        "grep_pattern": "LIMIT\\s+\\$[a-z_]+,\\s*\\$[a-z_]+",
+        "anti_pattern": "prepare\\s*\\(.*LIMIT.*%d",
+        "section_name": "SQL Injection: LIMIT clause without prepare()",
+        "description": "Matches LIMIT clauses using interpolated PHP variables. If the variable is not cast to int via absint() or intval(), this is a SQL injection point. Should use $wpdb->prepare() with %d format specifiers."
+      }
+    },
+    {
+      "vuln_class": "sql_injection",
+      "location": "mysql_escape_mimic(), lines 430-439; srdb() lines 234, 279",
+      "severity": "medium",
+      "reachability": "Admin-only. The function is used to escape SQL values placed inside double-quoted strings in the UPDATE SET and WHERE clauses. It escapes standard MySQL special characters but is not equivalent to $wpdb->prepare() or real_escape_string(). It does not handle multi-byte character encoding attacks and relies on double-quoted string literals, which are mode-dependent in MySQL (ANSI_QUOTES mode treats double-quotes as identifier quotes, not string delimiters).",
+      "justification": "mysql_escape_mimic() is a home-rolled escape function used in place of $wpdb->prepare(). With MySQL ANSI_QUOTES SQL mode enabled, double-quoted strings are treated as identifiers rather than string literals, causing the entire escaping scheme to fail and enabling SQL injection. Even without ANSI_QUOTES, using a custom escape function instead of the standard $wpdb->prepare() is a security anti-pattern.",
+      "detection_pattern": {
+        "grep_pattern": "mysql_escape_mimic|mysql_real_escape_string",
+        "anti_pattern": "wpdb->prepare",
+        "section_name": "SQL Injection: custom escape function instead of wpdb->prepare()",
+        "description": "Matches use of custom MySQL escape functions or the deprecated mysql_real_escape_string(). These should be replaced with $wpdb->prepare() which uses PDO-style placeholders and is safe against encoding attacks and SQL mode variations."
+      }
+    },
+    {
+      "vuln_class": "object_injection",
+      "location": "recursive_unserialize_replace(), lines 341, 382; unserialize() static method lines 456-459",
+      "severity": "low",
+      "reachability": "Indirect. Data comes from DB rows fetched via SELECT * (line 220). The data was originally user-submitted (arbitrary DB content). The unserialize() wrapper at line 457 uses allowed_classes => false for PHP 7+, which blocks object instantiation and prevents POP chain exploitation. PHP < 7.0 falls back to a polyfill (BSR\\Brumann\\Polyfill\\Unserialize) which also enforces allowed_classes. The exception-catching try/catch at line 332 suppresses errors.",
+      "justification": "The plugin calls PHP unserialize() on arbitrary database content. The allowed_classes => false mitigation (line 457) is correctly applied and prevents POP gadget exploitation on PHP 7+. The polyfill provides equivalent protection on PHP < 7. This is a noted concern but is mitigated in the current code.",
+      "detection_pattern": {
+        "grep_pattern": "unserialize\\s*\\(",
+        "anti_pattern": "allowed_classes.*false|Unserialize::unserialize",
+        "section_name": "Object Injection: unserialize() without allowed_classes restriction",
+        "description": "Matches calls to PHP's unserialize() function. Without 'allowed_classes' => false, any serialized object in the input can instantiate arbitrary PHP classes, enabling POP chain exploitation leading to RCE or other critical impacts."
+      }
+    }
+  ]
+}

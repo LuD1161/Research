@@ -39,7 +39,7 @@ do_commit() {
     return 0
   fi
   # Commit ONLY this path -- ignores whatever sibling agents have staged.
-  git -c user.name="Aseem Shrey" -c user.email="LuD1161@users.noreply.github.com" commit -q -m "$MSG" -- "$FILE"
+  git commit -q -m "$MSG" -- "$FILE"
 }
 
 if retry do_commit; then

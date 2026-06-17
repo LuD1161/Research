@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "path_traversal_lfi",
+      "location": "BSF_Analytics_Loader::load_analytics(), line 113",
+      "severity": "high",
+      "reachability": "Reachable by any WordPress plugin or theme that calls BSF_Analytics_Loader::get_instance()->set_entity() with an attacker-influenced path value; BSF_Analytics_Loader is a shared singleton across all Brainstorm Force products.",
+      "justification": "The value stored in $this->analytics_path comes directly from $data['path'] (passed to set_entity()) with no sanitization, realpath() check, or prefix validation, and is used in require_once $this->analytics_path . '/class-bsf-analytics.php' — if any calling plugin allows an attacker-controlled value into the path field, this becomes an arbitrary file inclusion (LFI/RCE).",
+      "detection_pattern": {
+        "grep_pattern": "require(?:_once)?\\s+\\$[a-zA-Z_]+(?:\\s*\\.\\s*['\"][^'\"]+['\"])?\\s*;",
+        "anti_pattern": "realpath\\(|plugin_dir_path\\(|ABSPATH|WP_CONTENT_DIR",
+        "section_name": "LFI: require/include of unsanitized variable path",
+        "description": "Catches require/require_once/include calls using a variable path without adjacent realpath() or WordPress path-constant anchoring; such calls can become LFI or RCE if the variable is influenced by attacker-supplied data."
+      }
+    },
+    {
+      "vuln_class": "path_traversal_file_read",
+      "location": "BSF_Analytics_Loader::load_analytics(), line 95",
+      "severity": "medium",
+      "reachability": "Same trust boundary as above: any caller of set_entity() with a controllable path value; the path is concatenated directly with '/version.json' and passed to file_get_contents().",
+      "justification": "file_get_contents($data['path'] . '/version.json') uses an unsanitized path from set_entity() callers with no realpath() or directory-prefix check; if $data['path'] contains traversal sequences (e.g. '../../sensitive-dir'), it can read arbitrary server files, including wp-config.php.",
+      "detection_pattern": {
+        "grep_pattern": "file_get_contents\\s*\\(\\s*\\$[a-zA-Z_]+\\s*\\.\\s*['\"][^'\"]+['\"]",
+        "anti_pattern": "realpath\\(|str_starts_with|strpos.*ABSPATH|plugin_dir_path",
+        "section_name": "Path Traversal: file_get_contents with unsanitized variable prefix",
+        "description": "Catches file_get_contents calls where the path is built by concatenating a variable with a literal suffix, without any path-anchoring or traversal-prevention check; an attacker-controlled variable prefix allows reading arbitrary files."
+      }
+    },
+    {
+      "vuln_class": "missing_array_key_check",
+      "location": "BSF_Analytics_Loader::load_analytics(), line 97",
+      "severity": "low",
+      "reachability": "Triggered whenever the version.json file exists but does not contain the 'bsf-analytics-ver' key; reachable by any entity whose path resolves to a directory containing a version.json without that key.",
+      "justification": "After json_decode(), the code directly accesses $analytics_version['bsf-analytics-ver'] without an isset() guard; if the JSON is malformed or the key is absent, PHP emits a notice and $analytics_version becomes null, causing version_compare(null, ...) to behave unexpectedly and potentially allowing an attacker-placed version.json to influence which analytics path wins the version-comparison race.",
+      "detection_pattern": {
+        "grep_pattern": "json_decode\\s*\\([^)]+\\)[^;]*;\\s*\\n[^;]*\\$[a-zA-Z_]+\\[['\"][^'\"]+['\"]\\]",
+        "anti_pattern": "isset\\(.*\\[|array_key_exists",
+        "section_name": "Missing array key guard after json_decode",
+        "description": "Catches patterns where json_decode output is immediately indexed by a literal key without an isset() or array_key_exists() guard; missing keys produce PHP notices and null values that can corrupt downstream logic such as version comparisons."
+      }
+    }
+  ]
+}

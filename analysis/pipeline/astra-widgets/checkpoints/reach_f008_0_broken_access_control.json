@@ -1,0 +1,7 @@
+{
+  "gate_type": "wp_nonce admin-enqueue (any logged-in) + capability check manage_options default",
+  "gate_breachable": false,
+  "adjusted_severity": "LOW",
+  "reasoning": "Two gates protect dismiss_notice(). Gate 1 is the nonce: wp_create_nonce('astra-notices') is generated in enqueue_scripts() hooked on admin_enqueue_scripts, which fires for ALL logged-in users visiting admin pages (including subscribers), so the nonce is obtainable by any authenticated user — it provides CSRF protection only, not authorization. Gate 2 is the capability check at line 114: apply_filters('astra_notices_user_cap_check', current_user_can($capability)) where $capability defaults to 'manage_options' (line 112). In a default WordPress install with no filter overrides, only admins can pass gate 2. A low-priv user can obtain a valid nonce from the localized JS object (astraNotices._notice_nonce) but will be rejected by the capability check. Exploitation requires a cooperating second plugin that hooks 'astra_notices_user_cap_check' and returns true unconditionally — this is a dependency attack pattern, not a standalone exploit. Even if gate 2 were bypassed, the sink (set_transient with sanitize_key-constrained name, hardcoded true value, absint TTL) has minimal impact: no arbitrary data storage, no XSS/RCE vector. The finding is valid as a design concern (overridable capability filter) but is not default-exploitable. Severity confirmed as LOW.",
+  "_done": true
+}

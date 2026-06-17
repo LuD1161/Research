@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "load_details() / admin_post_bsr_view_details hook (class-bsr-admin.php ~line 220)",
+      "severity": "medium",
+      "reachability": "Any logged-in WordPress user can POST/GET to admin-post.php?action=bsr_view_details. WordPress admin-post.php only requires a logged-in session for admin_post_ hooks (not nopriv), but there is no capability check and no nonce verification inside load_details() before it renders transient data.",
+      "justification": "The handler registered at line 127 of class-bsr-main.php (`admin_post_bsr_view_details`) calls `load_details()`, which performs zero authorization or CSRF checks — it only reads `bsr_results` transient and renders it. Any authenticated user (including Subscribers) can directly load the search/replace result details page.",
+      "detection_pattern": {
+        "grep_pattern": "add_action\\(\\s*['\"]admin_post_[^'\"]+['\"]",
+        "anti_pattern": "check_admin_referer|current_user_can|wp_verify_nonce",
+        "section_name": "Broken Access Control: admin-post handler without auth check",
+        "description": "Matches admin_post_ action registrations. Files where the registered callback does not call check_admin_referer, wp_verify_nonce, or current_user_can are suspicious because any logged-in user can trigger admin-post.php handlers."
+      }
+    },
+    {
+      "vuln_class": "information_disclosure",
+      "location": "load_details() (class-bsr-admin.php ~line 220-263)",
+      "severity": "low",
+      "reachability": "Any logged-in WordPress user who can reach admin-post.php?action=bsr_view_details.",
+      "justification": "Because load_details() has no capability check, any subscriber-level user can view the bsr_results transient, which contains the search terms, replace terms, and table-level change counts from the most recent admin search/replace run. This leaks sensitive data about the site's database structure and recent modifications.",
+      "detection_pattern": {
+        "grep_pattern": "get_transient\\(.*\\)",
+        "anti_pattern": "current_user_can|check_admin_referer|wp_verify_nonce",
+        "section_name": "Information Disclosure: transient data exposed without capability check",
+        "description": "Matches transient reads in handlers. When a handler reads and outputs transient data without checking user capabilities or nonces first, lower-privileged users may observe data from privileged operations."
+      }
+    },
+    {
+      "vuln_class": "unauthenticated_action_dispatch",
+      "location": "do_bsr_ajax() / BSR_AJAX::init() (class-bsr-ajax.php lines 70-81, registered on init hook)",
+      "severity": "low",
+      "reachability": "Any visitor (unauthenticated) can hit ?bsr-ajax=<action> on any page URL (the endpoint is admin_url/tools.php?...&bsr-ajax=, but the init hook fires on the front-end too if the query var is present). The dispatcher has no login check at the routing layer.",
+      "justification": "In do_bsr_ajax() (lines 70-81 of class-bsr-ajax.php), `do_action('bsr_ajax_' . $action)` is called unconditionally for any ?bsr-ajax= parameter during the init hook, before any authentication check. Individual handlers (e.g. process_search_replace) guard themselves with BSR_Utils::check_admin_referer, but the dispatch layer itself is fully open. Third-party code hooking bsr_ajax_* without its own auth check would be exposed.",
+      "detection_pattern": {
+        "grep_pattern": "do_action\\(\\s*['\"].*_ajax_.*\\.",
+        "anti_pattern": "is_user_logged_in|current_user_can|check_ajax_referer",
+        "section_name": "Unauthenticated dispatch: custom AJAX router without login gate",
+        "description": "Matches custom AJAX dispatch patterns that concatenate an action name and call do_action. If the routing layer lacks a login check, unauthenticated requests can trigger any hooked callback that does not have its own auth guard."
+      }
+    }
+  ]
+}
