@@ -1,0 +1,83 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "ssrf_no_url_validation",
+      "location": "simpleGet(), lines 18-22",
+      "severity": "high",
+      "reachability": "Any caller of simpleGet() or simpleGet.concat() that passes a user-controlled URL string or opts.url property",
+      "justification": "opts.url is passed directly into url.parse() and the resulting hostname/port/path are forwarded to http.request()/https.request() without any validation against private IP ranges, loopback addresses, or cloud metadata endpoints (e.g. 169.254.169.254), enabling full SSRF.",
+      "detection_pattern": {
+        "grep_pattern": "http\\.request\\(|https\\.request\\(|url\\.parse\\(",
+        "anti_pattern": "isPrivateIP|isInternal|privateIp|SSRF|blockPrivate|allowedHosts",
+        "section_name": "SSRF: fetch with user URL",
+        "description": "Detects direct use of http.request/https.request or url.parse without any private-IP or allowlist guard, which enables SSRF when the URL is user-controlled."
+      }
+    },
+    {
+      "vuln_class": "ssrf_open_redirect_chain",
+      "location": "simpleGet(), lines 50-68 (redirect handler)",
+      "severity": "high",
+      "reachability": "Any caller making a request to a server that can issue 3xx redirects; the attacker controls the redirect Location header",
+      "justification": "On 3xx responses, res.headers.location is assigned to opts.url and the recursive simpleGet() call is made without re-validating the new URL against private IP ranges, so a redirect from a public server to http://127.0.0.1/ or http://169.254.169.254/ succeeds.",
+      "detection_pattern": {
+        "grep_pattern": "res\\.headers\\.location|statusCode.*30[12378]",
+        "anti_pattern": "isPrivateIP|blockPrivate|redirectUrl.*validate|allowedRedirect",
+        "section_name": "SSRF: redirect without re-validation",
+        "description": "Detects redirect-following code that does not re-validate the Location header URL, allowing an attacker-controlled redirect target to reach internal services."
+      }
+    },
+    {
+      "vuln_class": "crlf_injection",
+      "location": "simpleGet(), line 19 (url.parse path extraction)",
+      "severity": "medium",
+      "reachability": "Callers passing a user-controlled URL string; affected in older Node.js versions where net/http do not strip CRLF",
+      "justification": "The path component extracted by url.parse(opts.url) is used verbatim in the HTTP request; CRLF characters in the path (%0d%0a) can inject extra HTTP headers in Node.js versions that do not sanitize the path, enabling request smuggling or header injection.",
+      "detection_pattern": {
+        "grep_pattern": "url\\.parse\\(.*\\)\\.path|opts\\.path\\s*=",
+        "anti_pattern": "encodeURIComponent|replace.*\\\\r|replace.*\\\\n|sanitizePath",
+        "section_name": "CRLF injection in HTTP path",
+        "description": "Detects use of raw path values from url.parse without CRLF stripping, which can allow header injection in older Node.js runtimes."
+      }
+    },
+    {
+      "vuln_class": "prototype_pollution_header_keys",
+      "location": "simpleGet(), line 26 (header key copy loop)",
+      "severity": "medium",
+      "reachability": "Any caller who passes opts.headers sourced from untrusted input (e.g. parsed JSON or user-supplied object)",
+      "justification": "opts.headers keys are iterated with Object.keys() and copied into a plain headers object without filtering __proto__ or constructor; an input like { \"__proto__\": { \"admin\": true } } pollutes Object.prototype via the bracket-notation assignment headers[k.toLowerCase()] = opts.headers[k].",
+      "detection_pattern": {
+        "grep_pattern": "Object\\.keys.*headers|\\[k\\]\\s*=|\\[key\\]\\s*=",
+        "anti_pattern": "hasOwnProperty|Object\\.create\\(null\\)|k\\s*===\\s*'__proto__'|k\\s*===\\s*'constructor'",
+        "section_name": "Prototype pollution via header key merge",
+        "description": "Detects loops that copy arbitrary keys from a user-supplied object into a plain object using bracket notation, which can pollute Object.prototype when __proto__ or constructor keys are present."
+      }
+    },
+    {
+      "vuln_class": "deserialization_untrusted_json",
+      "location": "simpleGet.concat(), lines 91-96",
+      "severity": "low",
+      "reachability": "Callers of simpleGet.concat() with opts.json=true making requests to attacker-controlled or compromised servers",
+      "justification": "JSON.parse() is called on the raw HTTP response body without any schema validation; a malicious server can return a crafted JSON payload that, when later passed to recursive merge utilities by the caller, enables prototype pollution or type confusion downstream.",
+      "detection_pattern": {
+        "grep_pattern": "JSON\\.parse\\(.*toString\\(\\)\\)|JSON\\.parse\\(data\\)",
+        "anti_pattern": "JSON\\.parse.*reviver|ajv|joi\\.validate|schema\\.validate",
+        "section_name": "Deserialization: JSON.parse on HTTP response",
+        "description": "Detects JSON.parse calls on raw HTTP response data without schema validation or a reviver that blocks prototype-sensitive keys, flagging a deserialization trust boundary issue."
+      }
+    },
+    {
+      "vuln_class": "header_value_injection",
+      "location": "simpleGet(), line 26 (header value copy)",
+      "severity": "medium",
+      "reachability": "Callers passing opts.headers with values sourced from user input",
+      "justification": "Header values from opts.headers are copied verbatim into the outgoing request without CRLF sanitization; in runtimes that do not enforce HTTP/1.1 header field rules, an attacker-controlled header value containing \\r\\n can inject arbitrary headers or split the HTTP request.",
+      "detection_pattern": {
+        "grep_pattern": "headers\\[.*\\]\\s*=|setHeader\\(",
+        "anti_pattern": "replace.*\\\\r\\\\n|sanitizeHeader|encodeHeader|validateHeaderValue",
+        "section_name": "Header value CRLF injection",
+        "description": "Detects assignment of user-controlled values to HTTP header fields without stripping CRLF sequences, which enables header injection or HTTP request splitting."
+      }
+    }
+  ]
+}
