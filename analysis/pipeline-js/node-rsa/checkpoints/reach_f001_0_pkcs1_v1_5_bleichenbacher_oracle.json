@@ -1,0 +1,7 @@
+{
+  "gate_breachable": false,
+  "gate_type": "non-default option required",
+  "adjusted_severity": "low",
+  "reasoning": "The vulnerable PKCS#1 v1.5 binary oracle path in JsEngine.decrypt() is only reached when a caller explicitly sets encryptionScheme:'pkcs1' — a non-default option. The library default (line 3271) is DEFAULT_ENCRYPTION_SCHEME = 'pkcs1_oaep', so any NodeRSA instance created without overriding encryptionScheme uses OAEP and is not affected. The routing logic is unambiguous: nativeAvailableForDecrypt() at line 3984 returns false only when (!usePublic && encryptionScheme === 'pkcs1'), sending execution to the JsEngine fallback; all other schemes (including the default pkcs1_oaep) use Node's native crypto.privateDecrypt with RSA_PKCS1_OAEP_PADDING, which is not susceptible to a Bleichenbacher oracle. The public API surface (NodeRSA.decrypt() at line 3835) is exported and network-reachable, but the vulnerability only materialises under explicit, non-default caller opt-in to pkcs1 mode. There is no schema validation or allowlist guarding the encryptionScheme option — it is purely caller-controlled — but opting into an insecure scheme is a deliberate, documented choice: the library comment at lines 3023-3033 explicitly warns callers to use OAEP for untrusted ciphertexts. Because exploitation requires a non-default configuration that contradicts the library's own recommendation, gate_breachable is false and severity is downgraded from medium to low.",
+  "_done": true
+}
