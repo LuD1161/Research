@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "missing_integer_validation",
+      "location": "flamingo_set_screen_options(), lines 58-69",
+      "severity": "low",
+      "reachability": "Any logged-in user with access to Flamingo admin pages (requires flamingo_edit_contacts or flamingo_edit_inbound_messages capability) can POST an arbitrary value for the screen options. The value is stored in user meta without coercion to integer.",
+      "justification": "The function returns raw `$value` from the request without calling `absint()` or `intval()`, so non-integer values (strings, serialized data in older WP) are persisted to user meta via `update_user_meta`; the risk is contained to the authenticated user's own meta but the contract of a 'per_page' option implies an integer.",
+      "detection_pattern": {
+        "grep_pattern": "function.*set_screen_option[^{]*\\{[^}]*return.*\\$value",
+        "anti_pattern": "absint|intval",
+        "section_name": "Screen option: unvalidated per-page value stored in user meta",
+        "description": "Plugins hooking set_screen_option (or set_screen_option_{option}) that return $value directly without integer coercion store attacker-controlled strings in user meta. In WordPress < 5.4.2 with the generic filter this was a privilege escalation vector; with the specific-option filter form the impact is limited to polluted user meta."
+      }
+    },
+    {
+      "vuln_class": "stored_xss",
+      "location": "flamingo_inbound_submit_meta_box() in meta-boxes.php, lines 172-183 (spam_log reason rendering)",
+      "severity": "low",
+      "reachability": "The spam_log array is stored in post meta (_spam_log) at message creation time via Flamingo_Inbound_Message::add() / ::spam(). When spam_log is populated by an external source (e.g. the flamingo_add_inbound filter), a reason string with HTML can be stored. It is rendered in the admin edit-inbound page for users with flamingo_edit_inbound_message capability via wp_kses_data(), which in practice strips all HTML tags (the 'data' context returns an empty allowed-tags array in WP core), making this a defense-in-depth concern rather than an active XSS.",
+      "justification": "At meta-boxes.php line 178, `$log['reason']` is concatenated into a sprintf format string and then passed to `wp_kses_data()`. Because `wp_kses_data()` maps to `wp_kses($data, 'data')` and `wp_kses_allowed_html('data')` returns an empty array, all HTML is stripped before output. No executable XSS is possible in current WordPress, but the absence of `esc_html()` on `$log['reason']` before the sprintf means the defense relies entirely on `wp_kses_data`; a future change to that context's allowed-tags list would reintroduce XSS.",
+      "detection_pattern": {
+        "grep_pattern": "wp_kses_data\\(.*sprintf.*\\$",
+        "anti_pattern": "esc_html\\(.*\\$log|esc_html\\(.*reason",
+        "section_name": "Stored XSS: unescaped variable inside wp_kses_data sprintf",
+        "description": "Pattern catches wp_kses_data wrapping a sprintf that embeds an unescaped variable. The variable should be esc_html()-escaped inside the sprintf before wp_kses_data is applied; relying solely on wp_kses_data for sanitization is fragile because the allowed context can change."
+      }
+    },
+    {
+      "vuln_class": "unvalidated_filter_class_substitution",
+      "location": "flamingo_load_contact_admin() lines 247-257 (flamingo_contact_csv_class filter) and flamingo_load_inbound_admin() lines 656-666 (flamingo_inbound_csv_class filter)",
+      "severity": "low",
+      "reachability": "Only reachable by authenticated users with flamingo_edit_contacts / flamingo_edit_inbound_messages capability who trigger a CSV export. The class substitution happens via apply_filters so only code already running on the server (another plugin or theme) can influence it.",
+      "justification": "apply_filters('flamingo_contact_csv_class', 'Flamingo_Contact_CSV') allows any plugin to return an arbitrary class name. The guard `is_subclass_of($csv_class, 'Flamingo_CSV')` limits instantiation to subclasses of Flamingo_CSV, but if a malicious class inheriting Flamingo_CSV is loaded (e.g., via a vulnerable companion plugin), its constructor and send_http_headers/print_data methods execute in the admin context. This is a defense-in-depth issue rather than a direct vulnerability, but the filter has no nonce or capability re-verification tied to the class name.",
+      "detection_pattern": {
+        "grep_pattern": "apply_filters.*_csv_class",
+        "anti_pattern": "is_subclass_of|instanceof",
+        "section_name": "Unvalidated filter: CSV class instantiation without subclass guard",
+        "description": "Plugins that use apply_filters to select a class name and then instantiate it without an is_subclass_of / instanceof guard allow any hooking code to redirect instantiation to an arbitrary class, potentially executing unintended methods. Files matching grep_pattern but not anti_pattern lack even the basic subclass constraint."
+      }
+    }
+  ]
+}
