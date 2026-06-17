@@ -1,9 +1,3 @@
-<<<<<<< HEAD
-#!/bin/bash
-cd /DATA/openclaw/Repos/Research
-git add analysis/pipeline-js/ 2>/dev/null
-git -c user.name="Aseem Shrey" -c user.email="LuD1161@users.noreply.github.com" commit -m "ckpt: sync pipeline-js checkpoints" --allow-empty 2>/dev/null || true
-=======
 #!/usr/bin/env bash
 # Concurrency-safe checkpoint PUSH (sync to remote) for resumable workflows.
 #
@@ -47,4 +41,3 @@ fi
 # Non-fatal: commits are safe locally; next wave's sync will catch up.
 echo "ckpt sync deferred (commits safe locally)" >&2
 exit 0
->>>>>>> worktree-woo-security-review

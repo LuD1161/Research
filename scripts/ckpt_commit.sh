@@ -1,11 +1,3 @@
-<<<<<<< HEAD
-#!/bin/bash
-CKPT="$1"
-MSG="$2"
-cd /DATA/openclaw/Repos/Research
-git add "$CKPT" 2>/dev/null
-git -c user.name="Aseem Shrey" -c user.email="LuD1161@users.noreply.github.com" commit -m "$MSG" --allow-empty 2>/dev/null || true
-=======
 #!/usr/bin/env bash
 # Concurrency-safe checkpoint COMMIT for parallel workflow agents.
 #
@@ -47,7 +39,7 @@ do_commit() {
     return 0
   fi
   # Commit ONLY this path -- ignores whatever sibling agents have staged.
-  git commit -q -m "$MSG" -- "$FILE"
+  git -c user.name="Aseem Shrey" -c user.email="LuD1161@users.noreply.github.com" commit -q -m "$MSG" -- "$FILE"
 }
 
 if retry do_commit; then
@@ -56,4 +48,3 @@ if retry do_commit; then
 fi
 echo "ckpt commit FAILED after retries: $FILE" >&2
 exit 1
->>>>>>> worktree-woo-security-review
