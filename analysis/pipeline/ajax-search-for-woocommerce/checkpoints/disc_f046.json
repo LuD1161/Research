@@ -1,0 +1,31 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "unvalidated_redirect_via_get_parameter",
+      "location": "Multilingual::getCurrentLanguage(), line 132-134",
+      "severity": "low",
+      "reachability": "Any unauthenticated visitor can supply ?lang=xx in the URL. The value is used as the current language when neither WPML nor Polylang is active but a third-party filter sets the provider to something other than 'not set'. The language value then flows into getPermalink() which passes it to the wpml_permalink filter, potentially redirecting users via an attacker-supplied language tag.",
+      "justification": "Line 132 reads $_GET['lang'] directly without a nonce or capability check; isLangCode() only enforces character class and length (2-15 alpha chars per segment), which does not prevent the value being used to manipulate URL generation through WPML's wpml_permalink filter in getPermalink().",
+      "detection_pattern": {
+        "grep_pattern": "\\$_(?:GET|REQUEST|POST)\\[.lang.\\]",
+        "anti_pattern": "sanitize_(?:text_field|key)\\(.*\\$_(?:GET|REQUEST|POST)\\[.lang.\\]",
+        "section_name": "Unvalidated $_GET['lang'] used as language identifier",
+        "description": "Detects direct reads of a 'lang' parameter from superglobals without sanitization. In multilingual WordPress plugins, unsanitized lang values can influence URL generation, cache keys, or database lookups, and may enable open redirects or cache-poisoning when the value flows into permalink or redirect functions."
+      }
+    },
+    {
+      "vuln_class": "table_name_interpolated_into_wpdb_prepare",
+      "location": "Multilingual::getPostLang(), lines 155-165; Multilingual::getTermLang(), lines 197-211",
+      "severity": "low",
+      "reachability": "Internal (server-side only). The table name is built from $wpdb->prefix (WordPress-controlled) concatenated with the hardcoded string 'icl_translations'. The $postType and $taxonomy parameters are sanitized with sanitize_key() before use as %s placeholders inside wpdb->prepare(). Not exploitable in isolation.",
+      "justification": "wpdb->prepare() does not escape table or column names; interpolating any variable into the SQL string before prepare() creates a risky pattern that future maintainers may copy with attacker-controlled input. Both call sites suppress the phpcs warning (WordPress.DB.PreparedSQL.InterpolatedNotPrepared) which masks the pattern from automated tooling.",
+      "detection_pattern": {
+        "grep_pattern": "\\$wpdb->(?:get_var|get_col|get_results|query)\\s*\\(\\s*\\$wpdb->prepare\\s*\\([^)]*\\$[a-zA-Z_]+Table",
+        "anti_pattern": "\\$wpdb->(?:prefix)\\s*\\.\\s*'[a-zA-Z_]+'(?!.*\\$[a-zA-Z]*[Ii]nput|.*\\$_(?:GET|POST|REQUEST))",
+        "section_name": "Table name variable interpolated inside wpdb->prepare()",
+        "description": "Catches patterns where a variable table name is string-interpolated into the SQL passed to wpdb->prepare(). prepare() only parameterises %s/%d/%f placeholders; a variable table name bypasses all escaping. Dangerous when the table-name variable is derived from user input or a filter value."
+      }
+    }
+  ]
+}
