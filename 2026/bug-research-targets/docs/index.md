@@ -11,7 +11,7 @@ Every finding is reproduced against a running instance before it is logged as co
 | Ecosystem | Targets Analyzed | Confirmed Findings | Status |
 |-----------|-----------------|-------------------|--------|
 | **WordPress Plugins** | 155 plugins (of top 200) | 49 vulnerabilities | Pipeline complete |
-| **npm / Node.js** | 14 packages | 33 vulnerabilities | Batch 1–4 complete |
+| **npm / Node.js** | 14 packages reviewed | 1 confirmed (write-up complete) | Active |
 | **Web-Tech N-Days** | Next.js image optimizer | 1 SSRF (reproduced) | Active |
 | **Android Apps** | — | — | Pipeline designed |
 | **Browser Extensions** | — | — | Pipeline designed |

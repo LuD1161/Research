@@ -9,9 +9,9 @@ Cross-ecosystem overview of all confirmed vulnerabilities.
 | Ecosystem | Count | Severity Range | Key Classes |
 |-----------|-------|---------------|-------------|
 | [WordPress Plugins](wordpress/index.md) | 49 | Critical–Low | File upload, object injection, stored XSS, authz bypass |
-| [npm / Node.js](npm/index.md) | 33 | High–Medium | SSRF, prototype pollution, ReDoS, path traversal, XSS |
+| [npm / Node.js](npm/index.md) | 1 | High | SSRF |
 
-**Total: 82 confirmed findings** across 2 ecosystems.
+**Total: 50 confirmed findings** across 2 ecosystems.
 
 ---
 
@@ -28,4 +28,4 @@ Cross-ecosystem overview of all confirmed vulnerabilities.
 See per-ecosystem pages for complete listings:
 
 - **[WordPress — 49 findings](wordpress/index.md)** with attack flow diagrams and exploitation chains
-- **[npm / Node.js — 33 findings](npm/index.md)** across 14 packages
+- **[npm / Node.js — 1 finding](npm/index.md)** (Next.js image optimizer SSRF)
