@@ -1,0 +1,6 @@
+{
+  "is_real": false,
+  "severity": "none",
+  "reasoning": "The save_post() callback at lines 626-645 of plugin.php only verifies a nonce (wp_verify_nonce) and contains no current_user_can('edit_post', $post_id) call — that much is accurate. However, the claimed reachability is incorrect. In the standard WordPress post-edit flow, wp-admin/post.php performs check_admin_referer('update-post_'.$post_id) AND current_user_can('edit_post', $post_id) BEFORE calling wp_update_post() -> wp_insert_post() -> do_action('save_post'). A contributor or author who lacks edit rights on a published post owned by someone else is rejected by WordPress core before the plugin hook ever fires. The nonce retention scenario (attacker loads the edit screen, saves the nonce, later replays it) does not bypass the upstream WP capability check — WP core blocks the POST to wp-admin/post.php at its own capability gate. The plugin code is a best-practice violation (defense-in-depth: it should have its own current_user_can guard), but the specific attack path described — contributors/authors modifying others' published posts — is not reachable because WP core prevents it upstream. No alternative code path (AJAX, REST, programmatic) is shown that would fire save_post without a prior capability check. False positive.",
+  "_done": true
+}
