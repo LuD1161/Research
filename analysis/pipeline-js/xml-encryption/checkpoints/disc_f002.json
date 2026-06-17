@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "xml_injection",
+      "location": "encrypted-key.tpl.xml.js line 6 — template literal interpolation of `keyInfo`",
+      "severity": "high",
+      "reachability": "Any caller of the `encrypt` function that controls `options.pem` or intermediate keyInfo rendering; library users constructing encryption options.",
+      "justification": "The `keyInfo` variable is interpolated directly into the XML template on line 6 (`${keyInfo}`) without any escaping. `keyInfo` is itself rendered by `keyinfo.tpl.xml.js`, which embeds `${encryptionPublicCert}` raw on its line 10. `encryptionPublicCert` is built in xmlenc.js line 29 by string-concatenating raw XML around `pemToCert(options.pem.toString())`. If `options.pem` contains XML-significant characters in the cert body position (e.g., via a crafted PEM), they are inserted into the output document unescaped, enabling XML structure manipulation.",
+      "detection_pattern": {
+        "grep_pattern": "\\$\\{[a-zA-Z_][a-zA-Z0-9_]*\\}",
+        "anti_pattern": "escapehtml\\(|xmlEscape\\(|encodeXML\\(",
+        "section_name": "XML injection: unescaped template interpolation in XML output",
+        "description": "Finds template literal interpolations inside XML-generating JS template files. When the interpolated variable is not wrapped in an escaping function (escape-html, xmlEscape, etc.), attacker-controlled input can break out of the XML text context."
+      }
+    },
+    {
+      "vuln_class": "xml_injection",
+      "location": "keyinfo.tpl.xml.js line 10 — unescaped `${encryptionPublicCert}`",
+      "severity": "medium",
+      "reachability": "Same as above — caller controls `options.pem`, whose parsed form is placed into `encryptionPublicCert` and then interpolated unescaped into a KeyInfo XML block.",
+      "justification": "Inside `keyinfo.tpl.xml.js`, the `encryptionPublicCert` parameter is interpolated without escaping on line 10. It is constructed in xmlenc.js as the literal string `'<X509Data><X509Certificate>' + utils.pemToCert(options.pem.toString()) + '</X509Certificate></X509Data>'`. Although the base64 content of a well-formed cert is safe, a crafted or truncated PEM could produce output that closes the `<X509Certificate>` tag early and injects sibling elements into the XML KeyInfo block, affecting downstream XML signature or decryption logic.",
+      "detection_pattern": {
+        "grep_pattern": "\\$\\{[a-zA-Z_][a-zA-Z0-9_]*\\}",
+        "anti_pattern": "escapehtml\\(|xmlEscape\\(|encodeXML\\(",
+        "section_name": "XML injection: unescaped certificate data in XML template",
+        "description": "Template literal interpolations in XML output files without escaping allow cert or key material strings to inject XML structure if the input deviates from the expected base64 format."
+      }
+    },
+    {
+      "vuln_class": "null_dereference_dos",
+      "location": "utils.js `pemToCert` function, line 15 — `cert[1]` accessed without null check",
+      "severity": "medium",
+      "reachability": "Any caller passing a non-PEM or malformed string as `options.pem` to `encryptKeyInfo`; reachable from the public `encrypt` API.",
+      "justification": "In `pemToCert`, the regex `/-----BEGIN CERTIFICATE-----([^-]*)-----END CERTIFICATE-----/g.exec(pem)` returns `null` when `pem` does not match. The code immediately accesses `cert[1]` and `cert.length` on the next line without a null guard, causing an uncaught `TypeError: Cannot read properties of null` that crashes the Node.js process. This is a denial-of-service vector for any service that passes caller-supplied PEM data.",
+      "detection_pattern": {
+        "grep_pattern": "\\.exec\\([^)]+\\)\\s*[;\\n]",
+        "anti_pattern": "if\\s*\\(\\s*cert\\s*\\)|cert\\s*&&|cert\\s*!==\\s*null",
+        "section_name": "Null dereference: regex exec result used without null check",
+        "description": "Identifies `.exec()` calls whose return value is used in the next statement without a null check. `RegExp.prototype.exec` returns null on no-match; accessing properties on null causes a TypeError crash."
+      }
+    },
+    {
+      "vuln_class": "implicit_global_variable_race_condition",
+      "location": "xmlenc.js `encryptKeyInfoWithScheme` function, lines 25, 27, 34 — undeclared `base64EncodedEncryptedKey`, `params`, `result`",
+      "severity": "medium",
+      "reachability": "Any concurrent invocation of `encrypt` in a multi-request Node.js server environment; no external input needed beyond concurrent use.",
+      "justification": "Inside `encryptKeyInfoWithScheme`, the variables `base64EncodedEncryptedKey`, `params`, and `result` are assigned without `var`, `let`, or `const`, making them implicit globals on the module's global object. Under concurrent async calls, a second in-flight encryption can overwrite `params` or `result` before the first call reads them, causing key material (`encryptedKey`, `symmetricKey`) from one session to bleed into another session's output — a potentially critical confidentiality and integrity failure in high-concurrency scenarios.",
+      "detection_pattern": {
+        "grep_pattern": "^\\s{2,}[a-zA-Z_$][a-zA-Z0-9_$]* = ",
+        "anti_pattern": "^\\s*(var|let|const)\\s+",
+        "section_name": "Implicit global variable: undeclared assignment in function scope",
+        "description": "Finds variable assignments inside functions that lack a `var`/`let`/`const` declaration. These become implicit globals in non-strict mode, creating shared mutable state that is unsafe under concurrency and leaks data between calls."
+      }
+    }
+  ]
+}
