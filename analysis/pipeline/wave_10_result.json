@@ -1,0 +1,655 @@
+{
+  "summary": "Run a wave of plugins sequentially through the security review pipeline",
+  "agentCount": 39,
+  "logs": [
+    "wave: 10 plugins",
+    "[1/10] header-and-footer-scripts",
+    "▸ running dynamic workflow review-pipeline",
+    "[review-pipeline] manifest: 1 files at tier>=1 (MANIFEST=/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review/analysis/pipeline/header-and-footer-scripts/manifest.json)",
+    "[review-pipeline] discover a0 w0: files=1 failed=0",
+    "[review-pipeline] verifying 4 raw findings",
+    "[review-pipeline] verify a0 w0: done=4 failed=0",
+    "[review-pipeline] reachability check: 2 of 3 confirmed findings qualify",
+    "[review-pipeline] reach a0 w0: done=2 failed=0",
+    "[review-pipeline] reachability: 2 findings downgraded, 1 unchanged",
+    "▸ review-pipeline done",
+    "header-and-footer-scripts: 1 files → 4 raw → 3 confirmed (2 downgraded)",
+    "[2/10] menu-icons",
+    "▸ running dynamic workflow review-pipeline",
+    "[review-pipeline] manifest: 1 files at tier>=1 (MANIFEST=/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review/analysis/pipeline/menu-icons/manifest.json)",
+    "[review-pipeline] discover a0 w0: files=1 failed=0",
+    "[review-pipeline] verifying 3 raw findings",
+    "[verd:f009.2] failed: API Error: [SSL: SSLV3_ALERT_BAD_RECORD_MAC] sslv3 alert bad record mac (_ssl.c:2546)",
+    "[review-pipeline] verify a0 w0: done=3 failed=0",
+    "[review-pipeline] reachability check: 0 of 0 confirmed findings qualify",
+    "[review-pipeline] reachability: 0 findings downgraded, 0 unchanged",
+    "▸ review-pipeline done",
+    "menu-icons: 1 files → 3 raw → 0 confirmed (0 downgraded)",
+    "[3/10] page-links-to",
+    "▸ running dynamic workflow review-pipeline",
+    "[review-pipeline] manifest: 1 files at tier>=1 (MANIFEST=/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review/analysis/pipeline/page-links-to/manifest.json)",
+    "[review-pipeline] discover a0 w0: files=1 failed=0",
+    "[review-pipeline] verifying 5 raw findings",
+    "[review-pipeline] verify a0 w0: done=4 failed=0",
+    "[review-pipeline] verify a0 w1: done=5 failed=0",
+    "[review-pipeline] reachability check: 2 of 2 confirmed findings qualify",
+    "[review-pipeline] reach a0 w0: done=2 failed=0",
+    "[review-pipeline] reachability: 0 findings downgraded, 2 unchanged",
+    "▸ review-pipeline done",
+    "page-links-to: 1 files → 5 raw → 2 confirmed (0 downgraded)",
+    "[4/10] acf-content-analysis-for-yoast-seo",
+    "acf-content-analysis-for-yoast-seo: 0 tier-2 files — skipping",
+    "[5/10] classic-widgets",
+    "classic-widgets: 0 tier-2 files — skipping",
+    "[6/10] cloudflare-flexible-ssl",
+    "cloudflare-flexible-ssl: 0 tier-2 files — skipping",
+    "[7/10] custom-post-type-permalinks",
+    "custom-post-type-permalinks: 0 tier-2 files — skipping",
+    "[8/10] disable-xml-rpc",
+    "disable-xml-rpc: 0 tier-2 files — skipping",
+    "[9/10] layout-grid",
+    "layout-grid: 0 tier-2 files — skipping",
+    "[10/10] php-compatibility-checker",
+    "php-compatibility-checker: 0 tier-2 files — skipping",
+    "wave complete: 10 plugins, 3 succeeded"
+  ],
+  "result": {
+    "wave": 10,
+    "results": [
+      {
+        "slug": "header-and-footer-scripts",
+        "files": 1,
+        "run": "header-and-footer-scripts",
+        "plugin": "/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review/analysis/pipeline/header-and-footer-scripts/manifest.json",
+        "files_reviewed": 1,
+        "raw_findings": 4,
+        "confirmed_count": 3,
+        "confirmed": [
+          {
+            "id": "f004",
+            "rel": "shfs.php",
+            "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/header-and-footer-scripts/shfs.php",
+            "tags": [
+              "access_control",
+              "sqli",
+              "xss",
+              "auth_token"
+            ],
+            "finding": {
+              "vuln_class": "csrf_no_nonce",
+              "location": "HeaderAndFooterScripts::admin_notices(), line 225-226",
+              "severity": "low",
+              "reachability": "Any authenticated user with access to any wp-admin page can trigger this via a GET request or CSRF img-tag embed; no capability check is performed beyond being in an admin context.",
+              "justification": "The admin_notices handler checks isset($_GET['shfs_dismiss_notice']) and immediately calls delete_option('shfs_script_access_level') without verifying a nonce or checking current_user_can(); a forged GET request (e.g., via an img src pointing to wp-admin/index.php?shfs_dismiss_notice=true) silently suppresses the migration security warning that prompts admins to review permission settings.",
+              "detection_pattern": {
+                "grep_pattern": "isset\\(\\$_GET\\[.*\\]\\).*delete_option",
+                "anti_pattern": "wp_verify_nonce|check_admin_referer",
+                "section_name": "CSRF: GET-triggered option deletion without nonce",
+                "description": "Catches code that acts on a query-string flag to delete or modify options without a nonce, allowing CSRF deletion of WordPress options from any admin page load."
+              }
+            },
+            "verdict": {
+              "is_real": true,
+              "severity": "low",
+              "reasoning": "Confirmed. The admin_notices callback (lines 221-226) checks isset($_GET['shfs_dismiss_notice']) and calls delete_option('shfs_script_access_level') with no nonce and no current_user_can() check. The phpcs:ignore WordPress.Security.NonceVerification.Recommended comment on line 225 explicitly acknowledges the missing nonce. The hook runs on every wp-admin page load, so any authenticated user in the admin context (not unauthenticated) can trigger it. A CSRF vector exists: an img src pointing to any wp-admin URL with ?shfs_dismiss_notice=true will silently delete the option on behalf of any admin who loads the attacker-controlled page. The outer gate (get_option('shfs_script_access_level')) must be truthy, which is only true on sites that previously used the legacy plugin version and have not yet dismissed the migration notice. The effect is confined to suppressing the one-time migration warning notice that prompts admins to review author/contributor script access settings; it does not directly alter the actual permission options (jamify_hfs_allow_author, jamify_hfs_allow_contributor). No sanitizer or guard was missed. Severity is correctly rated low: the impact is indirect (an admin may not see the security-review reminder), not a direct privilege escalation or data exposure."
+            }
+          },
+          {
+            "id": "f004",
+            "rel": "shfs.php",
+            "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/header-and-footer-scripts/shfs.php",
+            "tags": [
+              "access_control",
+              "sqli",
+              "xss",
+              "auth_token"
+            ],
+            "finding": {
+              "vuln_class": "privilege_escalation_via_role_capability",
+              "location": "HeaderAndFooterScripts::update_role_author() lines 248-255, update_role_contributor() lines 263-270, triggered by update_option hooks from the settings form",
+              "severity": "medium",
+              "reachability": "Site administrators who enable the 'Allow Authors add scripts' or 'Allow Contributors add scripts' checkboxes in plugin settings; the capability grant persists in the role table permanently.",
+              "justification": "The plugin's UI states it allows Authors/Contributors to 'add scripts' via the meta box, but the implementation calls $role->add_cap('unfiltered_html') on the entire role globally: this grants the WordPress 'unfiltered_html' capability that bypasses wp_kses_post() in the block/classic editor for ALL posts authored by that role, enabling injection of arbitrary <script> tags in post content far beyond just the plugin's meta box, which constitutes a scope-exceeding privilege escalation.",
+              "detection_pattern": {
+                "grep_pattern": "add_cap\\(.*unfiltered_html",
+                "anti_pattern": "add_cap\\(.*unfiltered_html.*super_admin|is_super_admin",
+                "section_name": "Privilege escalation: unfiltered_html granted to non-admin roles",
+                "description": "Flags code that grants the unfiltered_html capability to Author or Contributor roles, which allows arbitrary HTML/JS injection in post content beyond the plugin's intended scope, and is especially dangerous on multisite where unfiltered_html is intentionally withheld from all but super-admins."
+              }
+            },
+            "verdict": {
+              "is_real": true,
+              "severity": "LOW",
+              "reasoning": "The code at shfs.php lines 248-255 (update_role_author) and 263-270 (update_role_contributor) is confirmed: when the option value is 'yes', $role->add_cap('unfiltered_html') is called on the global WP_Role object for 'author' or 'contributor'. This persists in the wp_user_roles DB option and applies site-wide. The constructor (lines 51-52) registers the triggers via add_action('update_option_jamify_hfs_allow_author', ...) and add_action('update_option_jamify_hfs_allow_contributor', ...) unconditionally. The hook fires whenever update_option() is called for those option keys. The settings form (inc/options.php) posts to WordPress core options.php, which enforces manage_options capability and nonce verification via settings_fields(). Therefore, the trigger is only reachable by a site administrator. The scope-exceeding aspect is real: the UI labels the feature as 'Allow Authors to add scripts' (implying meta-box-scoped access), but the implementation grants 'unfiltered_html' globally, which bypasses wp_kses_post() in the standard block and classic editors for all posts by those users, not just the plugin's meta box. The options page even displays a bold security warning acknowledging this, which confirms the plugin author is aware of the breadth. On multisite, this is more severe: a site admin (who has manage_options but is not a super-admin) can use this setting to grant unfiltered_html to all Contributors/Authors on their subsite, bypassing the WordPress multisite design that intentionally withholds unfiltered_html from non-super-admins. On single-site installs, an administrator granting unfiltered_html to authors is a policy decision within their authority. No attacker-controlled input path exists without administrator credentials or a CSRF attack (mitigated by WP nonces on options.php). The finding's claimed reachability ('Site administrators who enable the checkboxes') is accurate. The 'privilege escalation' framing is most valid on multisite. Severity 'medium' is appropriate: code behavior confirmed, scope-exceeding grant confirmed, but requires administrator action to trigger.",
+              "severity_pre_reach": "medium"
+            },
+            "reachability": {
+              "gate_type": "capability check manage_options + WordPress options.php nonce (settings_fields)",
+              "gate_breachable": false,
+              "adjusted_severity": "LOW",
+              "reasoning": "The exploitation chain requires two gate layers that are both admin-only. First, the settings form in inc/options.php posts to WordPress core options.php and calls settings_fields('header-and-footer-scripts'), which emits a wp_nonce field tied to the 'header-and-footer-scripts' options group. WordPress options.php enforces manage_options capability AND verifies this nonce before processing any registered settings; unauthenticated or low-privilege users are rejected before update_option() is ever called. Second, even if options.php were bypassed, the update_option_jamify_hfs_allow_author and update_option_jamify_hfs_allow_contributor hooks in the constructor fire only as a consequence of update_option() succeeding, which itself requires the caller to have already passed the options.php gate. There is no alternative code path in the plugin that calls update_option for these two keys without administrator authentication. No REST endpoint, AJAX handler, or public-facing route in the plugin touches these option keys. The nonce is generated via wp_create_nonce() inside settings_fields(), which is only rendered on the admin options page that itself requires manage_options to access; there is no place in the plugin or WordPress core where this nonce is exposed to unauthenticated users. The finding is a genuine logic/design flaw (scope-exceeding unfiltered_html grant, especially impactful on multisite), but the trigger is fully gated behind administrator credentials. On multisite the impact is elevated because a site admin (non-super-admin, who has manage_options on their subsite) can use this to grant unfiltered_html to Authors/Contributors, bypassing the multisite design that intentionally withholds unfiltered_html from non-super-admins — but even this path requires the site admin to be authenticated. No unauthenticated or subscriber/contributor-level attacker can reach the vulnerable code without first obtaining administrator (or site-admin on multisite) credentials."
+            }
+          },
+          {
+            "id": "f004",
+            "rel": "shfs.php",
+            "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/header-and-footer-scripts/shfs.php",
+            "tags": [
+              "access_control",
+              "sqli",
+              "xss",
+              "auth_token"
+            ],
+            "finding": {
+              "vuln_class": "stored_xss_by_design_multisite_risk",
+              "location": "HeaderAndFooterScripts::wp_head() line 174, 179; wp_body_open() line 190; wp_footer() line 205",
+              "severity": "medium",
+              "reachability": "All site visitors; the stored scripts are echoed verbatim in page output. The write-path is gated by current_user_can('unfiltered_html') at line 320, but on WordPress multisite this capability is restricted to super-admins only; on single-site, ordinary admins have it by default and the plugin optionally grants it to Author/Contributor roles.",
+              "justification": "All three output hooks echo option values and post meta without any escaping (phpcs:ignore comments confirm this is intentional); while gating input on unfiltered_html is the correct approach for a script-injection plugin, the optional privilege escalation to Author/Contributor roles means lower-privilege users can inject arbitrary JavaScript served to all visitors, and the wp_footer path additionally runs stored content through do_shortcode() which can execute registered shortcode callbacks stored within the scripts.",
+              "detection_pattern": {
+                "grep_pattern": "echo.*get_option.*phpcs:ignore.*EscapeOutput",
+                "anti_pattern": "esc_html|esc_attr|wp_kses",
+                "section_name": "Stored XSS: unescaped echo of option/meta values",
+                "description": "Catches plugins that suppress PHPCS escape warnings and echo option or post-meta values verbatim to page output; combined with any write-path that grants unfiltered_html to non-admin roles this becomes an exploitable stored XSS."
+              }
+            },
+            "verdict": {
+              "is_real": true,
+              "severity": "LOW",
+              "reasoning": "The sinks are confirmed real: wp_head() (line 174) echoes get_option('jamify_hfs_insert_header') verbatim; wp_body_open() (line 190) echoes get_option('jamify_hfs_insert_body') verbatim; wp_footer() (lines 200-205) runs get_option('jamify_hfs_insert_footer') through convert_smilies() and do_shortcode() then echoes it verbatim; per-post meta is echoed at line 179 as $shfs_post_meta['synth_header_script']. All phpcs:ignore comments confirm intentional unescaped output. Two write paths exist: (1) Global options via register_setting() with only 'trim' sanitization, gated behind manage_options (admin), not unfiltered_html as the finding claims; (2) Per-post meta via post_meta_save(), which does gate on current_user_can('unfiltered_html') at line 320. The finding's claim that line 320 gates the global options write path is incorrect -- global options only require manage_options. The optional privilege escalation is confirmed real: update_role_author() and update_role_contributor() (lines ~248-269) explicitly call $role->add_cap('unfiltered_html') when options 'jamify_hfs_allow_author'/'jamify_hfs_allow_contributor' are set to 'yes'. When an admin enables either option, Authors or Contributors can write per-post meta that is echoed verbatim in wp_head for that post. On multisite, unfiltered_html is super-admin only regardless of these settings, limiting the per-post meta path. The global options path is strictly admin-only on both single-site and multisite. The do_shortcode() execution in wp_footer is a real additional concern as it executes registered shortcodes stored within the footer script value. Severity medium is appropriate: the primary admin-only global options path is by-design for WordPress (admins are trusted); the escalation path to Author/Contributor via unfiltered_html grants is the genuinely concerning vector and is the real security risk in this plugin.",
+              "severity_pre_reach": "medium"
+            },
+            "reachability": {
+              "gate_type": "capability check manage_options (global options) + wp_nonce admin-only + capability check unfiltered_html (per-post meta)",
+              "gate_breachable": false,
+              "adjusted_severity": "LOW",
+              "reasoning": "Two write paths exist, neither reachable by unauthenticated or default low-privilege attackers. (1) Global options path: register_setting() with 'trim' sanitization is protected by WordPress Settings API which enforces manage_options capability — strictly admin-only on both single-site and multisite. (2) Per-post meta path: post_meta_save() requires a valid wp_nonce verified against 'jamify_hfs_post_meta_save', which is only generated by meta_setup() when rendering the post edit meta box in the admin area (line 286). The nonce is therefore only obtainable by logged-in users who have access to the post editor. Additionally, even after nonce verification, a second gate at line 320 checks current_user_can('unfiltered_html') before persisting the script content — on single-site this capability belongs only to admins by default; on multisite it is restricted to super-admins regardless of plugin settings. The optional privilege escalation (update_role_author/update_role_contributor granting unfiltered_html via add_cap) is itself gated behind an admin deliberately enabling 'jamify_hfs_allow_author' or 'jamify_hfs_allow_contributor' options. An unauthenticated attacker cannot obtain the nonce (generated only in authenticated admin page render) and cannot satisfy the capability checks. Even a default Author or Contributor on a standard install lacks unfiltered_html unless an admin explicitly grants it via the plugin settings. The sinks are confirmed real and intentionally unescaped, but neither write path is reachable without admin action or an authenticated session with explicitly-granted unfiltered_html capability. The do_shortcode() execution in wp_footer is a legitimate additional risk surface for admin-controlled content but does not change exploitability by external attackers. Severity is downgraded from MEDIUM to LOW because the primary risk (admin storing scripts) is by-design WordPress behavior (admins are trusted), and the escalation vector requires explicit admin opt-in — making this an administrative misconfiguration risk rather than a default-exploitable vulnerability."
+            }
+          }
+        ],
+        "all_with_verdicts": [
+          {
+            "id": "f004",
+            "rel": "shfs.php",
+            "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/header-and-footer-scripts/shfs.php",
+            "tags": [
+              "access_control",
+              "sqli",
+              "xss",
+              "auth_token"
+            ],
+            "finding": {
+              "vuln_class": "csrf_no_nonce",
+              "location": "HeaderAndFooterScripts::admin_notices(), line 225-226",
+              "severity": "low",
+              "reachability": "Any authenticated user with access to any wp-admin page can trigger this via a GET request or CSRF img-tag embed; no capability check is performed beyond being in an admin context.",
+              "justification": "The admin_notices handler checks isset($_GET['shfs_dismiss_notice']) and immediately calls delete_option('shfs_script_access_level') without verifying a nonce or checking current_user_can(); a forged GET request (e.g., via an img src pointing to wp-admin/index.php?shfs_dismiss_notice=true) silently suppresses the migration security warning that prompts admins to review permission settings.",
+              "detection_pattern": {
+                "grep_pattern": "isset\\(\\$_GET\\[.*\\]\\).*delete_option",
+                "anti_pattern": "wp_verify_nonce|check_admin_referer",
+                "section_name": "CSRF: GET-triggered option deletion without nonce",
+                "description": "Catches code that acts on a query-string flag to delete or modify options without a nonce, allowing CSRF deletion of WordPress options from any admin page load."
+              }
+            },
+            "verdict": {
+              "is_real": true,
+              "severity": "low",
+              "reasoning": "Confirmed. The admin_notices callback (lines 221-226) checks isset($_GET['shfs_dismiss_notice']) and calls delete_option('shfs_script_access_level') with no nonce and no current_user_can() check. The phpcs:ignore WordPress.Security.NonceVerification.Recommended comment on line 225 explicitly acknowledges the missing nonce. The hook runs on every wp-admin page load, so any authenticated user in the admin context (not unauthenticated) can trigger it. A CSRF vector exists: an img src pointing to any wp-admin URL with ?shfs_dismiss_notice=true will silently delete the option on behalf of any admin who loads the attacker-controlled page. The outer gate (get_option('shfs_script_access_level')) must be truthy, which is only true on sites that previously used the legacy plugin version and have not yet dismissed the migration notice. The effect is confined to suppressing the one-time migration warning notice that prompts admins to review author/contributor script access settings; it does not directly alter the actual permission options (jamify_hfs_allow_author, jamify_hfs_allow_contributor). No sanitizer or guard was missed. Severity is correctly rated low: the impact is indirect (an admin may not see the security-review reminder), not a direct privilege escalation or data exposure."
+            }
+          },
+          {
+            "id": "f004",
+            "rel": "shfs.php",
+            "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/header-and-footer-scripts/shfs.php",
+            "tags": [
+              "access_control",
+              "sqli",
+              "xss",
+              "auth_token"
+            ],
+            "finding": {
+              "vuln_class": "privilege_escalation_via_role_capability",
+              "location": "HeaderAndFooterScripts::update_role_author() lines 248-255, update_role_contributor() lines 263-270, triggered by update_option hooks from the settings form",
+              "severity": "medium",
+              "reachability": "Site administrators who enable the 'Allow Authors add scripts' or 'Allow Contributors add scripts' checkboxes in plugin settings; the capability grant persists in the role table permanently.",
+              "justification": "The plugin's UI states it allows Authors/Contributors to 'add scripts' via the meta box, but the implementation calls $role->add_cap('unfiltered_html') on the entire role globally: this grants the WordPress 'unfiltered_html' capability that bypasses wp_kses_post() in the block/classic editor for ALL posts authored by that role, enabling injection of arbitrary <script> tags in post content far beyond just the plugin's meta box, which constitutes a scope-exceeding privilege escalation.",
+              "detection_pattern": {
+                "grep_pattern": "add_cap\\(.*unfiltered_html",
+                "anti_pattern": "add_cap\\(.*unfiltered_html.*super_admin|is_super_admin",
+                "section_name": "Privilege escalation: unfiltered_html granted to non-admin roles",
+                "description": "Flags code that grants the unfiltered_html capability to Author or Contributor roles, which allows arbitrary HTML/JS injection in post content beyond the plugin's intended scope, and is especially dangerous on multisite where unfiltered_html is intentionally withheld from all but super-admins."
+              }
+            },
+            "verdict": {
+              "is_real": true,
+              "severity": "medium",
+              "reasoning": "The code at shfs.php lines 248-255 (update_role_author) and 263-270 (update_role_contributor) is confirmed: when the option value is 'yes', $role->add_cap('unfiltered_html') is called on the global WP_Role object for 'author' or 'contributor'. This persists in the wp_user_roles DB option and applies site-wide. The constructor (lines 51-52) registers the triggers via add_action('update_option_jamify_hfs_allow_author', ...) and add_action('update_option_jamify_hfs_allow_contributor', ...) unconditionally. The hook fires whenever update_option() is called for those option keys. The settings form (inc/options.php) posts to WordPress core options.php, which enforces manage_options capability and nonce verification via settings_fields(). Therefore, the trigger is only reachable by a site administrator. The scope-exceeding aspect is real: the UI labels the feature as 'Allow Authors to add scripts' (implying meta-box-scoped access), but the implementation grants 'unfiltered_html' globally, which bypasses wp_kses_post() in the standard block and classic editors for all posts by those users, not just the plugin's meta box. The options page even displays a bold security warning acknowledging this, which confirms the plugin author is aware of the breadth. On multisite, this is more severe: a site admin (who has manage_options but is not a super-admin) can use this setting to grant unfiltered_html to all Contributors/Authors on their subsite, bypassing the WordPress multisite design that intentionally withholds unfiltered_html from non-super-admins. On single-site installs, an administrator granting unfiltered_html to authors is a policy decision within their authority. No attacker-controlled input path exists without administrator credentials or a CSRF attack (mitigated by WP nonces on options.php). The finding's claimed reachability ('Site administrators who enable the checkboxes') is accurate. The 'privilege escalation' framing is most valid on multisite. Severity 'medium' is appropriate: code behavior confirmed, scope-exceeding grant confirmed, but requires administrator action to trigger."
+            }
+          },
+          {
+            "id": "f004",
+            "rel": "shfs.php",
+            "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/header-and-footer-scripts/shfs.php",
+            "tags": [
+              "access_control",
+              "sqli",
+              "xss",
+              "auth_token"
+            ],
+            "finding": {
+              "vuln_class": "stored_xss_by_design_multisite_risk",
+              "location": "HeaderAndFooterScripts::wp_head() line 174, 179; wp_body_open() line 190; wp_footer() line 205",
+              "severity": "medium",
+              "reachability": "All site visitors; the stored scripts are echoed verbatim in page output. The write-path is gated by current_user_can('unfiltered_html') at line 320, but on WordPress multisite this capability is restricted to super-admins only; on single-site, ordinary admins have it by default and the plugin optionally grants it to Author/Contributor roles.",
+              "justification": "All three output hooks echo option values and post meta without any escaping (phpcs:ignore comments confirm this is intentional); while gating input on unfiltered_html is the correct approach for a script-injection plugin, the optional privilege escalation to Author/Contributor roles means lower-privilege users can inject arbitrary JavaScript served to all visitors, and the wp_footer path additionally runs stored content through do_shortcode() which can execute registered shortcode callbacks stored within the scripts.",
+              "detection_pattern": {
+                "grep_pattern": "echo.*get_option.*phpcs:ignore.*EscapeOutput",
+                "anti_pattern": "esc_html|esc_attr|wp_kses",
+                "section_name": "Stored XSS: unescaped echo of option/meta values",
+                "description": "Catches plugins that suppress PHPCS escape warnings and echo option or post-meta values verbatim to page output; combined with any write-path that grants unfiltered_html to non-admin roles this becomes an exploitable stored XSS."
+              }
+            },
+            "verdict": {
+              "is_real": true,
+              "severity": "medium",
+              "reasoning": "The sinks are confirmed real: wp_head() (line 174) echoes get_option('jamify_hfs_insert_header') verbatim; wp_body_open() (line 190) echoes get_option('jamify_hfs_insert_body') verbatim; wp_footer() (lines 200-205) runs get_option('jamify_hfs_insert_footer') through convert_smilies() and do_shortcode() then echoes it verbatim; per-post meta is echoed at line 179 as $shfs_post_meta['synth_header_script']. All phpcs:ignore comments confirm intentional unescaped output. Two write paths exist: (1) Global options via register_setting() with only 'trim' sanitization, gated behind manage_options (admin), not unfiltered_html as the finding claims; (2) Per-post meta via post_meta_save(), which does gate on current_user_can('unfiltered_html') at line 320. The finding's claim that line 320 gates the global options write path is incorrect -- global options only require manage_options. The optional privilege escalation is confirmed real: update_role_author() and update_role_contributor() (lines ~248-269) explicitly call $role->add_cap('unfiltered_html') when options 'jamify_hfs_allow_author'/'jamify_hfs_allow_contributor' are set to 'yes'. When an admin enables either option, Authors or Contributors can write per-post meta that is echoed verbatim in wp_head for that post. On multisite, unfiltered_html is super-admin only regardless of these settings, limiting the per-post meta path. The global options path is strictly admin-only on both single-site and multisite. The do_shortcode() execution in wp_footer is a real additional concern as it executes registered shortcodes stored within the footer script value. Severity medium is appropriate: the primary admin-only global options path is by-design for WordPress (admins are trusted); the escalation path to Author/Contributor via unfiltered_html grants is the genuinely concerning vector and is the real security risk in this plugin."
+            }
+          },
+          {
+            "id": "f004",
+            "rel": "shfs.php",
+            "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/header-and-footer-scripts/shfs.php",
+            "tags": [
+              "access_control",
+              "sqli",
+              "xss",
+              "auth_token"
+            ],
+            "finding": {
+              "vuln_class": "shortcode_execution_of_admin_stored_content",
+              "location": "HeaderAndFooterScripts::wp_footer() lines 201-205",
+              "severity": "low",
+              "reachability": "The footer script content is stored by admins (or lower roles if privilege escalation is enabled) and runs through do_shortcode() on every page load for all visitors.",
+              "justification": "The footer script value is passed to do_shortcode() before output (lines 201-205), while the header and body scripts are not; this inconsistency means any registered shortcode (including those added by other plugins) embedded in footer scripts executes as a callback, creating an indirect code-execution surface if a malicious shortcode is registered or if the stored content was injected by an attacker who exploited the Author/Contributor privilege escalation finding.",
+              "detection_pattern": {
+                "grep_pattern": "do_shortcode.*get_option",
+                "anti_pattern": "current_user_can.*manage_options",
+                "section_name": "Shortcode execution on admin-stored option values",
+                "description": "Flags plugins that run get_option() values through do_shortcode() on front-end output, which can execute arbitrary registered shortcode callbacks and amplifies the impact of any stored-content injection finding."
+              }
+            },
+            "verdict": {
+              "is_real": false,
+              "severity": "informational",
+              "reasoning": "The do_shortcode() call on jamify_hfs_insert_footer is confirmed at lines 201-202 of shfs.php (get_option -> convert_smilies -> do_shortcode -> unescaped echo). The code-level observation is accurate: header and body outputs lack do_shortcode(), footer has it. However, the finding's reachability claim is wrong in a critical way. The footer option is saved via WordPress's Settings API (options.php form with settings_fields). WordPress enforces manage_options on options.php by default, so only Administrators can write this option. The privilege escalation path in the plugin (jamify_hfs_allow_author / jamify_hfs_allow_contributor) grants unfiltered_html to Authors/Contributors, but unfiltered_html does NOT grant manage_options and does NOT allow those roles to write the footer option. No lower-privileged user can reach the sink. Since only an Administrator can store the shortcode in the footer, and Administrators already have full WordPress site control (plugin install, theme editing, direct PHP execution), calling do_shortcode() on their own stored content provides zero additional attack surface. This is a code quality inconsistency, not a security vulnerability.",
+              "_done": true
+            }
+          }
+        ],
+        "reachability_applied": 2,
+        "reachability_downgraded": 2
+      },
+      {
+        "slug": "menu-icons",
+        "files": 1,
+        "run": "menu-icons",
+        "plugin": "/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review/analysis/pipeline/menu-icons/manifest.json",
+        "files_reviewed": 1,
+        "raw_findings": 3,
+        "confirmed_count": 0,
+        "confirmed": [],
+        "all_with_verdicts": [
+          {
+            "id": "f009",
+            "rel": "includes/settings.php",
+            "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/menu-icons/includes/settings.php",
+            "tags": [
+              "access_control",
+              "sqli",
+              "xss"
+            ],
+            "finding": {
+              "vuln_class": "broken_access_control",
+              "location": "_ajax_menu_icons_update_settings(), line 316-325",
+              "severity": "high",
+              "reachability": "Any authenticated WordPress user (subscriber role or above) can POST directly to admin-ajax.php?action=menu_icons_update_settings",
+              "justification": "The handler calls check_ajax_referer() for CSRF protection but has no current_user_can() check; any logged-in user can overwrite the plugin's global settings stored in the menu-icons WordPress option.",
+              "detection_pattern": {
+                "grep_pattern": "add_action\\s*\\(\\s*['\"]wp_ajax_[^'\"]+['\"]",
+                "anti_pattern": "current_user_can",
+                "section_name": "Broken Access Control: AJAX handler without capability check",
+                "description": "Finds wp_ajax_ handler registrations; files where no current_user_can() appears near the handler are suspicious because a nonce alone prevents CSRF but does not restrict which authenticated users can perform the privileged action."
+              }
+            },
+            "verdict": {
+              "is_real": false,
+              "severity": "low",
+              "reasoning": "The AJAX handler _ajax_menu_icons_update_settings() at line 316 lacks a current_user_can() check, confirming a defense-in-depth gap. However, the claimed reachability ('any subscriber or above') is incorrect. The nonce for action 'menu-icons-settings-update' is generated exclusively via wp_nonce_field() inside _meta_box(), which is rendered only on wp-admin/nav-menus.php. WordPress core requires the 'edit_theme_options' capability (Editor role or higher) to access nav-menus.php. A subscriber-level user cannot load nav-menus.php and therefore cannot obtain the required nonce. Without the nonce, check_ajax_referer() kills the request. The localized JS data (wp_localize_script) exposes only the AJAX URL — not the nonce — so there is no frontend exposure path. The practical attack surface is limited to users who already have edit_theme_options, which is an elevated role that can directly edit menus via the same page. The missing capability check is a code quality issue (no explicit authorization gate), but it does not enable privilege escalation for low-privilege roles. Not a real high-severity finding as described."
+            }
+          },
+          {
+            "id": "f009",
+            "rel": "includes/settings.php",
+            "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/menu-icons/includes/settings.php",
+            "tags": [
+              "access_control",
+              "sqli",
+              "xss"
+            ],
+            "finding": {
+              "vuln_class": "broken_access_control",
+              "location": "_maybe_update_settings(), line 233-243",
+              "severity": "medium",
+              "reachability": "Any authenticated user who can craft a POST request to nav-menus.php with a valid nonce (obtainable by visiting nav-menus.php, which itself requires edit_theme_options); ambient page-level protection exists but is not explicitly enforced in the handler",
+              "justification": "check_admin_referer() verifies the nonce but there is no explicit current_user_can('manage_options') or current_user_can('edit_theme_options') check inside _maybe_update_settings(); the function relies entirely on the page's own capability gate rather than defending itself.",
+              "detection_pattern": {
+                "grep_pattern": "check_admin_referer\\s*\\(",
+                "anti_pattern": "current_user_can",
+                "section_name": "Broken Access Control: form handler without explicit capability check",
+                "description": "Finds check_admin_referer() calls; when no current_user_can() appears in the same function, the handler is relying solely on ambient page-level access controls rather than explicitly enforcing authorization."
+              }
+            },
+            "verdict": {
+              "is_real": false,
+              "severity": "none",
+              "reasoning": "The finding correctly identifies that _maybe_update_settings() (lines 233-243) lacks an explicit current_user_can() call inside the function body, but the claimed vulnerability is not real for three reasons:\n\n1. AMBIENT GATE IS ENFORCED BY WORDPRESS CORE: The function is only called from _load_nav_menus(), which is hooked to the 'load-nav-menus.php' action (line 115). WordPress core fires this action only after its own capability check enforces 'edit_theme_options' on the nav-menus.php page. The WordPress page loader (admin.php) calls die() before any plugin hook runs if the current user lacks the required capability. This is not just an 'ambient' or 'incidental' gate - it is a hard WordPress enforcement point that runs before the plugin hook fires.\n\n2. NONCE OBTAINABILITY IS RESTRICTED TO edit_theme_options HOLDERS: The nonce (UPDATE_KEY / 'menu-icons-settings-update') is generated via wp_nonce_field() inside _meta_box(), which renders only on nav-menus.php. Since nav-menus.php itself requires 'edit_theme_options', only users with that capability can ever obtain the nonce. 'edit_theme_options' is an administrator-only capability in default WordPress. There is no path for a Contributor or Editor to obtain this nonce.\n\n3. AJAX ENDPOINT (line 316-324) ALSO PROTECTED BY NONCE SCOPE: The _ajax_menu_icons_update_settings() handler uses check_ajax_referer(UPDATE_KEY) which validates the same nonce. Since acquiring this nonce requires visiting nav-menus.php (edit_theme_options required), the AJAX endpoint is also not reachable by lower-privileged users.\n\n4. IMPACT IS LIMITED EVEN IF REACHED: _update_settings() calls kucrut_validate() (which applies wp_kses_data sanitization) and then update_option('menu-icons', ...). The operation only modifies plugin display settings (icon types, hide_label, position, font size). There is no code execution, file write, or privilege escalation possible through this path.\n\nConclusion: The absence of an explicit current_user_can() in _maybe_update_settings() is a code quality concern (missing defense-in-depth) but is NOT an exploitable vulnerability. The WordPress core page-level gate enforced before any hook fires provides a hard boundary. No authenticated user below 'edit_theme_options' (administrator) can reach this code path. This is a false positive."
+            }
+          },
+          {
+            "id": "f009",
+            "rel": "includes/settings.php",
+            "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/menu-icons/includes/settings.php",
+            "tags": [
+              "access_control",
+              "sqli",
+              "xss"
+            ],
+            "finding": {
+              "vuln_class": "xss_stored",
+              "location": "_enqueue_assets(), line 744 (upsell anchor construction), propagated into settingsInfo at line 757-766 via wp_localize_script at line 777",
+              "severity": "low",
+              "reachability": "Admin-only context; the $upsell_notices values are hardcoded in this file but the surrounding $js_data array is passed through apply_filters('menu_icons_settings_js_data', ...) at line 747, and $upsell_notices['url'] / ['btn_text'] are concatenated into $box_data without esc_url()/esc_html() before being embedded in settingsInfo",
+              "justification": "On line 744, $upsell_notices[$rand_key]['url'] and ['btn_text'] are injected directly into an HTML anchor string without esc_url() or esc_html(); this $box_data is then embedded verbatim into the settingsInfo JS string passed to wp_localize_script, meaning any filter that alters the upsell URL or text could introduce XSS rendered in the admin page.",
+              "detection_pattern": {
+                "grep_pattern": "href=['\"]\\s*\\.\\s*\\$[a-zA-Z_]+\\[",
+                "anti_pattern": "esc_url\\s*\\(",
+                "section_name": "XSS: unescaped URL concatenated into anchor href",
+                "description": "Finds href attribute values built by concatenating PHP variables without esc_url(); any variable-derived URL lacking esc_url() is a potential XSS vector if a filter or upstream code can influence the value."
+              }
+            },
+            "verdict": null
+          }
+        ],
+        "reachability_applied": 0,
+        "reachability_downgraded": 0
+      },
+      {
+        "slug": "page-links-to",
+        "files": 1,
+        "run": "page-links-to",
+        "plugin": "/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review/analysis/pipeline/page-links-to/manifest.json",
+        "files_reviewed": 1,
+        "raw_findings": 5,
+        "confirmed_count": 2,
+        "confirmed": [
+          {
+            "id": "f001",
+            "rel": "classes/plugin.php",
+            "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/page-links-to/classes/plugin.php",
+            "tags": [
+              "access_control",
+              "sqli",
+              "xss",
+              "auth_token"
+            ],
+            "finding": {
+              "vuln_class": "broken_access_control",
+              "location": "ajax_dismiss_notice / line 942-946",
+              "severity": "medium",
+              "reachability": "Any logged-in WordPress user (wp_ajax_ requires authentication by default, but no capability check is performed beyond being logged in)",
+              "justification": "The wp_ajax_plt_dismiss_notice handler calls dismiss_notice() which writes to the site-wide DISMISSED_NOTICES option with no nonce verification and no current_user_can() check, allowing any authenticated user to permanently suppress admin notices for all users on the site.",
+              "detection_pattern": {
+                "grep_pattern": "wp_ajax_[a-z_]+.*\\bdismiss\\b",
+                "anti_pattern": "check_ajax_referer|wp_verify_nonce|current_user_can",
+                "section_name": "CSRF+AuthZ: AJAX dismiss handler without nonce or capability check",
+                "description": "Finds AJAX handlers whose action name contains 'dismiss'; these typically mutate persistent option state and should have both a nonce and a capability check. Files matching but not containing a nonce or capability verification are likely missing access controls."
+              }
+            },
+            "verdict": {
+              "is_real": true,
+              "severity": "medium",
+              "reasoning": "Verified in /home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/page-links-to/classes/plugin.php. The complete attack path is confirmed:\n\n1. Hook registration (line 158): 'wp_ajax_plt_dismiss_notice' maps to ajax_dismiss_notice() — only the wp_ajax_ variant is registered (not wp_ajax_nopriv_), so authentication is required, but no capability beyond being logged-in.\n\n2. Handler (lines 942-946): ajax_dismiss_notice() contains no check_ajax_referer, no wp_verify_nonce, no current_user_can() call. The only gate is isset($_GET['plt_notice']) && is_numeric($_GET['plt_notice']), which is not a security guard — it merely avoids PHP warnings and any integer value passes.\n\n3. Sink (lines 1023-1028): dismiss_notice($id) calls update_option(self::DISMISSED_NOTICES, $notices) where DISMISSED_NOTICES = 'page_links_dismissed_options' (line 31) — a site-wide WordPress option, not per-user meta.\n\n4. Any authenticated WordPress user (subscriber, customer, etc.) can send: POST /wp-admin/admin-ajax.php?action=plt_dismiss_notice&plt_notice=4 with no nonce. This permanently appends the integer to the site-wide dismissed notices array, suppressing that admin notice for all users on the site.\n\n5. No sanitizer or guard was missed. The is_numeric() and (int) cast control input type only — they do not restrict who can call the handler or enforce any access level.\n\n6. CSRF is also present (no nonce), meaning an unauthenticated attacker can trigger this via a logged-in admin visiting a malicious page, but the broken_access_control framing is the primary class.\n\nSeverity is medium: impact is site-wide persistent state corruption (suppression of admin notices for all users), not code execution or data exfiltration. Reachability claim in finding is correct."
+            },
+            "reachability": {
+              "gate_breachable": true,
+              "gate_type": "no gate — open handler",
+              "adjusted_severity": "medium",
+              "reasoning": "The wp_ajax_plt_dismiss_notice handler (line 158/942-946) has exactly one gate: WordPress authentication cookie required by the wp_ajax_ hook prefix (not wp_ajax_nopriv_). There is no nonce, no capability check, and no secret value. The gate value (a valid WordPress session cookie) is trivially possessed by ANY logged-in user — subscriber, customer, contributor — in a default WordPress install. The exploitation path requires only: (1) be logged in to the site as any user role, (2) send POST /wp-admin/admin-ajax.php?action=plt_dismiss_notice&plt_notice=4 with no additional tokens. The handler calls dismiss_notice() which calls update_option('page_links_dismissed_options', ...) — a site-wide persistent option, not per-user meta — permanently suppressing admin notices for ALL users. CSRF is also present (no nonce), meaning a logged-in admin browsing a malicious page could be forced to trigger it cross-site, but the broken_access_control framing is primary. Severity remains medium: impact is site-wide persistent state corruption (suppressing admin notices for all users, including security/update alerts), not code execution or data exfiltration. Comparison: ajax_quick_add (line 953-969) demonstrates the developer knew how to secure AJAX handlers — it calls current_user_can('edit_pages') AND check_ajax_referer('plt-quick-add', 'plt_nonce') — confirming this omission on ajax_dismiss_notice is a genuine oversight, not intentional open access."
+            }
+          },
+          {
+            "id": "f001",
+            "rel": "classes/plugin.php",
+            "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/page-links-to/classes/plugin.php",
+            "tags": [
+              "access_control",
+              "sqli",
+              "xss",
+              "auth_token"
+            ],
+            "finding": {
+              "vuln_class": "csrf",
+              "location": "ajax_dismiss_notice / line 942-946",
+              "severity": "medium",
+              "reachability": "Any logged-in WordPress user; a CSRF request from a third-party page dismisses the notice for any logged-in admin because no nonce is verified",
+              "justification": "The plt_dismiss_notice AJAX handler reads $_GET['plt_notice'] and calls update_option() with no call to check_ajax_referer() or wp_verify_nonce(), making it trivially CSRF-able by any page that can lure a logged-in admin into making a GET request to admin-ajax.php?action=plt_dismiss_notice&plt_notice=4.",
+              "detection_pattern": {
+                "grep_pattern": "add_action.*wp_ajax_[a-z_]+",
+                "anti_pattern": "check_ajax_referer|wp_verify_nonce",
+                "section_name": "CSRF: AJAX handler without nonce verification",
+                "description": "Finds all wp_ajax_ action registrations; the corresponding handler should contain check_ajax_referer or wp_verify_nonce. Handlers matched here but not the anti-pattern are missing CSRF protection."
+              }
+            },
+            "verdict": {
+              "is_real": true,
+              "severity": "medium",
+              "reasoning": "Confirmed real CSRF vulnerability. Full path verified:\n\n1. REGISTRATION (line 158): `$this->hook('wp_ajax_plt_dismiss_notice', 'ajax_dismiss_notice')` — registered only under `wp_ajax_` (requires login), not `wp_ajax_nopriv_`, so only logged-in users trigger it. This matches the claimed reachability.\n\n2. HANDLER (lines 942-946): `ajax_dismiss_notice()` reads `$_GET['plt_notice']`, casts to int with `is_numeric()` check, then calls `self::dismiss_notice((int) $_GET['plt_notice'])`. No call to `check_ajax_referer()`, `wp_verify_nonce()`, or `current_user_can()` anywhere in this handler.\n\n3. SINK (lines 1023-1028): `dismiss_notice($id)` appends the int to the dismissed-notices array and writes it to the database via `update_option(self::DISMISSED_NOTICES, $notices)`. Attacker-controlled int reaches `update_option` with no sanitizer or guard missed.\n\n4. NO MISSING GUARD: A file-wide grep for `check_ajax_referer`, `wp_verify_nonce`, `current_user_can` shows these are only present in `ajax_quick_add` (line 954-955) and unrelated code paths (lines 343, 439, 628). They are entirely absent from `ajax_dismiss_notice` and `dismiss_notice`.\n\n5. CONTRAST: The sibling handler `ajax_quick_add` (line 953-955) correctly uses `current_user_can('edit_pages')` AND `check_ajax_referer('plt-quick-add', 'plt_nonce')`, proving the developer knows the pattern and deliberately or inadvertently omitted it from `ajax_dismiss_notice`.\n\n6. IMPACT: Any third-party page that causes a logged-in WordPress admin to issue a GET request to `admin-ajax.php?action=plt_dismiss_notice&plt_notice=<N>` will silently persist that notice ID to the options table — no user interaction beyond page load required. The impact is limited to UI nuisance (hiding an admin notice), not privilege escalation or data exfiltration, which justifies medium severity over high.",
+              "_done": true
+            },
+            "reachability": {
+              "gate_breachable": true,
+              "gate_type": "no gate — authentication cookie only (wp_ajax_ prefix), no nonce, no capability check",
+              "adjusted_severity": "medium",
+              "reasoning": "The only access control on ajax_dismiss_notice is the WordPress authentication layer enforced by the wp_ajax_ hook prefix (line 158), which requires a logged-in session. There is no nonce, no wp_verify_nonce(), no check_ajax_referer(), and no current_user_can() call anywhere in ajax_dismiss_notice() (lines 942-946) or its sink dismiss_notice() (lines 1023-1028). In a CSRF attack the attacker does not need to obtain the authentication cookie — the victim's browser sends it automatically when it makes the cross-site request. Therefore the authentication-only gate is fully bypassed by the CSRF vector itself: any attacker-controlled page that causes a logged-in WordPress admin to issue a GET to admin-ajax.php?action=plt_dismiss_notice&plt_notice=<N> will silently write to update_option(). No secret value exists to steal or guess. The sibling handler ajax_quick_add (lines 953-955) uses both current_user_can('edit_pages') and check_ajax_referer('plt-quick-add','plt_nonce'), confirming the developer knows the correct pattern and that its omission from ajax_dismiss_notice is the defect. Impact is limited to UI state manipulation (hiding admin notices), which keeps severity at medium rather than high."
+            }
+          }
+        ],
+        "all_with_verdicts": [
+          {
+            "id": "f001",
+            "rel": "classes/plugin.php",
+            "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/page-links-to/classes/plugin.php",
+            "tags": [
+              "access_control",
+              "sqli",
+              "xss",
+              "auth_token"
+            ],
+            "finding": {
+              "vuln_class": "broken_access_control",
+              "location": "ajax_dismiss_notice / line 942-946",
+              "severity": "medium",
+              "reachability": "Any logged-in WordPress user (wp_ajax_ requires authentication by default, but no capability check is performed beyond being logged in)",
+              "justification": "The wp_ajax_plt_dismiss_notice handler calls dismiss_notice() which writes to the site-wide DISMISSED_NOTICES option with no nonce verification and no current_user_can() check, allowing any authenticated user to permanently suppress admin notices for all users on the site.",
+              "detection_pattern": {
+                "grep_pattern": "wp_ajax_[a-z_]+.*\\bdismiss\\b",
+                "anti_pattern": "check_ajax_referer|wp_verify_nonce|current_user_can",
+                "section_name": "CSRF+AuthZ: AJAX dismiss handler without nonce or capability check",
+                "description": "Finds AJAX handlers whose action name contains 'dismiss'; these typically mutate persistent option state and should have both a nonce and a capability check. Files matching but not containing a nonce or capability verification are likely missing access controls."
+              }
+            },
+            "verdict": {
+              "is_real": true,
+              "severity": "medium",
+              "reasoning": "Verified in /home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/page-links-to/classes/plugin.php. The complete attack path is confirmed:\n\n1. Hook registration (line 158): 'wp_ajax_plt_dismiss_notice' maps to ajax_dismiss_notice() — only the wp_ajax_ variant is registered (not wp_ajax_nopriv_), so authentication is required, but no capability beyond being logged-in.\n\n2. Handler (lines 942-946): ajax_dismiss_notice() contains no check_ajax_referer, no wp_verify_nonce, no current_user_can() call. The only gate is isset($_GET['plt_notice']) && is_numeric($_GET['plt_notice']), which is not a security guard — it merely avoids PHP warnings and any integer value passes.\n\n3. Sink (lines 1023-1028): dismiss_notice($id) calls update_option(self::DISMISSED_NOTICES, $notices) where DISMISSED_NOTICES = 'page_links_dismissed_options' (line 31) — a site-wide WordPress option, not per-user meta.\n\n4. Any authenticated WordPress user (subscriber, customer, etc.) can send: POST /wp-admin/admin-ajax.php?action=plt_dismiss_notice&plt_notice=4 with no nonce. This permanently appends the integer to the site-wide dismissed notices array, suppressing that admin notice for all users on the site.\n\n5. No sanitizer or guard was missed. The is_numeric() and (int) cast control input type only — they do not restrict who can call the handler or enforce any access level.\n\n6. CSRF is also present (no nonce), meaning an unauthenticated attacker can trigger this via a logged-in admin visiting a malicious page, but the broken_access_control framing is the primary class.\n\nSeverity is medium: impact is site-wide persistent state corruption (suppression of admin notices for all users), not code execution or data exfiltration. Reachability claim in finding is correct."
+            }
+          },
+          {
+            "id": "f001",
+            "rel": "classes/plugin.php",
+            "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/page-links-to/classes/plugin.php",
+            "tags": [
+              "access_control",
+              "sqli",
+              "xss",
+              "auth_token"
+            ],
+            "finding": {
+              "vuln_class": "broken_access_control",
+              "location": "save_post / line 626-645",
+              "severity": "medium",
+              "reachability": "Any user who can submit a valid nonce for the target post (i.e., anyone who loaded the post-edit screen for that post ID, including contributors and authors on their own posts)",
+              "justification": "save_post verifies the nonce but never calls current_user_can('edit_post', $post_id), so any user who once loaded a post-edit screen for a given post and retained the nonce can set or delete the custom redirect URL on that post — including authors/contributors who lack the right to modify others' posts once they are published.",
+              "detection_pattern": {
+                "grep_pattern": "function save_post\\(\\s*\\$post_id",
+                "anti_pattern": "current_user_can.*edit_post",
+                "section_name": "AuthZ: save_post hook without capability check",
+                "description": "Finds save_post implementations that lack a current_user_can('edit_post') guard; a nonce alone is CSRF protection, not authorization — anyone with a valid nonce for any role can trigger the state change."
+              }
+            },
+            "verdict": {
+              "is_real": false,
+              "severity": "none",
+              "reasoning": "The save_post() callback at lines 626-645 of plugin.php only verifies a nonce (wp_verify_nonce) and contains no current_user_can('edit_post', $post_id) call — that much is accurate. However, the claimed reachability is incorrect. In the standard WordPress post-edit flow, wp-admin/post.php performs check_admin_referer('update-post_'.$post_id) AND current_user_can('edit_post', $post_id) BEFORE calling wp_update_post() -> wp_insert_post() -> do_action('save_post'). A contributor or author who lacks edit rights on a published post owned by someone else is rejected by WordPress core before the plugin hook ever fires. The nonce retention scenario (attacker loads the edit screen, saves the nonce, later replays it) does not bypass the upstream WP capability check — WP core blocks the POST to wp-admin/post.php at its own capability gate. The plugin code is a best-practice violation (defense-in-depth: it should have its own current_user_can guard), but the specific attack path described — contributors/authors modifying others' published posts — is not reachable because WP core prevents it upstream. No alternative code path (AJAX, REST, programmatic) is shown that would fire save_post without a prior capability check. False positive."
+            }
+          },
+          {
+            "id": "f001",
+            "rel": "classes/plugin.php",
+            "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/page-links-to/classes/plugin.php",
+            "tags": [
+              "access_control",
+              "sqli",
+              "xss",
+              "auth_token"
+            ],
+            "finding": {
+              "vuln_class": "open_redirect",
+              "location": "template_redirect / get_redirect / absolute_url / lines 775-861",
+              "severity": "low",
+              "reachability": "Unauthenticated visitors — the redirect fires on every singular page request without any authentication gate",
+              "justification": "get_redirect() retrieves the raw URL stored in post meta and passes it through absolute_url() which does not call esc_url() or wp_http_validate_url(), then hands the result to wp_redirect() with a 301 status; a stored URL such as 'javascript:alert(1)' passes through unchallenged because clean_url() at save time only prepends 'http://' for 'www.' prefixes and enforces no scheme allowlist.",
+              "detection_pattern": {
+                "grep_pattern": "wp_redirect\\(\\s*\\$",
+                "anti_pattern": "esc_url|wp_http_validate_url|wp_sanitize_redirect",
+                "section_name": "Open redirect: wp_redirect without URL validation",
+                "description": "Matches wp_redirect calls where the URL argument is a variable; without esc_url or an allowlist check the destination could be an arbitrary or dangerous scheme stored earlier in the DB."
+              }
+            },
+            "verdict": {
+              "is_real": false,
+              "severity": "informational",
+              "reasoning": "The finding correctly identifies that clean_url() (lines 653-662) applies no scheme allowlist — only trim() and www. prefixing — and that absolute_url() (lines 843-861) similarly performs no scheme validation before wp_redirect() at line 780. However, the critical flaw in the finding is the reachability claim. The attacker-controlled input path requires storing the URL via save_post() at line 626, which is protected by wp_verify_nonce() and requires the authenticated editor/admin capability to modify post meta. Unauthenticated visitors trigger the redirect but cannot set the destination — the finding conflates trigger with control. Additionally, the javascript: XSS concern is a non-issue: wp_redirect() issues an HTTP Location header, and browsers do not execute javascript: URIs delivered via Location headers (this is a browser-enforced constraint). The redirect to arbitrary external http/https URLs is the plugin's intentional design — 'Page Links To' exists solely to redirect posts to custom URLs — so there is no meaningful vulnerability here beyond the plugin's stated purpose. No host allowlist is absent by design. The finding should be rejected as a mischaracterization of intended functionality combined with an incorrect threat model for the attacker's capability."
+            }
+          },
+          {
+            "id": "f001",
+            "rel": "classes/plugin.php",
+            "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/page-links-to/classes/plugin.php",
+            "tags": [
+              "access_control",
+              "sqli",
+              "xss",
+              "auth_token"
+            ],
+            "finding": {
+              "vuln_class": "stored_xss",
+              "location": "meta_box / line 592",
+              "severity": "low",
+              "reachability": "Admin or editor — the script src concatenates esc_url() output with an unescaped suffix; the suffix is a compile-time constant so not directly attacker-controlled, but the pattern is fragile if CSS_JS_VERSION becomes filterable",
+              "justification": "Line 592 emits a script src tag as esc_url($this->get_url()) . 'dist/meta-box.js?v=' . self::CSS_JS_VERSION where esc_url wraps only the plugin URL prefix and the concatenated suffix sits outside the escaping call — if CSS_JS_VERSION were made dynamic or filterable upstream, this becomes a script injection in the admin.",
+              "detection_pattern": {
+                "grep_pattern": "echo esc_url.*\\..*['\"]",
+                "anti_pattern": "esc_url\\([^)]+\\.[^)]+\\)",
+                "section_name": "Partial escaping: esc_url applied to only part of a concatenated URL",
+                "description": "Matches patterns where esc_url is applied then further string content is appended via concatenation outside the escaping call; the suffix is not sanitized."
+              }
+            },
+            "verdict": {
+              "is_real": false,
+              "severity": "N/A",
+              "reasoning": "Line 592 emits: echo esc_url( $this->get_url() ) . 'dist/meta-box.js?v=' . self::CSS_JS_VERSION. The esc_url() call wraps only $this->get_url(), which resolves to plugin_dir_url($this->file) — a server-controlled constant derived from the plugin's filesystem location. The appended suffix 'dist/meta-box.js?v=' is a string literal and self::CSS_JS_VERSION is a PHP class constant (const CSS_JS_VERSION = '3.4.1') — PHP class constants are not runtime-modifiable, cannot be filtered via apply_filters, and cannot be influenced by attacker-controlled input without source code modification. No component of the concatenated URL receives attacker-controlled data. The partial esc_url() coverage is a code smell and a fragile pattern, but it does not constitute a present vulnerability. The finding's own justification concedes the suffix is a compile-time constant, and the hypothetical about CSS_JS_VERSION becoming filterable is speculative, not evidence of a real flaw. Auth/reachability assessment (admin/editor) is accurate but irrelevant given no attacker-controlled sink exists."
+            }
+          },
+          {
+            "id": "f001",
+            "rel": "classes/plugin.php",
+            "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/page-links-to/classes/plugin.php",
+            "tags": [
+              "access_control",
+              "sqli",
+              "xss",
+              "auth_token"
+            ],
+            "finding": {
+              "vuln_class": "csrf",
+              "location": "ajax_dismiss_notice / line 942-946",
+              "severity": "medium",
+              "reachability": "Any logged-in WordPress user; a CSRF request from a third-party page dismisses the notice for any logged-in admin because no nonce is verified",
+              "justification": "The plt_dismiss_notice AJAX handler reads $_GET['plt_notice'] and calls update_option() with no call to check_ajax_referer() or wp_verify_nonce(), making it trivially CSRF-able by any page that can lure a logged-in admin into making a GET request to admin-ajax.php?action=plt_dismiss_notice&plt_notice=4.",
+              "detection_pattern": {
+                "grep_pattern": "add_action.*wp_ajax_[a-z_]+",
+                "anti_pattern": "check_ajax_referer|wp_verify_nonce",
+                "section_name": "CSRF: AJAX handler without nonce verification",
+                "description": "Finds all wp_ajax_ action registrations; the corresponding handler should contain check_ajax_referer or wp_verify_nonce. Handlers matched here but not the anti-pattern are missing CSRF protection."
+              }
+            },
+            "verdict": {
+              "is_real": true,
+              "severity": "medium",
+              "reasoning": "Confirmed real CSRF vulnerability. Full path verified:\n\n1. REGISTRATION (line 158): `$this->hook('wp_ajax_plt_dismiss_notice', 'ajax_dismiss_notice')` — registered only under `wp_ajax_` (requires login), not `wp_ajax_nopriv_`, so only logged-in users trigger it. This matches the claimed reachability.\n\n2. HANDLER (lines 942-946): `ajax_dismiss_notice()` reads `$_GET['plt_notice']`, casts to int with `is_numeric()` check, then calls `self::dismiss_notice((int) $_GET['plt_notice'])`. No call to `check_ajax_referer()`, `wp_verify_nonce()`, or `current_user_can()` anywhere in this handler.\n\n3. SINK (lines 1023-1028): `dismiss_notice($id)` appends the int to the dismissed-notices array and writes it to the database via `update_option(self::DISMISSED_NOTICES, $notices)`. Attacker-controlled int reaches `update_option` with no sanitizer or guard missed.\n\n4. NO MISSING GUARD: A file-wide grep for `check_ajax_referer`, `wp_verify_nonce`, `current_user_can` shows these are only present in `ajax_quick_add` (line 954-955) and unrelated code paths (lines 343, 439, 628). They are entirely absent from `ajax_dismiss_notice` and `dismiss_notice`.\n\n5. CONTRAST: The sibling handler `ajax_quick_add` (line 953-955) correctly uses `current_user_can('edit_pages')` AND `check_ajax_referer('plt-quick-add', 'plt_nonce')`, proving the developer knows the pattern and deliberately or inadvertently omitted it from `ajax_dismiss_notice`.\n\n6. IMPACT: Any third-party page that causes a logged-in WordPress admin to issue a GET request to `admin-ajax.php?action=plt_dismiss_notice&plt_notice=<N>` will silently persist that notice ID to the options table — no user interaction beyond page load required. The impact is limited to UI nuisance (hiding an admin notice), not privilege escalation or data exfiltration, which justifies medium severity over high.",
+              "_done": true
+            }
+          }
+        ],
+        "reachability_applied": 2,
+        "reachability_downgraded": 0
+      },
+      {
+        "slug": "acf-content-analysis-for-yoast-seo",
+        "files": 0,
+        "skipped": true
+      },
+      {
+        "slug": "classic-widgets",
+        "files": 0,
+        "skipped": true
+      },
+      {
+        "slug": "cloudflare-flexible-ssl",
+        "files": 0,
+        "skipped": true
+      },
+      {
+        "slug": "custom-post-type-permalinks",
+        "files": 0,
+        "skipped": true
+      },
+      {
+        "slug": "disable-xml-rpc",
+        "files": 0,
+        "skipped": true
+      },
+      {
+        "slug": "layout-grid",
+        "files": 0,
+        "skipped": true
+      },
+      {
+        "slug": "php-compatibility-checker",
+        "files": 0,
+        "skipped": true
+      }
+    ]
+  }
+}
