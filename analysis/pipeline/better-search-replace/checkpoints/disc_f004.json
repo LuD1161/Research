@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "reflected_xss_via_unescaped_server_variable",
+      "location": "BSR_Compatibility::get_sysinfo(), line 51; rendered in templates/bsr-help.php line 62",
+      "severity": "low",
+      "reachability": "Admin-only: the help tab is only accessible to users with admin/manage_options capability. SERVER_SOFTWARE is set by the web server, not directly by end-users, but could be influenced by a malicious reverse proxy or misconfigured server.",
+      "justification": "Line 51 concatenates $_SERVER['SERVER_SOFTWARE'] into $return without any escaping; the entire $return string is then echoed raw into an HTML <textarea> at bsr-help.php:62 (echo BSR_Compatibility::get_sysinfo()) without esc_textarea() or esc_html(), so a value like '</textarea><script>alert(1)</script>' in SERVER_SOFTWARE would break out of the textarea and execute JS in the admin context.",
+      "detection_pattern": {
+        "grep_pattern": "echo\\s+[^;]*\\$_SERVER\\[",
+        "anti_pattern": "esc_html|esc_attr|esc_textarea|htmlspecialchars|wp_kses",
+        "section_name": "XSS: unescaped $_SERVER superglobal echoed in HTML",
+        "description": "Catches direct echo of $_SERVER values without output escaping; in WordPress admin pages these can break out of HTML contexts (including textarea) if server-controlled headers like SERVER_SOFTWARE contain HTML metacharacters."
+      }
+    },
+    {
+      "vuln_class": "missing_output_escaping_on_aggregate_string_in_html_context",
+      "location": "templates/bsr-help.php line 62",
+      "severity": "low",
+      "reachability": "Admin-only: only users who can access the BSR help/system-info admin tab.",
+      "justification": "The call 'echo BSR_Compatibility::get_sysinfo()' outputs an aggregate string built from multiple server/environment sources directly into a <textarea> without esc_textarea(); WordPress coding standards require esc_textarea() for any value placed between <textarea> tags to prevent HTML injection even for trusted data, because any source in the aggregate that contains '</textarea>' would break the element boundary.",
+      "detection_pattern": {
+        "grep_pattern": "<textarea[^>]*>\\s*<\\?php\\s+echo",
+        "anti_pattern": "esc_textarea\\s*\\(",
+        "section_name": "XSS: textarea content echoed without esc_textarea()",
+        "description": "Matches PHP echo inside <textarea> tags without esc_textarea() wrapping; any unescaped value that contains '</textarea>' can break out of the element and inject arbitrary HTML/JS, even in admin-only contexts."
+      }
+    },
+    {
+      "vuln_class": "arbitrary_content_injection_in_admin_download",
+      "location": "BSR_Admin::download_sysinfo(), includes/class-bsr-admin.php line 288",
+      "severity": "low",
+      "reachability": "Authenticated admin only; CSRF is prevented by nonce check on line 279 (check_admin_referer). An admin who crafts a raw POST request can supply arbitrary content in $_POST['bsr-sysinfo'].",
+      "justification": "Line 288 echoes wp_strip_all_tags($_POST['bsr-sysinfo']) as the body of a text/plain download; the server-generated sysinfo is placed in a <textarea> in the form but the POST handler trusts that value from the client, so an admin (or a script with admin credentials) can substitute any text content in the downloaded 'system info' file, making the file unreliable as evidence for support or forensics.",
+      "detection_pattern": {
+        "grep_pattern": "echo\\s+wp_strip_all_tags\\s*\\(\\s*\\$_POST",
+        "anti_pattern": "BSR_Compatibility::get_sysinfo|get_sysinfo\\(\\)",
+        "section_name": "Information integrity: admin download reflecting user-supplied POST data",
+        "description": "Catches echo of wp_strip_all_tags($_POST[...]) in download handlers; while not directly exploitable for code execution, it means the downloaded 'server info' file content is attacker-controlled by any authenticated admin, undermining its value as a trusted diagnostic artifact."
+      }
+    }
+  ]
+}
