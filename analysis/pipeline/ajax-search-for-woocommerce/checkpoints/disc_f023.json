@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "xss_reflected",
+      "location": "getIcon() lines 128,143,158,176,189,202,216,235,259,273,287,303,317,331,344",
+      "severity": "medium",
+      "reachability": "The $class parameter is a public API argument passed by any caller; all current callers use hardcoded strings, but the method is exposed via apply_filters('dgwt/wcas/icon',...) which any plugin/theme can hook to modify $class. Privilege required to add a filter (admin-level or author on a vulnerable site), so real-world reachability is limited to privileged users unless combined with a filter injection.",
+      "justification": "Every SVG icon case in getIcon() does `echo $class;` bare inside the SVG `class` HTML attribute without esc_attr() or esc_html(); if a privileged attacker (or a second vulnerability) controls $class they can close the attribute and inject arbitrary HTML/JS into rendered pages.",
+      "detection_pattern": {
+        "grep_pattern": "echo \\$class;",
+        "anti_pattern": "esc_attr\\(\\s*\\$class\\s*\\)|esc_html\\(\\s*\\$class\\s*\\)",
+        "section_name": "XSS: unescaped class attribute echo",
+        "description": "Finds bare `echo $class;` statements that are likely inside HTML attribute contexts (e.g., SVG class attributes). When $class is not filtered through esc_attr/esc_html, an attacker who controls the parameter can break out of the attribute and inject markup or event handlers."
+      }
+    },
+    {
+      "vuln_class": "xss_reflected",
+      "location": "createTooltip() line 1130",
+      "severity": "low",
+      "reachability": "All current callers of createTooltip()/createQuestionMark()/createOverrideTooltip() pass hardcoded string literals for $class and $placement. No current path from user input to these parameters exists, but the public method's signature accepts arbitrary strings and the function is part of a public API.",
+      "justification": "At line 1130, `$class` and `$placement` are concatenated raw into HTML attribute values (`class=\"js-dgwt-wcas-tooltip ' . $class . '\"` and `data-tooltip-placement=\"' . $placement . '\"`) without escaping; a caller passing attacker-controlled values would produce stored or reflected XSS.",
+      "detection_pattern": {
+        "grep_pattern": "'\\.\\s*\\$class\\s*\\.\\s*'[^;]*class=|'\\.\\s*\\$placement\\s*\\.\\s*'",
+        "anti_pattern": "esc_attr\\(\\s*\\$class\\s*\\)|esc_attr\\(\\s*\\$placement\\s*\\)",
+        "section_name": "XSS: unescaped variable concatenated into HTML attribute",
+        "description": "Detects PHP variables concatenated directly into HTML attribute strings without esc_attr(). If these variables are ever caller-controlled, the attribute boundary can be escaped to inject event handlers or additional attributes."
+      }
+    },
+    {
+      "vuln_class": "unvalidated_input_to_js_context",
+      "location": "maybeInjectFiboDebugFields() line 2208",
+      "severity": "low",
+      "reachability": "Any unauthenticated visitor can append ?fibodebug=<value> to a page URL that triggers this code path. isFiboDebugEnabled() only checks if the key is present and matches; any string is accepted. The value is serialized via wp_localize_script (JSON-encoded, so no direct HTML XSS), but it is reflected unvalidated into the JS custom_params object accessible to all frontend scripts.",
+      "justification": "Line 2208: `$params['fibodebug'] = $_GET['fibodebug']` stores the raw GET parameter into the custom_params filter return with no sanitization before it reaches wp_localize_script; while JSON encoding prevents HTML injection, the raw value propagates to search API requests as a URL parameter and can be used for server-side parameter injection or log injection.",
+      "detection_pattern": {
+        "grep_pattern": "\\$_GET\\[.fibodebug.\\]",
+        "anti_pattern": "sanitize_text_field\\(\\s*\\$_GET\\[.fibodebug.\\]\\)|esc_attr\\(\\s*\\$_GET\\[.fibodebug.\\]\\)",
+        "section_name": "Unsanitized GET parameter into JS localization",
+        "description": "Finds raw $_GET['fibodebug'] usage without sanitization before it is passed to JavaScript via wp_localize_script. Even though JSON encoding prevents direct HTML XSS, the unsanitized value can be forwarded to server-side endpoints or logged."
+      }
+    }
+  ]
+}
