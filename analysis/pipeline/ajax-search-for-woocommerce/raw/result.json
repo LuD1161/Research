@@ -1,0 +1,1070 @@
+{
+  "summary": "Self-healing wrapper: runs pipeline with automatic retry on partial failure",
+  "agentCount": 63,
+  "logs": [
+    "attempt 1/5 for ajax-search-for-woocommerce",
+    "▸ running dynamic workflow review-pipeline",
+    "[review-pipeline] manifest: 15 files at tier>=1 (MANIFEST=/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review/analysis/pipeline/ajax-search-for-woocommerce/manifest.json)",
+    "[review-pipeline] discover a0 w0: files=4 failed=0",
+    "[review-pipeline] discover a0 w1: files=8 failed=0",
+    "[review-pipeline] discover a0 w2: files=12 failed=0",
+    "[review-pipeline] discover a0 w3: files=15 failed=0",
+    "[review-pipeline] verifying 32 raw findings",
+    "[review-pipeline] verify a0 w0: done=4 failed=0",
+    "[review-pipeline] verify a0 w1: done=8 failed=0",
+    "[review-pipeline] verify a0 w2: done=12 failed=0",
+    "[review-pipeline] verify a0 w3: done=16 failed=0",
+    "[verd:f034.0] failed: API Error: [SSL: SSLV3_ALERT_BAD_RECORD_MAC] sslv3 alert bad record mac (_ssl.c:2546)",
+    "[review-pipeline] verify a0 w4: done=20 failed=0",
+    "[review-pipeline] verify a0 w5: done=24 failed=0",
+    "[review-pipeline] verify a0 w6: done=28 failed=0",
+    "[review-pipeline] verify a0 w7: done=32 failed=0",
+    "[review-pipeline] reachability check: 3 of 5 confirmed findings qualify",
+    "[review-pipeline] reach a0 w0: done=3 failed=0",
+    "[review-pipeline] reachability: 3 findings downgraded, 2 unchanged",
+    "▸ review-pipeline done",
+    "attempt 1: 15/15 files, 32 raw, 32 verdicts",
+    "complete after 1 attempt(s)"
+  ],
+  "result": {
+    "slug": "ajax-search-for-woocommerce",
+    "attempts": 1,
+    "run": "ajax-search-for-woocommerce",
+    "plugin": "/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review/analysis/pipeline/ajax-search-for-woocommerce/manifest.json",
+    "files_reviewed": 15,
+    "raw_findings": 32,
+    "confirmed_count": 5,
+    "confirmed": [
+      {
+        "id": "f013",
+        "rel": "includes/Admin/Troubleshooting.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Admin/Troubleshooting.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss",
+          "deserialize",
+          "ssrf"
+        ],
+        "finding": {
+          "vuln_class": "object_injection",
+          "location": "getTestProductFilterByWBW(), line 710",
+          "severity": "medium",
+          "reachability": "Runs automatically for any authenticated admin on the troubleshooting settings page (via localizeSettings() at line 207). The DB row must first be poisoned — requires write access to the WBW Product Filter settings table (shop-admin level or a compromised WBW plugin).",
+          "justification": "unserialize($filter['setting_data']) is called on data fetched from a third-party plugin's database table with no allowed_classes restriction; a poisoned serialized payload in that table triggers object injection during every admin page load without any AJAX call.",
+          "detection_pattern": {
+            "grep_pattern": "unserialize\\s*\\(",
+            "anti_pattern": "unserialize\\s*\\(.*allowed_classes",
+            "section_name": "Object Injection: unserialize without allowed_classes",
+            "description": "Matches any call to unserialize() that does not specify the allowed_classes option. PHP unserialize without allowed_classes can trigger __wakeup/__destruct on arbitrary classes present in the codebase (POP chain), making it exploitable whenever the serialized input originates from DB rows, options, or transients written by users or other plugins."
+          }
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "LOW",
+          "reasoning": "The unserialize() call at line 710 of Troubleshooting.php is confirmed reachable with attacker-influenced data under specific but realistic conditions.\n\nFull call chain: admin_init fires adminScripts() -> apply_filters('dgwt/wcas/scripts/admin/localize') -> Troubleshooting::localizeSettings() -> iterates getTests()['direct'] -> calls getTestProductFilterByWBW() via performTest() -> unserialize($filter['setting_data']).\n\nThis chain runs synchronously on every page load of the plugin settings page (?page=dgwt_wcas_settings), with no nonce and no explicit capability check in localizeSettings itself. WordPress restricts that URL to admin users by convention, but no programmatic check gates execution.\n\nSink analysis: Line 710: $raw = ( is_array($filter['setting_data']) ? $filter['setting_data'] : unserialize($filter['setting_data']) ). No allowed_classes argument is provided. The input is $filter['setting_data'] from \\FrameWpf::_()->getModule('woofilters')->getModel()->getFromTbl(), which reads raw rows from the WBW Product Filter plugin's database table. The data is used without any sanitization, validation, or unserialize allowed_classes restriction.\n\nGuards that must be satisfied (do NOT block exploitation, they are feature-presence checks): (1) WPF_VERSION constant must be defined — meaning WBW Product Filter must be active. (2) \\FrameWpf class must exist. (3) getFromTbl() must return an array. (4) A row must have a 'setting_data' key. (5) setting_data must not already be an array (it is a serialized string in WBW's schema).\n\nAttacker control path: An attacker who can write to the WBW Product Filter settings table (requires shop-admin privileges, a SQL injection in that plugin, or a compromised admin account) can store a malicious serialized POP chain in setting_data. On the next admin page load of the ajax-search plugin settings, unserialize() fires with that payload. No additional attacker interaction is needed after poisoning the DB.\n\nSeverity rationale: Rated medium rather than high because the prerequisite — write access to the WBW plugin's DB table — already implies near-admin-level compromise. The practical incremental risk is POP-chain execution (code execution, data exfiltration) beyond what a shop-admin can already do via the WordPress admin UI, but the attack path is realistic in multi-tenant or plugin-chaining scenarios (e.g., a second plugin with SQLi populates WBW's table). The finding is genuine and the code is exactly as described.",
+          "severity_pre_reach": "medium"
+        },
+        "reachability": {
+          "gate_breachable": false,
+          "gate_type": "capability check (admin/shop_manager) + is_admin() page guard",
+          "adjusted_severity": "LOW",
+          "reasoning": "The vulnerable unserialize() call at line 710 of Troubleshooting.php is reached only through: admin_init -> adminScripts() -> [inside isSettingsPage() guard] -> apply_filters('dgwt/wcas/scripts/admin/localize') -> Troubleshooting::localizeSettings() -> getTestProductFilterByWBW(). The decisive gate is in ajax-search-for-woocommerce.php at line 312: the entire localize block including the filter call is wrapped in `if ( \\DgoraWcas\\Helpers::isSettingsPage() )`. isSettingsPage() (Helpers.php line 538-543) requires both is_admin() (WordPress-enforced, only authenticated users with admin-panel access pass) AND $_GET['page'] === 'dgwt_wcas_settings'. WordPress's is_admin() combined with the admin-area URL means only users authenticated as admin or shop_manager can trigger this code path at all. An unauthenticated attacker is redirected to wp-login.php before admin_init fires for admin-specific contexts. A subscriber-level user cannot load ?page=dgwt_wcas_settings. There is no nonce on the localizeSettings execution path, but that is irrelevant — the gate is a WordPress session capability check. The full prerequisite chain requires (1) admin/shop_manager credentials to load the settings page AND (2) write access to the WBW Product Filter DB table to poison setting_data. Both prerequisites individually imply near-full-site-level access. No unauthenticated or low-privilege attacker has a path to the sink. The incremental risk over what an authenticated shop-admin can already do is marginal. Severity is downgraded to LOW.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f021",
+        "rel": "includes/Engines/WordPressNative/DetailsBox.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Engines/WordPressNative/DetailsBox.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "missing_csrf_protection",
+          "location": "getResultDetails() — line 29-103, registered at lines 18/20-21",
+          "severity": "low",
+          "reachability": "Any unauthenticated visitor on the internet; registered via wp_ajax_nopriv_ (and wc_ajax_ which is also public/unauthenticated). The phpcs:ignore comment at line 35 explicitly suppresses the nonce-check warning, confirming intentional omission.",
+          "justification": "getResultDetails() reads $_POST['items'] with no nonce or referer verification whatsoever; a cross-origin request can be forged to make any logged-in user's browser query product/taxonomy detail HTML on their behalf, leaking whatever canUserSee() would permit for that user's session — a read-only CSRF whose value is limited but not zero (e.g., probing whether a private product exists for an admin user).",
+          "detection_pattern": {
+            "grep_pattern": "wp_ajax_nopriv_",
+            "anti_pattern": "check_ajax_referer|wp_verify_nonce",
+            "section_name": "CSRF: public AJAX handler without nonce",
+            "description": "Finds wp_ajax_nopriv_ registrations (publicly callable AJAX handlers) and flags those whose corresponding callback does not contain a nonce verification call. Even read-only handlers can leak data via CSRF if the response differs by auth context."
+          }
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "low",
+          "reasoning": "Confirmed: getResultDetails() at line 29 has no nonce or referer check — the //phpcs:ignore WordPress.Security.NonceVerification.Missing comment at line 35 makes this explicit. The handler is registered via wc_ajax_ (not wp_ajax_nopriv_ as claimed — DGWT_WCAS_WC_AJAX_ENDPOINT is defined as true in the main plugin file at line 247, taking the line-17/18 branch). wc_ajax_ is equally public/unauthenticated (?wc-ajax=dgwt_wcas_result_details), so the finding's core reachability claim holds despite the wrong hook name. The canUserSee() method at Product.php:658-665 calls current_user_can('read_post') and current_user_can('edit_post'), meaning the response differs by auth context: a draft or hidden product returns empty HTML for an unauthenticated caller but returns full product details for an admin. This confirms the theoretical CSRF info-leak path (attacker's page POSTs to ?wc-ajax=dgwt_wcas_result_details with a private product ID; if an admin visits, the response leaks existence/details of that product). However, practical exploitability is substantially limited by: (1) modern browsers set SameSite=Lax on WordPress auth cookies by default, so cross-site POST requests do not carry the auth cookie — the response would be identical to an unauthenticated call; (2) even without SameSite, the response goes to the attacker's origin only if CORS allows it, which it does not by default; (3) the operation is read-only with no state mutation. The finding's severity=low is correct. The finding is real (code confirms absent nonce, confirmed auth-gated canUserSee, confirmed public endpoint), but the wp_ajax_nopriv_ attribution is factually wrong — it uses wc_ajax_ in the actual deployed code path."
+        }
+      },
+      {
+        "id": "f034",
+        "rel": "includes/Integrations/Plugins/WooCommerce/WooCommerce.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Plugins/WooCommerce/WooCommerce.php",
+        "tags": [
+          "sqli"
+        ],
+        "finding": {
+          "vuln_class": "sql_injection_via_unvalidated_filter_output",
+          "location": "filter_counts_query(), line 153",
+          "severity": "medium",
+          "reachability": "Reachable on any product search page when the woocommerce_get_filtered_term_product_counts_query filter fires (i.e., layered nav / attribute filters active). Same second-plugin precondition as the price-filter finding.",
+          "justification": "At line 153, the same pattern recurs in filter_counts_query(): `$query['where'] .= \" AND $wpdb->posts.ID IN(\" . implode( ',', $post_ids ) . ')'`. The $post_ids array comes from the untyped public filter dgwt/wcas/search_page/result_post_ids with no integer validation, allowing SQL injection if any hook returns non-integer elements.",
+          "detection_pattern": {
+            "grep_pattern": "\\$query\\[.where.\\].*\\.=.*implode",
+            "anti_pattern": "array_map\\s*\\(\\s*['\"]intval['\"]|array_map\\s*\\(\\s*['\"]absint['\"]|\\$wpdb->prepare",
+            "section_name": "SQL Injection: unguarded concatenation into SQL WHERE clause via implode",
+            "description": "Catches direct string concatenation into a SQL where clause using implode() on an array, without integer sanitization. Common pattern in WooCommerce filter integration code where post ID arrays flow through WordPress hooks and are then embedded in raw SQL."
+          }
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "LOW",
+          "reasoning": "The sink is real and unguarded: filter_counts_query() at line 153 concatenates $post_ids directly into a raw SQL WHERE clause via implode(',', $post_ids) with no intval/absint cast and no $wpdb->prepare(). The data path is: apply_filters('dgwt/wcas/search_page/result_post_ids', []) -> implode(',', ...) -> $query['where'] .= \" AND ...\". In the canonical (no-extra-plugin) flow, $post_ids is populated by Search.php::getProductIds(), which returns $postsIDsBuffer. That buffer is set from $postIn[] = $suggestion->ID where $suggestion->ID comes from get_posts() WP_Post->ID (a PHP integer from a DB-backed WordPress API call) -- so the canonical path is safe. However, the filter 'dgwt/wcas/search_page/result_post_ids' is a public WordPress filter: any plugin/theme hooking it at priority > 10 can replace the array with arbitrary string values, which would flow directly into the raw SQL. Additionally, the intermediate filter 'dgwt/wcas/page_search_results/output' (Search.php line 271) lets a second plugin mutate $output['suggestions'] objects before their ->ID values are pushed into postsIDsBuffer, providing a second injection vector. There is no integer sanitization anywhere in either code path. The reachability requires a second-plugin precondition (consistent with the finding's stated reachability), making this a second-order vulnerability/API design flaw rather than a direct HTTP-to-SQL path. Severity medium is appropriate: exploitation requires admin-level plugin installation or a vulnerable co-installed plugin, but the SQL injection itself is unmitigated if that precondition is met. The finding's reachability description correctly acknowledges the second-plugin precondition.",
+          "severity_pre_reach": "medium"
+        },
+        "reachability": {
+          "gate_breachable": false,
+          "gate_type": "second-plugin admin-install precondition",
+          "adjusted_severity": "LOW",
+          "reasoning": "The vulnerable code path (filter_counts_query at line 153) is gated only by isProductSearchPage(), which checks three public GET parameters (?dgwt_wcas=1&post_type=product&s=...) — no nonce, no capability check, no authentication required. Any unauthenticated visitor can satisfy that page-level condition. However, the actual SQL injection requires a second plugin (or theme/mu-plugin) to hook 'dgwt/wcas/search_page/result_post_ids' and return non-integer elements. In the canonical plugin-only flow, getProductIds() returns $postsIDsBuffer populated from WP_Post->ID values obtained via get_posts(), which are PHP integers from a DB-backed WordPress API — these are safe. The only path to inject non-integer values is through the public WordPress filter 'dgwt/wcas/search_page/result_post_ids', which any co-installed plugin can hook. Installing a plugin in WordPress requires manage_options / install_plugins capability — an administrator-level privilege. An unauthenticated or subscriber-level attacker cannot install plugins and therefore cannot place the hook that injects malicious values. The gate is not a nonce or cryptographic secret — it is the requirement for a second admin-installed plugin that itself contains or exposes a vulnerability. This is a second-order / API design flaw: the filter lacks integer sanitization at the consumption point, so any future or current co-plugin regression would flow directly into raw SQL with no mitigation. Because exploitation requires admin-level plugin installation, gate_breachable=false and severity is downgraded to LOW."
+        }
+      },
+      {
+        "id": "f035",
+        "rel": "includes/Integrations/Plugins/WooCommerceProductsFilter/WooCommerceProductsFilter.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Plugins/WooCommerceProductsFilter/WooCommerceProductsFilter.php",
+        "tags": [
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "sql_injection_via_unvalidated_filter_output",
+          "location": "get_filtered_price_query(), line 109",
+          "severity": "medium",
+          "reachability": "Reachable on any product search page where the WOOF price filter widget is rendered. Exploitation requires a second plugin or theme hooking 'dgwt/wcas/search_page/result_post_ids' and returning non-integer array elements, or a future regression in the upstream populator. The filter is public and documented.",
+          "justification": "At line 109, the output of apply_filters('dgwt/wcas/search_page/result_post_ids', []) is passed directly to implode(',', $post_ids) and concatenated into a raw SQL string: `$sql .= \" AND $wpdb->posts.ID IN(\" . implode( ',', $post_ids ) . ')'`. No integer cast (array_map('intval',...) or absint()) is applied, nor is $wpdb->prepare() used. Any WordPress hook registered on this public filter can inject non-integer elements (e.g., '1 UNION SELECT...') that break out of the IN() clause.",
+          "detection_pattern": {
+            "grep_pattern": "implode\\s*\\(\\s*['\"],\\s*['\"]\\s*,\\s*apply_filters",
+            "anti_pattern": "array_map\\s*\\(\\s*['\"]intval['\"]|array_map\\s*\\(\\s*['\"]absint['\"]|\\$wpdb->prepare",
+            "section_name": "SQL Injection: apply_filters array imploded into IN() clause without integer cast",
+            "description": "Catches PHP code that calls apply_filters() to obtain an array and immediately implodes it into a SQL fragment without integer sanitization. WordPress filters are public extension points; any plugin can alter the returned array. Without array_map('intval',...) or $wpdb->prepare(), SQL injection is possible via injected non-integer elements."
+          }
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "LOW",
+          "reasoning": "The sink at WooCommerceProductsFilter.php line 109 is confirmed: apply_filters('dgwt/wcas/search_page/result_post_ids', []) output is directly imploded into a raw SQL IN() clause with no intval/absint cast and no $wpdb->prepare(). The canonical populator in Search.php::getProductIds() fills postsIDsBuffer from $post->ID values returned by get_posts(), which are integers from the database — so the baseline code path does not pass attacker-controlled strings. The vulnerability is second-order: the public WordPress filter 'dgwt/wcas/search_page/result_post_ids' has no type enforcement, and any registered hook (another installed plugin, mu-plugin, or theme) can return non-integer array elements that flow directly into the SQL sink. No sanitizer, intval cast, or $wpdb->prepare() exists between the filter output and the SQL concatenation. The finding's reachability claim is accurate: exploitation requires a cooperating second component hooking the filter. Without such a component, an unauthenticated attacker has no direct path. The flaw is real and the severity 'medium' is appropriate — it represents a missing defense-in-depth control at a trust boundary, exploitable if any co-installed code (malicious or buggy) injects non-integer values.",
+          "severity_pre_reach": "medium"
+        },
+        "reachability": {
+          "gate_type": "no gate — open handler (public GET parameters only; no nonce, no capability check, no secret)",
+          "gate_breachable": false,
+          "adjusted_severity": "LOW",
+          "reasoning": "The code path to the SQL sink is gated only by is_search(), which checks for publicly controllable GET parameters (?dgwt_wcas=1&post_type=product&s=query) — any unauthenticated user can satisfy this check trivially. There is no nonce, no authentication cookie, and no capability check protecting the path. However, the SQL injection itself is NOT directly exploitable by an unauthenticated attacker: the filter 'dgwt/wcas/search_page/result_post_ids' is populated by Search::getProductIds() (Search.php lines 949-954), which returns $this->postsIDsBuffer built from $post->ID values sourced from get_posts() — these are always integers from the database. An unauthenticated attacker cannot directly inject non-integer values into the filter output in a default WordPress install; doing so requires a second co-installed plugin, mu-plugin, or theme that hooks 'dgwt/wcas/search_page/result_post_ids' and returns attacker-controlled non-integer elements. No such hook exists in this plugin itself. Additionally, the vulnerable function only fires when the WOOF Products Filter plugin is also installed and active (it hooks 'woof_get_filtered_price_query', a WOOF-specific filter). The exploitation chain requires: (1) WOOF plugin active, (2) ajax-search-for-woocommerce active, (3) a third co-installed component hooking the public filter with non-integer values. Without a cooperating second component, an unauthenticated attacker has no direct path to inject into the SQL. The flaw represents a missing defense-in-depth control (no intval cast / no $wpdb->prepare()) at a public WordPress filter trust boundary, not a directly exploitable vulnerability in default installs. Severity is downgraded to LOW.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f038",
+        "rel": "includes/Integrations/Plugins/XforWooCommerceFilter/XforWooCommerceFilter.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Plugins/XforWooCommerceFilter/XforWooCommerceFilter.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "missing_input_sanitization",
+          "location": "set_search_post_ids_from_ajax(), line 65",
+          "severity": "medium",
+          "reachability": "Reachable by any unauthenticated user via wp_ajax_nopriv_prdctfltr_respond_550 (line 38); no authentication or capability check protects this handler.",
+          "justification": "The search phrase is taken directly from $_POST['pf_filters'][$_POST['pf_id']]['s'] (line 65) with no sanitization (no sanitize_text_field, wp_unslash, or strip_tags) before being passed to Helpers::searchProducts($phrase); safety depends entirely on downstream sanitization inside the search engine.",
+          "detection_pattern": {
+            "grep_pattern": "\\$_POST\\[.*\\]\\[.*\\]\\['s'\\]",
+            "anti_pattern": "sanitize_text_field|wp_unslash|sanitize_search_query",
+            "section_name": "Missing Input Sanitization: Raw $_POST nested key passed to search",
+            "description": "Detects places where a nested $_POST value used as a search phrase is not sanitized before use. Without upstream sanitization, security relies entirely on downstream callers — removing or changing those callers introduces injection risk."
+          }
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "low",
+          "reasoning": "The code pattern exists exactly as described. Line 65 of set_search_post_ids_from_ajax() assigns $phrase = $_POST['pf_filters'][$_POST['pf_id']]['s'] with no upstream sanitize_text_field, wp_unslash, or strip_tags. The handler is reachable unauthenticated via wp_ajax_nopriv_prdctfltr_respond_550 (line 38) with no nonce or capability check (phpcs:disable at line 56 confirms intentional omission). However, downstream sanitization fully covers the value: Helpers::searchProducts($phrase) calls DGWT_WCAS()->nativeSearch->getSearchResults($phrase, true, 'product-ids'), and at Search.php line 175, because $return=true, the code unconditionally applies $keyword = sanitize_text_field($phrase) before any database query. The final result stored in $this->post_ids is integer IDs extracted by wp_list_pluck($results['suggestions'], 'ID'), so no XSS, SQLi, or other injection is possible through this path. The finding is real as a defense-in-depth / code quality concern (missing upstream sanitization that relies on downstream callers remaining correct), but the original 'medium' severity overstates the risk because exploitation requires circumventing downstream sanitization that is hardcoded in getSearchResults(). Severity is better classified as low/informational."
+        }
+      }
+    ],
+    "all_with_verdicts": [
+      {
+        "id": "f007",
+        "rel": "includes/Admin/Promo/FeedbackNotice.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Admin/Promo/FeedbackNotice.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "stored_xss",
+          "location": "displayNotice() / line 64",
+          "severity": "medium",
+          "reachability": "Any authenticated WordPress user who can update their own profile display_name (subscriber and above by default) and whose display_name renders in the admin notice visible to other admins on the plugin settings page.",
+          "justification": "$current_user->display_name is concatenated directly into HTML markup without esc_html() or any escaping before being passed to printf(), so a user-controlled display_name containing HTML/script tags will be rendered verbatim in the admin notice.",
+          "detection_pattern": {
+            "grep_pattern": "display_name[^;]*\\.(\\s*'|\\s*\")",
+            "anti_pattern": "esc_html.*display_name|esc_attr.*display_name|display_name.*esc_html|display_name.*esc_attr",
+            "section_name": "XSS: unescaped display_name in HTML output",
+            "description": "Catches concatenation or direct use of $current_user->display_name (or similar user-profile fields) into HTML strings without context-correct escaping. WordPress does not sanitize display_name for HTML on save, so it can contain tags that execute when echoed into page output."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "informational",
+          "reasoning": "Three independent reasons make this finding false:\n\n1. WRONG REACHABILITY — The notice is only rendered when shouldShowFeedbackNotice() returns true (NoticePolicy.php line 42), which requires current_user_can('install_plugins'). That capability is administrator-only. The finding's claim of 'subscriber and above' is incorrect. No subscriber-level user can trigger or see this notice.\n\n2. SELF-XSS ONLY — $current_user->display_name is the display name of the same administrator who is currently viewing the notice. There is no mechanism by which a low-privileged user's display_name appears in this admin-facing notice. There is no cross-user attack vector.\n\n3. WORDPRESS CORE SANITIZES display_name ON SAVE — WordPress core's wp_insert_user() / wp_update_user() in wp-includes/user.php passes display_name through sanitize_text_field(), which calls strip_tags() internally. HTML and script tags are stripped before being persisted to the database. An attacker cannot store '<script>alert(1)</script>' in display_name through any normal WordPress user update API.\n\nThe unescaped output at line 64 ('<strong>' . $current_user->display_name . '</strong>') is a code quality issue (missing esc_html()) but is not exploitable given: (a) admin-only gate via install_plugins capability check, (b) self-display of the current user's own name, and (c) WordPress-level HTML stripping on save. All three defenses must simultaneously fail for exploitation, and at least defenses (a) and (c) are robust and independent."
+        }
+      },
+      {
+        "id": "f013",
+        "rel": "includes/Admin/Troubleshooting.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Admin/Troubleshooting.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss",
+          "deserialize",
+          "ssrf"
+        ],
+        "finding": {
+          "vuln_class": "object_injection",
+          "location": "getTestProductFilterByWBW(), line 710",
+          "severity": "medium",
+          "reachability": "Runs automatically for any authenticated admin on the troubleshooting settings page (via localizeSettings() at line 207). The DB row must first be poisoned — requires write access to the WBW Product Filter settings table (shop-admin level or a compromised WBW plugin).",
+          "justification": "unserialize($filter['setting_data']) is called on data fetched from a third-party plugin's database table with no allowed_classes restriction; a poisoned serialized payload in that table triggers object injection during every admin page load without any AJAX call.",
+          "detection_pattern": {
+            "grep_pattern": "unserialize\\s*\\(",
+            "anti_pattern": "unserialize\\s*\\(.*allowed_classes",
+            "section_name": "Object Injection: unserialize without allowed_classes",
+            "description": "Matches any call to unserialize() that does not specify the allowed_classes option. PHP unserialize without allowed_classes can trigger __wakeup/__destruct on arbitrary classes present in the codebase (POP chain), making it exploitable whenever the serialized input originates from DB rows, options, or transients written by users or other plugins."
+          }
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "The unserialize() call at line 710 of Troubleshooting.php is confirmed reachable with attacker-influenced data under specific but realistic conditions.\n\nFull call chain: admin_init fires adminScripts() -> apply_filters('dgwt/wcas/scripts/admin/localize') -> Troubleshooting::localizeSettings() -> iterates getTests()['direct'] -> calls getTestProductFilterByWBW() via performTest() -> unserialize($filter['setting_data']).\n\nThis chain runs synchronously on every page load of the plugin settings page (?page=dgwt_wcas_settings), with no nonce and no explicit capability check in localizeSettings itself. WordPress restricts that URL to admin users by convention, but no programmatic check gates execution.\n\nSink analysis: Line 710: $raw = ( is_array($filter['setting_data']) ? $filter['setting_data'] : unserialize($filter['setting_data']) ). No allowed_classes argument is provided. The input is $filter['setting_data'] from \\FrameWpf::_()->getModule('woofilters')->getModel()->getFromTbl(), which reads raw rows from the WBW Product Filter plugin's database table. The data is used without any sanitization, validation, or unserialize allowed_classes restriction.\n\nGuards that must be satisfied (do NOT block exploitation, they are feature-presence checks): (1) WPF_VERSION constant must be defined — meaning WBW Product Filter must be active. (2) \\FrameWpf class must exist. (3) getFromTbl() must return an array. (4) A row must have a 'setting_data' key. (5) setting_data must not already be an array (it is a serialized string in WBW's schema).\n\nAttacker control path: An attacker who can write to the WBW Product Filter settings table (requires shop-admin privileges, a SQL injection in that plugin, or a compromised admin account) can store a malicious serialized POP chain in setting_data. On the next admin page load of the ajax-search plugin settings, unserialize() fires with that payload. No additional attacker interaction is needed after poisoning the DB.\n\nSeverity rationale: Rated medium rather than high because the prerequisite — write access to the WBW plugin's DB table — already implies near-admin-level compromise. The practical incremental risk is POP-chain execution (code execution, data exfiltration) beyond what a shop-admin can already do via the WordPress admin UI, but the attack path is realistic in multi-tenant or plugin-chaining scenarios (e.g., a second plugin with SQLi populates WBW's table). The finding is genuine and the code is exactly as described."
+        }
+      },
+      {
+        "id": "f013",
+        "rel": "includes/Admin/Troubleshooting.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Admin/Troubleshooting.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss",
+          "deserialize",
+          "ssrf"
+        ],
+        "finding": {
+          "vuln_class": "credential_forwarding",
+          "location": "getTestLoopbackRequests(), lines 319-325",
+          "severity": "low",
+          "reachability": "Runs when the async troubleshooting test 'LoopbackRequests' is executed (authenticated admin, wp_ajax_dgwt_wcas_troubleshooting_test with nonce). Requires the inbound request to carry HTTP Basic Auth headers.",
+          "justification": "Helpers::getBasicAuthHeader() extracts PHP_AUTH_USER and PHP_AUTH_PW from the inbound request's Authorization header and re-forwards them as the Authorization header in the outbound wp_remote_get() call to home_url(); wp_remote_get() follows redirects by default, so any open-redirect at home_url() could relay the credentials to an attacker-controlled host.",
+          "detection_pattern": {
+            "grep_pattern": "PHP_AUTH_USER|PHP_AUTH_PW",
+            "anti_pattern": "wp_remote_get\\s*\\([^)]*'redirection'\\s*=>\\s*0",
+            "section_name": "Credential Forwarding: Basic Auth headers echoed to outbound HTTP request",
+            "description": "Matches code that reads PHP_AUTH_USER or PHP_AUTH_PW from $_SERVER (the inbound Basic Auth credentials) to construct an Authorization header for an outbound HTTP request. If the target URL follows redirects or is partly attacker-controlled, the site's own admin credentials can be exfiltrated."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "low",
+          "reasoning": "The code pattern is real — Helpers::getBasicAuthHeader() at Helpers.php:1693-1703 reads PHP_AUTH_USER and PHP_AUTH_PW from the inbound request and forwards them as the Authorization header to wp_remote_get() at Troubleshooting.php:319-329. However, the finding's exploitability claim does not hold under adversarial scrutiny.\n\n1. DESTINATION IS NOT ATTACKER-CONTROLLED: wp_remote_get() targets home_url(), which is the WordPress 'home' site option stored in the database at installation time. The attacker cannot supply a different URL via the AJAX endpoint — it is hardcoded to the site's own home URL. This directly refutes the finding's implicit assumption that the sink is attacker-influenced.\n\n2. OPEN-REDIRECT PREREQUISITE IS IMPLAUSIBLE: Credential exfiltration via redirect-following would require a pre-existing open redirect at home_url() itself. If an attacker can control a redirect on the site's own home URL, they already have far more severe capabilities (code execution, full session takeover). The open-redirect chain adds no meaningful incremental risk.\n\n3. INTENTIONAL DESIGN: The loopback test is specifically designed to re-use the inbound Basic Auth credentials so that the internal loopback request can succeed if the WordPress admin UI is itself protected by HTTP Basic Auth (common in staging environments via .htaccess or nginx). Forwarding those credentials back to home_url() (the same server) is correct and expected behavior, not a flaw.\n\n4. AUTH AND NONCE GUARD: The AJAX handler asyncTest() at line 114 requires current_user_can('manage_options') or current_user_can('manage_woocommerce') AND a valid nonce via check_ajax_referer(). An external attacker cannot trigger this endpoint.\n\n5. NO REDIRECTION GUARD IS REAL BUT INCONSEQUENTIAL: It is true that wp_remote_get() follows up to 5 redirects by default and there is no 'redirection' => 0 set. However, without an open redirect at home_url() this is inert.\n\nVerdict: The finding describes a theoretical pattern (credential forwarding to an outbound HTTP request that follows redirects) but the sink is a fixed server-side value (home_url()), not an attacker-controlled input. The attack path requires a pre-existing open redirect on the site's own home URL, making this a non-exploitable design note rather than an actionable vulnerability. Marking is_real=false."
+        }
+      },
+      {
+        "id": "f017",
+        "rel": "includes/Analytics/UserInterface.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Analytics/UserInterface.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "missing_input_sanitization",
+          "location": "checkCriticalPhrase(), line 331",
+          "severity": "low",
+          "reachability": "Authenticated administrators and shop managers only (wp_ajax_ with current_user_can check). Not reachable by unauthenticated users.",
+          "justification": "$_REQUEST['phrase'] is assigned to $phrase with no sanitization (no sanitize_text_field, no wp_kses, no trim/strip), then passed directly into getSearchResults($phrase, true, 'autocomplete'); while the function's downstream handling determines actual impact, the raw unsanitized value crosses a trust boundary unnecessarily for an admin-only handler.",
+          "detection_pattern": {
+            "grep_pattern": "\\$_REQUEST\\['phrase'\\](?!.*sanitize)",
+            "anti_pattern": "sanitize_text_field|wp_kses|sanitize_key",
+            "section_name": "Missing sanitization: raw $_REQUEST phrase passed to business logic",
+            "description": "Catches handlers that extract a 'phrase' parameter from $_REQUEST without any sanitization function call on the same line. Files matching the grep pattern but not the anti-pattern may be passing raw user input into search, database, or rendering functions."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "The finding is a false positive. The detection pattern only examined the assignment at line 331 (`$phrase = $_REQUEST['phrase']`) without following the value into its sole downstream sink. In `checkCriticalPhrase()`, $phrase is passed as the first argument to `getSearchResults($phrase, true, 'autocomplete')`. Inside that function (WordPressNative/Search.php line 151), the second parameter `$return` is `true`, so the code takes the branch at line 174-175: `$keyword = sanitize_text_field($phrase)`. The raw value is sanitized before it is used in any WP_Query args, database calls, or output. There is no path by which unsanitized input reaches a dangerous sink. Additionally, the handler is correctly gated by `current_user_can('manage_woocommerce'/'manage_options')` AND `check_ajax_referer()`, making it reachable only by authenticated admin/shop-manager users with a valid nonce — there is no privilege-escalation or CSRF risk. The claimed vulnerability does not exist.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f017",
+        "rel": "includes/Analytics/UserInterface.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Analytics/UserInterface.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "missing_input_sanitization",
+          "location": "excludeCriticalPhrase(), line 407",
+          "severity": "low",
+          "reachability": "Authenticated administrators and shop managers only (wp_ajax_ with current_user_can check). Not reachable by unauthenticated users.",
+          "justification": "$phrase = (!empty($_REQUEST['phrase']) ? $_REQUEST['phrase'] : '') is passed unsanitized to $data->markAsSolved($phrase). The markAsSolved method uses $wpdb->update() with format specifiers (['%s']), so SQL injection is prevented by parameterization; however, the raw string with no sanitize_text_field call violates WordPress coding standards and could carry unexpected content (null bytes, control characters) into the database.",
+          "detection_pattern": {
+            "grep_pattern": "\\$_REQUEST\\['phrase'\\]",
+            "anti_pattern": "sanitize_text_field\\(\\s*\\$_REQUEST\\['phrase'\\]",
+            "section_name": "Unsanitized phrase from request passed to DB write",
+            "description": "Catches AJAX handlers writing a raw $_REQUEST['phrase'] value to the database without sanitize_text_field. Even when $wpdb->update/insert uses format specifiers (preventing SQL injection), the absence of sanitization allows null bytes or oversized strings to be stored."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "low",
+          "reasoning": "The finding is technically accurate as a coding standards violation (missing sanitize_text_field on $_REQUEST['phrase'] before passing to markAsSolved), but does not constitute an exploitable security vulnerability. Three factors prevent real impact: (1) Auth gate: the handler is registered only under wp_ajax_ (not wp_ajax_nopriv_), requires current_user_can('manage_woocommerce' or 'manage_options'), and validates a nonce via check_ajax_referer — only administrators or shop managers with a valid nonce can reach this code path. (2) SQL injection is not possible: $wpdb->update() parameterizes the WHERE value using the '%s' format specifier internally via $wpdb->prepare(), so the raw $phrase string cannot break out of the query. (3) The value is used only as a WHERE clause filter (not an INSERT/UPDATE of the phrase itself), meaning it can only match rows that already contain that exact string in the analytics stats table — an attacker-controlled phrase with null bytes or control characters would simply match no rows and cause no harm. The worst-case outcome is that a privileged user stores an unusual string in a WHERE clause that touches no rows. There is no XSS vector (the value is not reflected in the response). The absence of sanitize_text_field is a best-practices/coding standards issue, not a reachable exploit path."
+        }
+      },
+      {
+        "id": "f021",
+        "rel": "includes/Engines/WordPressNative/DetailsBox.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Engines/WordPressNative/DetailsBox.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "missing_csrf_protection",
+          "location": "getResultDetails() — line 29-103, registered at lines 18/20-21",
+          "severity": "low",
+          "reachability": "Any unauthenticated visitor on the internet; registered via wp_ajax_nopriv_ (and wc_ajax_ which is also public/unauthenticated). The phpcs:ignore comment at line 35 explicitly suppresses the nonce-check warning, confirming intentional omission.",
+          "justification": "getResultDetails() reads $_POST['items'] with no nonce or referer verification whatsoever; a cross-origin request can be forged to make any logged-in user's browser query product/taxonomy detail HTML on their behalf, leaking whatever canUserSee() would permit for that user's session — a read-only CSRF whose value is limited but not zero (e.g., probing whether a private product exists for an admin user).",
+          "detection_pattern": {
+            "grep_pattern": "wp_ajax_nopriv_",
+            "anti_pattern": "check_ajax_referer|wp_verify_nonce",
+            "section_name": "CSRF: public AJAX handler without nonce",
+            "description": "Finds wp_ajax_nopriv_ registrations (publicly callable AJAX handlers) and flags those whose corresponding callback does not contain a nonce verification call. Even read-only handlers can leak data via CSRF if the response differs by auth context."
+          }
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "low",
+          "reasoning": "Confirmed: getResultDetails() at line 29 has no nonce or referer check — the //phpcs:ignore WordPress.Security.NonceVerification.Missing comment at line 35 makes this explicit. The handler is registered via wc_ajax_ (not wp_ajax_nopriv_ as claimed — DGWT_WCAS_WC_AJAX_ENDPOINT is defined as true in the main plugin file at line 247, taking the line-17/18 branch). wc_ajax_ is equally public/unauthenticated (?wc-ajax=dgwt_wcas_result_details), so the finding's core reachability claim holds despite the wrong hook name. The canUserSee() method at Product.php:658-665 calls current_user_can('read_post') and current_user_can('edit_post'), meaning the response differs by auth context: a draft or hidden product returns empty HTML for an unauthenticated caller but returns full product details for an admin. This confirms the theoretical CSRF info-leak path (attacker's page POSTs to ?wc-ajax=dgwt_wcas_result_details with a private product ID; if an admin visits, the response leaks existence/details of that product). However, practical exploitability is substantially limited by: (1) modern browsers set SameSite=Lax on WordPress auth cookies by default, so cross-site POST requests do not carry the auth cookie — the response would be identical to an unauthenticated call; (2) even without SameSite, the response goes to the attacker's origin only if CORS allows it, which it does not by default; (3) the operation is read-only with no state mutation. The finding's severity=low is correct. The finding is real (code confirms absent nonce, confirmed auth-gated canUserSee, confirmed public endpoint), but the wp_ajax_nopriv_ attribution is factually wrong — it uses wc_ajax_ in the actual deployed code path."
+        }
+      },
+      {
+        "id": "f021",
+        "rel": "includes/Engines/WordPressNative/DetailsBox.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Engines/WordPressNative/DetailsBox.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "unescaped_filter_output_in_html",
+          "location": "getTaxonomyDetails() — lines 207-223",
+          "severity": "low",
+          "reachability": "Requires a third-party plugin or theme that hooks the filter dgwt/wcas/suggestion_details/taxonomy/headline; not reachable by an unauthenticated attacker in a default installation.",
+          "justification": "$title is assembled with safe HTML strings (esc_html applied to $termName at line 211) and then passed through apply_filters() at line 213-219, after which the full $title string is echo'd without any escaping at line 223. Any plugin hooking dgwt/wcas/suggestion_details/taxonomy/headline and returning malicious HTML would have it injected verbatim into the response; the risk is low because filter hooks require server-level access, but the pattern breaks the contract that caller-owned HTML should be escaped at the final output point.",
+          "detection_pattern": {
+            "grep_pattern": "echo.*apply_filters",
+            "anti_pattern": "esc_html|esc_attr|esc_url|wp_kses",
+            "section_name": "XSS: unescaped apply_filters output echoed",
+            "description": "Catches direct echo of apply_filters() return values without an escaping wrapper. Filter hooks can be registered by any installed plugin, so unescaped filter output is a latent stored-XSS vector whenever the filter return value is not already trusted HTML."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "low",
+          "reasoning": "The finding correctly identifies that $title is echo'd without escaping after apply_filters() at line 223, but the reachability analysis proves this is not a real web-exploitable vulnerability. The filter hook 'dgwt/wcas/suggestion_details/taxonomy/headline' can only be registered by server-side PHP code — a co-installed plugin or theme. An unauthenticated (or even authenticated) web attacker cannot register WordPress filter hooks via HTTP requests. The base $title string is safely constructed: $termName is passed through esc_html(wp_unslash()) at line 211, and $taxonomy is sanitized with sanitize_key() at line 66 before use. The pattern of echoing filter output directly is standard WordPress extensibility design (the plugin deliberately allows hook consumers to inject trusted HTML). This is a low-quality code practice that breaks the escaping contract, but it requires server-level code execution to exploit — meaning any attacker who could exploit this already has full server access, making the XSS irrelevant. No sanitizer was missed; the issue is architectural (filter output assumed to be trusted HTML). Classification: false positive for a web-exploitable vulnerability."
+        }
+      },
+      {
+        "id": "f021",
+        "rel": "includes/Engines/WordPressNative/DetailsBox.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Engines/WordPressNative/DetailsBox.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "missing_content_type_header",
+          "location": "getResultDetails() — line 101",
+          "severity": "low",
+          "reachability": "Any caller of the public AJAX endpoint.",
+          "justification": "The handler uses echo json_encode(...) instead of wp_send_json() or wp_send_json_success(); WordPress's wp_send_json() calls wp_die() with the correct application/json Content-Type, while the raw echo leaves the response with the default text/html Content-Type. Browsers may MIME-sniff the JSON response as HTML in legacy modes, potentially executing embedded script fragments injected via the dgwt/wcas/suggestion_details/output filter.",
+          "detection_pattern": {
+            "grep_pattern": "echo json_encode",
+            "anti_pattern": "wp_send_json|header.*application/json",
+            "section_name": "Missing Content-Type: JSON response sent as text/html",
+            "description": "Finds AJAX handlers that build a JSON response with echo json_encode() instead of wp_send_json(). Without an explicit Content-Type: application/json header, browsers may MIME-sniff the response and execute embedded HTML/script content."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "informational",
+          "reasoning": "The finding correctly identifies that getResultDetails() at line 101 uses `echo json_encode(...)` instead of `wp_send_json()`, which means no explicit Content-Type: application/json header is sent by the plugin. However, the claimed exploitation path (MIME-sniffing to execute injected script fragments) fails on multiple grounds:\n\n1. WordPress and WooCommerce both set X-Content-Type-Options: nosniff before the handler fires. WordPress core's admin-ajax.php hooks send_nosniff_header() to the send_headers action (wp-includes/default-filters.php), and WooCommerce's wc_ajax endpoint does the same. This header prevents MIME-type sniffing in all modern browsers (Chrome since 2016, Firefox, Edge, Safari). The 'legacy browser' scenario the finding relies on requires pre-IE8 behaviour that is negligible in any real deployment.\n\n2. The attacker-controlled input surface is tightly sanitized. All POST data flows through sanitize_text_field (suggestion value), sanitize_key (type, taxonomy), and absint (postID, termID, variationID). No raw attacker string reaches the JSON output directly.\n\n3. The dgwt/wcas/suggestion_details/output filter that the finding cites as the injection vector is a server-side WordPress filter hook. An attacker submitting POST data to the AJAX endpoint cannot invoke or alter this filter — only site code (themes, plugins running server-side) can add callbacks. Exploiting this filter requires prior server-side code execution, which would be a far more severe and separate vulnerability.\n\n4. The endpoint is unauthenticated (wp_ajax_nopriv_ plus wc_ajax_), which is expected for a public product search feature and is not itself a vulnerability.\n\nIn summary: the missing Content-Type header is a minor coding-quality issue (prefer wp_send_json), not a security vulnerability. The MIME-sniff exploitation chain is blocked by the nosniff header already emitted by the WordPress/WooCommerce infrastructure, and there is no realistic attacker-controlled path to inject script content into the response."
+        }
+      },
+      {
+        "id": "f022",
+        "rel": "includes/Engines/WordPressNative/Search.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Engines/WordPressNative/Search.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "missing_authentication",
+          "location": "getSearchResults() / constructor, lines 114-116",
+          "severity": "medium",
+          "reachability": "Unauthenticated via wp_ajax_nopriv_ AJAX action (DGWT_WCAS_SEARCH_ACTION) and WooCommerce AJAX endpoint; any visitor can call it",
+          "justification": "The handler is registered with both wp_ajax_nopriv_ and WC AJAX (line 114) with no nonce, capability check, or rate-limit, allowing unauthenticated enumeration of product data including SKUs, prices, descriptions, and internal product IDs via the 'product-ids' context parameter.",
+          "detection_pattern": {
+            "grep_pattern": "wp_ajax_nopriv_",
+            "anti_pattern": "check_ajax_referer|wp_verify_nonce|current_user_can",
+            "section_name": "Missing Auth: wp_ajax_nopriv_ handler without access control",
+            "description": "Finds AJAX handlers exposed to unauthenticated users (wp_ajax_nopriv_). When these handlers return non-public sensitive data (SKUs, internal IDs, draft content) without a capability check, they represent information disclosure. Files matching wp_ajax_nopriv_ but not containing check_ajax_referer, wp_verify_nonce, or current_user_can nearby are suspect."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "FALSE POSITIVE. The finding contains two material errors that together falsify it. (1) Hook attribution: DGWT_WCAS_WC_AJAX_ENDPOINT is defined as true in ajax-search-for-woocommerce.php:247, so the if-branch at Search.php:112 is taken (wc_ajax_dgwt_wcas_ajax_search), and the else-branch at lines 115-116 (wp_ajax_nopriv_) is dead code in all normal deployments. The reachability claim is still correct in substance — wc_ajax_ is equally unauthenticated — but the cited code path is wrong. (2) product-ids context claim is false: $context is a PHP function parameter with default 'autocomplete'; it is never read from $_REQUEST. When WordPress invokes the AJAX hook it calls getSearchResults() with no arguments, so $context='autocomplete' always. An attacker cannot supply context=product-ids via HTTP to reach that branch — it is only exercised by an internal programmatic call at Search.php:770 with $return=true. The autocomplete path (the only one reachable externally) queries only post_status=publish products and applies getTaxQuery() which excludes exclude-from-search products — returning identical data to what any visitor sees by browsing the shop. SKU, price, and description are gated behind per-setting checks (show_product_sku, show_product_price, show_product_desc). There is no nonce check (confirmed: //phpcs:disable WordPress.Security.NonceVerification.Recommended at line 178), but absence of a nonce on a read-only public search widget is by design, not a vulnerability. No unpublished products, no draft content, and no admin-only fields are exposed. The missing_authentication label is a category mismatch: this is an intentionally public autocomplete endpoint, not a guarded action."
+        }
+      },
+      {
+        "id": "f022",
+        "rel": "includes/Engines/WordPressNative/Search.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Engines/WordPressNative/Search.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "csrf_missing_nonce",
+          "location": "getSearchResults(), lines 179-185 (//phpcs:disable WordPress.Security.NonceVerification.Recommended suppression)",
+          "severity": "low",
+          "reachability": "Any page that can trigger an AJAX request to the search endpoint; exploitable by any page the logged-in user visits",
+          "justification": "The developer explicitly suppressed PHPCS's nonce warning (//phpcs:disable WordPress.Security.NonceVerification.Recommended) rather than adding verification; $_REQUEST['dgwt_wcas_keyword'] and $_REQUEST['s'] are read without any nonce check, so a cross-site request can force a logged-in user's browser to issue search queries and reveal returned data via CORS or redirect.",
+          "detection_pattern": {
+            "grep_pattern": "phpcs:disable WordPress.Security.NonceVerification",
+            "anti_pattern": "check_ajax_referer|wp_verify_nonce",
+            "section_name": "CSRF: PHPCS nonce suppression without actual nonce verification",
+            "description": "Flags files where the developer disabled PHPCS nonce checks without adding a real nonce verification call. This pattern is a code smell that frequently corresponds to a CSRF vulnerability; it is more reliable than searching for the absence of a nonce."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "The PHPCS nonce suppression at lines 178-185 of Search.php is not a real CSRF vulnerability. Three independent reasons converge: (1) The endpoint is intentionally public. It is registered on 'wc_ajax_dgwt_wcas_ajax_search' (WooCommerce AJAX, publicly reachable) AND on 'wp_ajax_nopriv_dgwt_wcas_ajax_search', meaning it is explicitly designed to work without any login. Nonce protection presupposes an authenticated user whose session can be hijacked — that precondition does not hold here. (2) No state change occurs. getSearchResults() is a pure read: it queries WooCommerce products (categories, tags, post content) and echoes JSON. CSRF is only harmful when a cross-site request causes a server-side state change on behalf of the victim. Reading a search index changes nothing. (3) The returned data is public. The endpoint surfaces the same product names, categories, and tags that any anonymous visitor sees via the front-end search widget. Even if an attacker could read the JSON response (which browser Same-Origin Policy prevents in the absence of CORS headers — none are set by this plugin), they would learn only public catalog data. The finding's claim that an attacker can 'reveal returned data via CORS or redirect' is false: no Access-Control-Allow-Origin header is emitted and no redirect mechanic exists in the response path. The sanitize_text_field() calls on $_REQUEST['dgwt_wcas_keyword'] and $_REQUEST['s'] (lines 180, 183) mean the keyword input is properly sanitized before use. The phpcs:disable comment is a code-style suppression appropriate for a public, authentication-free search endpoint, not evidence of a missing security control."
+        }
+      },
+      {
+        "id": "f022",
+        "rel": "includes/Engines/WordPressNative/Search.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Engines/WordPressNative/Search.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "stored_xss_risk",
+          "location": "getCategories() line 535, getTags() line 587, getProductsData() lines 388-392",
+          "severity": "medium",
+          "reachability": "Any visitor triggering a search; the XSS fires in the browser when the JavaScript frontend renders results using innerHTML rather than textContent",
+          "justification": "Category/tag names are passed through html_entity_decode() (lines 535, 587) and product names through html_entity_decode() (line 390) before being JSON-encoded into the response; if the client-side JavaScript renders the 'value' field via innerHTML (a reasonable assumption for rich search dropdowns showing formatted product names), a stored payload in a product/category name — which an admin can set — would execute in every visitor's browser during search.",
+          "detection_pattern": {
+            "grep_pattern": "html_entity_decode",
+            "anti_pattern": "esc_html|esc_attr|wp_kses",
+            "section_name": "XSS: html_entity_decode on user-controlled data without re-escaping",
+            "description": "html_entity_decode() reverses HTML entity encoding, so if the decoded string is placed into HTML output or into a JSON field that JavaScript renders as HTML, any HTML/JS in the original stored value becomes active. Files that call html_entity_decode but lack a subsequent esc_html/esc_attr/wp_kses before outputting are suspect for stored XSS."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "The finding claims that html_entity_decode() on category/tag names (getCategories line 535, getTags line 587) and on product names (getProductsData line 390) produces a stored XSS because the client-side JS renders the 'value' field via innerHTML. The sink is correct — jQuery container.html(html) at assets/js/search.js line 2460 is innerHTML-equivalent — but the attack path is broken by the client-side sanitizer that the finding missed.\n\nThe JS function utils.formatHtml() (search.js lines 36-52) processes every suggestion value before it enters the HTML string:\n1. Escapes & -> &amp;, < -> &lt;, > -> &gt;, \" -> &quot;, ' -> &apos;\n2. Selectively re-opens only: <sup>, <sub>, <br>, <b>, <strong>, <span>, <i> (no attributes, lines 43-50)\n3. Re-opens <strong class=\"VAL\">, <span class=\"VAL\">, <i class=\"VAL\"> where VAL matches [^&]+ (line 51)\n\nThe regex on line 51 requires the exact pattern &lt;TAG class=&quot;VAL&quot;&gt; — it cannot be confused by inserting event-handler attributes because: (a) any extra attribute content is encoded as &quot; which contains &, stopping the [^&]+ match; (b) the &gt; terminator must immediately follow the closing &quot; of the class value, so extra attribute content prevents the regex from matching at all.\n\nConsequently: even if an admin stores <script>alert(1)</script> or <span onmouseover=alert(1)> as a category name, formatHtml converts angle brackets to &lt;/&gt; and the re-open regexes do not reconstruct any executable form. The innerHTML receives only safe literal text or whitelisted structural tags with no event handlers.\n\nFor products, the PHP additionally runs wp_kses() with a restrictive allowlist (b/br/span/strong/sub/sup only) before html_entity_decode, providing a second defence layer, but the JS formatHtml alone is sufficient to defeat the attack.\n\nAttacker-controlled input (admin-set product/category names): yes. Sink (innerHTML via jQuery .html()): yes. Missing sanitizer: no — utils.formatHtml() at lines 36-52 of assets/js/search.js is the guard, and it is not bypassable with the tag/attribute set available after wp_kses and html_entity_decode on the PHP side. Finding is a false positive."
+        }
+      },
+      {
+        "id": "f022",
+        "rel": "includes/Engines/WordPressNative/Search.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Engines/WordPressNative/Search.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "information_disclosure",
+          "location": "getSearchResults(), context='product-ids' branch, lines 263-277",
+          "severity": "medium",
+          "reachability": "Unauthenticated via the nopriv AJAX endpoint by passing context=product-ids or product-ids-ff in the request",
+          "justification": "The 'product-ids' and 'product-ids-ff' context values (lines 263, 279) are read from the request ($context parameter flow) and cause the handler to return raw WP_Post objects or IDs for ALL matching products regardless of user role, potentially exposing hidden or not-yet-linked product IDs to unauthenticated callers who can enumerate the store's product catalog.",
+          "detection_pattern": {
+            "grep_pattern": "product-ids",
+            "anti_pattern": "current_user_can|is_user_logged_in",
+            "section_name": "Info Disclosure: Product ID enumeration via context parameter",
+            "description": "Flags endpoints that branch on a caller-supplied context value (e.g., 'product-ids') to return bulk product IDs without checking whether the caller is authorized to see that data. Absence of current_user_can or is_user_logged_in near these branches indicates unauthenticated bulk data access."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "N/A",
+          "reasoning": "FALSE POSITIVE. The core claim — that an attacker can pass context=product-ids or context=product-ids-ff via the HTTP request to trigger the product-ID enumeration branch — is wrong. The $context parameter in getSearchResults($phrase='', $return=false, $context='autocomplete') is a PHP function parameter with a hardcoded default of 'autocomplete'. It is never populated from $_REQUEST, $_GET, or $_POST anywhere in the function or its callers. When WordPress fires the method via wp_ajax_nopriv_ or wc_ajax_ with zero arguments, $context is always 'autocomplete', making the product-ids branch (line 263) and product-ids-ff branch (line 279) completely unreachable via HTTP. The only callers that pass 'product-ids' as $context are internal PHP callers: Helpers::searchProducts() (Helpers.php:1660) and Search::doSearch() (includes/Search.php:67), both of which pass $return=true so results go back to PHP, not echoed as AJAX JSON. A grep of the entire plugin source confirms $context is never read from $_REQUEST — the only REQUEST['context'] usage in the codebase is in Blocks.php for a REST API edit-context check, unrelated to search. The branches exist in the code but are not reachable by an unauthenticated HTTP caller supplying any request parameter."
+        }
+      },
+      {
+        "id": "f022",
+        "rel": "includes/Engines/WordPressNative/Search.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Engines/WordPressNative/Search.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "unvalidated_open_redirect_risk",
+          "location": "fixPolylangWooEndpoint() / woocommerce_ajax_get_endpoint filter hook, lines 1011-1019",
+          "severity": "low",
+          "reachability": "Requires Polylang active without WooCommerce Polylang integration; the $request parameter comes from a WordPress filter chain meaning it may incorporate URL parameters from external sources",
+          "justification": "The method hooks woocommerce_ajax_get_endpoint and receives a $request string from the filter without sanitizing it before passing it to add_query_arg('wc-ajax', $request, $url); add_query_arg does not escape its values for HTML output contexts, so if the composed URL is later echoed without esc_url() in a theme or WooCommerce template, a crafted wc-ajax value could inject additional query parameters or cause a redirect.",
+          "detection_pattern": {
+            "grep_pattern": "add_query_arg",
+            "anti_pattern": "esc_url",
+            "section_name": "Open Redirect / URL Injection: add_query_arg without esc_url on output",
+            "description": "add_query_arg() does not HTML-encode its output; when its return value is echoed in HTML without esc_url(), an attacker who controls any input parameter flowing into it can inject arbitrary URL characters. Files that call add_query_arg but do not pass the result through esc_url() before output are suspect."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "The finding claims that $request in fixPolylangWooEndpoint() could carry attacker-controlled data from URL parameters, enabling URL injection via add_query_arg. This is incorrect on multiple grounds.\n\n1. SINK IS SANITIZED AT WooCommerce CALL SITE: WC_AJAX::get_endpoint() (class-wc-ajax.php:51) wraps the entire filter output in esc_url_raw() before returning it. The plugin's modified URL passes through esc_url_raw(), which strips javascript: and other dangerous protocol prefixes. No HTML-context esc_url() gap exists in the primary call path.\n\n2. $request IS NEVER USER-CONTROLLED: Every call to WC_AJAX::get_endpoint() in WooCommerce core passes a hardcoded string literal: '%%endpoint%%', 'checkout', 'add-payment-method', 'order-received', 'order-pay', etc. The $request parameter to the woocommerce_ajax_get_endpoint filter is forwarded verbatim from these hardcoded values, not from $_GET, $_POST, or any user-supplied input.\n\n3. %%endpoint%% IS A JS TEMPLATE, NOT USER INPUT: The %%endpoint%% placeholder is embedded via wp_localize_script() into a JavaScript object. The JS then replaces it with another hardcoded endpoint name (e.g. 'get_refreshed_fragments', 'update_order_review'). The replacement occurs client-side in JavaScript and never feeds back into the PHP filter.\n\n4. OUTPUT CONTEXT IS JAVASCRIPT, NOT HTML HREF: The result of get_endpoint() is assigned to wc_ajax_url in a localized JS params object. It is not echoed in an HTML href attribute. An open redirect requires the browser to navigate to a URL — a JS AJAX URL template does not constitute a redirect sink.\n\n5. POLYLANG CONDITION IS NARROW: The filter is only registered when Polylang is active AND neither 'Polylang for WooCommerce' nor 'Hyyan WooCommerce Polylang Integration' is present. Even in that narrow condition, the $request value is still hardcoded, so the attack surface does not change.\n\nConclusion: No attacker-controlled data ever reaches the add_query_arg call in fixPolylangWooEndpoint(), and the output is sanitized by esc_url_raw() at the WooCommerce call site before any HTML or redirect context. The finding is a false positive."
+        }
+      },
+      {
+        "id": "f023",
+        "rel": "includes/Helpers.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Helpers.php",
+        "tags": [
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "xss_reflected",
+          "location": "getIcon() lines 128,143,158,176,189,202,216,235,259,273,287,303,317,331,344",
+          "severity": "medium",
+          "reachability": "The $class parameter is a public API argument passed by any caller; all current callers use hardcoded strings, but the method is exposed via apply_filters('dgwt/wcas/icon',...) which any plugin/theme can hook to modify $class. Privilege required to add a filter (admin-level or author on a vulnerable site), so real-world reachability is limited to privileged users unless combined with a filter injection.",
+          "justification": "Every SVG icon case in getIcon() does `echo $class;` bare inside the SVG `class` HTML attribute without esc_attr() or esc_html(); if a privileged attacker (or a second vulnerability) controls $class they can close the attribute and inject arbitrary HTML/JS into rendered pages.",
+          "detection_pattern": {
+            "grep_pattern": "echo \\$class;",
+            "anti_pattern": "esc_attr\\(\\s*\\$class\\s*\\)|esc_html\\(\\s*\\$class\\s*\\)",
+            "section_name": "XSS: unescaped class attribute echo",
+            "description": "Finds bare `echo $class;` statements that are likely inside HTML attribute contexts (e.g., SVG class attributes). When $class is not filtered through esc_attr/esc_html, an attacker who controls the parameter can break out of the attribute and inject markup or event handlers."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "The sink is confirmed: every SVG case in getIcon() does `echo $class;` bare inside the SVG class HTML attribute with no esc_attr() or esc_html() call. However, $class is NOT reachable with attacker-controlled input through any call path in the codebase. All direct callers of getIcon() and getMagnifierIco() pass hardcoded string literals as the $class argument. The $iconType shortcode attribute ($args['icon']) flows to the $type/$name parameter of getMagnifierIco/getIcon (the switch-case selector), not to $class. The $iconColor shortcode attribute flows to the $color parameter, which is properly escaped with esc_attr() at every usage site. The apply_filters('dgwt/wcas/icon', $svg, $name, $class, $color) call passes $class as a read-only informational argument; filter callbacks receive the already-rendered $svg string and can modify it, but this does not allow an attacker to retroactively inject into the already-built SVG via $class. Adding a filter hook requires admin/code-level access, which is out-of-scope for a plugin vulnerability. The Blocks.php entry point sanitizes icon_color with esc_attr() before passing it to the shortcode. The widget.php does not pass icon_color at all. There is a latent/theoretical code quality issue (missing escaping on $class), but no exploitable path from any user-controlled input to the $class sink exists in the current codebase."
+        }
+      },
+      {
+        "id": "f023",
+        "rel": "includes/Helpers.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Helpers.php",
+        "tags": [
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "xss_reflected",
+          "location": "createTooltip() line 1130",
+          "severity": "low",
+          "reachability": "All current callers of createTooltip()/createQuestionMark()/createOverrideTooltip() pass hardcoded string literals for $class and $placement. No current path from user input to these parameters exists, but the public method's signature accepts arbitrary strings and the function is part of a public API.",
+          "justification": "At line 1130, $class and $placement are concatenated raw into HTML attribute values (class=\"js-dgwt-wcas-tooltip ' . $class . '\" and data-tooltip-placement=\"' . $placement . '\") without escaping; a caller passing attacker-controlled values would produce stored or reflected XSS.",
+          "detection_pattern": {
+            "grep_pattern": "'\\.\\s*\\$class\\s*\\.\\s*'[^;]*class=|'\\.\\s*\\$placement\\s*\\.\\s*'",
+            "anti_pattern": "esc_attr\\(\\s*\\$class\\s*\\)|esc_attr\\(\\s*\\$placement\\s*\\)",
+            "section_name": "XSS: unescaped variable concatenated into HTML attribute",
+            "description": "Detects PHP variables concatenated directly into HTML attribute strings without esc_attr(). If these variables are ever caller-controlled, the attribute boundary can be escaped to inject event handlers or additional attributes."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "low",
+          "reasoning": "The sink at Helpers.php line 1130 is real: $class and $placement are concatenated into HTML attribute values without esc_attr(). However, no attacker-controlled path to this sink exists in the current codebase. (1) $class: every external caller goes through createQuestionMark() or createOverrideTooltip(), both of which hardcode $class to fixed CSS class string literals ('dashicons dashicons-editor-help dgwt-wcas-questio-mark' and 'dashicons dashicons-lock dgwt-wcas-override-tooltip'). No caller exposes $class to external input. (2) $placement: every call site passes only $id and $content arguments; $placement always defaults to the literal 'right' and is never supplied by any caller. (3) Context: the output is rendered exclusively in WordPress admin settings pages, gated by admin_init and current_user_can('manage_options'/'manage_woocommerce'). Admins are trusted principals in the WordPress security model. (4) No apply_filters or do_action hooks expose $placement or $class through createTooltip(). The finding is a theoretical future-caller risk (a code-quality issue), not an exploitable vulnerability given the current codebase. Verdict: NOT REAL as an exploitable vulnerability.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f023",
+        "rel": "includes/Helpers.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Helpers.php",
+        "tags": [
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "unvalidated_input_to_js_context",
+          "location": "maybeInjectFiboDebugFields() line 2208",
+          "severity": "low",
+          "reachability": "Any unauthenticated visitor can append ?fibodebug=<value> to a page URL that triggers this code path. isFiboDebugEnabled() only checks if the key is present and matches; any string is accepted. The value is serialized via wp_localize_script (JSON-encoded, so no direct HTML XSS), but it is reflected unvalidated into the JS custom_params object accessible to all frontend scripts.",
+          "justification": "Line 2208: $params['fibodebug'] = $_GET['fibodebug'] stores the raw GET parameter into the custom_params filter return with no sanitization before it reaches wp_localize_script; while JSON encoding prevents HTML injection, the raw value propagates to search API requests as a URL parameter and can be used for server-side parameter injection or log injection.",
+          "detection_pattern": {
+            "grep_pattern": "\\$_GET\\[.fibodebug.\\]",
+            "anti_pattern": "sanitize_text_field\\(\\s*\\$_GET\\[.fibodebug.\\]\\)|esc_attr\\(\\s*\\$_GET\\[.fibodebug.\\]\\)",
+            "section_name": "Unsanitized GET parameter into JS localization",
+            "description": "Finds raw $_GET['fibodebug'] usage without sanitization before it is passed to JavaScript via wp_localize_script. Even though JSON encoding prevents direct HTML XSS, the unsanitized value can be forwarded to server-side endpoints or logged."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "informational",
+          "reasoning": "The finding correctly identifies that $_GET['fibodebug'] is stored at line 2208 without sanitize_text_field(). However, all claimed impact paths fail under adversarial scrutiny.\n\nData flow: $_GET['fibodebug'] -> $params['fibodebug'] via add_filter('dgwt/wcas/search_bar/custom_params') -> $customParams in search-form.php line 20 -> output at line 58 via htmlspecialchars(json_encode((object)$customParams)). The double encoding (json_encode wraps the value in a JSON string, htmlspecialchars escapes the attribute context) makes reflected XSS impossible in the HTML sink.\n\nIn the JS layer (search.js applyCustomParams, lines 2003-2016), the fibodebug value is read back from the parsed JSON data attribute and forwarded as a URL query parameter to the AJAX search endpoint. This adds no attack surface: an attacker who can set ?fibodebug=score,payload on the page URL can identically set it directly on the AJAX request. The forwarding is redundant, not additive.\n\nLog injection is an inherent property of any GET parameter reaching access logs; it is not a plugin-introduced vulnerability and does not meet the threshold for a security finding.\n\nThe gate check in isFiboDebugEnabled() (lines 2184-2192) is not a security guard: any value containing the substring 'score' as a comma-separated token (e.g. '?fibodebug=score') passes. But since the downstream sinks are fully protected by encoding, this permissiveness has no exploitable consequence.\n\nMissing sanitize_text_field() is a WordPress coding standards violation (PHPCS would flag it), but this is a code quality issue, not an exploitable vulnerability. No confidentiality, integrity, or availability impact is achievable by an attacker."
+        }
+      },
+      {
+        "id": "f033",
+        "rel": "includes/Integrations/Plugins/UsCore/UsCore.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Plugins/UsCore/UsCore.php",
+        "tags": [
+          "access_control"
+        ],
+        "finding": {
+          "vuln_class": "missing_nonce_nopriv_ajax_handler",
+          "location": "set_search_post_ids_from_ajax() / init() lines 26-44",
+          "severity": "low",
+          "reachability": "Any unauthenticated user can POST to admin-ajax.php with action=us_ajax_grid to trigger this handler. No authentication or nonce required.",
+          "justification": "The wp_ajax_nopriv_us_ajax_grid action (line 27) hooks set_search_post_ids_from_ajax() with no nonce verification and no current_user_can() check; the phpcs:ignore on line 34 confirms deliberate suppression. An unauthenticated attacker can force the server to execute a product search query with an arbitrary (sanitized) search term. State mutation is absent so severity is low, but CSRF protection is completely missing.",
+          "detection_pattern": {
+            "grep_pattern": "wp_ajax_nopriv_",
+            "anti_pattern": "check_ajax_referer|wp_verify_nonce",
+            "section_name": "CSRF: nopriv AJAX handler without nonce",
+            "description": "Matches WordPress nopriv AJAX handler registrations. Files that register a nopriv handler but contain no nonce-verification call are suspicious — any visitor can trigger the handler cross-origin, potentially causing unintended server-side work or data reads."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "false_positive",
+          "reasoning": "FALSE POSITIVE. The finding correctly identifies a wp_ajax_nopriv_us_ajax_grid handler with no nonce check (line 27) and the phpcs:ignore on line 34 confirms deliberate suppression. However, the claimed vulnerability does not constitute a real security issue for the following reasons:\n\n1. SANITIZATION IS PRESENT DOWNSTREAM: $search_term flows from $_POST['template_vars'] (JSON-decoded) into Helpers::searchProducts($search_term), which calls getSearchResults($phrase, true, 'product-ids'). Because $return=true, line 175 of Search.php applies sanitize_text_field($phrase) before any DB interaction. There is no unsanitized path to the database.\n\n2. NO STATE MUTATION: The handler stores post IDs in $this->post_ids (instance variable) that only affects a pre_get_posts query within the same request. No writes occur. No persistent state is changed.\n\n3. NO DATA DISCLOSURE: set_search_post_ids_from_ajax() returns void. The attacker receives no output from this hook. The actual us_ajax_grid response is owned by UpSolution Core plugin, not this integration hook.\n\n4. CSRF IS IRRELEVANT FOR NOPRIV HANDLERS: CSRF/nonce protection exists to protect authenticated users' sessions. A nopriv handler requires no credentials by definition — there is no session to hijack. Missing nonce on a public-facing, read-only, no-output handler is a WordPress coding standards advisory (hence phpcs:ignore), not an exploitable vulnerability.\n\n5. REACHABILITY IS CORRECT BUT IMPACT IS ZERO: Any unauthenticated user can POST to admin-ajax.php with action=us_ajax_grid and a JSON payload. The handler executes a product search query server-side. The attacker gets no useful output and causes no state change. The worst-case is a DB read (same as the normal public search endpoint), not meaningfully different from calling the plugin's own public search.\n\n6. INTEGRATION-ONLY HOOK: This class is an integration shim that hooks into UpSolution Core's grid to inject search results. It does not handle or return the AJAX response itself. The attacker cannot leverage this hook to receive any data.\n\nConclusion: The nopriv handler is intentionally public (it supports an e-commerce product grid that anonymous users browse), input is sanitized before DB use, there is no state mutation, no data is disclosed to callers, and nonce requirements are inapplicable to fully-public read-only handlers. This is not a real vulnerability."
+        }
+      },
+      {
+        "id": "f033",
+        "rel": "includes/Integrations/Plugins/UsCore/UsCore.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Plugins/UsCore/UsCore.php",
+        "tags": [
+          "access_control"
+        ],
+        "finding": {
+          "vuln_class": "unsanitized_input_passed_to_search_function",
+          "location": "set_search_post_ids_from_ajax() lines 35-43",
+          "severity": "low",
+          "reachability": "Any visitor (nopriv) or authenticated user can supply an arbitrary value in $_POST['template_vars']['query_args']['s']. Sanitization only occurs inside Helpers::searchProducts() -> getSearchResults() via sanitize_text_field() at Search.php:175.",
+          "justification": "The search term extracted from user-controlled JSON on line 37 ($search_term = $template_vars['query_args']['s']) is passed without any sanitization or length limit in UsCore.php itself to Helpers::searchProducts(). Safety depends entirely on the downstream sanitize_text_field() call in Search.php. If that call were removed or bypassed by a future refactor, unsanitized attacker input would reach the search engine directly. Severity is low given current downstream sanitization.",
+          "detection_pattern": {
+            "grep_pattern": "json_decode.*\\$_POST",
+            "anti_pattern": "sanitize_text_field|sanitize_key|intval|absint|wp_kses",
+            "section_name": "Unsanitized POST JSON decoded directly",
+            "description": "Matches patterns where POST data is decoded from JSON without immediate sanitization in the same scope. Values extracted from such JSON and forwarded to query functions or output without a sanitization call at the call site represent a layered-defence gap."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "false_positive",
+          "reasoning": "The full taint path from $_POST['template_vars']['query_args']['s'] to the search engine sink was traced. UsCore.php lines 35-43 extract $search_term from attacker-controlled JSON without any sanitization at the call site, and pass it to Helpers::searchProducts($search_term) (Helpers.php line 1655). That function immediately calls DGWT_WCAS()->nativeSearch->getSearchResults($phrase, true, 'product-ids') (Helpers.php line 1660). In WordPressNative/Search.php::getSearchResults(), the $return parameter is true, so the code always takes the branch at line 174-175: $keyword = sanitize_text_field($phrase). The else branch (lines 177-185) is only reached when $return === false, which never happens via this call chain. The sanitization is therefore guaranteed and not conditional. No unsanitized attacker value reaches any dangerous sink in the current code. The reachability claim (nopriv) is accurate — wp_ajax_nopriv_us_ajax_grid is registered with no capability or nonce check, and isRelevantProductAjaxQuery() only gates on post_type being 'product'. However, the impact is nil because the sanitization executes on every invocation. The finding describes a defense-in-depth gap (reliance on downstream sanitization rather than sanitizing at the entry point), not an exploitable vulnerability."
+        }
+      },
+      {
+        "id": "f034",
+        "rel": "includes/Integrations/Plugins/WooCommerce/WooCommerce.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Plugins/WooCommerce/WooCommerce.php",
+        "tags": [
+          "sqli"
+        ],
+        "finding": {
+          "vuln_class": "sql_injection_via_unvalidated_filter_output",
+          "location": "filter_price_sql(), line 110",
+          "severity": "medium",
+          "reachability": "Reachable on any product search page when the woocommerce_price_filter_sql filter fires (i.e., when the WC price filter widget is rendered). Exploitation requires a second plugin or theme hooking dgwt/wcas/search_page/result_post_ids and injecting non-integer values, OR a future regression in the upstream populator that lets unsanitized data into the buffer.",
+          "justification": "At line 110, apply_filters('dgwt/wcas/search_page/result_post_ids', []) output is directly implode()','-joined into raw SQL without any integer cast or $wpdb->prepare(): `$sql .= ' AND product_id IN(' . implode( ',', $post_ids ) . ')'`. The filter is a public WordPress hook; any plugin can inject non-integer elements into the returned array, breaking out of the IN() clause.",
+          "detection_pattern": {
+            "grep_pattern": "implode\\(\\s*['\"],\\s*['\"]\\s*,\\s*\\$",
+            "anti_pattern": "array_map\\s*\\(\\s*['\"]intval['\"]|array_map\\s*\\(\\s*['\"]absint['\"]|\\$wpdb->prepare",
+            "section_name": "SQL Injection: implode() array into IN() clause without integer cast",
+            "description": "Catches any place where a PHP array is joined with commas directly into a SQL fragment via implode(). Without array_map('intval', ...) or $wpdb->prepare(), if any element is non-integer (e.g., injected via a WordPress filter), SQL injection is possible. Files matching the grep pattern but lacking integer-cast or prepare() in close proximity are suspicious."
+          }
+        },
+        "verdict": null
+      },
+      {
+        "id": "f034",
+        "rel": "includes/Integrations/Plugins/WooCommerce/WooCommerce.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Plugins/WooCommerce/WooCommerce.php",
+        "tags": [
+          "sqli"
+        ],
+        "finding": {
+          "vuln_class": "sql_injection_via_unvalidated_filter_output",
+          "location": "filter_counts_query(), line 153",
+          "severity": "medium",
+          "reachability": "Reachable on any product search page when the woocommerce_get_filtered_term_product_counts_query filter fires (i.e., layered nav / attribute filters active). Same second-plugin precondition as the price-filter finding.",
+          "justification": "At line 153, the same pattern recurs in filter_counts_query(): `$query['where'] .= \" AND $wpdb->posts.ID IN(\" . implode( ',', $post_ids ) . ')'`. The $post_ids array comes from the untyped public filter dgwt/wcas/search_page/result_post_ids with no integer validation, allowing SQL injection if any hook returns non-integer elements.",
+          "detection_pattern": {
+            "grep_pattern": "\\$query\\[.where.\\].*\\.=.*implode",
+            "anti_pattern": "array_map\\s*\\(\\s*['\"]intval['\"]|array_map\\s*\\(\\s*['\"]absint['\"]|\\$wpdb->prepare",
+            "section_name": "SQL Injection: unguarded concatenation into SQL WHERE clause via implode",
+            "description": "Catches direct string concatenation into a SQL where clause using implode() on an array, without integer sanitization. Common pattern in WooCommerce filter integration code where post ID arrays flow through WordPress hooks and are then embedded in raw SQL."
+          }
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "The sink is real and unguarded: filter_counts_query() at line 153 concatenates $post_ids directly into a raw SQL WHERE clause via implode(',', $post_ids) with no intval/absint cast and no $wpdb->prepare(). The data path is: apply_filters('dgwt/wcas/search_page/result_post_ids', []) -> implode(',', ...) -> $query['where'] .= \" AND ...\". In the canonical (no-extra-plugin) flow, $post_ids is populated by Search.php::getProductIds(), which returns $postsIDsBuffer. That buffer is set from $postIn[] = $suggestion->ID where $suggestion->ID comes from get_posts() WP_Post->ID (a PHP integer from a DB-backed WordPress API call) -- so the canonical path is safe. However, the filter 'dgwt/wcas/search_page/result_post_ids' is a public WordPress filter: any plugin/theme hooking it at priority > 10 can replace the array with arbitrary string values, which would flow directly into the raw SQL. Additionally, the intermediate filter 'dgwt/wcas/page_search_results/output' (Search.php line 271) lets a second plugin mutate $output['suggestions'] objects before their ->ID values are pushed into postsIDsBuffer, providing a second injection vector. There is no integer sanitization anywhere in either code path. The reachability requires a second-plugin precondition (consistent with the finding's stated reachability), making this a second-order vulnerability/API design flaw rather than a direct HTTP-to-SQL path. Severity medium is appropriate: exploitation requires admin-level plugin installation or a vulnerable co-installed plugin, but the SQL injection itself is unmitigated if that precondition is met. The finding's reachability description correctly acknowledges the second-plugin precondition."
+        }
+      },
+      {
+        "id": "f035",
+        "rel": "includes/Integrations/Plugins/WooCommerceProductsFilter/WooCommerceProductsFilter.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Plugins/WooCommerceProductsFilter/WooCommerceProductsFilter.php",
+        "tags": [
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "sql_injection_via_unvalidated_filter_output",
+          "location": "get_filtered_price_query(), line 109",
+          "severity": "medium",
+          "reachability": "Reachable on any product search page where the WOOF price filter widget is rendered. Exploitation requires a second plugin or theme hooking 'dgwt/wcas/search_page/result_post_ids' and returning non-integer array elements, or a future regression in the upstream populator. The filter is public and documented.",
+          "justification": "At line 109, the output of apply_filters('dgwt/wcas/search_page/result_post_ids', []) is passed directly to implode(',', $post_ids) and concatenated into a raw SQL string: `$sql .= \" AND $wpdb->posts.ID IN(\" . implode( ',', $post_ids ) . ')'`. No integer cast (array_map('intval',...) or absint()) is applied, nor is $wpdb->prepare() used. Any WordPress hook registered on this public filter can inject non-integer elements (e.g., '1 UNION SELECT...') that break out of the IN() clause.",
+          "detection_pattern": {
+            "grep_pattern": "implode\\s*\\(\\s*['\"],\\s*['\"]\\s*,\\s*apply_filters",
+            "anti_pattern": "array_map\\s*\\(\\s*['\"]intval['\"]|array_map\\s*\\(\\s*['\"]absint['\"]|\\$wpdb->prepare",
+            "section_name": "SQL Injection: apply_filters array imploded into IN() clause without integer cast",
+            "description": "Catches PHP code that calls apply_filters() to obtain an array and immediately implodes it into a SQL fragment without integer sanitization. WordPress filters are public extension points; any plugin can alter the returned array. Without array_map('intval',...) or $wpdb->prepare(), SQL injection is possible via injected non-integer elements."
+          }
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "The sink at WooCommerceProductsFilter.php line 109 is confirmed: apply_filters('dgwt/wcas/search_page/result_post_ids', []) output is directly imploded into a raw SQL IN() clause with no intval/absint cast and no $wpdb->prepare(). The canonical populator in Search.php::getProductIds() fills postsIDsBuffer from $post->ID values returned by get_posts(), which are integers from the database — so the baseline code path does not pass attacker-controlled strings. The vulnerability is second-order: the public WordPress filter 'dgwt/wcas/search_page/result_post_ids' has no type enforcement, and any registered hook (another installed plugin, mu-plugin, or theme) can return non-integer array elements that flow directly into the SQL sink. No sanitizer, intval cast, or $wpdb->prepare() exists between the filter output and the SQL concatenation. The finding's reachability claim is accurate: exploitation requires a cooperating second component hooking the filter. Without such a component, an unauthenticated attacker has no direct path. The flaw is real and the severity 'medium' is appropriate — it represents a missing defense-in-depth control at a trust boundary, exploitable if any co-installed code (malicious or buggy) injects non-integer values."
+        }
+      },
+      {
+        "id": "f037",
+        "rel": "includes/Integrations/Plugins/WooProductFilter/WooProductFilter.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Plugins/WooProductFilter/WooProductFilter.php",
+        "tags": [
+          "access_control",
+          "sqli"
+        ],
+        "finding": {
+          "vuln_class": "sql_injection",
+          "location": "filter_price_sql(), line 45",
+          "severity": "high",
+          "reachability": "Any code that hooks the 'dgwt/wcas/search_page/result_post_ids' filter (another plugin, theme, or mu-plugin) can inject arbitrary values; the filter result is also indirectly influenced by the attacker-controlled search term processed in set_search_post_ids_from_ajax.",
+          "justification": "At line 45, $post_ids (obtained via apply_filters) is concatenated directly into a SQL fragment with implode(',', $post_ids) and no intval() cast, integer validation, or $wpdb->prepare() — any non-integer value injected through that filter becomes raw SQL.",
+          "detection_pattern": {
+            "grep_pattern": "implode\\s*\\(\\s*['\"],\\s*['\"]\\s*,\\s*\\$[a-zA-Z_]+\\s*\\).*\\.=.*\\$wpdb",
+            "anti_pattern": "\\$wpdb->prepare|array_map\\s*\\(\\s*'intval'|absint\\(",
+            "section_name": "SQL Injection: implode into raw SQL fragment",
+            "description": "Catches implode() calls whose result is concatenated into a SQL string touching $wpdb without prepare() or integer casting. Non-integer values produce second-order or filter-supplied SQL injection."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "low",
+          "reasoning": "The code defect exists — line 45 of filter_price_sql() concatenates implode(',', $post_ids) directly into a SQL fragment with no intval(), absint(), array_map('intval'), or $wpdb->prepare(). However, the claimed attack path is not demonstrated by the code.\n\nCanonical data flow: The filter 'dgwt/wcas/search_page/result_post_ids' is populated by Search::getProductIds() (Search.php:949-954), which returns $this->postsIDsBuffer. That buffer is built at Search.php:769-779 from $suggestion->ID values extracted via wp_list_pluck($results['suggestions'], 'ID') from WP_Post objects. WordPress always stores post IDs as positive integers, so the canonical populator always yields an array of PHP integers — safe to implode into SQL.\n\nThe 'indirect influence via set_search_post_ids_from_ajax' claim in the finding is incorrect. WooProductFilter::set_search_post_ids_from_ajax() sets $this->post_ids (line 82) via Helpers::searchProducts(), which also returns wp_list_pluck(..., 'ID') — integers only. More critically, $this->post_ids feeds only pre_get_posts() via $query->set('post__in', ...) and never reaches the 'dgwt/wcas/search_page/result_post_ids' filter. The two data paths are completely separate; no attacker-controlled search term flows into the SQL sink.\n\nThe only viable attack vector is a co-installed plugin or theme hooking 'dgwt/wcas/search_page/result_post_ids' and returning a non-integer element. This is a second-order/chained condition external to the plugin under review — no such hook exists in the plugin itself. Missing integer validation is a hardening gap (the code should use array_map('intval', $post_ids)) but without a demonstrated direct attacker-controlled input path, this does not constitute a confirmed exploitable SQL injection. Per the adversarial default (is_real=false unless the code proves it), verdict is false positive."
+        }
+      },
+      {
+        "id": "f037",
+        "rel": "includes/Integrations/Plugins/WooProductFilter/WooProductFilter.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Plugins/WooProductFilter/WooProductFilter.php",
+        "tags": [
+          "access_control",
+          "sqli"
+        ],
+        "finding": {
+          "vuln_class": "csrf_missing_nonce",
+          "location": "init() lines 30-31, set_search_post_ids_from_ajax() lines 50-84",
+          "severity": "medium",
+          "reachability": "Any unauthenticated or authenticated user can POST to admin-ajax.php?action=filtersFrontend; no nonce is checked (the phpcs:ignore at line 51 explicitly suppresses the warning).",
+          "justification": "Both wp_ajax_filtersFrontend and wp_ajax_nopriv_filtersFrontend are registered without any nonce verification, allowing cross-site or direct requests to trigger the search engine query using an attacker-supplied URL string.",
+          "detection_pattern": {
+            "grep_pattern": "wp_ajax_nopriv_[a-zA-Z0-9_]+",
+            "anti_pattern": "check_ajax_referer|wp_verify_nonce|check_admin_referer",
+            "section_name": "CSRF: nopriv AJAX handler without nonce",
+            "description": "Detects unauthenticated AJAX handlers that perform state-changing or information-leaking operations without nonce verification; files matching the first pattern but not the second are suspicious."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "N/A",
+          "reasoning": "FALSE POSITIVE for CSRF. The code pattern is real — both wp_ajax_filtersFrontend and wp_ajax_nopriv_filtersFrontend are registered at init() lines 30-31, and set_search_post_ids_from_ajax() (lines 50-84) contains three phpcs:ignore WordPress.Security.NonceVerification.Missing suppressions with zero calls to check_ajax_referer, wp_verify_nonce, or check_admin_referer anywhere in the file. The missing-nonce linting issue is genuine. However, this does NOT constitute a true CSRF vulnerability because: (1) The handler performs no state-changing operation — it reads $_POST['currenturl'], parses a URL from it, extracts a search term, calls Helpers::searchProducts() (a read-only search index query), and stores returned product IDs in an in-memory instance property ($this->post_ids). No database writes, no option updates, no persistent side effects occur. (2) The handler outputs nothing — no wp_send_json, no echo, no wp_die — so no data is returned to the caller via this callback. It hooks at priority 5 to pre-populate IDs before the WooProductFilter plugin's own handler runs at default priority 10. (3) The 'filtersFrontend' action is the WooProductFilter plugin's own public storefront AJAX action for product filtering. Registering on it with nopriv is architecturally expected for a front-end product filter widget on a public WooCommerce store. (4) CSRF requires a forged request to cause harmful state change on the victim's behalf. Here, an attacker-forged POST with a crafted 'currenturl' causes the search engine to run a query for the attacker's search term — but the result only narrows the WooProductFilter's product list for that same request, which is identical in outcome to a legitimate user submitting the same filter. No account change, no data exfiltration to the attacker, no persistent harm. The phpcs:ignore at line 51 explicitly acknowledges the lint warning but the suppression is defensible because the operation is read-only. Verdict: the missing-nonce pattern is a real linting/code-quality issue but fails the standard CSRF bar of requiring a state-changing or data-exfiltrating operation."
+        }
+      },
+      {
+        "id": "f037",
+        "rel": "includes/Integrations/Plugins/WooProductFilter/WooProductFilter.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Plugins/WooProductFilter/WooProductFilter.php",
+        "tags": [
+          "access_control",
+          "sqli"
+        ],
+        "finding": {
+          "vuln_class": "missing_input_sanitization",
+          "location": "set_search_post_ids_from_ajax(), line 63 and 82",
+          "severity": "medium",
+          "reachability": "Any unauthenticated visitor (nopriv handler) who can POST to admin-ajax.php?action=filtersFrontend with a crafted 'currenturl' value.",
+          "justification": "The search term is extracted from $_POST['currenturl'] via wp_parse_url() and wp_parse_str() (lines 63-68) with no sanitization — wc_clean() is only applied to 'orderby' and 'order', not to 's' — before being passed verbatim to Helpers::searchProducts() at line 82.",
+          "detection_pattern": {
+            "grep_pattern": "wp_parse_str\\s*\\(",
+            "anti_pattern": "wc_clean|sanitize_text_field|esc_sql",
+            "section_name": "Missing sanitization: parsed URL query values used without cleaning",
+            "description": "Catches wp_parse_str() usage where extracted array values are not sanitized before being forwarded to downstream functions; unvalidated user-supplied query parameters can propagate into search or SQL contexts."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "FALSE POSITIVE. The taint flow is accurate up to the call site — $_POST['currenturl'] is parsed via wp_parse_url() and wp_parse_str() with no sanitization applied to the extracted 's' key, and it is passed verbatim to Helpers::searchProducts($url_query_args['s']) at line 82. However, the finding incorrectly claims the value reaches a dangerous sink without sanitization. Inside Helpers::searchProducts() (Helpers.php:1660), the phrase is passed to DGWT_WCAS()->nativeSearch->getSearchResults($phrase, true, 'product-ids') with $return hardcoded as true. Inside getSearchResults() (Search.php:175), the code branches on $return: when true (which is always the case from this call path), it executes $keyword = sanitize_text_field($phrase) before the value is used in any WP_Query or database operation. The sanitizer is unconditionally hit in this specific call path. The 'orderby' and 'order' fields do get wc_clean() at the call site, and 's' does not — but 's' gets sanitize_text_field() inside getSearchResults(), which is functionally equivalent. There is no exploitable unsanitized path to a sink. The auth reachability claim is correct (wp_ajax_nopriv_filtersFrontend with no nonce or capability check), but the absence of call-site sanitization is not a vulnerability because the downstream sanitizer is always reached and cannot be bypassed from this entry point."
+        }
+      },
+      {
+        "id": "f037",
+        "rel": "includes/Integrations/Plugins/WooProductFilter/WooProductFilter.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Plugins/WooProductFilter/WooProductFilter.php",
+        "tags": [
+          "access_control",
+          "sqli"
+        ],
+        "finding": {
+          "vuln_class": "broken_access_control",
+          "location": "init() line 31, set_search_post_ids_from_ajax() lines 50-84",
+          "severity": "low",
+          "reachability": "Unauthenticated users via the nopriv AJAX action.",
+          "justification": "The wp_ajax_nopriv_filtersFrontend handler performs a live search-engine query on behalf of any unauthenticated caller without rate limiting, capability check, or nonce, enabling unlimited unauthenticated search-index probing.",
+          "detection_pattern": {
+            "grep_pattern": "wp_ajax_nopriv_",
+            "anti_pattern": "current_user_can|is_user_logged_in",
+            "section_name": "Broken Access Control: nopriv handler without capability check",
+            "description": "Detects AJAX handlers available to unauthenticated users that perform privileged or information-sensitive operations without any authorization check."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "FALSE POSITIVE. The finding correctly identifies that wp_ajax_nopriv_filtersFrontend is registered without a nonce or capability check (init() line 31), and that set_search_post_ids_from_ajax() at lines 50-84 processes attacker-supplied input from $_POST['currenturl'] without call-site sanitization. However, the 'broken access control' label does not hold for two reasons. First, the operation is inherently public: a public WooCommerce shop allows unauthenticated product searches; this handler hooks into the WooProductFilter plugin's own AJAX action to narrow a WP_Query that was already going to execute. No permission boundary is crossed. Second, the taint path is neutralised downstream: $_POST['currenturl'] is parsed via wp_parse_url() and wp_parse_str(), and the extracted 's' value is passed verbatim to Helpers::searchProducts() (line 82), which calls getSearchResults($phrase, true, 'product-ids') with $return hardcoded true. Inside getSearchResults() (Search.php line 175), the branch on $return=true unconditionally executes sanitize_text_field($phrase) before any WP_Query or DB operation. The handler stores a filtered post-ID array in $this->post_ids and does not echo or return data to the caller, so there is no information disclosure path either. Unlimited unauthenticated calls are a resource concern (no rate limiting) but not a broken access control vulnerability in the WordPress security model sense. Reachability claim is factually correct; the vulnerability class claim is not."
+        }
+      },
+      {
+        "id": "f038",
+        "rel": "includes/Integrations/Plugins/XforWooCommerceFilter/XforWooCommerceFilter.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Plugins/XforWooCommerceFilter/XforWooCommerceFilter.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "missing_input_sanitization",
+          "location": "set_search_post_ids_from_ajax(), line 65",
+          "severity": "medium",
+          "reachability": "Reachable by any unauthenticated user via wp_ajax_nopriv_prdctfltr_respond_550 (line 38); no authentication or capability check protects this handler.",
+          "justification": "The search phrase is taken directly from $_POST['pf_filters'][$_POST['pf_id']]['s'] (line 65) with no sanitization (no sanitize_text_field, wp_unslash, or strip_tags) before being passed to Helpers::searchProducts($phrase); safety depends entirely on downstream sanitization inside the search engine.",
+          "detection_pattern": {
+            "grep_pattern": "\\$_POST\\[.*\\]\\[.*\\]\\['s'\\]",
+            "anti_pattern": "sanitize_text_field|wp_unslash|sanitize_search_query",
+            "section_name": "Missing Input Sanitization: Raw $_POST nested key passed to search",
+            "description": "Detects places where a nested $_POST value used as a search phrase is not sanitized before use. Without upstream sanitization, security relies entirely on downstream callers — removing or changing those callers introduces injection risk."
+          }
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "low",
+          "reasoning": "The code pattern exists exactly as described. Line 65 of set_search_post_ids_from_ajax() assigns $phrase = $_POST['pf_filters'][$_POST['pf_id']]['s'] with no upstream sanitize_text_field, wp_unslash, or strip_tags. The handler is reachable unauthenticated via wp_ajax_nopriv_prdctfltr_respond_550 (line 38) with no nonce or capability check (phpcs:disable at line 56 confirms intentional omission). However, downstream sanitization fully covers the value: Helpers::searchProducts($phrase) calls DGWT_WCAS()->nativeSearch->getSearchResults($phrase, true, 'product-ids'), and at Search.php line 175, because $return=true, the code unconditionally applies $keyword = sanitize_text_field($phrase) before any database query. The final result stored in $this->post_ids is integer IDs extracted by wp_list_pluck($results['suggestions'], 'ID'), so no XSS, SQLi, or other injection is possible through this path. The finding is real as a defense-in-depth / code quality concern (missing upstream sanitization that relies on downstream callers remaining correct), but the original 'medium' severity overstates the risk because exploitation requires circumventing downstream sanitization that is hardcoded in getSearchResults(). Severity is better classified as low/informational."
+        }
+      },
+      {
+        "id": "f038",
+        "rel": "includes/Integrations/Plugins/XforWooCommerceFilter/XforWooCommerceFilter.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Plugins/XforWooCommerceFilter/XforWooCommerceFilter.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "missing_csrf_protection",
+          "location": "set_search_post_ids_from_ajax(), lines 55-70",
+          "severity": "low",
+          "reachability": "Reachable by any visitor (authenticated or not) via wp_ajax_nopriv_prdctfltr_respond_550 / wp_ajax_prdctfltr_respond_550 (lines 38-39); PHPCS nonce-check suppression comment at line 56 confirms this is intentional.",
+          "justification": "The AJAX handler performs a server-side product search and populates $this->post_ids which then influences WP_Query results; there is no nonce verification (phpcs:disable WordPress.Security.NonceVerification.Missing at line 56), making it trivially CSRF-able to force a mis-populated search result list in a victim's session.",
+          "detection_pattern": {
+            "grep_pattern": "add_action\\(\\s*'wp_ajax_nopriv_",
+            "anti_pattern": "check_ajax_referer|wp_verify_nonce",
+            "section_name": "CSRF: wp_ajax_nopriv_ handler without nonce verification",
+            "description": "Detects nopriv AJAX handlers that perform state-affecting operations without any nonce check. Without a nonce, any site can craft a cross-origin POST that is executed in the victim's browser context."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "FALSE POSITIVE. The CSRF framing is incorrect. The wp_ajax_nopriv_prdctfltr_respond_550 handler (lines 38-39) is confirmed reachable by any visitor, and there is no nonce check (phpcs:disable at line 56 of set_search_post_ids_from_ajax confirms intentional suppression). However, CSRF requires a cross-origin request to cause persistent state change affecting the victim. This handler does not satisfy that requirement: (1) It performs a pure read — it calls Helpers::searchProducts($phrase) which runs a product ID lookup via getSearchResults(), with sanitize_text_field() applied to the phrase at Engines/WordPressNative/Search.php:175. (2) The result ($this->post_ids, an array of integer product IDs) is stored only as an object property scoped to the current PHP request. It is not written to the database, to a session, or to any cookie. It influences pre_get_posts only within the same AJAX request that set it. (3) An attacker's cross-origin POST would affect only the attacker's own response, not a victim's search results. There is no cross-request state mutation. (4) The nopriv registration is appropriate: anonymous visitors legitimately use product filters on public WooCommerce stores. A nonce would be needed if the handler mutated persistent state, but it does not. The phpcs suppression reflects that the developer knew nonce verification was unnecessary for this read-only path. No database write, no privilege escalation, no content modification occurs. The severity is none."
+        }
+      },
+      {
+        "id": "f038",
+        "rel": "includes/Integrations/Plugins/XforWooCommerceFilter/XforWooCommerceFilter.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Plugins/XforWooCommerceFilter/XforWooCommerceFilter.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "broken_access_control",
+          "location": "set_search_post_ids_from_ajax(), lines 55-70",
+          "severity": "low",
+          "reachability": "Accessible to all unauthenticated users via wp_ajax_nopriv_prdctfltr_respond_550 (line 38).",
+          "justification": "The handler fires a backend product search (Helpers::searchProducts) triggered by anonymous visitors with no capability check (no current_user_can call anywhere in the method); while the operation itself is read-only, the lack of any access gate means unauthenticated actors can drive the plugin's internal search engine, potentially leaking information about non-public products if the search engine does not filter by post status.",
+          "detection_pattern": {
+            "grep_pattern": "add_action\\(\\s*'wp_ajax_nopriv_",
+            "anti_pattern": "current_user_can|is_user_logged_in",
+            "section_name": "Access Control: nopriv AJAX handler with no capability check",
+            "description": "Finds wp_ajax_nopriv_ handlers that perform backend work without verifying the caller has appropriate permissions. Even read-only operations on private data require at least an authentication gate."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "n/a",
+          "reasoning": "The wp_ajax_nopriv_prdctfltr_respond_550 handler is confirmed reachable by unauthenticated users (line 38), and set_search_post_ids_from_ajax() at lines 55-70 contains no current_user_can or is_user_logged_in check. However, the finding's own justification concedes the vulnerability only materialises 'if the search engine does not filter by post status.' The search engine does filter: Engines/WordPressNative/Search.php line 218 sets 'post_status' => 'publish' inside getSearchResults(), meaning only published products can ever appear in results. Private, draft, and password-protected products are excluded by the WP_Query args before any results are returned. Furthermore, the handler is intentionally nopriv — it exists to support anonymous storefront visitors filtering products on a public WooCommerce shop page; unauthenticated access is the designed use-case, not a defect. Because the backend search is fully restricted to publicly visible products, there is no information leakage and no access control violation. The finding is a false positive."
+        }
+      },
+      {
+        "id": "f040",
+        "rel": "includes/Integrations/Themes/Bacola/Bacola.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Themes/Bacola/Bacola.php",
+        "tags": [
+          "access_control"
+        ],
+        "finding": {
+          "vuln_class": "csrf_missing_nonce",
+          "location": "set_search_post_ids_from_ajax() / lines 24-36 (hooked at lines 19-20)",
+          "severity": "medium",
+          "reachability": "Any unauthenticated visitor (wp_ajax_nopriv_load_more) or authenticated user (wp_ajax_load_more) can trigger this handler via a cross-origin POST.",
+          "justification": "The handler explicitly suppresses nonce verification with a phpcs:ignore comment (line 28) and calls no check_ajax_referer() or wp_verify_nonce(), so any page on any origin can forge a POST to wp-admin/admin-ajax.php with action=load_more and a crafted search term.",
+          "detection_pattern": {
+            "grep_pattern": "wp_ajax_nopriv_",
+            "anti_pattern": "check_ajax_referer|wp_verify_nonce",
+            "section_name": "CSRF: AJAX nopriv handler without nonce",
+            "description": "Finds WordPress AJAX handlers registered for unauthenticated users (wp_ajax_nopriv_) that lack any nonce verification call; these are reachable cross-origin and exploitable via CSRF."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "informational",
+          "reasoning": "The finding is technically accurate that nonce verification is absent: both wp_ajax_load_more and wp_ajax_nopriv_load_more are hooked (lines 19-20), is_relevant_product_ajax_query() (lines 63-72) only checks DOING_AJAX and $_POST['action'] === 'load_more' with no nonce, and the phpcs:ignore comment at line 28 explicitly suppresses nonce verification lint. However, the handler is a FALSE POSITIVE as a security vulnerability because the exploitable impact is negligible. The only effect of set_search_post_ids_from_ajax() is: (1) it reads $_POST['s'], (2) passes it to Helpers::searchProducts($search_term) which immediately applies sanitize_text_field() at Search.php line 175, and (3) stores the resulting array of integer post IDs in $this->post_ids. That array is consumed only in pre_get_posts() to set post__in on a WP_Query — a read-only filter that changes which products are shown in the AJAX response. There is no persistent state change, no database write, no option update, no file write, no privilege escalation, and no data exfiltration (the response goes to the victim's own browser). An attacker who forges a cross-origin POST can only influence which products appear in the victim's own load_more search results during that one request — a harmless cosmetic effect. The missing nonce is a code quality / PHPCS compliance issue, not an exploitable CSRF vulnerability."
+        }
+      },
+      {
+        "id": "f040",
+        "rel": "includes/Integrations/Themes/Bacola/Bacola.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Themes/Bacola/Bacola.php",
+        "tags": [
+          "access_control"
+        ],
+        "finding": {
+          "vuln_class": "missing_input_sanitization",
+          "location": "set_search_post_ids_from_ajax() / line 29",
+          "severity": "low",
+          "reachability": "Any unauthenticated visitor who can reach the wp_ajax_nopriv_load_more endpoint.",
+          "justification": "The value of $_POST['s'] is assigned to $search_term without any sanitization (no sanitize_text_field(), no wp_unslash(), no strip_tags()) before being passed to Helpers::searchProducts($search_term), which forwards it to the search engine; the impact depends on how the downstream search engine handles the input but the missing sanitization violates WordPress coding standards and may enable injection or resource exhaustion.",
+          "detection_pattern": {
+            "grep_pattern": "\\$_POST\\[.s.\\]\\s*\\?\\?\\s*''",
+            "anti_pattern": "sanitize_text_field|wp_unslash|intval|absint",
+            "section_name": "Missing sanitization: raw $_POST passed to search",
+            "description": "Detects raw $_POST['s'] (search term) read with a null-coalesce but without any sanitization function applied before use; unsanitized search input passed to backend query engines may enable injection or resource exhaustion."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "false_positive",
+          "reasoning": "FALSE POSITIVE. The finding correctly observes that $_POST['s'] is read without sanitization at Bacola.php line 29, and is passed unsanitized to Helpers::searchProducts($search_term) (Helpers.php line 1655). However, the downstream call chain applies sanitize_text_field() unconditionally before any dangerous use. Helpers::searchProducts() calls DGWT_WCAS()->nativeSearch->getSearchResults($phrase, true, 'product-ids') (Search.php line 1660). In getSearchResults() (Search.php lines 174-175), the branch when $return === true executes $keyword = sanitize_text_field($phrase) — this is always true in the call from searchProducts(). The sanitized $keyword is what proceeds to all query logic. The raw $search_term string never reaches any dangerous sink (no SQL concatenation, no output escaping bypass, no eval). The reachability claim is accurate — the wp_ajax_nopriv_load_more hook is accessible to unauthenticated visitors and the is_relevant_product_ajax_query() guard only checks $_POST['action'] === 'load_more', not capability or nonce — but there is no exploitable impact because sanitization is guaranteed inside getSearchResults() when called via this path. This is a coding-standards violation at the call site (sanitize before passing), not a security vulnerability."
+        }
+      },
+      {
+        "id": "f046",
+        "rel": "includes/Multilingual.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Multilingual.php",
+        "tags": [
+          "sqli"
+        ],
+        "finding": {
+          "vuln_class": "unvalidated_redirect_via_get_parameter",
+          "location": "Multilingual::getCurrentLanguage(), line 132-134",
+          "severity": "low",
+          "reachability": "Any unauthenticated visitor can supply ?lang=xx in the URL. The value is used as the current language when neither WPML nor Polylang is active but a third-party filter sets the provider to something other than 'not set'. The language value then flows into getPermalink() which passes it to the wpml_permalink filter, potentially redirecting users via an attacker-supplied language tag.",
+          "justification": "Line 132 reads $_GET['lang'] directly without a nonce or capability check; isLangCode() only enforces character class and length (2-15 alpha chars per segment), which does not prevent the value being used to manipulate URL generation through WPML's wpml_permalink filter in getPermalink().",
+          "detection_pattern": {
+            "grep_pattern": "\\$_(?:GET|REQUEST|POST)\\[.lang.\\]",
+            "anti_pattern": "sanitize_(?:text_field|key)\\(.*\\$_(?:GET|REQUEST|POST)\\[.lang.\\]",
+            "section_name": "Unvalidated $_GET['lang'] used as language identifier",
+            "description": "Detects direct reads of a 'lang' parameter from superglobals without sanitization. In multilingual WordPress plugins, unsanitized lang values can influence URL generation, cache keys, or database lookups, and may enable open redirects or cache-poisoning when the value flows into permalink or redirect functions."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "N/A",
+          "reasoning": "The finding contains two distinct errors that together invalidate it.\n\n1. The $_GET['lang'] branch is guarded by `empty($currentLang)`. `getDefaultLanguage()` initializes $currentLang to 'en' and then falls back to substr(get_locale(),0,2) when WPML/Polylang are not active, meaning $currentLang is virtually never empty in practice. The branch is only reachable when: (a) neither WPML nor Polylang is active AND (b) the 'wpml_default_language' or 'dgwt/wcas/multilingual/default-language' filters are used to return an empty string AND (c) get_locale() returns something shorter than 2 chars (impossible on a standard WP install). Even with a third-party multilingual provider via the filter, $currentLang is set from getDefaultLanguage() before the $_GET branch is reached.\n\n2. Even if $_GET['lang'] were accepted, the claimed sink — Multilingual::getPermalink() — is never called anywhere in the plugin codebase. A codebase-wide search confirms zero invocations of Multilingual::getPermalink() or self::getPermalink() in any non-vendor PHP file. The $lang value from getCurrentLanguage() is passed to do_action('dgwt/wcas/analytics/after_searching', ...) (an analytics hook) and used as a context value for WPML language-switching actions, none of which perform HTTP redirects. Product::getPermalink() (a different, unrelated method) is called in Search.php and DetailsBox.php but does not accept a $lang parameter and does not use getCurrentLanguage() output.\n\n3. isLangCode() enforces /^([a-zA-Z]{2,15})$|^([a-zA-Z]{2,15}[-_][a-zA-Z]{2,15})$/, which blocks any open-redirect payload (e.g. //evil.com). No redirect function (wp_redirect, wp_safe_redirect, header Location) is called in any code path that reaches the $_GET['lang'] value within the plugin.\n\nConclusion: No exploitable redirect sink exists. The code path where $_GET['lang'] is accepted is heavily gated and leads only to an analytics action hook, not any redirect. The finding is FALSE."
+        }
+      },
+      {
+        "id": "f046",
+        "rel": "includes/Multilingual.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Multilingual.php",
+        "tags": [
+          "sqli"
+        ],
+        "finding": {
+          "vuln_class": "table_name_interpolated_into_wpdb_prepare",
+          "location": "Multilingual::getPostLang(), lines 155-165; Multilingual::getTermLang(), lines 197-211",
+          "severity": "low",
+          "reachability": "Internal (server-side only). The table name is built from $wpdb->prefix (WordPress-controlled) concatenated with the hardcoded string 'icl_translations'. The $postType and $taxonomy parameters are sanitized with sanitize_key() before use as %s placeholders inside wpdb->prepare(). Not exploitable in isolation.",
+          "justification": "wpdb->prepare() does not escape table or column names; interpolating any variable into the SQL string before prepare() creates a risky pattern that future maintainers may copy with attacker-controlled input. Both call sites suppress the phpcs warning (WordPress.DB.PreparedSQL.InterpolatedNotPrepared) which masks the pattern from automated tooling.",
+          "detection_pattern": {
+            "grep_pattern": "\\$wpdb->(?:get_var|get_col|get_results|query)\\s*\\(\\s*\\$wpdb->prepare\\s*\\([^)]*\\$[a-zA-Z_]+Table",
+            "anti_pattern": "\\$wpdb->(?:prefix)\\s*\\.\\s*'[a-zA-Z_]+'(?!.*\\$[a-zA-Z]*[Ii]nput|.*\\$_(?:GET|POST|REQUEST))",
+            "section_name": "Table name variable interpolated inside wpdb->prepare()",
+            "description": "Catches patterns where a variable table name is string-interpolated into the SQL passed to wpdb->prepare(). prepare() only parameterises %s/%d/%f placeholders; a variable table name bypasses all escaping. Dangerous when the table-name variable is derived from user input or a filter value."
+          }
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "low",
+          "reasoning": "The table name interpolated into wpdb->prepare() is provably constant: $wpdb->prefix is WordPress-controlled (set in wp-config.php by an admin) and 'icl_translations' is a hardcoded string literal. No attacker can influence $tranlationsTable. The $postType and $taxonomy parameters are sanitized with sanitize_key() before use as %s placeholders, adding defense-in-depth. All three call sites in the plugin pass either hardcoded strings ('product_cat') or default values ('product') — no call site reads from $_GET, $_POST, $_REQUEST, or any other user-supplied source. $postID and $termID are integers from WordPress object constructors (absint() applied) used as %d placeholders. The phpcs suppression comments mask the pattern from automated tooling, which is a valid maintainability observation, but there is no exploitable SQL injection path. Verdict: code quality concern only, not a real exploitable vulnerability.",
+          "_done": true
+        }
+      }
+    ],
+    "reachability_applied": 3,
+    "reachability_downgraded": 3
+  }
+}
