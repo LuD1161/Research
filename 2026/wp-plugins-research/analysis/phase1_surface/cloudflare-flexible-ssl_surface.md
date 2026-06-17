@@ -1,6 +1,6 @@
 # Attack Surface: cloudflare-flexible-ssl
 
-> Generated: 2026-06-16T18:36:21Z
+> Generated: 2026-06-16T19:03:55Z
 
 ## Section 1: Entry Points
 
@@ -14,7 +14,22 @@ None found
 None found
 ```
 
+### admin-post Handlers (authenticated)
+```
+None found
+```
+
+### admin-post Handlers (UNAUTHENTICATED)
+```
+None found
+```
+
 ### REST API Routes
+```
+None found
+```
+
+### REST permission_callback => __return_true (public REST)
 ```
 None found
 ```
@@ -39,10 +54,41 @@ None found
 None found
 ```
 
+### Block render_callback (server-rendered blocks)
+```
+None found
+```
+
+### Settings API / Meta Box save handlers
+```
+None found
+```
+
+### Widgets
+```
+None found
+```
+
+### Activation / Deactivation / Uninstall Hooks
+```
+None found
+```
+
+### XML-RPC / Heartbeat / Raw input (php://input)
+```
+None found
+```
+
+### PHP files WITHOUT direct-access guard (defined(ABSPATH/WPINC))
+```
+/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/cloudflare-flexible-ssl/plugin.php
+/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/cloudflare-flexible-ssl/shieldprom.php
+```
+
 ## Section 2: Authentication & Authorization
 
 ### Capability Checks
-- `current_user_can` calls: **0**
+- `current_user_can` calls: **1**
 
 ### Nonce Verifications
 - `wp_verify_nonce` / `check_ajax_referer` / `check_admin_referer` calls: **0**
@@ -61,6 +107,11 @@ None found
 ```
 
 ### File System Operations (first 30 matches)
+```
+None found
+```
+
+### Deserialization (object injection surface)
 ```
 None found
 ```
