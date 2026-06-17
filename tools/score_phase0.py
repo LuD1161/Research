@@ -17,11 +17,18 @@ ROOT = os.path.dirname(HERE)
 GT = os.path.join(ROOT, 'analysis/experiments/exp07/ground_truth_phase0.json')
 CK = os.path.join(ROOT, 'analysis/experiments/exp07/phase0/checkpoints')
 
-AC_RE = re.compile(r'access|author|capab|privil|idor|broken_access|missing_auth', re.I)
+# Match access-control finding CLASSES on the vuln_class field only (not justification,
+# which is too noisy: e.g. "privilege_sensitive_query" is not a broken-access-control claim).
+AC_RE = re.compile(
+    r'access[_ ]?control|broken_access|missing[_ ]?author|unauthor|authoriz'
+    r'|\bidor\b|privilege[_ ]?escal|missing[_ ]?capab|capability[_ ]?check'
+    r'|\bcapability\b|auth[_ ]?bypass|insufficient[_ ]?privi|missing[_ ]?permission'
+    r'|direct[_ ]?object[_ ]?reference|unauthenticated|nopriv',
+    re.I,
+)
 
 def is_ac(finding):
-    vc = (finding.get('vuln_class') or '') + ' ' + (finding.get('justification') or '')
-    return bool(AC_RE.search(vc))
+    return bool(AC_RE.search(finding.get('vuln_class') or ''))
 
 def main():
     gt = json.load(open(GT))
