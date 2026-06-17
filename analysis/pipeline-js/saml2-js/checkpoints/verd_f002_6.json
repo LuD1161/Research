@@ -1,0 +1,6 @@
+{
+  "is_real": true,
+  "severity": "medium",
+  "reasoning": "Confirmed. In both `create_logout_request_url` (line 862) and `create_logout_response_url` (line 903), `identity_provider.sso_logout_url` is passed directly to `url.parse()` with no scheme check, no allowlist, and no validation. The `IdentityProvider` constructor (line 935) stores `options.sso_logout_url` verbatim — there is no joi/zod/ajv schema, no regex guard, and no allowlist anywhere in the file. Both functions return `url.format(uri)` via `cb(null, url.format(uri), ...)` as the redirect destination for the caller to send the browser to. The attacker-controlled input path is: tenant supplies IdP metadata with a crafted `sso_logout_url` (e.g. `https://evil.com`) -> stored in DB -> `IdentityProvider` instantiated with it -> `create_logout_request_url` or `create_logout_response_url` called -> `url.format(uri)` returned -> application redirects user browser to attacker domain. No sanitizer or guard was missed. The reachability qualifier (multi-tenant deployments where tenants control IdP config) is accurate and makes this a real but deployment-context-dependent finding. In single-tenant deployments with static admin-controlled config the risk is negligible; in multi-tenant SaaS SSO scenarios it is a genuine open redirect. Severity medium is appropriate.",
+  "_done": true
+}
