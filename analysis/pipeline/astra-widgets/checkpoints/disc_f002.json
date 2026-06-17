@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "information_disclosure",
+      "location": "get_default_stats() / line 66-103",
+      "severity": "low",
+      "reachability": "This class is instantiated internally by the BSF analytics library and its output is sent to a remote telemetry endpoint. The data includes PHP version, MySQL version, active plugins list, debug flags (WP_DEBUG, WP_DEBUG_DISPLAY, SCRIPT_DEBUG), SSL state, user count, timezone, and server software string. An attacker who can intercept the outbound analytics request (or who hooks bsf_core_stats) obtains a detailed server fingerprint.",
+      "justification": "get_default_stats() aggregates sensitive server environment details (line 70-101) including debug mode flags at lines 94-96 and full active plugin list at line 98, all of which accelerate targeted exploitation if exposed.",
+      "detection_pattern": {
+        "grep_pattern": "WP_DEBUG[^_]",
+        "anti_pattern": "wp_send_json_error|current_user_can|is_admin",
+        "section_name": "Information Disclosure: server fingerprint in analytics payload",
+        "description": "Catches code that reads WP_DEBUG and similar constants into data structures without an admin capability check; when transmitted to third-party analytics endpoints this leaks environment details useful to attackers."
+      }
+    },
+    {
+      "vuln_class": "ineffective_sanitization",
+      "location": "get_default_stats() / line 71",
+      "severity": "low",
+      "reachability": "Reachable whenever the analytics library collects stats; no user interaction needed. Affects PHP 8.1+ installations where FILTER_SANITIZE_STRING is deprecated and in PHP 8.2+ it is removed (returns empty string or the raw value depending on configuration).",
+      "justification": "Line 71 applies FILTER_SANITIZE_STRING to $_SERVER['SERVER_SOFTWARE'], but this filter was deprecated in PHP 8.1 and removed in PHP 8.2, making the sanitization silently ineffective on modern PHP versions and leaving the raw server software string in the stats payload.",
+      "detection_pattern": {
+        "grep_pattern": "FILTER_SANITIZE_STRING",
+        "anti_pattern": "FILTER_SANITIZE_SPECIAL_CHARS|htmlspecialchars|esc_html",
+        "section_name": "Ineffective Sanitization: FILTER_SANITIZE_STRING removed in PHP 8.2",
+        "description": "FILTER_SANITIZE_STRING was deprecated in PHP 8.1 and removed in PHP 8.2; any code still using it provides no sanitization on modern PHP and may silently pass raw input through, breaking assumptions made by callers."
+      }
+    },
+    {
+      "vuln_class": "xss_second_order_risk",
+      "location": "format_plugin() / lines 164-173",
+      "severity": "low",
+      "reachability": "format_plugin() is public and called during stats collection on any WordPress page load that triggers BSF analytics. The author_url (line 171) and url (line 167) fields are returned without any sanitization or escaping. If a malicious plugin is installed with a javascript: URI in its PluginURI or AuthorURI header, these are passed raw into the stats array and would be XSS if the array is ever rendered as HTML href values downstream.",
+      "justification": "format_plugin() at line 167 and 171 returns PluginURI and AuthorURI directly without esc_url() or any sanitization; a javascript: scheme in a plugin header field would survive into any downstream HTML link rendering of the stats data.",
+      "detection_pattern": {
+        "grep_pattern": "\\$plugin\\['PluginURI'\\]|\\$plugin\\['AuthorURI'\\]",
+        "anti_pattern": "esc_url",
+        "section_name": "XSS: unescaped plugin URI fields from get_plugin_data",
+        "description": "Plugin header URI fields (PluginURI, AuthorURI) read via get_plugin_data() and returned without esc_url(); if rendered into HTML href attributes, a maliciously installed plugin with a javascript: URI could trigger XSS."
+      }
+    },
+    {
+      "vuln_class": "xss_second_order_risk",
+      "location": "format_plugin() / lines 166, 170",
+      "severity": "low",
+      "reachability": "Called during stats collection for every active plugin. html_entity_decode() on plugin Name and Author fields reverses any HTML entity encoding that WordPress or the plugin installer may have applied. If the decoded strings are later echoed into an HTML context without re-escaping, encoded payloads like &lt;script&gt; become active HTML.",
+      "justification": "Lines 166 and 170 apply html_entity_decode() to plugin Name and Author fields, converting safely-encoded HTML entities back to raw HTML characters; any downstream output of these values without esc_html() would constitute stored XSS if a plugin with a crafted Name/Author header were installed.",
+      "detection_pattern": {
+        "grep_pattern": "html_entity_decode",
+        "anti_pattern": "esc_html|esc_attr|wp_kses",
+        "section_name": "XSS: html_entity_decode on plugin metadata without re-escaping",
+        "description": "html_entity_decode() reverses HTML entity encoding; if applied to data read from the DB or plugin headers and the result is echoed to HTML without context-correct escaping, previously-safe encoded payloads become active HTML enabling stored XSS."
+      }
+    }
+  ]
+}
