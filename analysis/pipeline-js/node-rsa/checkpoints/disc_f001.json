@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "redos_catastrophic_backtracking",
+      "location": "opensshFormat.autoImport (lines 2148, 2154), pkcs1Format.autoImport (lines 2645, 2651), pkcs8Format.autoImport (lines 2760, 2766)",
+      "severity": "high",
+      "reachability": "Any caller passing attacker-controlled key material to importKey() without specifying a format triggers autoImport, which tries each format's regex in sequence. The regexes are applied to the full string before any structural parsing, so a crafted ~50 kB string with no END marker causes multi-second hangs.",
+      "justification": "All four autoImport functions use regexes of the form /^[\\S\\s]*-----BEGIN ...-----\\s*(?=(([A-Za-z0-9+/=]+\\s*)+))\\1-----END ...-----[\\S\\s]*$/g — the inner group ([A-Za-z0-9+/=]+\\s*)+ with nested quantifiers plus a backreference inside a lookahead causes exponential backtracking when the END delimiter is absent or misplaced.",
+      "detection_pattern": {
+        "grep_pattern": "\\(\\([A-Za-z0-9+/=]+\\\\s\\*\\)\\+\\)",
+        "anti_pattern": "String\\.prototype\\.indexOf|startsWith|split",
+        "section_name": "ReDoS: nested quantifiers in PEM autodetect regex",
+        "description": "Catches nested-quantifier patterns used for PEM/SSH key format autodetection; exponential backtracking occurs when the input lacks the closing delimiter."
+      }
+    },
+    {
+      "vuln_class": "weak_default_hash_algorithm",
+      "location": "PssScheme.hash() line 3126 (DEFAULT_HASH3 = 'sha1'), NodeNativePssScheme.sign/verify lines 4177/4189 (DEFAULT_PSS_HASH = 'sha1'), OaepScheme.hash() line 2877 (DEFAULT_HASH = 'sha1')",
+      "severity": "medium",
+      "reachability": "Affects all callers that construct NodeRSA with the default signingScheme ('pss') or encryptionScheme ('pkcs1_oaep') without explicitly setting a hash option. This is the common out-of-the-box usage.",
+      "justification": "The PSS signing scheme defaults to SHA-1 (cryptographically deprecated for signatures since 2011; NIST SP 800-131A requires SHA-2 for new systems). OAEP also defaults to SHA-1 for the hash and MGF, weakening ciphertext indistinguishability against future SHA-1 collision-class attacks.",
+      "detection_pattern": {
+        "grep_pattern": "DEFAULT.*['\"]sha1['\"]",
+        "anti_pattern": "DEFAULT.*['\"]sha256['\"]|DEFAULT.*['\"]sha384['\"]|DEFAULT.*['\"]sha512['\"]",
+        "section_name": "Weak default: SHA-1 as default hash",
+        "description": "Identifies packages that hard-code SHA-1 as the default hash for signing or OAEP — callers who omit the hash option silently use a deprecated algorithm."
+      }
+    },
+    {
+      "vuln_class": "unhandled_json_parse_exception",
+      "location": "NodeRSA.$getDecryptedData() line 3887",
+      "severity": "low",
+      "reachability": "Reached when a caller invokes decrypt(ciphertext, 'json') and the decrypted plaintext is not valid JSON. This can occur with wrong keys, corrupted ciphertexts, or when an adversary controls the ciphertext in a scenario where decryption succeeds but payload is crafted.",
+      "justification": "Line 3887 calls JSON.parse(toUtf8(bytes)) with no surrounding try/catch; a SyntaxError propagates through the catch-all in $$decryptKey (line 3871-3873) which rethrows as 'Error during decryption', leaking that the ciphertext decrypted successfully but payload is malformed — a mild oracle distinguishable from a true decryption failure.",
+      "detection_pattern": {
+        "grep_pattern": "JSON\\.parse\\([^)]*\\)",
+        "anti_pattern": "try\\s*\\{[^}]*JSON\\.parse",
+        "section_name": "Unsafe JSON.parse: unguarded deserialization",
+        "description": "Flags bare JSON.parse calls not wrapped in try/catch; thrown SyntaxErrors can crash callers or leak information about successful decryption when used in crypto decode paths."
+      }
+    },
+    {
+      "vuln_class": "pkcs1_v1_5_bleichenbacher_oracle",
+      "location": "JsEngine.decrypt() lines 3393-3414, NodeNativeEngine.decrypt() lines 4026-4041 (nativeAvailableForDecrypt returns false for pkcs1 private path, routing to JS fallback)",
+      "severity": "medium",
+      "reachability": "Callers that configure encryptionScheme:'pkcs1' and expose a decryption endpoint over a network where an attacker can submit chosen ciphertexts and observe whether decryption succeeds or fails (binary oracle). The code itself documents this at line 3024-3033.",
+      "justification": "The code comment at lines 3024-3033 explicitly acknowledges that while internal differential timing is mitigated, 'the valid/invalid binary oracle inherent to PKCS#1 v1.5 remains' — the JsEngine.decrypt() path throws 'Decryption failed' on any padding error, making success vs. failure distinguishable, enabling a Bleichenbacher attack to decrypt arbitrary RSA-PKCS1v1.5 ciphertexts in ~10^6 queries.",
+      "detection_pattern": {
+        "grep_pattern": "throw.*[Dd]ecryption.fail|encUnPad.*null",
+        "anti_pattern": "RSA_PKCS1_OAEP_PADDING|pkcs1_oaep",
+        "section_name": "PKCS#1 v1.5 binary oracle: distinguishable decryption failure",
+        "description": "Flags PKCS#1 v1.5 decryption paths that throw or return distinct errors on padding failures; enables Bleichenbacher-style oracle attacks if the decryption endpoint is network-accessible."
+      }
+    }
+  ]
+}
