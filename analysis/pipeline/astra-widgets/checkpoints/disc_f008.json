@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "dismiss_notice(), line 114",
+      "severity": "medium",
+      "reachability": "Any logged-in WordPress user if a third-party plugin hooks 'astra_notices_user_cap_check' and returns true; by design reachable by any admin otherwise.",
+      "justification": "The capability check is wrapped in apply_filters('astra_notices_user_cap_check', current_user_can($capability)), meaning any plugin or theme that does add_filter('astra_notices_user_cap_check', '__return_true') silently grants all logged-in users (or even unauthenticated users if nopriv were added) the ability to dismiss notices and write arbitrary transient keys with attacker-controlled names and TTLs via the set_transient() call on line 126.",
+      "detection_pattern": {
+        "grep_pattern": "apply_filters\\s*\\(\\s*['\"][^'\"]+['\"]\\s*,\\s*current_user_can\\s*\\(",
+        "anti_pattern": "current_user_can\\s*\\([^)]+\\)(?!.*apply_filters)",
+        "section_name": "Broken Access Control: capability check wrapped in overridable filter",
+        "description": "Finds WordPress handlers where current_user_can() is the second argument to apply_filters(), making the capability enforcement overridable by any installed plugin. Any third-party code returning true from the filter bypasses the check entirely."
+      }
+    },
+    {
+      "vuln_class": "auth_logic_flaw",
+      "location": "dismiss_notice(), lines 114-119",
+      "severity": "low",
+      "reachability": "Logged-in users who fail the capability check but pass silently; observable as a timing/response side-channel.",
+      "justification": "The capability check (line 114) silently returns with no response on failure, while the nonce check (line 118) responds with a JSON error. This inverted ordering means an attacker can determine whether they passed the capability check by observing whether they get a JSON error response or a silent HTTP 200 with no body, leaking information about user privilege state.",
+      "detection_pattern": {
+        "grep_pattern": "wp_ajax_[a-z_-]+.*\\n.*function.*\\{[\\s\\S]*?current_user_can[\\s\\S]*?return[\\s\\S]*?wp_verify_nonce",
+        "anti_pattern": "wp_verify_nonce[\\s\\S]*?current_user_can",
+        "section_name": "Auth Logic: capability check before nonce creates info-leaking response divergence",
+        "description": "AJAX handlers that silently return on failed capability checks before the nonce check runs produce different observable responses for capability-pass-nonce-fail vs capability-fail, leaking privilege information to callers."
+      }
+    },
+    {
+      "vuln_class": "improper_output_encoding",
+      "location": "dismiss_notice(), line 119",
+      "severity": "low",
+      "reachability": "Any client receiving the AJAX nonce-failure response.",
+      "justification": "esc_html_e() echoes its translated string to output and returns void (null). Passing it as the argument to wp_send_json_error() means the translated error string is written directly to the output buffer before wp_send_json_error() emits its JSON envelope, producing a malformed response like 'WordPress Nonce not validated.{\"success\":false,\"data\":null}' that breaks JSON.parse() in the client JS and prevents proper error handling. The correct function is esc_html__() which returns without echoing.",
+      "detection_pattern": {
+        "grep_pattern": "wp_send_json(?:_error|_success)?\\s*\\(\\s*esc_html_e\\s*\\(",
+        "anti_pattern": "wp_send_json(?:_error|_success)?\\s*\\(\\s*esc_html__\\s*\\(",
+        "section_name": "Improper Output: esc_html_e() inside wp_send_json corrupts JSON response",
+        "description": "esc_html_e() echoes to output and returns null; using it as an argument to wp_send_json_*() corrupts the JSON body. Any plugin doing this will produce an invalid JSON response that breaks client-side error handling."
+      }
+    },
+    {
+      "vuln_class": "csrf_insufficient_nonce_scoping",
+      "location": "dismiss_notice(), lines 118-149; constructor line 72",
+      "severity": "low",
+      "reachability": "Any authenticated admin who has visited any admin page (where the nonce is injected into every admin page load via enqueue_scripts).",
+      "justification": "A single shared nonce action 'astra-notices' (created at line 149 and verified at line 118) covers all notice dismissals regardless of notice_id. Because the nonce is injected into every admin page load, a valid nonce for dismissing one notice is equally valid for dismissing any other notice. If a more-privileged notice existed (e.g., one with capability 'edit_plugins'), an admin user could use a nonce obtained from any page to dismiss notices for capabilities above their own if the capability fallback logic produced a weaker default.",
+      "detection_pattern": {
+        "grep_pattern": "wp_create_nonce\\s*\\(\\s*['\"][^'\"]+['\"]\\s*\\)(?!.*\\$notice_id|.*\\$action)",
+        "anti_pattern": "wp_create_nonce\\s*\\(\\s*['\"][^'\"]+['\"]\\s*\\.\\s*\\$",
+        "section_name": "CSRF: shared nonce action not scoped per resource",
+        "description": "Finds nonces created with a static string action rather than a per-resource string (e.g., action . item_id). Shared nonces allow a nonce obtained from one context to authorize a different but same-type action."
+      }
+    }
+  ]
+}
