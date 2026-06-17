@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "csrf_no_nonce",
+      "location": "HeaderAndFooterScripts::admin_notices(), line 225-226",
+      "severity": "low",
+      "reachability": "Any authenticated user with access to any wp-admin page can trigger this via a GET request or CSRF img-tag embed; no capability check is performed beyond being in an admin context.",
+      "justification": "The admin_notices handler checks isset($_GET['shfs_dismiss_notice']) and immediately calls delete_option('shfs_script_access_level') without verifying a nonce or checking current_user_can(); a forged GET request (e.g., via an img src pointing to wp-admin/index.php?shfs_dismiss_notice=true) silently suppresses the migration security warning that prompts admins to review permission settings.",
+      "detection_pattern": {
+        "grep_pattern": "isset\\(\\$_GET\\[.*\\]\\).*delete_option",
+        "anti_pattern": "wp_verify_nonce|check_admin_referer",
+        "section_name": "CSRF: GET-triggered option deletion without nonce",
+        "description": "Catches code that acts on a query-string flag to delete or modify options without a nonce, allowing CSRF deletion of WordPress options from any admin page load."
+      }
+    },
+    {
+      "vuln_class": "privilege_escalation_via_role_capability",
+      "location": "HeaderAndFooterScripts::update_role_author() lines 248-255, update_role_contributor() lines 263-270, triggered by update_option hooks from the settings form",
+      "severity": "medium",
+      "reachability": "Site administrators who enable the 'Allow Authors add scripts' or 'Allow Contributors add scripts' checkboxes in plugin settings; the capability grant persists in the role table permanently.",
+      "justification": "The plugin's UI states it allows Authors/Contributors to 'add scripts' via the meta box, but the implementation calls $role->add_cap('unfiltered_html') on the entire role globally: this grants the WordPress 'unfiltered_html' capability that bypasses wp_kses_post() in the block/classic editor for ALL posts authored by that role, enabling injection of arbitrary <script> tags in post content far beyond just the plugin's meta box, which constitutes a scope-exceeding privilege escalation.",
+      "detection_pattern": {
+        "grep_pattern": "add_cap\\(.*unfiltered_html",
+        "anti_pattern": "add_cap\\(.*unfiltered_html.*super_admin|is_super_admin",
+        "section_name": "Privilege escalation: unfiltered_html granted to non-admin roles",
+        "description": "Flags code that grants the unfiltered_html capability to Author or Contributor roles, which allows arbitrary HTML/JS injection in post content beyond the plugin's intended scope, and is especially dangerous on multisite where unfiltered_html is intentionally withheld from all but super-admins."
+      }
+    },
+    {
+      "vuln_class": "stored_xss_by_design_multisite_risk",
+      "location": "HeaderAndFooterScripts::wp_head() line 174, 179; wp_body_open() line 190; wp_footer() line 205",
+      "severity": "medium",
+      "reachability": "All site visitors; the stored scripts are echoed verbatim in page output. The write-path is gated by current_user_can('unfiltered_html') at line 320, but on WordPress multisite this capability is restricted to super-admins only; on single-site, ordinary admins have it by default and the plugin optionally grants it to Author/Contributor roles.",
+      "justification": "All three output hooks echo option values and post meta without any escaping (phpcs:ignore comments confirm this is intentional); while gating input on unfiltered_html is the correct approach for a script-injection plugin, the optional privilege escalation to Author/Contributor roles means lower-privilege users can inject arbitrary JavaScript served to all visitors, and the wp_footer path additionally runs stored content through do_shortcode() which can execute registered shortcode callbacks stored within the scripts.",
+      "detection_pattern": {
+        "grep_pattern": "echo.*get_option.*phpcs:ignore.*EscapeOutput",
+        "anti_pattern": "esc_html|esc_attr|wp_kses",
+        "section_name": "Stored XSS: unescaped echo of option/meta values",
+        "description": "Catches plugins that suppress PHPCS escape warnings and echo option or post-meta values verbatim to page output; combined with any write-path that grants unfiltered_html to non-admin roles this becomes an exploitable stored XSS."
+      }
+    },
+    {
+      "vuln_class": "shortcode_execution_of_admin_stored_content",
+      "location": "HeaderAndFooterScripts::wp_footer() lines 201-205",
+      "severity": "low",
+      "reachability": "The footer script content is stored by admins (or lower roles if privilege escalation is enabled) and runs through do_shortcode() on every page load for all visitors.",
+      "justification": "The footer script value is passed to do_shortcode() before output (lines 201-205), while the header and body scripts are not; this inconsistency means any registered shortcode (including those added by other plugins) embedded in footer scripts executes as a callback, creating an indirect code-execution surface if a malicious shortcode is registered or if the stored content was injected by an attacker who exploited the Author/Contributor privilege escalation finding.",
+      "detection_pattern": {
+        "grep_pattern": "do_shortcode.*get_option",
+        "anti_pattern": "current_user_can.*manage_options",
+        "section_name": "Shortcode execution on admin-stored option values",
+        "description": "Flags plugins that run get_option() values through do_shortcode() on front-end output, which can execute arbitrary registered shortcode callbacks and amplifies the impact of any stored-content injection finding."
+      }
+    }
+  ]
+}
