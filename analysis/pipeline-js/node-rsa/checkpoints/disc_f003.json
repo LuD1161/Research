@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "redos",
+      "location": "autoImport functions in opensshFormat (lines 2145, 2151), pkcs1Format (lines 2642, 2648), pkcs8Format (lines 2757, 2763)",
+      "severity": "high",
+      "reachability": "Any caller of importKey() or NodeRSA constructor that passes a string/Uint8Array key — reachable without authentication. detectAndImport() iterates all four format providers calling autoImport() on every attempt, so all six regex paths run on unrecognized input.",
+      "justification": "All six autoImport regexes use the nested-quantifier pattern `(?=(([A-Za-z0-9+/=]+\\s*)+))\\1` inside a `^[\\S\\s]*...$` anchor. The inner group `([A-Za-z0-9+/=]+\\s*)+` is a classic catastrophic backtracking pattern: when input contains a long base64-like segment without a matching end marker, the engine explores O(2^n) backtracking paths. A 10 KB crafted string with no valid PEM footer can lock the JS event loop for seconds.",
+      "detection_pattern": {
+        "grep_pattern": "\\(\\[A-Za-z0-9+/=\\]+\\\\s\\*\\)\\+",
+        "anti_pattern": "simple non-backtracking split or indexOf-based PEM boundary detection instead of a single regex test",
+        "section_name": "ReDoS: nested quantifiers in PEM format detection",
+        "description": "Matches nested `+` quantifiers on base64 character classes inside lookaheads or other anchored regexes used to detect PEM blocks — a classic ReDoS pattern exploitable when input length is attacker-controlled."
+      }
+    },
+    {
+      "vuln_class": "deserialization_unsafe",
+      "location": "$getDecryptedData (line 3884)",
+      "severity": "medium",
+      "reachability": "Any caller that calls decrypt(ciphertext, 'json') and whose ciphertext is attacker-influenced (e.g. stored ciphertext modified at rest, network-delivered ciphertext). The encoding parameter is caller-supplied.",
+      "justification": "At line 3884, `JSON.parse(toUtf8(bytes))` is called on the raw decrypted plaintext with no schema validation. An attacker who controls the ciphertext (or who can produce a chosen-ciphertext under Bleichenbacher conditions) can inject arbitrary JSON, including `{\"__proto__\":{\"polluted\":true}}` or objects that cause application logic errors. In modern V8 `JSON.parse` does not directly set `Object.prototype`, but objects with unexpected shapes can break downstream logic, and in environments with a custom reviver or when the result is spread/assigned, prototype pollution is possible.",
+      "detection_pattern": {
+        "grep_pattern": "JSON\\.parse\\(.*decrypt",
+        "anti_pattern": "schema validation (e.g. zod, ajv) applied to JSON.parse result before use",
+        "section_name": "Deserialization: JSON.parse on decrypted payload",
+        "description": "Catches JSON.parse calls whose input originates from a decryption operation — the plaintext is attacker-controlled if the ciphertext is attacker-controlled, enabling object injection or logic bypass."
+      }
+    },
+    {
+      "vuln_class": "weak_crypto_default",
+      "location": "DEFAULT_HASH (line 2853) in OaepScheme, DEFAULT_HASH3 (line 3113) in PssScheme, encryptionSchemeOptions default (line 3281)",
+      "severity": "medium",
+      "reachability": "Any caller that constructs NodeRSA without explicitly specifying encryptionSchemeOptions.hash or signingSchemeOptions.hash — i.e. the majority of default usage. PSS signing default is sha1; OAEP encryption default is sha1.",
+      "justification": "SHA-1 is set as the default hash for both PSS signing (`DEFAULT_HASH3 = 'sha1'` at line 3113) and OAEP encryption (`DEFAULT_HASH = 'sha1'` at line 2853, confirmed by `encryptionSchemeOptions: { hash: 'sha1' }` in makeDefaultOptions at line 3281). SHA-1 is broken for collision resistance (SHAttered attack). For PSS, a collision in the hash allows an attacker to find two messages with the same EMSA-PSS encoding, enabling signature forgery under certain conditions. NIST deprecated SHA-1 for digital signatures in 2011.",
+      "detection_pattern": {
+        "grep_pattern": "DEFAULT_HASH.*=.*['\"]sha1['\"]",
+        "anti_pattern": "DEFAULT_HASH.*=.*['\"]sha256['\"]",
+        "section_name": "Weak crypto: SHA-1 as default hash algorithm",
+        "description": "Flags packages that hard-code SHA-1 as a default hashing algorithm for cryptographic schemes — a broken algorithm for signature and integrity purposes per NIST SP 800-131A."
+      }
+    },
+    {
+      "vuln_class": "bleichenbacher_oracle",
+      "location": "Pkcs1Scheme.encUnPad / JsEngine.decrypt (lines 3021-3065, 3390-3411)",
+      "severity": "medium",
+      "reachability": "Any application that uses pkcs1 (non-OAEP) decryption and exposes the decrypt result or error to an attacker in a way that distinguishes padding-valid from padding-invalid outcomes (network API, timing, error message). The code comment at line 3028 explicitly acknowledges this residual oracle.",
+      "justification": "The `encUnPad` method for PKCS#1 v1.5 accumulates a `bad` flag and returns null for all failure modes (constant-time internally), but the caller at line 3407 propagates this null into a `bad |= (unpadded == null)` flag and ultimately throws `'Error during decryption'` at line 3869. Any application that returns a different HTTP status, different response body, or different response timing for decrypt success vs. failure exposes the classic Bleichenbacher '98 adaptive chosen-ciphertext attack, allowing recovery of plaintext in O(10^6) queries. The code comment at line 3028 acknowledges the full Manger/Bleichenbacher fix was not implemented.",
+      "detection_pattern": {
+        "grep_pattern": "encUnPad.*null|pkcs1.*decrypt.*throw",
+        "anti_pattern": "synthetic-plaintext Bleichenbacher mitigation|RFC 8017.*7\\.2\\.2.*NOTE",
+        "section_name": "Bleichenbacher oracle: PKCS#1 v1.5 binary decrypt oracle",
+        "description": "Identifies PKCS#1 v1.5 decrypt implementations that return distinct null/throw on bad padding rather than synthetic plaintext per RFC 8017 §7.2.2 NOTE — the unmitigated form exposes an adaptive chosen-ciphertext oracle."
+      }
+    }
+  ]
+}
