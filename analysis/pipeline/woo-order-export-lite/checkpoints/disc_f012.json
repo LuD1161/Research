@@ -1,0 +1,26 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "csrf_missing_nonce",
+      "location": "ajax_gate(), lines 530-538 (global handler branch)",
+      "severity": "medium",
+      "reachability": "Any logged-in user with view_woocommerce_reports or export_woocommerce_orders capability",
+      "justification": "When $_REQUEST['tab'] is absent or not in $this->tabs, the code dispatches $ajax_handler->$method() (line 537) without ever calling check_admin_referer(); the nonce check at line 546 only runs in the tab-routed branch, so all globally-handled AJAX methods (WC_Order_Export_Ajax) execute with no CSRF protection."
+    },
+    {
+      "vuln_class": "broken_access_control",
+      "location": "export_orders_bulk_action_process(), lines 593-634",
+      "severity": "medium",
+      "reachability": "Any user who can access the WooCommerce orders list page (shop_manager or above by default, but filterable)",
+      "justification": "The bulk action handler that marks and unmarks orders as exported (lines 599-625) performs no current_user_can() check; WordPress's handle_bulk_actions filter does not enforce capability, so a lower-privileged user who can reach the orders list can toggle the export status of any order."
+    },
+    {
+      "vuln_class": "sensitive_data_exposure_unauthenticated",
+      "location": "export_orders_bulk_action_process(), line 597",
+      "severity": "medium",
+      "reachability": "Any authenticated user who triggers the bulk export action, but the resulting redirect URL is nonce-free and can be replayed by an unauthenticated party if the URL leaks",
+      "justification": "The redirect URL constructed at line 597 (admin-ajax.php?action=order_exporter&method=export_download_bulk_file&...&ids=...) contains no nonce parameter; if this URL is shared or logged, a third party can download the bulk export file without authentication because the target AJAX method is registered under wp_ajax_order_exporter and whether it enforces auth is outside this file, but the generated link itself carries no CSRF/auth token."
+    }
+  ]
+}
