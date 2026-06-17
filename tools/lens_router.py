@@ -84,11 +84,39 @@ LENS = {
         "a branch, and nonce actions reused across privilege boundaries.",
 }
 
-def classify(text):
+# Cross-file registration: handlers are registered in one file (add_action('wp_ajax_x',
+# array($this,'method'))) but DEFINED in another. A per-file regex misses the access-control
+# angle on the file that actually contains the handler. So we build a plugin-wide map of
+# registered callback names first, then tag any file DEFINING such a callback.
+REG_CALLBACK = re.compile(
+    r"add_action\(\s*['\"](?:wp_ajax_(?:nopriv_)?|admin_post_(?:nopriv_)?)[^'\"]+['\"]\s*,\s*"
+    r"(?:array\(\s*[^,]+,\s*)?['\"]([A-Za-z0-9_]+)['\"]", re.I)
+REST_CALLBACK = re.compile(r"['\"]callback['\"]\s*=>\s*(?:array\(\s*[^,]+,\s*)?['\"]([A-Za-z0-9_]+)['\"]", re.I)
+
+def build_callback_map(root):
+    cbs = set()
+    for path in walk_php(root):
+        try:
+            t = open(path, encoding='utf-8', errors='ignore').read()
+        except Exception:
+            continue
+        cbs.update(REG_CALLBACK.findall(t))
+        cbs.update(REST_CALLBACK.findall(t))
+    return cbs
+
+def classify(text, callbacks=frozenset()):
     tags = [k for k, rx in SIGNALS.items() if rx.search(text)]
     has_source = bool(SOURCE.search(text))
     has_handler = bool(HANDLER.search(text))
     has_sink = bool(DANGER_SINK.search(text))
+    # registration-aware: file defines a globally-registered AJAX/REST/admin-post callback
+    if callbacks:
+        for cb in callbacks:
+            if re.search(r"function\s+" + re.escape(cb) + r"\s*\(", text):
+                has_handler = True
+                if 'access_control' not in tags:
+                    tags.append('access_control')
+                break
     if has_handler or (has_source and has_sink):
         tier = 2
     elif has_source or has_sink or tags:
@@ -127,13 +155,14 @@ def main():
     args = ap.parse_args()
 
     root = os.path.abspath(args.plugin_dir)
+    callbacks = build_callback_map(root)  # plugin-wide registration map (cross-file)
     rows = []
     for path in sorted(walk_php(root)):
         try:
             text = open(path, encoding='utf-8', errors='ignore').read()
         except Exception:
             continue
-        tags, tier, sig = classify(text)
+        tags, tier, sig = classify(text, callbacks)
         rel = os.path.relpath(path, root)
         rows.append({'path': path, 'rel': rel, 'tags': tags, 'tier': tier,
                      'lines': text.count('\n') + 1, **sig})
