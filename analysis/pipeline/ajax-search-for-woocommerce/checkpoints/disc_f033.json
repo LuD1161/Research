@@ -1,0 +1,31 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "missing_nonce_nopriv_ajax_handler",
+      "location": "set_search_post_ids_from_ajax() / init() lines 26-44",
+      "severity": "low",
+      "reachability": "Any unauthenticated user can POST to admin-ajax.php with action=us_ajax_grid to trigger this handler. No authentication or nonce required.",
+      "justification": "The wp_ajax_nopriv_us_ajax_grid action (line 27) hooks set_search_post_ids_from_ajax() with no nonce verification and no current_user_can() check; the phpcs:ignore on line 34 confirms deliberate suppression. An unauthenticated attacker can force the server to execute a product search query with an arbitrary (sanitized) search term. State mutation is absent so severity is low, but CSRF protection is completely missing.",
+      "detection_pattern": {
+        "grep_pattern": "wp_ajax_nopriv_",
+        "anti_pattern": "check_ajax_referer|wp_verify_nonce",
+        "section_name": "CSRF: nopriv AJAX handler without nonce",
+        "description": "Matches WordPress nopriv AJAX handler registrations. Files that register a nopriv handler but contain no nonce-verification call are suspicious — any visitor can trigger the handler cross-origin, potentially causing unintended server-side work or data reads."
+      }
+    },
+    {
+      "vuln_class": "unsanitized_input_passed_to_search_function",
+      "location": "set_search_post_ids_from_ajax() lines 35-43",
+      "severity": "low",
+      "reachability": "Any visitor (nopriv) or authenticated user can supply an arbitrary value in $_POST['template_vars']['query_args']['s']. Sanitization only occurs inside Helpers::searchProducts() -> getSearchResults() via sanitize_text_field() at Search.php:175.",
+      "justification": "The search term extracted from user-controlled JSON on line 37 ($search_term = $template_vars['query_args']['s']) is passed without any sanitization or length limit in UsCore.php itself to Helpers::searchProducts(). Safety depends entirely on the downstream sanitize_text_field() call in Search.php. If that call were removed or bypassed by a future refactor, unsanitized attacker input would reach the search engine directly. Severity is low given current downstream sanitization.",
+      "detection_pattern": {
+        "grep_pattern": "json_decode.*\\$_POST",
+        "anti_pattern": "sanitize_text_field|sanitize_key|intval|absint|wp_kses",
+        "section_name": "Unsanitized POST JSON decoded directly",
+        "description": "Matches patterns where POST data is decoded from JSON without immediate sanitization in the same scope. Values extracted from such JSON and forwarded to query functions or output without a sanitization call at the call site represent a layered-defence gap."
+      }
+    }
+  ]
+}

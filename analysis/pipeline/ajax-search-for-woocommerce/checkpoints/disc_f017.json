@@ -1,0 +1,31 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "missing_input_sanitization",
+      "location": "checkCriticalPhrase(), line 331",
+      "severity": "low",
+      "reachability": "Authenticated administrators and shop managers only (wp_ajax_ with current_user_can check). Not reachable by unauthenticated users.",
+      "justification": "$_REQUEST['phrase'] is assigned to $phrase with no sanitization (no sanitize_text_field, no wp_kses, no trim/strip), then passed directly into getSearchResults($phrase, true, 'autocomplete'); while the function's downstream handling determines actual impact, the raw unsanitized value crosses a trust boundary unnecessarily for an admin-only handler.",
+      "detection_pattern": {
+        "grep_pattern": "\\$_REQUEST\\['phrase'\\](?!.*sanitize)",
+        "anti_pattern": "sanitize_text_field|wp_kses|sanitize_key",
+        "section_name": "Missing sanitization: raw $_REQUEST phrase passed to business logic",
+        "description": "Catches handlers that extract a 'phrase' parameter from $_REQUEST without any sanitization function call on the same line. Files matching the grep pattern but not the anti-pattern may be passing raw user input into search, database, or rendering functions."
+      }
+    },
+    {
+      "vuln_class": "missing_input_sanitization",
+      "location": "excludeCriticalPhrase(), line 407",
+      "severity": "low",
+      "reachability": "Authenticated administrators and shop managers only (wp_ajax_ with current_user_can check). Not reachable by unauthenticated users.",
+      "justification": "$phrase = (!empty($_REQUEST['phrase']) ? $_REQUEST['phrase'] : '') is passed unsanitized to $data->markAsSolved($phrase). The markAsSolved method uses $wpdb->update() with format specifiers (['%s']), so SQL injection is prevented by parameterization; however, the raw string with no sanitize_text_field call violates WordPress coding standards and could carry unexpected content (null bytes, control characters) into the database.",
+      "detection_pattern": {
+        "grep_pattern": "\\$_REQUEST\\['phrase'\\]",
+        "anti_pattern": "sanitize_text_field\\(\\s*\\$_REQUEST\\['phrase'\\]",
+        "section_name": "Unsanitized phrase from request passed to DB write",
+        "description": "Catches AJAX handlers writing a raw $_REQUEST['phrase'] value to the database without sanitize_text_field. Even when $wpdb->update/insert uses format specifiers (preventing SQL injection), the absence of sanitization allows null bytes or oversized strings to be stored."
+      }
+    }
+  ]
+}

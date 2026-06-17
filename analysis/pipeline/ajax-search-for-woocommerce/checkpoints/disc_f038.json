@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "missing_input_sanitization",
+      "location": "set_search_post_ids_from_ajax(), line 65",
+      "severity": "medium",
+      "reachability": "Reachable by any unauthenticated user via wp_ajax_nopriv_prdctfltr_respond_550 (line 38); no authentication or capability check protects this handler.",
+      "justification": "The search phrase is taken directly from $_POST['pf_filters'][$_POST['pf_id']]['s'] (line 65) with no sanitization (no sanitize_text_field, wp_unslash, or strip_tags) before being passed to Helpers::searchProducts($phrase); safety depends entirely on downstream sanitization inside the search engine.",
+      "detection_pattern": {
+        "grep_pattern": "\\$_POST\\[.*\\]\\[.*\\]\\['s'\\]",
+        "anti_pattern": "sanitize_text_field|wp_unslash|sanitize_search_query",
+        "section_name": "Missing Input Sanitization: Raw $_POST nested key passed to search",
+        "description": "Detects places where a nested $_POST value used as a search phrase is not sanitized before use. Without upstream sanitization, security relies entirely on downstream callers — removing or changing those callers introduces injection risk."
+      }
+    },
+    {
+      "vuln_class": "missing_csrf_protection",
+      "location": "set_search_post_ids_from_ajax(), lines 55-70",
+      "severity": "low",
+      "reachability": "Reachable by any visitor (authenticated or not) via wp_ajax_nopriv_prdctfltr_respond_550 / wp_ajax_prdctfltr_respond_550 (lines 38-39); PHPCS nonce-check suppression comment at line 56 confirms this is intentional.",
+      "justification": "The AJAX handler performs a server-side product search and populates $this->post_ids which then influences WP_Query results; there is no nonce verification (phpcs:disable WordPress.Security.NonceVerification.Missing at line 56), making it trivially CSRF-able to force a mis-populated search result list in a victim's session.",
+      "detection_pattern": {
+        "grep_pattern": "add_action\\(\\s*'wp_ajax_nopriv_",
+        "anti_pattern": "check_ajax_referer|wp_verify_nonce",
+        "section_name": "CSRF: wp_ajax_nopriv_ handler without nonce verification",
+        "description": "Detects nopriv AJAX handlers that perform state-affecting operations without any nonce check. Without a nonce, any site can craft a cross-origin POST that is executed in the victim's browser context."
+      }
+    },
+    {
+      "vuln_class": "broken_access_control",
+      "location": "set_search_post_ids_from_ajax(), lines 55-70",
+      "severity": "low",
+      "reachability": "Accessible to all unauthenticated users via wp_ajax_nopriv_prdctfltr_respond_550 (line 38).",
+      "justification": "The handler fires a backend product search (Helpers::searchProducts) triggered by anonymous visitors with no capability check (no current_user_can call anywhere in the method); while the operation itself is read-only, the lack of any access gate means unauthenticated actors can drive the plugin's internal search engine, potentially leaking information about non-public products if the search engine does not filter by post status.",
+      "detection_pattern": {
+        "grep_pattern": "add_action\\(\\s*'wp_ajax_nopriv_",
+        "anti_pattern": "current_user_can|is_user_logged_in",
+        "section_name": "Access Control: nopriv AJAX handler with no capability check",
+        "description": "Finds wp_ajax_nopriv_ handlers that perform backend work without verifying the caller has appropriate permissions. Even read-only operations on private data require at least an authentication gate."
+      }
+    }
+  ]
+}

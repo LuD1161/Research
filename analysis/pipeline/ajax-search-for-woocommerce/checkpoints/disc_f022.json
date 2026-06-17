@@ -1,0 +1,70 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "missing_authentication",
+      "location": "getSearchResults() / constructor, lines 114-116",
+      "severity": "medium",
+      "reachability": "Unauthenticated via wp_ajax_nopriv_ AJAX action (DGWT_WCAS_SEARCH_ACTION) and WooCommerce AJAX endpoint; any visitor can call it",
+      "justification": "The handler is registered with both wp_ajax_nopriv_ and WC AJAX (line 114) with no nonce, capability check, or rate-limit, allowing unauthenticated enumeration of product data including SKUs, prices, descriptions, and internal product IDs via the 'product-ids' context parameter.",
+      "detection_pattern": {
+        "grep_pattern": "wp_ajax_nopriv_",
+        "anti_pattern": "check_ajax_referer|wp_verify_nonce|current_user_can",
+        "section_name": "Missing Auth: wp_ajax_nopriv_ handler without access control",
+        "description": "Finds AJAX handlers exposed to unauthenticated users (wp_ajax_nopriv_). When these handlers return non-public sensitive data (SKUs, internal IDs, draft content) without a capability check, they represent information disclosure. Files matching wp_ajax_nopriv_ but not containing check_ajax_referer, wp_verify_nonce, or current_user_can nearby are suspect."
+      }
+    },
+    {
+      "vuln_class": "csrf_missing_nonce",
+      "location": "getSearchResults(), lines 179-185 (//phpcs:disable WordPress.Security.NonceVerification.Recommended suppression)",
+      "severity": "low",
+      "reachability": "Any page that can trigger an AJAX request to the search endpoint; exploitable by any page the logged-in user visits",
+      "justification": "The developer explicitly suppressed PHPCS's nonce warning (//phpcs:disable WordPress.Security.NonceVerification.Recommended) rather than adding verification; $_REQUEST['dgwt_wcas_keyword'] and $_REQUEST['s'] are read without any nonce check, so a cross-site request can force a logged-in user's browser to issue search queries and reveal returned data via CORS or redirect.",
+      "detection_pattern": {
+        "grep_pattern": "phpcs:disable WordPress.Security.NonceVerification",
+        "anti_pattern": "check_ajax_referer|wp_verify_nonce",
+        "section_name": "CSRF: PHPCS nonce suppression without actual nonce verification",
+        "description": "Flags files where the developer disabled PHPCS nonce checks without adding a real nonce verification call. This pattern is a code smell that frequently corresponds to a CSRF vulnerability; it is more reliable than searching for the absence of a nonce."
+      }
+    },
+    {
+      "vuln_class": "stored_xss_risk",
+      "location": "getCategories() line 535, getTags() line 587, getProductsData() line 388-392",
+      "severity": "medium",
+      "reachability": "Any visitor triggering a search; the XSS fires in the browser when the JavaScript frontend renders results using innerHTML rather than textContent",
+      "justification": "Category/tag names are passed through html_entity_decode() (lines 535, 587) and product names through html_entity_decode() (line 390) before being JSON-encoded into the response; if the client-side JavaScript renders the 'value' field via innerHTML (a reasonable assumption for rich search dropdowns showing formatted product names), a stored payload in a product/category name — which an admin can set — would execute in every visitor's browser during search.",
+      "detection_pattern": {
+        "grep_pattern": "html_entity_decode",
+        "anti_pattern": "esc_html|esc_attr|wp_kses",
+        "section_name": "XSS: html_entity_decode on user-controlled data without re-escaping",
+        "description": "html_entity_decode() reverses HTML entity encoding, so if the decoded string is placed into HTML output or into a JSON field that JavaScript renders as HTML, any HTML/JS in the original stored value becomes active. Files that call html_entity_decode but lack a subsequent esc_html/esc_attr/wp_kses before outputting are suspect for stored XSS."
+      }
+    },
+    {
+      "vuln_class": "information_disclosure",
+      "location": "getSearchResults(), context='product-ids' branch, lines 263-277",
+      "severity": "medium",
+      "reachability": "Unauthenticated via the nopriv AJAX endpoint by passing context=product-ids or product-ids-ff in the request",
+      "justification": "The 'product-ids' and 'product-ids-ff' context values (lines 263, 279) are read from the request ($context parameter flow) and cause the handler to return raw WP_Post objects or IDs for ALL matching products regardless of user role, potentially exposing hidden or not-yet-linked product IDs to unauthenticated callers who can enumerate the store's product catalog.",
+      "detection_pattern": {
+        "grep_pattern": "product-ids",
+        "anti_pattern": "current_user_can|is_user_logged_in",
+        "section_name": "Info Disclosure: Product ID enumeration via context parameter",
+        "description": "Flags endpoints that branch on a caller-supplied context value (e.g., 'product-ids') to return bulk product IDs without checking whether the caller is authorized to see that data. Absence of current_user_can or is_user_logged_in near these branches indicates unauthenticated bulk data access."
+      }
+    },
+    {
+      "vuln_class": "unvalidated_open_redirect_risk",
+      "location": "fixPolylangWooEndpoint() / woocommerce_ajax_get_endpoint filter hook, ~lines 125-130",
+      "severity": "low",
+      "reachability": "Requires Polylang active without WooCommerce Polylang integration; the $request parameter comes from a WordPress filter chain meaning it may incorporate URL parameters from external sources",
+      "justification": "The method hooks woocommerce_ajax_get_endpoint and receives a $request string from the filter without sanitizing it before passing it to add_query_arg('wc-ajax', $request, $url); add_query_arg does not escape its values for HTML output contexts, so if the composed URL is later echoed without esc_url() in a theme or WooCommerce template, a crafted wc-ajax value could inject additional query parameters or cause a redirect.",
+      "detection_pattern": {
+        "grep_pattern": "add_query_arg",
+        "anti_pattern": "esc_url",
+        "section_name": "Open Redirect / URL Injection: add_query_arg without esc_url on output",
+        "description": "add_query_arg() does not HTML-encode its output; when its return value is echoed in HTML without esc_url(), an attacker who controls any input parameter flowing into it can inject arbitrary URL characters. Files that call add_query_arg but do not pass the result through esc_url() before output are suspect."
+      }
+    }
+  ]
+}

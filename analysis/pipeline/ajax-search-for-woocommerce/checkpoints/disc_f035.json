@@ -1,0 +1,18 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "sql_injection_via_unvalidated_filter_output",
+      "location": "get_filtered_price_query(), line 109",
+      "severity": "medium",
+      "reachability": "Reachable on any product search page where the WOOF price filter widget is rendered. Exploitation requires a second plugin or theme hooking 'dgwt/wcas/search_page/result_post_ids' and returning non-integer array elements, or a future regression in the upstream populator. The filter is public and documented.",
+      "justification": "At line 109, the output of apply_filters('dgwt/wcas/search_page/result_post_ids', []) is passed directly to implode(',', $post_ids) and concatenated into a raw SQL string: `$sql .= \" AND $wpdb->posts.ID IN(\" . implode( ',', $post_ids ) . ')'`. No integer cast (array_map('intval',...) or absint()) is applied, nor is $wpdb->prepare() used. Any WordPress hook registered on this public filter can inject non-integer elements (e.g., '1 UNION SELECT...') that break out of the IN() clause.",
+      "detection_pattern": {
+        "grep_pattern": "implode\\s*\\(\\s*['\"],\\s*['\"]\\s*,\\s*apply_filters",
+        "anti_pattern": "array_map\\s*\\(\\s*['\"]intval['\"]|array_map\\s*\\(\\s*['\"]absint['\"]|\\$wpdb->prepare",
+        "section_name": "SQL Injection: apply_filters array imploded into IN() clause without integer cast",
+        "description": "Catches PHP code that calls apply_filters() to obtain an array and immediately implodes it into a SQL fragment without integer sanitization. WordPress filters are public extension points; any plugin can alter the returned array. Without array_map('intval',...) or $wpdb->prepare(), SQL injection is possible via injected non-integer elements."
+      }
+    }
+  ]
+}
