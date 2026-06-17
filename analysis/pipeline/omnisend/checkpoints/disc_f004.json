@@ -1,0 +1,31 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "http_header_injection",
+      "location": "Sync::sync_contact() line 28 -> Snippet::set_contact_cookie_id() line 25",
+      "severity": "medium",
+      "reachability": "Exploitable by an attacker who can control the Omnisend API response (compromised API key, MITM on the HTTPS call, or a rogue Omnisend-side contact record). The contactID from the API JSON response is cast to string and passed directly to PHP setcookie() with no newline stripping or sanitization.",
+      "justification": "In class-sync.php line 102-109, the API response contactID is extracted as `(string) $arr['contactID']` and returned; at line 28 it is passed to `Snippet::set_contact_cookie_id()`, which at class-snippet.php line 25 calls `setcookie('omnisendContactID', $contact_id, ...)` with no sanitization. PHP versions before 7.4 do not reject \\r\\n in cookie values, enabling a MITM attacker who injects newlines into contactID to split the HTTP response and inject arbitrary headers or a second response body.",
+      "detection_pattern": {
+        "grep_pattern": "setcookie\\s*\\([^)]*\\$[a-zA-Z_]+[^)]*\\)",
+        "anti_pattern": "sanitize_text_field|preg_replace.*[\\\\r\\\\n]|str_replace.*\\\\n|filter_var",
+        "section_name": "Cookie header injection: unsanitized value in setcookie()",
+        "description": "Finds setcookie() calls where the value argument is a variable. Without newline sanitization, an externally-controlled value can inject additional HTTP headers (response splitting). Anti-pattern checks for sanitization immediately preceding the call."
+      }
+    },
+    {
+      "vuln_class": "sensitive_data_exfiltration",
+      "location": "Sync::sync_contact() lines 88-99",
+      "severity": "low",
+      "reachability": "Triggered automatically on every user registration (user_register hook), login (wp_login hook), profile update (profile_update hook), and batch cron sync. All WordPress users including administrators are affected. No authentication or capability check gates this path.",
+      "justification": "Line 88 reads `wp_capabilities` from user meta and lines 90-99 parse each active role (e.g. 'administrator', 'editor', 'shop_manager') into `$parsed_roles`, then line 98 transmits them to the Omnisend external API via `add_custom_property('wordpress_roles', ...)`. This exfiltrates user privilege information to a third-party SaaS for every synced WordPress user, including admins, with no redaction or user consent mechanism in the plugin.",
+      "detection_pattern": {
+        "grep_pattern": "get_user_meta.*wp_capabilities",
+        "anti_pattern": "current_user_can.*manage_options|capability.*filter|role.*redact",
+        "section_name": "Sensitive data exfiltration: WordPress roles sent to third-party API",
+        "description": "Finds code that reads wp_capabilities user meta. When the resulting role array is forwarded to an external service without redaction, it leaks administrative privilege structure of the site's user base."
+      }
+    }
+  ]
+}
