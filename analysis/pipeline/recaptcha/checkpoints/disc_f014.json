@@ -1,0 +1,54 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "xss_stored_or_reflected",
+      "location": "create_toggle_switch, line 121",
+      "severity": "medium",
+      "reachability": "Reachable by any caller passing attacker-influenced $name (e.g., a setting key read from DB or URL param); rendered in admin UI HTML",
+      "justification": "The $name parameter is interpolated verbatim into id=, for=, name=, and value= HTML attributes without esc_attr(), so a malicious value breaks out of the attribute context and injects arbitrary HTML/JS."
+    },
+    {
+      "vuln_class": "xss_stored_or_reflected",
+      "location": "create_select_options, lines 172-174",
+      "severity": "medium",
+      "reachability": "Any caller passing $options array with attacker-influenced 'val' or 'label' entries (e.g., values read from DB/user input)",
+      "justification": "$tmp['val'] and $tmp['label'] are interpolated directly into <option> tag attribute and content positions without esc_attr()/esc_html(), allowing attribute breakout and HTML injection."
+    },
+    {
+      "vuln_class": "xss_stored_or_reflected",
+      "location": "create_radio_group, lines 192-194",
+      "severity": "medium",
+      "reachability": "Any caller passing $name or $options with attacker-influenced 'val' or 'label' entries",
+      "justification": "$name, $tmp['val'], and $tmp['label'] are interpolated into id=, name=, value= attributes and label text without any escaping, enabling attribute injection or HTML injection."
+    },
+    {
+      "vuln_class": "xss_reflected",
+      "location": "parse_user_agent, line 255",
+      "severity": "medium",
+      "reachability": "Any HTTP request; $browser_name, $browser_version[0], and $os are derived from HTTP_* request headers via $_SERVER and flow into the return string which is stored/displayed in logs",
+      "justification": "$browser_name, $browser_version[0], and $os originate from HTTP request headers and are concatenated into an HTML string without esc_html(), enabling XSS when the result is rendered in the activity log UI."
+    },
+    {
+      "vuln_class": "xss_filter_bypass",
+      "location": "wp_kses_wf, lines 501-507",
+      "severity": "high",
+      "reachability": "All HTML output from this file passes through wp_kses_wf(), which is intended as the XSS sanitizer; exploitable by any input that ends up in HTML rendered via this function",
+      "justification": "The custom wp_kses allowlist explicitly whitelists the <script> tag (with src= and type= attributes), meaning any attacker-controlled HTML reaching wp_kses_wf() can include arbitrary script tags that wp_kses will pass through unstripped."
+    },
+    {
+      "vuln_class": "xss_filter_bypass",
+      "location": "wp_kses_wf, lines 467-472",
+      "severity": "medium",
+      "reachability": "Same as above — all HTML output routed through wp_kses_wf()",
+      "justification": "The allowlist also whitelists <style> tags, allowing injected CSS (e.g., expression()-based attacks in older IE, or CSS data exfiltration) to pass through the kses sanitizer."
+    },
+    {
+      "vuln_class": "improper_input_validation",
+      "location": "getUserIP, line 146",
+      "severity": "low",
+      "reachability": "Any request triggering IP logging; REMOTE_ADDR is attacker-controlled in some proxy/load-balancer configurations",
+      "justification": "sanitize_url() is applied to an IP address — it is not an IP validator and does not strip all invalid characters — so a non-standard REMOTE_ADDR value passes through and is stored in logs, potentially causing second-order issues if the IP is later used in SQL or HTML contexts."
+    }
+  ]
+}
