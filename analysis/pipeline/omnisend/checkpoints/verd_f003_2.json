@@ -1,0 +1,6 @@
+{
+  "is_real": true,
+  "severity": "low",
+  "reasoning": "Confirmed real. The sink at class-connection.php line 99 is `die( 'nonce verification failed: ' . __FILE__ . ':' . __LINE__ )`, which sends the absolute server filesystem path (e.g. /var/www/html/wp-content/plugins/omnisend/includes/Internal/class-connection.php) to the browser as plaintext on any nonce mismatch. Call chain: admin_menu hook -> add_menu_page(capability='manage_options', callback=Connection::display) -> Connection::display() [has own current_user_can('manage_options') guard at line 21] -> show_connection_view() [called when $_GET['action']=='show_connection_form' and store not connected] -> nonce check fails -> die with __FILE__. A second call site exists at class-omnisend-core-bootstrap.php line 296 inside admin_enqueue_scripts, which lacks an explicit manage_options guard but still requires an authenticated admin-area session. No sanitizer or output wrapper is missed; the die() is the terminal call. Severity is correctly low: the path leaks only to users already authenticated as WP administrators, who already have full filesystem access via the plugin editor. No unauthenticated or subscriber-level reachability exists. The correct fix is wp_die() with a generic message.",
+  "_done": true
+}
