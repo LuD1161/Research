@@ -1,0 +1,19 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "WPCaptcha_Functions::install_template (libs/functions.php ~line 1317); registered via admin_action_wpcaptcha_install_template (advanced-google-recaptcha.php line 107)",
+      "severity": "medium",
+      "reachability": "Any authenticated WordPress user (subscriber, contributor, editor) who visits wp-admin can trigger admin_action_* hooks. The nonce is created in tab_design.php line 35 and embedded in a URL visible to any user who loads the Design tab, but more critically any logged-in user can craft a request to admin.php?action=wpcaptcha_install_template&template=<id>&_wpnonce=<valid_nonce>.",
+      "justification": "install_template() calls check_admin_referer() for CSRF protection but has no current_user_can() capability check; any authenticated user can overwrite all plugin design settings (merging a chosen template array into options and calling update_option) without needing manage_options or administrator capability."
+    },
+    {
+      "vuln_class": "xss",
+      "location": "WPCaptcha_Tab_Design::display (interface/tab_design.php line 35), $template_id used bare inside wp_kses_wf HTML string",
+      "severity": "low",
+      "reachability": "Admin-only page; $template_id comes from WPCaptcha_Functions::get_templates() which returns a hardcoded array with fixed string keys ('white', 'orange', 'green', 'blue'). No attacker-controlled data reaches this variable in the current implementation.",
+      "justification": "While $template_id is concatenated without esc_attr() into an HTML class attribute and href URL inside the string passed to wp_kses_wf(), all template IDs are hardcoded constants; however if get_templates() were ever extended to include user-supplied or DB-sourced keys, this would be a stored XSS in an admin context - flagged as a latent risk rather than an immediately exploitable bug."
+    }
+  ]
+}
