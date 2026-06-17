@@ -1,0 +1,70 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "ip_spoofing_untrusted_header",
+      "location": "getClientIp, lines 41-85",
+      "severity": "medium",
+      "reachability": "Any remote attacker who can send HTTP requests can forge all non-connection-level IP headers (x-client-ip, x-forwarded-for, cf-connecting-ip, fastly-client-ip, true-client-ip, x-real-ip, x-cluster-client-ip, x-forwarded, forwarded-for, forwarded, x-appengine-user-ip, Cf-Pseudo-IPv4); the library reads them verbatim before falling through to connection.remoteAddress.",
+      "justification": "Client-supplied headers are prioritised over TCP-level remoteAddress without any trusted-proxy allowlist, so any caller using this IP for access control can be bypassed by setting a spoofed header.",
+      "detection_pattern": {
+        "grep_pattern": "req\\.headers\\[['\"](x-client-ip|x-forwarded-for|cf-connecting-ip|x-real-ip|true-client-ip)['\"]\\]",
+        "anti_pattern": "trusted.*proxy|isTrustedProxy|proxyList|TRUSTED_PROXIES",
+        "section_name": "IP spoofing: untrusted proxy headers",
+        "description": "Libraries that return a client IP from user-controlled headers without first verifying the upstream proxy is trusted enable IP-spoofing attacks that bypass IP-based authentication and rate-limiting."
+      }
+    },
+    {
+      "vuln_class": "redos_complex_regex_on_user_input",
+      "location": "is.ip() in lib/is.js line 5, called from getClientIp on every header value",
+      "severity": "medium",
+      "reachability": "Any remote attacker who can send a single HTTP request; every header value (x-client-ip, x-forwarded-for entries, etc.) is passed to is.ip() which applies the complex IPv6 regex.",
+      "justification": "The IPv6 regex contains nested repeating groups (([:A-F]{1,4}:(:|\b)|){5}) whose alternation creates exponential backtracking paths; a crafted string such as 'A:A:A:A:A:A:A:A:A:!A' can pin the event-loop thread for seconds, constituting a denial-of-service.",
+      "detection_pattern": {
+        "grep_pattern": "RegExp|/\\^.*\\{[0-9],.*\\}.*\\{[0-9],.*\\}/",
+        "anti_pattern": "net\\.isIP|isIPv4|isIPv6",
+        "section_name": "ReDoS: complex IPv6 regex on user input",
+        "description": "Hand-rolled IPv6 regexes with nested quantifiers applied to HTTP header values are a well-known ReDoS vector; Node.js's built-in net.isIP() provides a safe, O(n) alternative."
+      }
+    },
+    {
+      "vuln_class": "infinite_recursion_dos",
+      "location": "getClientIp, lines 116-118",
+      "severity": "medium",
+      "reachability": "Any caller that can pass a synthetic or mutated req object where req.raw references back to req (circular) — realistic in test harnesses, proxy middleware chains, or Fastify where req.raw is normally distinct but could be overridden.",
+      "justification": "The function recurses unconditionally into getClientIp(req.raw) with no depth guard or cycle detection; a circular reference (req.raw = req) causes unlimited recursion and a stack overflow that crashes the Node process.",
+      "detection_pattern": {
+        "grep_pattern": "getClientIp\\(req\\.raw\\)|return\\s+\\w+\\(req\\.raw\\)",
+        "anti_pattern": "depth\\s*>|seen\\.has|visited\\.has|recursionGuard",
+        "section_name": "DoS: unbounded recursion on req.raw",
+        "description": "Request-unwrapping helpers that recurse on req.raw without a depth limit or cycle guard are vulnerable to stack overflow if the wrapped object is ever self-referential."
+      }
+    },
+    {
+      "vuln_class": "property_injection_via_object_define_property",
+      "location": "mw(), lines 130-138",
+      "severity": "low",
+      "reachability": "Requires an attacker-controlled options object passed to mw(); typical in multi-tenant setups where configuration originates from user data or config files.",
+      "justification": "configuration.attributeName is used directly as the property name in Object.defineProperty(req, attributeName, ...) without validation; passing '__proto__', 'constructor', or any existing req property name can shadow built-ins or overwrite framework internals on the request object.",
+      "detection_pattern": {
+        "grep_pattern": "Object\\.defineProperty\\s*\\(\\s*\\w+,\\s*\\w+(?:\\.\\w+)?\\s*,",
+        "anti_pattern": "hasOwnProperty|Object\\.prototype\\.hasOwnProperty|allowedAttributes|whitelist",
+        "section_name": "Property injection: unvalidated Object.defineProperty key",
+        "description": "Passing an attacker-controlled string as the property name argument to Object.defineProperty can shadow prototype properties or overwrite security-relevant fields on the target object."
+      }
+    },
+    {
+      "vuln_class": "logic_bug_missing_null_guard_in_validator",
+      "location": "is.ip() in lib/is.js line 19",
+      "severity": "low",
+      "reachability": "Any request where a header is present but set to null (some HTTP frameworks allow this); the bug is structural and affects every is.ip() call in getClientIp.",
+      "justification": "Operator precedence means the expression evaluates as (existy(value) && ipv4.test(value)) || ipv6.test(value); the existy guard is not applied to the IPv6 branch, so ipv6.test(null) (which coerces null to the string 'null') runs unconditionally — both inefficient and logically incorrect.",
+      "detection_pattern": {
+        "grep_pattern": "existy.*&&.*test.*||.*test",
+        "anti_pattern": "existy.*&&.*\\(.*test.*||.*test.*\\)",
+        "section_name": "Logic bug: missing null guard before second regex branch",
+        "description": "When a null-guard is combined with two regex alternatives using && and || without parentheses, operator precedence bypasses the guard for the second alternative, running a potentially complex regex on null/undefined input."
+      }
+    }
+  ]
+}
