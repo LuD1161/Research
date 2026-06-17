@@ -1,0 +1,6 @@
+{
+  "is_real": true,
+  "severity": "medium",
+  "reasoning": "Confirmed. At lines 3331-3335 of /DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js, when signingSchemeOptions.hash is 'md4' or 'md5', the code emits console.warn but does not throw. The critical detail is that the allowedHashes guard at line 3328 explicitly permits md4 and md5 because NODE_HASHES (lines 3248-3257) includes both — so they pass validation and signing proceeds silently. Reachability is confirmed via two paths: (1) string form setOptions({signingScheme:'pkcs1-md5'}) — line 3306 splits on '-' yielding scheme='pkcs1' and hash='md5', which passes the allowedHashes check and hits warn-only; (2) object form setOptions({signingScheme:{scheme:'pkcs1',hash:'md5'}}) — lines 3320-3323 extract the hash directly, same outcome. No schema validation (zod/joi/ajv) is present. The default options at line 3278 use sha256, so this requires explicit non-default caller configuration; however the library documents signingScheme as a user-controlled parameter. The finding is real: the library design accepts cryptographically broken hashes for signing with warn-only semantics, giving callers a false sense of security that the library enforces safe configurations.",
+  "_done": true
+}
