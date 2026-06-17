@@ -2,6 +2,8 @@
 
 Automated security review of WordPress plugins using LLM agents with static pre-filtering and self-improving pattern detection.
 
+> **For agents**: Read [`AGENT_INSTRUCTIONS.md`](AGENT_INSTRUCTIONS.md) for step-by-step instructions to run the pipeline on any plugin. It includes what to ask the user, exact commands, and troubleshooting.
+
 ## Quick Start — Run a Plugin Review
 
 ```bash
@@ -80,6 +82,10 @@ enumerate_surface.sh (static surface enumeration, loads learned patterns)
 | `scripts/enumerate_surface.sh` | Static surface enumeration with ripgrep. Section 4 loads learned patterns. |
 | `analysis/pipeline/learned_patterns.json` | Growing pattern library — grep + anti-pattern pairs discovered by agents. |
 | `analysis/pipeline/costs.json` | Cost tracking ledger — tokens, agents, duration, estimated USD per run. |
+| `analysis/pipeline/tracker.json` | Per-plugin status: pending/done/failed/skipped. The batch scoreboard. |
+| `analysis/pipeline/wave_01.json` ... `wave_10.json` | Pre-sorted batches of 10 plugins each (heaviest first). |
+| `workflows/batch_wave.js` | Run a wave of 10 plugins sequentially. Updates tracker.json on completion. |
+| `workflows/rerun_failed.js` | Re-run all non-done plugins from tracker.json. |
 
 ## Discovery Schema
 
@@ -158,3 +164,10 @@ Typical costs (Sonnet 4.6, tier-2 only):
 | flexible-shipping | 27 | — | — | — | — | in progress |
 
 *Pre-cost-tracking or partial run
+
+## Batch Status
+
+100 plugins routed into 10 waves. Check `analysis/pipeline/tracker.json` for live status.
+
+To run: `Workflow({scriptPath: "workflows/batch_wave.js", args: {wave: N}})`
+To retry: `Workflow({scriptPath: "workflows/rerun_failed.js"})`
