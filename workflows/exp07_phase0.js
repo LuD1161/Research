@@ -12,7 +12,7 @@ export const meta = {
 const ROOT = '/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review'
 const PR = '/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src'
 const CKPT = `${ROOT}/analysis/experiments/exp07/phase0/checkpoints`
-const WAVE = 14
+const WAVE = 6 // lowered from 14: server-side burst throttling tripped at 14-wide
 
 // Frozen labeled set (mirrors ground_truth_phase0.json). label is for our records; the
 // agent never sees it.
