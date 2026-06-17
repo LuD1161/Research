@@ -21,7 +21,7 @@ const ROOT = '/home/openclaw/Repos/Research/.claude/worktrees/woo-security-revie
 const RUN = (typeof args !== 'undefined' && args && args.run) || 'recaptcha'
 const MANIFEST = `${ROOT}/analysis/pipeline/${RUN}/manifest.json`
 const CK = `${ROOT}/analysis/pipeline/${RUN}/checkpoints`
-const WAVE = 14 // 16 cores → cap min(16, cores-2) = 14
+const WAVE = 4 // conservative: avoids SSL/rate-limit failures when multiple pipelines run
 const TIER_MIN = 1 // small plugin -> exhaustive sweep of all tier>=1 files
 
 const DISC_SCHEMA = {
