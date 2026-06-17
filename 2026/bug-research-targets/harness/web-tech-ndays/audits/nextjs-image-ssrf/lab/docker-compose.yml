@@ -1,0 +1,103 @@
+networks:
+  audit-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.99.0.0/24
+
+services:
+  # --- Tier 1: allowlist-only tests (dangerouslyAllowLocalIP not relevant — doesn't exist in 15.3.3) ---
+
+  app-baseline:
+    build:
+      context: ./nextjs-app
+      target: run-baseline
+    ports:
+      - "13001:3000"
+    networks:
+      audit-net:
+    dns:
+      - 10.99.0.5
+    mem_limit: 512m
+    cpus: 1.0
+    restart: "no"
+
+  app-wildcard:
+    build:
+      context: ./nextjs-app
+      target: run-wildcard
+    ports:
+      - "13002:3000"
+    networks:
+      audit-net:
+    dns:
+      - 10.99.0.5
+    mem_limit: 512m
+    cpus: 1.0
+    restart: "no"
+
+  app-subdomain:
+    build:
+      context: ./nextjs-app
+      target: run-subdomain
+    ports:
+      - "13003:3000"
+    networks:
+      audit-net:
+    dns:
+      - 10.99.0.5
+    mem_limit: 512m
+    cpus: 1.0
+    restart: "no"
+
+  app-rebind:
+    build:
+      context: ./nextjs-app
+      target: run-rebind
+    ports:
+      - "13004:3000"
+    networks:
+      audit-net:
+    dns:
+      - 10.99.0.5
+    mem_limit: 512m
+    cpus: 1.0
+    restart: "no"
+
+  # --- Infrastructure services ---
+
+  attacker:
+    build:
+      context: ./attacker-server
+      dockerfile: Dockerfile
+    ports:
+      - "4444:4444"
+    networks:
+      audit-net:
+        ipv4_address: 10.99.0.10
+    mem_limit: 128m
+    restart: "no"
+
+  oracle:
+    build:
+      context: ./oracle
+      dockerfile: Dockerfile
+    ports:
+      - "4010:80"
+    networks:
+      audit-net:
+        ipv4_address: 10.99.0.100
+    mem_limit: 128m
+    restart: "no"
+
+  dns-server:
+    build:
+      context: ./dns-server
+      dockerfile: Dockerfile
+    ports:
+      - "15353:5353"
+    networks:
+      audit-net:
+        ipv4_address: 10.99.0.5
+    mem_limit: 128m
+    restart: "no"
