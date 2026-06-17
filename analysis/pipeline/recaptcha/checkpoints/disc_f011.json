@@ -1,0 +1,40 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "handle_unblock(), line 805-810",
+      "severity": "high",
+      "reachability": "Unauthenticated — triggered by visiting the login page with ?wpcaptcha_unblock=<key>; no session or capability required",
+      "justification": "Any visitor who knows (or guesses/leaks) the admin-configured global_unblock_key can permanently add their own IP to the plugin whitelist by issuing a GET request to wp-login.php with that key, bypassing all login-protection lockouts forever."
+    },
+    {
+      "vuln_class": "auth_token_logic",
+      "location": "handle_unblock(), line 818",
+      "severity": "low",
+      "reachability": "Unauthenticated — anyone with a valid unblock email link",
+      "justification": "The transient-based unblock token comparison uses loose == operator (`$unblock_transient == $unblock_key`); while not exploitable via type juggling here because both sides are strings, it is non-constant-time and could theoretically be affected by PHP type coercions in edge cases involving numeric-string transient values."
+    },
+    {
+      "vuln_class": "captcha_bypass",
+      "location": "handle_captcha(), lines 326-338 (builtin branch)",
+      "severity": "medium",
+      "reachability": "Unauthenticated — any user submitting a form protected by the built-in captcha",
+      "justification": "The built-in captcha stores wp_hash(answer) as a hidden form field; since valid answers are only integers 0-20 (sum/difference of two 0-10 random numbers), an attacker can precompute wp_hash() for all 21 possible values offline and forge a valid token for any captcha challenge, fully bypassing the captcha."
+    },
+    {
+      "vuln_class": "url_parameter_injection",
+      "location": "handle_captcha(), lines 297 and 314",
+      "severity": "low",
+      "reachability": "Unauthenticated — any user triggering captcha verification on login/registration",
+      "justification": "The sanitized g-recaptcha-response value is directly concatenated into the Google verification URL (`?secret=...&response=<user_value>`); sanitize_text_field() strips tags but not URL metacharacters, so a value like `foo&secret=attacker_key` would inject an additional query parameter and allow substituting the secret key in the outbound verification request."
+    },
+    {
+      "vuln_class": "stored_css_injection",
+      "location": "login_head(), line 1074-1075",
+      "severity": "medium",
+      "reachability": "Admin-only — requires an administrator to save malicious custom CSS through the plugin settings",
+      "justification": "The design_custom_css option is output inside a <style> block using esc_html(), which encodes < and > but does NOT prevent CSS injection payloads like `} body { background-image: url(//attacker.com) }` that exfiltrate page data or inject visible content visible to all login page visitors."
+    }
+  ]
+}
