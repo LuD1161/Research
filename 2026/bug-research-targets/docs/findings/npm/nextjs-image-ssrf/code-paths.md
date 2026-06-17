@@ -1,0 +1,1 @@
+../../../../harness/web-tech-ndays/audits/nextjs-image-ssrf/analysis/code-paths.md

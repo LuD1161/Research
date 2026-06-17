@@ -1,0 +1,1 @@
+../../../../harness/web-tech-ndays/audits/nextjs-image-ssrf/findings/001-redirect-ssrf-no-hop-validation.md

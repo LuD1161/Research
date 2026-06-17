@@ -1,0 +1,1 @@
+../../harness/web-tech-ndays/REMOTE-VALIDATION.md
