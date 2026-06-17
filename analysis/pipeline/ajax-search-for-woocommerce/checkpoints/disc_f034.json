@@ -1,0 +1,31 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "sql_injection_via_unvalidated_filter_output",
+      "location": "filter_price_sql(), line 110",
+      "severity": "medium",
+      "reachability": "Reachable on any product search page when the woocommerce_price_filter_sql filter fires (i.e., when the WC price filter widget is rendered). Exploitation requires a second plugin or theme hooking dgwt/wcas/search_page/result_post_ids and injecting non-integer values, OR a future regression in the upstream populator that lets unsanitized data into the buffer.",
+      "justification": "At line 110, apply_filters('dgwt/wcas/search_page/result_post_ids', []) output is directly implode()','-joined into raw SQL without any integer cast or $wpdb->prepare(): `$sql .= ' AND product_id IN(' . implode( ',', $post_ids ) . ')'`. The filter is a public WordPress hook; any plugin can inject non-integer elements into the returned array, breaking out of the IN() clause.",
+      "detection_pattern": {
+        "grep_pattern": "implode\\(\\s*['\"],\\s*['\"]\\s*,\\s*\\$",
+        "anti_pattern": "array_map\\s*\\(\\s*['\"]intval['\"]|array_map\\s*\\(\\s*['\"]absint['\"]|\\$wpdb->prepare",
+        "section_name": "SQL Injection: implode() array into IN() clause without integer cast",
+        "description": "Catches any place where a PHP array is joined with commas directly into a SQL fragment via implode(). Without array_map('intval', ...) or $wpdb->prepare(), if any element is non-integer (e.g., injected via a WordPress filter), SQL injection is possible. Files matching the grep pattern but lacking integer-cast or prepare() in close proximity are suspicious."
+      }
+    },
+    {
+      "vuln_class": "sql_injection_via_unvalidated_filter_output",
+      "location": "filter_counts_query(), line 153",
+      "severity": "medium",
+      "reachability": "Reachable on any product search page when the woocommerce_get_filtered_term_product_counts_query filter fires (i.e., layered nav / attribute filters active). Same second-plugin precondition as the price-filter finding.",
+      "justification": "At line 153, the same pattern recurs in filter_counts_query(): `$query['where'] .= \" AND $wpdb->posts.ID IN(\" . implode( ',', $post_ids ) . ')'`. The $post_ids array comes from the untyped public filter dgwt/wcas/search_page/result_post_ids with no integer validation, allowing SQL injection if any hook returns non-integer elements.",
+      "detection_pattern": {
+        "grep_pattern": "\\$query\\[.where.\\].*\\.=.*implode",
+        "anti_pattern": "array_map\\s*\\(\\s*['\"]intval['\"]|array_map\\s*\\(\\s*['\"]absint['\"]|\\$wpdb->prepare",
+        "section_name": "SQL Injection: unguarded concatenation into SQL WHERE clause via implode",
+        "description": "Catches direct string concatenation into a SQL where clause using implode() on an array, without integer sanitization. Common pattern in WooCommerce filter integration code where post ID arrays flow through WordPress hooks and are then embedded in raw SQL."
+      }
+    }
+  ]
+}
