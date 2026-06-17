@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "header_injection_crlf",
+      "location": "normalize() — full function body (lines 1-58); no sanitization of CR/LF in any replace/join step",
+      "severity": "medium",
+      "reachability": "Any caller that passes user-controlled strings to urlJoin() and then uses the returned value directly in an HTTP response header (e.g., res.setHeader('Location', urlJoin(...))) is reachable; very common server-side redirect pattern.",
+      "justification": "The function performs no stripping or encoding of carriage-return (\\r) or line-feed (\\n) characters at any point; a string like urlJoin('https://example.com', 'path\\r\\nX-Evil: injected') passes through intact, enabling HTTP response splitting / header injection if the result is placed in a Location or Set-Cookie header.",
+      "detection_pattern": {
+        "grep_pattern": "(?:join|concat|resolve)\\([^)]*\\)[^;]*(?:setHeader|redirect|location)",
+        "anti_pattern": "(?:encodeURIComponent|replace.*[\\\\r\\\\n]|sanitize)",
+        "section_name": "Header Injection: CRLF passthrough in URL builder",
+        "description": "Detects patterns where a URL-joining call result flows into a header-setting call without CRLF sanitization; dangerous when user input is a component."
+      }
+    },
+    {
+      "vuln_class": "dangerous_protocol_passthrough",
+      "location": "normalize() lines 16-19 — protocol normalization replaces any protocol's slashes but never validates the scheme; urlJoin() line 63 accepts any first element",
+      "severity": "medium",
+      "reachability": "Any caller that accepts user-controlled input as the first argument (protocol/base) or mixes a fixed dangerous protocol with user-controlled path; reachable in template/link-generation code.",
+      "justification": "The regex /^([^/:]+):\\/*/ on lines 17/19 normalizes ANY protocol without a denylist, so urlJoin('javascript:', 'alert(1)') produces 'javascript://alert(1)' and urlJoin('data:', 'text/html,<img src=x onerror=alert(1)>') produces 'data://text/html,...'; if the returned string is assigned to an href, src, or action attribute, this directly enables XSS.",
+      "detection_pattern": {
+        "grep_pattern": "urlJoin\\s*\\(|url[_-]join\\s*\\(",
+        "anti_pattern": "(?:javascript|data|vbscript).*(?:throw|Error|blocked|sanitize|deny)",
+        "section_name": "XSS: dangerous protocol passthrough in URL join",
+        "description": "Flags calls to url-join (or similar concatenators) that do not validate the resulting protocol before the URL is used in a DOM or HTML context; the library normalizes all schemes equally, including javascript: and data:."
+      }
+    },
+    {
+      "vuln_class": "url_path_traversal_passthrough",
+      "location": "normalize() lines 22-44 — the loop strips leading/trailing slashes from components but does not canonicalize '..' segments",
+      "severity": "low",
+      "reachability": "Callers that construct file-system paths or internal API paths from urlJoin output and pass the result to fs.* or path.resolve without further normalization; less common but possible in Node.js file-serving code.",
+      "justification": "urlJoin('https://example.com/api', '../../../etc/passwd') produces 'https://example.com/api/../../../etc/passwd' with no removal of dot-dot segments; downstream consumers that treat the path portion as a local filesystem path without normalization are vulnerable to path traversal.",
+      "detection_pattern": {
+        "grep_pattern": "urlJoin|url_join",
+        "anti_pattern": "path\\.normalize|resolve.*__dirname|\\.\\./.*(?:throw|Error)",
+        "section_name": "Path Traversal: dot-dot passthrough in URL builder",
+        "description": "Catches URL-join results used in file-path or internal routing contexts without dot-dot normalization; the library does not resolve '..' segments."
+      }
+    }
+  ]
+}
