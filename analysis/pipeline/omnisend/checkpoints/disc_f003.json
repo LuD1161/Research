@@ -1,0 +1,70 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "omnisend_register_connection_routes() in class-omnisend-core-bootstrap.php; handler Connection::omnisend_post_connection()",
+      "severity": "medium",
+      "reachability": "Any authenticated WordPress user (subscriber or higher) can POST to /wp-json/omnisend/v1/connect. The REST permission_callback only calls is_user_logged_in(), not current_user_can('manage_options').",
+      "justification": "The permission_callback at route registration gates on is_user_logged_in() only; the manage_options check lives inside the handler body, which is correct defense-in-depth but leaves the REST endpoint improperly described to WordPress core and means any logged-in user reaches the capability check — a non-admin gets an error response but the route is unnecessarily exposed to all authenticated users and the permission boundary is in the wrong layer.",
+      "detection_pattern": {
+        "grep_pattern": "permission_callback.*is_user_logged_in",
+        "anti_pattern": "permission_callback.*current_user_can",
+        "section_name": "Broken Access Control: REST route with weak permission_callback",
+        "description": "REST routes whose permission_callback only checks is_user_logged_in() for privileged/state-changing actions — any logged-in user can reach the handler; the proper gate is current_user_can() in the permission_callback itself."
+      }
+    },
+    {
+      "vuln_class": "stored_xss_via_unescaped_remote_url",
+      "location": "resolve_wordpress_settings() line 57-58; output at view/landing-page.html lines 20 and 100",
+      "severity": "high",
+      "reachability": "Triggered for any admin who visits the Omnisend landing page (display() -> resolve_wordpress_settings() -> landing-page.html). Requires the Omnisend API at https://api.omnisend.com/wordpress/settings to return a malicious exploreOmnisendLink value (supply-chain / MitM scenario).",
+      "justification": "self::$landing_page_url is set directly from $data['exploreOmnisendLink'] (JSON-decoded API response) with no URL sanitization; the public static property is then echoed raw into two href attributes in landing-page.html (echo Connection::$landing_page_url) with no esc_url/esc_attr, so a javascript: URI or attribute-breaking payload from the API would execute as XSS in the admin context.",
+      "detection_pattern": {
+        "grep_pattern": "echo\\s+.*::\\$[a-zA-Z_]+url",
+        "anti_pattern": "esc_url|esc_attr|wp_kses",
+        "section_name": "XSS: unescaped remote-sourced URL echoed in HTML attribute",
+        "description": "Catches bare echo of a static property holding a URL (often sourced from a remote API or option) inside HTML without esc_url/esc_attr — a javascript: payload would execute in the admin browser."
+      }
+    },
+    {
+      "vuln_class": "information_disclosure",
+      "location": "show_connection_view() line 99",
+      "severity": "low",
+      "reachability": "Any admin who triggers a nonce failure on the show_connection_form action (e.g., by replaying a stale nonce) will see the full absolute server filesystem path in the browser.",
+      "justification": "die( 'nonce verification failed: ' . __FILE__ . ':' . __LINE__ ) leaks the absolute path to the PHP source file (e.g., /var/www/html/wp-content/plugins/omnisend/includes/Internal/class-connection.php) to the client; correct practice is to call wp_die() with a generic message.",
+      "detection_pattern": {
+        "grep_pattern": "die.*__FILE__",
+        "anti_pattern": "wp_die\\(.*esc_html",
+        "section_name": "Information Disclosure: __FILE__ in die() message",
+        "description": "Catches PHP die() or exit() calls that interpolate __FILE__ or __DIR__, which leak absolute server paths to the browser; wp_die() with a generic message is the WordPress-safe alternative."
+      }
+    },
+    {
+      "vuln_class": "xss_wrong_escape_context",
+      "location": "display() line 37",
+      "severity": "low",
+      "reachability": "Admins only (display() is behind manage_options). Requires a third-party plugin to hook 'omnisend_signup_wp_link' and return a URL containing JS-special characters.",
+      "justification": "esc_url_raw() is used to output get_signup_url() inside a JavaScript string literal (var plugin_omnisend_signup_url = \"...\") — esc_url_raw strips some characters but does not escape double-quotes or backslashes, so a filter returning a URL with a double-quote would break out of the JS string; the correct function here is esc_js() or wp_json_encode().",
+      "detection_pattern": {
+        "grep_pattern": "esc_url_raw.*javascript\\|javascript.*esc_url_raw",
+        "anti_pattern": "esc_js|wp_json_encode",
+        "section_name": "XSS: esc_url_raw used in JavaScript string context",
+        "description": "esc_url_raw is designed for URL-context output (HTTP headers, href attributes), not JavaScript string literals — double-quotes and backslashes are not escaped, so attacker-controlled values can break out of the JS string; esc_js or wp_json_encode is required for JS context."
+      }
+    },
+    {
+      "vuln_class": "logic_error_forced_disconnect",
+      "location": "omnisend_post_connection() lines 271-296",
+      "severity": "medium",
+      "reachability": "Any authenticated user (subscriber+) who can pass a valid wp_nonce for action 'connect' and supplies an API key whose registered Omnisend account has a platform value other than '' or 'wordpress' (e.g., 'woocommerce', 'shopify'). Since any logged-in user can reach the REST endpoint, this is reachable by subscribers.",
+      "justification": "When $response['platform'] is neither 'wordpress' nor '', $connected stays false, the code falls through to Options::disconnect() at line 296, which clears the store connection even if the store was previously connected — an authenticated non-admin user could force a store disconnection by finding or guessing a valid 'connect' nonce and submitting an API key tied to a non-WordPress Omnisend account.",
+      "detection_pattern": {
+        "grep_pattern": "Options::disconnect\\|disconnect\\(\\)",
+        "anti_pattern": "current_user_can.*manage_options.*disconnect|permission_callback.*manage_options",
+        "section_name": "Logic Error: forced store disconnect via insufficiently-gated code path",
+        "description": "Disconnect / deactivation paths that are reachable by low-privilege users because the outer capability check is too weak — look for disconnect calls inside REST handlers where permission_callback only gates on is_user_logged_in()."
+      }
+    }
+  ]
+}
