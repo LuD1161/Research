@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "unsanitized_filename_exposure",
+      "location": "handleFile (line 697-744), uploadPath (line 831-835), onParseHeadersEnd (line 507-547)",
+      "severity": "medium",
+      "reachability": "Any HTTP client sending a multipart/form-data request with a file part can control the Content-Disposition filename parameter. The value reaches application event handlers via publicFile.originalFilename.",
+      "justification": "The raw, attacker-controlled filename from the Content-Disposition header is stored in publicFile.originalFilename (line 701) without any sanitization and emitted to the application via self.emit('file', fileStream.name, publicFile) at line 738. While the actual upload path is safe (uid.sync(18) prefix + FILE_EXT_RE-sanitized extension + path.join to a fixed uploadDir), the originalFilename field is a well-known dangerous sink: if downstream application code passes it to fs.rename, fs.createWriteStream, or path.join without sanitization, full path traversal results. This is the documented root cause of CVE-2021-43803 (Next.js) and similar exploits where frameworks naively used originalFilename in file persistence.",
+      "detection_pattern": {
+        "grep_pattern": "originalFilename|original_filename",
+        "anti_pattern": "path\\.basename|originalFilename\\.replace|sanitize.*filename",
+        "section_name": "Path traversal: unsanitized originalFilename exposure",
+        "description": "Multipart libraries that expose the raw Content-Disposition filename to application code create a dangerous sink. Grep for originalFilename or original_filename in file-handling libraries; the absence of path.basename or sanitization before returning to callers indicates the caller is expected to sanitize but often does not."
+      }
+    },
+    {
+      "vuln_class": "unbounded_resource_consumption",
+      "location": "Form constructor (line 64), handleFile (line 697-744)",
+      "severity": "low",
+      "reachability": "Any HTTP client sending a multipart/form-data upload to a server using multiparty without explicitly setting maxFilesSize.",
+      "justification": "The default value of maxFilesSize is Infinity (line 64: self.maxFilesSize = opts.maxFilesSize || Infinity). The LimitStream enforces this limit in _transform, but with an Infinity limit it effectively never triggers. An attacker can upload arbitrarily large files, limited only by available disk space and connection timeout, potentially exhausting disk and causing a denial of service. The developer must explicitly configure maxFilesSize to be protected.",
+      "detection_pattern": {
+        "grep_pattern": "maxFilesSize.*Infinity|maxFileSize.*Infinity",
+        "anti_pattern": "maxFilesSize\\s*=.*[0-9]|maxFileSize\\s*=.*[0-9]",
+        "section_name": "DoS: unlimited file upload size default",
+        "description": "Multipart and file-upload libraries that default maxFilesSize or maxFileSize to Infinity allow attackers to exhaust server disk. Grep for Infinity as the default; absence of a numeric default or mandatory option check is the vulnerability."
+      }
+    },
+    {
+      "vuln_class": "missing_input_length_validation",
+      "location": "Form.prototype.parse (line 91), setUpParser (line 808-829)",
+      "severity": "low",
+      "reachability": "Any HTTP client can send an arbitrarily long boundary value in the Content-Type header (e.g., Content-Type: multipart/form-data; boundary=AAAA...AAAA). Constrained in practice by HTTP server header size limits (typically 8-16 KB).",
+      "justification": "The boundary value extracted from the Content-Type header (lines 188-190) is passed directly to setUpParser without any length validation. setUpParser allocates Buffer.alloc(boundary.length + 4) and Buffer.alloc(boundary.length + 8) (lines 809 and 811). RFC 2046 specifies a maximum boundary length of 70 characters, but multiparty does not enforce this. While HTTP server header limits cap the practical attack at approximately 8-16 KB per request (creating ~16 KB of buffer allocations), this is still an unnecessary resource amplification with no benefit.",
+      "detection_pattern": {
+        "grep_pattern": "Buffer\\.alloc.*boundary\\.length|boundary\\.length.*Buffer\\.alloc",
+        "anti_pattern": "boundary\\.length\\s*>|boundary length.*max|MAX_BOUNDARY",
+        "section_name": "DoS: unbounded boundary length allocation",
+        "description": "Multipart parsers that allocate buffers proportional to the attacker-controlled boundary string without enforcing RFC 2046's 70-character limit allow minor memory amplification per request. Grep for Buffer.alloc calls whose size argument includes a user-derived length without a preceding bounds check."
+      }
+    },
+    {
+      "vuln_class": "mutable_shared_regex_state",
+      "location": "Form.prototype.parse (lines 187-191), module scope (line 43)",
+      "severity": "low",
+      "reachability": "Relevant under Node.js Worker Threads sharing the same module instance, or if the module is monkey-patched; effectively a code quality/fragility issue in standard single-threaded Node.js.",
+      "justification": "CONTENT_TYPE_BOUNDARY_RE is declared at module scope with the /g (global) flag (line 43), giving it persistent mutable .lastIndex state. In parse(), the code manually sets CONTENT_TYPE_BOUNDARY_RE.lastIndex = m.index + m[0].length - 1 (line 187) before calling exec(). Because these two lines are synchronous in single-threaded Node.js they are not interleaved in practice, but the pattern is fragile: any future introduction of async code between lastIndex assignment and exec, or use under Worker Threads with a shared module scope, could cause one request's lastIndex to corrupt another's, resulting in missing or wrong boundary values and either parse failure (DoS) or boundary confusion.",
+      "detection_pattern": {
+        "grep_pattern": "lastIndex\\s*=.*\\.length|lastIndex\\s*=.*index",
+        "anti_pattern": "lastIndex\\s*=\\s*0",
+        "section_name": "Mutable global regex state manipulation",
+        "description": "Module-level regex objects with the /g flag retain .lastIndex between calls. Manually setting lastIndex to a non-zero value derived from input before exec() is fragile: in multi-threaded environments or after async refactors, one caller's state corrupts another's. Grep for lastIndex assignments to values other than 0."
+      }
+    }
+  ]
+}
