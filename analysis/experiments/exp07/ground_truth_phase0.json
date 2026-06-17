@@ -1,0 +1,69 @@
+{
+  "_status": "FROZEN 2026-06-16. Immutable once agent runs start (Codex rule). Any addition = new experiment / explicitly flagged post hoc.",
+  "_phase": "Phase 0 — auth-lens A/B (A0 generic  vs  A1 generic + access-control clause)",
+  "_arms": {
+    "A0": "generic: 'evaluate this file for security issues' (bare-bones, exp05-style)",
+    "A1": "generic + ONE access-control clause (who can reach each handler; nonce != authorization; missing current_user_can = broken access control)"
+  },
+  "_design": "8 files, no structural context in either arm, model claude-sonnet-4-6, 3 reps/arm, randomized file+arm order, no arm labels in prompt.",
+  "_scoring": "POSITIVE catch = arm emits a finding with vuln_class in {broken_access_control, missing_authorization, privilege_escalation} at an acceptable_location (named handler OR file-level registrar/dispatcher counts). NEGATIVE FP = arm emits any such access-control finding on a negative file. Severity of the positive is irrelevant to the catch (label is a CODE property: reachable handler lacks current_user_can).",
+  "_plugins_root": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src",
+  "_size_covariate": "lines recorded per file; large files dilute BOTH arms, so the A1-A0 contrast remains valid, but absolute recall is reported split by size band.",
+
+  "positives": [
+    {
+      "id": "P1", "file": "smart-slider-3/Nextend/Framework/Browse/ControllerAjaxBrowse.php", "lines": 287,
+      "handler": "actionIndex", "vuln_class": "broken_access_control",
+      "acceptable_locations": ["ControllerAjaxBrowse.php:actionIndex", "AdminHelper:display_admin_ajax", "file-level: AJAX dispatch missing capability check"],
+      "required_evidence": "AJAX reaches actionIndex with only validateToken() nonce, no current_user_can; any logged-in user can enumerate media dir + leak fullPath",
+      "impact": "low", "source": "verified exp03 + exp06", "status": "CONFIRMED"
+    },
+    {
+      "id": "P2", "file": "ultimate-member/includes/core/class-query.php", "lines": 542,
+      "handler": "ajax_paginate", "vuln_class": "broken_access_control",
+      "acceptable_locations": ["class-query.php:ajax_paginate", "file-level: wp_ajax_um_ajax_paginate missing capability check"],
+      "required_evidence": "ajax_paginate() calls only UM()->check_ajax_nonce() (frontend nonce, anon-obtainable) and no current_user_can; fires um_ajax_load_posts__* hooks",
+      "impact": "low", "source": "code-verified 2026-06-16", "status": "CONFIRMED"
+    },
+    {
+      "id": "P3", "file": "ultimate-member/includes/ajax/class-forms.php", "lines": 61,
+      "handler": "get_icons", "vuln_class": "broken_access_control",
+      "acceptable_locations": ["class-forms.php:get_icons", "file-level: wp_ajax_um_get_icons missing capability check"],
+      "required_evidence": "get_icons() calls only UM()->admin()->check_ajax_nonce() and no current_user_can; any logged-in user who has the admin nonce can call it",
+      "impact": "low", "source": "code-verified 2026-06-16", "status": "CONFIRMED"
+    },
+    {
+      "id": "P4", "file": "ultimate-member/includes/admin/core/class-admin-notices.php", "lines": 1128,
+      "handler": "dismiss_notice", "vuln_class": "broken_access_control",
+      "acceptable_locations": ["class-admin-notices.php:dismiss_notice", "file-level: wp_ajax_*dismiss_notice missing capability check"],
+      "required_evidence": "dismiss_notice() calls only UM()->admin()->check_ajax_nonce() and no current_user_can; the current_user_can('manage_options') at line ~151 is a DIFFERENT function (not the AJAX dismiss path)",
+      "impact": "low", "source": "code-verified 2026-06-16", "status": "CONFIRMED"
+    }
+  ],
+
+  "hard_negatives": [
+    {
+      "id": "N1", "file": "ultimate-member/includes/ajax/class-secure.php", "lines": 516,
+      "why_negative": "ajax_scanner handler is correctly gated: wp_verify_nonce('um-admin-nonce') AND current_user_can('manage_options') (line ~33). Flagging an access-control bug here = FP.",
+      "status": "VERIFIED_GATED"
+    },
+    {
+      "id": "N2", "file": "ultimate-member/includes/common/class-secure.php", "lines": 263,
+      "why_negative": "secure-scan path gated by wp_verify_nonce('um-admin-nonce') AND current_user_can('manage_options') (line ~213). Flagging access control = FP.",
+      "status": "VERIFIED_GATED"
+    },
+    {
+      "id": "N3", "file": "woocommerce/includes/admin/class-wc-admin-exporters.php", "lines": 244,
+      "why_negative": "do_ajax_product_export() gated by check_ajax_referer('wc-product-export') AND export_allowed() (current_user_can('edit_products') && current_user_can('export')). Flagging access control = FP.",
+      "status": "VERIFIED_GATED"
+    }
+  ],
+
+  "easy_negatives": [
+    {
+      "id": "E1", "file": "woocommerce/includes/wc-formatting-functions.php", "lines": 1691,
+      "why_negative": "pure formatting helpers; no request-reachable handler, no AJAX/REST registration. Any access-control finding here is a hallucination. Sanity subset.",
+      "status": "NO_SURFACE"
+    }
+  ]
+}
