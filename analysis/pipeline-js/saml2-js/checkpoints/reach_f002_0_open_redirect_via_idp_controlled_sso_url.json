@@ -1,0 +1,7 @@
+{
+  "gate_breachable": true,
+  "gate_type": "no gate — default config",
+  "adjusted_severity": "medium",
+  "reasoning": "Both `create_logout_request_url` and `create_logout_response_url` are methods on `ServiceProvider`, which is exported via `module.exports.ServiceProvider`. `IdentityProvider` is also exported via `module.exports.IdentityProvider`. The `IdentityProvider` constructor stores `options.sso_logout_url` verbatim with no validation (line 935) — no scheme allowlist, no regex guard, no joi/zod/ajv schema. Both vulnerable methods are public prototype methods on the exported `ServiceProvider` class, directly callable by any consumer. No non-default option is required to trigger the vulnerable path; the code unconditionally calls `url.parse(identity_provider.sso_logout_url, true)` and returns `url.format(uri)` as the redirect destination. In multi-tenant deployments where tenants supply their own IdP metadata (a normal SAML use-case), a tenant can set `sso_logout_url` to an arbitrary URL (e.g., `https://evil.com`) and cause the application to redirect users there. The gate is entirely absent at the library level — any input validation must be supplied by the application, and the library provides no guardrails. Severity remains medium because exploitation requires attacker control over IdP configuration, which is typical in multi-tenant SaaS but not universal.",
+  "_done": true
+}
