@@ -1,0 +1,18 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "save() / line 24 (save.php, referenced from admin.php form action)",
+      "severity": "low",
+      "reachability": "Authenticated administrator-level users only (ADS_TXT_MANAGE_CAPABILITY = edit_ads_txt, assigned only to administrator role). Requires a valid nonce.",
+      "justification": "save.php line 24 casts the POST field `post_id` to int and passes it as `'ID'` to `wp_insert_post()` without verifying the caller owns or should be allowed to mutate that specific post. Any post ID in the DB can be submitted, causing wp_insert_post to overwrite that post's content and change its post_type to 'adstxt'. Since the capability is administrator-only, this is within WordPress's admin-trusted model, but the intent is to only mutate the plugin's own adstxt/app-adstxt posts.",
+      "detection_pattern": {
+        "grep_pattern": "post_id.*=.*\\(int\\).*_POST|\\$postarr.*'ID'.*\\$post_id",
+        "anti_pattern": "get_post\\(.*post_id\\)|post_type.*adstxt.*post_id|current_user_can.*edit_post.*post_id",
+        "section_name": "Unverified post_id in wp_insert_post",
+        "description": "Catches handlers that cast a user-supplied POST field to int and use it as the WP post ID in wp_insert_post without verifying the caller has edit access to that specific post. An attacker with sufficient capability can overwrite arbitrary posts."
+      }
+    }
+  ]
+}
