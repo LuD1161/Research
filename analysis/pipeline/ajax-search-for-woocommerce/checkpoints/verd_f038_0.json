@@ -1,0 +1,6 @@
+{
+  "is_real": true,
+  "severity": "low",
+  "reasoning": "The code pattern exists exactly as described. Line 65 of set_search_post_ids_from_ajax() assigns $phrase = $_POST['pf_filters'][$_POST['pf_id']]['s'] with no upstream sanitize_text_field, wp_unslash, or strip_tags. The handler is reachable unauthenticated via wp_ajax_nopriv_prdctfltr_respond_550 (line 38) with no nonce or capability check (phpcs:disable at line 56 confirms intentional omission). However, downstream sanitization fully covers the value: Helpers::searchProducts($phrase) calls DGWT_WCAS()->nativeSearch->getSearchResults($phrase, true, 'product-ids'), and at Search.php line 175, because $return=true, the code unconditionally applies $keyword = sanitize_text_field($phrase) before any database query. The final result stored in $this->post_ids is integer IDs extracted by wp_list_pluck($results['suggestions'], 'ID'), so no XSS, SQLi, or other injection is possible through this path. The finding is real as a defense-in-depth / code quality concern (missing upstream sanitization that relies on downstream callers remaining correct), but the original 'medium' severity overstates the risk because exploitation requires circumventing downstream sanitization that is hardcoded in getSearchResults(). Severity is better classified as low/informational.",
+  "_done": true
+}
