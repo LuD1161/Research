@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "regex_logic_flaw",
+      "location": "cpel_flag_code(), preg_match line",
+      "severity": "low",
+      "reachability": "The function is called internally whenever a language switcher renders flag images; no direct user trigger required, but the input ($flag_url) originates from Polylang's own stored flag URLs.",
+      "justification": "The regex /polylang\\/flags\\/(\\w+).(?:jpg|png|svg)$/i has an unescaped dot before the extension alternation group, so it matches any character in that position (e.g. 'en_jpg' or 'enXpng') instead of only a literal dot — this is a correctness flaw but has negligible security impact because (a) the captured group is still restricted to \\w+ and (b) the URL source is Polylang's own internal data.",
+      "detection_pattern": {
+        "grep_pattern": "preg_match\\(.*\\/[^'\"]*[^\\\\]\\.\\(\\?:",
+        "anti_pattern": "preg_match\\(.*\\/[^'\"]*\\\\\\.\\.+",
+        "section_name": "Regex: unescaped dot before extension alternation",
+        "description": "Catches regex literals where a dot immediately preceding a non-capturing extension group (?:jpg|png|svg) is not backslash-escaped, making it a wildcard instead of a literal dot; the anti-pattern checks for the properly escaped version."
+      }
+    },
+    {
+      "vuln_class": "missing_input_validation_in_public_function",
+      "location": "cpel_flag_svg(), $flag_path construction",
+      "severity": "low",
+      "reachability": "cpel_flag_svg() is a public PHP function; all internal callers pass $flag_code pre-filtered through cpel_flag_code() (\\w+ restriction), but external/third-party code calling the function directly with unsanitized input could pass path-traversal sequences.",
+      "justification": "The function builds $flag_path = \"/assets/flags/$flag_code.svg\" and passes CPEL_DIR . $flag_path to file_exists() without validating $flag_code internally; a caller supplying '../../../wp-config' would cause file_exists() to check an arbitrary path outside the plugin directory — limited to existence oracle, not read/execute, and current callers are safe, but no defense-in-depth guard exists inside the function.",
+      "detection_pattern": {
+        "grep_pattern": "file_exists\\(\\s*\\$[A-Z_]+\\s*\\.\\s*\\$[a-z_]+",
+        "anti_pattern": "sanitize_file_name|sanitize_key|preg_replace.*flag|basename\\(\\s*\\$flag",
+        "section_name": "Path traversal: unvalidated variable in filesystem path",
+        "description": "Detects file_exists() (or similar filesystem calls) where a plugin constant is concatenated with an unsanitized variable; the anti-pattern checks for sanitization functions applied to the variable before the filesystem call."
+      }
+    },
+    {
+      "vuln_class": "repeated_file_include_in_function",
+      "location": "cpel_flag_emoji(), include __DIR__ . '/util/emojis.php'",
+      "severity": "low",
+      "reachability": "Triggered every time cpel_flag_emoji() is called, which happens on every Elementor editor panel render for each language; PHP opcode cache mitigates performance but the redundant include is a code-quality issue.",
+      "justification": "The emojis.php file is included on every invocation of cpel_flag_emoji() rather than being cached or loaded once; __DIR__ is hardcoded so there is no LFI risk, but the pattern of include inside a frequently-called function is an unintentional resource amplification that can be exploited if the include path were ever made configurable.",
+      "detection_pattern": {
+        "grep_pattern": "function \\w+\\([^)]*\\)\\s*\\{[^}]*\\binclude\\b",
+        "anti_pattern": "static\\s+\\$|\\bonce\\b",
+        "section_name": "Resource amplification: file include inside function body without static cache",
+        "description": "Catches PHP functions that contain a bare include/require statement without a static variable guard; each call re-reads and re-evaluates the file. Anti-pattern checks for include_once or static caching of the result."
+      }
+    }
+  ]
+}
