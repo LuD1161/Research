@@ -1,55 +1,55 @@
-# ultimate-member 2.12.0 — end-to-end value run (harness findings)
+# ultimate-member 2.12.0 — final validated findings
 
-Harness: per-file **Sonnet 4.6** discovery + access-control/SQLi lenses + adversarial
-verify (refute-by-default). 93 attack-surface files, 138 agents, ~5.38M subagent tokens.
-Run: `analysis/experiments/um_value/raw/w80qbnmp4_result.json`. Date: 2026-06-16.
+Harness: per-file **Sonnet 4.6** discovery + access-control/SQLi lenses + adversarial verify
+(refute-by-default). 93 attack-surface files, 138 agents, ~5.38M subagent tokens.
+Raw run: `analysis/experiments/um_value/raw/w80qbnmp4_result.json`.
+Live validation: local Docker WP 6 / UM 2.12.0 @ `localhost:8880`. Date: 2026-06-16.
 
-## Headline numbers (and a harness caveat)
-- **45 raw findings → 35 "confirmed" → ~13 DISTINCT bugs.**
-- The 35→13 gap is a measurement artifact, not 35 bugs: (a) overlapping batches reviewed
-  the same file twice, (b) the same bug was tagged under multiple classes
-  (`class-files.php` upload appears 13× across authz / csrf / auth-bypass). **Lesson:
-  dedup must key on (file, root-cause), and "confirmed_count" is not "bug count."**
+## Funnel
+**45 raw → 35 "confirmed" (harness) → 13 distinct → live-validated below.**
+- 35→13: overlapping batches + same bug multi-tagged (the upload bug alone counted 13×).
+- 13→reality: live validation + nonce/default-config analysis. **Net result: 0 medium-or-above
+  bugs exploitable at DEFAULT config. The medium/high ones the harness reported are all
+  gated by a nonce non-admins can't obtain, or by an admin-config option that is empty by
+  default.** A few real LOW default bugs remain.
 
-## Distinct findings (deduped)
+## Final list (validated)
 
-| # | File | Class | Sev | Auth (verifier) | Status |
-|---|------|-------|-----|-----------------|--------|
-| 1 | `includes/admin/core/class-admin-settings.php` `same_page_update_ajax()` | Broken access control / priv-esc | ~~HIGH~~ → **config-cond. LOW/MED** | **LIVE-VALIDATED**: subscriber+editor both blocked from wp-admin at default → cannot get `um-admin-nonce`; attack → `Wrong Nonce`. Real-but-not-default-exploitable | see `validation.md` |
-| 2 | `includes/core/class-files.php` upload (`wp_ajax_nopriv_*`) | Unauth file upload / missing nonce | MED | unauthenticated | needs live validation |
-| 3 | `includes/core/class-member-directory.php` `default_filter_settings` AJAX | Broken access control | MED | any logged-in | candidate |
-| 4 | `includes/admin/core/class-admin-notices.php` `dismiss_notice` | Missing cap on AJAX | MED | any logged-in | candidate |
-| 5 | `includes/core/class-actions-listener.php` default action path | Missing nonce (CSRF-ish) | MED | any logged-in | candidate |
-| 6 | `includes/core/class-logout.php` | CSRF logout | MED | n/a (anon victim) | low impact |
-| 7 | `includes/admin/core/class-admin-settings.php` IN()-clause | 2nd-order SQLi via `implode()` | LOW | (gated by #1) | refuted as non-injectable by verifier |
-| 8 | `includes/core/class-users.php` sub-admin edit | IDOR (commented-out cap check) | LOW | sub-admin | candidate |
-| 9 | `includes/core/class-form.php` `ajax_select_options` | Usermeta enumeration | LOW | unauth/any | candidate |
-| 10 | `includes/admin/core/class-forms.php` `um_get_icons` | Missing cap | LOW | any logged-in | low impact |
-| 11 | `includes/core/class-query.php` `ajax_paginate` | Missing cap | LOW | any logged-in | low impact |
-| 12 | `includes/core/class-logout.php` / `password-reset.php` | CSRF on pw-reset init | LOW | anon | low impact |
-| 13 | `includes/um-short-functions.php` | IP blocklist bypass via `HTTP_CLIENT_IP` spoof | LOW | anon | candidate |
+| # | File / handler | Class | Real in code? | Default-exploitable? | Final severity | Evidence |
+|---|---|---|---|---|---|---|
+| 1 | `class-admin-settings.php` `same_page_update_ajax` | Missing cap / priv-esc | ✅ | ❌ | **config-cond. LOW/MED** | **CURL-PROVEN**: subscriber+editor 302-blocked from wp-admin → never get `um-admin-nonce` → attack = `Wrong Nonce` (`validation.md`) |
+| 2 | `class-files.php` `ajax_image_upload`/`ajax_file_upload` (nopriv) | Unauth upload, nonce-skip | by-design | ❌ | config-cond. | nonce-skip for unauth is intentional (registration); needs a reg form w/ uploader field (none by default) + a MIME bypass (not shown) |
+| 3 | `class-member-directory.php` `default_filter_settings` | Missing cap | ✅ | ❌ | config-cond. MED | uses `UM()->admin()->check_ajax_nonce()` = `um-admin-nonce` → same refutation as #1 |
+| 4 | `class-admin-notices.php` `dismiss_notice` | Missing cap | ✅ | ❌ | config-cond. LOW | `um-admin-nonce` gated; impact = hide an admin notice |
+| 5 | `class-actions-listener.php` default action path | Missing nonce → `do_action` | partial | reachable | **LOW** (extension-cond.) | frontend nonce reachable; fires `um_action_user_request_hook` — no core sink |
+| 6 | `class-logout.php` `logout_page` | CSRF logout | ✅ | ✅ | **real LOW** | code: GET on `template_redirect`, `wp_logout()`, no nonce (couldn't curl — logout page not provisioned on this install) |
+| 7 | `class-admin-settings.php` IN()-clause | 2nd-order SQLi | ❌ | — | **REFUTED** | `prepare()` on pagination; IN() built from option array, not attacker-controlled |
+| 8 | `class-users.php` bulk-action | IDOR (commented-out cap) | ✅ | ❌ | config-cond. LOW | WP `users.php` bulk action → needs wp-admin access + cap; same gating as #1 |
+| 9 | `class-form.php` `ajax_select_options` (nopriv) | Unauth usermeta enum | ✅ | ❌ | config-cond. MED | **CURL-PROVEN**: anon nonce accepted, but `allowed_choice_callbacks` empty by default → `"not possible for security reasons"`; query unreachable |
+| 10 | `class-forms.php` `um_get_icons` | Missing cap | ✅ | ❌ | config-cond. LOW | `um-admin-nonce` gated; impact = read icon list |
+| 11 | `class-query.php` `ajax_paginate` | Missing cap | ✅ | ✅ (frontend nonce) | **real LOW** | `UM()->check_ajax_nonce()` = frontend nonce (anon-obtainable); fires `um_ajax_load_posts__*` — low impact |
+| 12 | `password-reset.php` init | CSRF | ✅ | ✅ | **real LOW** | no `wp_nonce_field`, only honeypot; triggers reset email (annoyance) |
+| 13 | `um-short-functions.php` `um_user_ip` | IP blocklist bypass | ✅ | conditional | **LOW** | trusts `HTTP_CLIENT_IP` header; only matters if the IP-blocklist feature is enabled |
 
-⚠ = top exploitation candidate.
+## Bottom line
+- **0** critical/high default-config vulns. The one HIGH the harness reported (#1) is
+  **curl-disproven** for default installs.
+- **Real LOW default bugs:** #6 logout CSRF, #11 ajax_paginate, #12 pw-reset CSRF
+  (#13 conditional). All low impact — worth a defense-in-depth fix, not a security alert.
+- **6 config-conditional** (#1,#3,#4,#8,#9,#10): become MED if an admin loosens default
+  config (grants a role wp-admin access, or populates `allowed_choice_callbacks`). The fixes
+  (add `current_user_can`) are still correct; the *severity* is not what source-review said.
+- **1 refuted** (#7). **1 by-design** (#2).
 
-## The #1 finding (privilege escalation) — why live validation is decisive
-`wp_ajax_um_same_page_update` (registered in `class-admin-ajax-hooks.php:32`, **no
-`nopriv` variant**) dispatches `same_page_update_ajax()` which runs only
-`check_ajax_nonce()` (`um-admin-nonce`) — **no `current_user_can()`**. Reachable sinks:
-`update_option('um_usermeta_fields', …)`, a bulk `INSERT INTO {prefix}um_metadata`, and
-`do_action('um_same_page_update_ajax_action', $cb_func)` with an attacker-controlled key.
+## The thesis result
+The harness's discovery + adversarial-verify both **inherited a shared false premise** —
+"a low-priv user can obtain the gating nonce / the gating config is permissive." Every
+medium+ finding rested on it. Source-review (even refute-by-default) could not break it;
+**one curl per finding did.** This is the precise argument for validation-first:
+reasoning-confirmed ≠ exploitable. Default-config reachability must be a *measured* fact,
+not an inferred one. (Mirrors the WooCommerce-latest "0 confirmed = credible" outcome —
+recent, well-hardened plugins survive a good harness, and that's the honest signal.)
 
-**The entire severity hinges on one empirical question the verifiers could not agree on
-from source alone:** can a *subscriber* obtain `um-admin-nonce`? The nonce is localized
-on `admin_enqueue_scripts` (`class-enqueue.php:501`), which only fires on a wp-admin page
-load; `um_block_wpadmin_by_user_role()` may redirect subscribers away from wp-admin (but
-exempts `DOING_AJAX`). 4 agents assumed the nonce is reachable (→ HIGH, subscriber); 3
-argued only `can_access_wpadmin` roles get it (→ MED, editor/shop-manager).
-
-→ **Resolution = one curl as the `lowpriv` subscriber against `localhost:8880`.** This is
-exactly the case where source-review splits and a live PoC is the only arbiter. Tracked in
-`analysis/experiments/um_value/validation.md`.
-
-## Novelty / dedup vs known CVEs (to verify against OSV/WPScan)
-UM has prior upload + privilege CVEs; #1 (`um_same_page_update`) and #2 (nopriv upload)
-must be checked against the known set — an *incomplete-patch bypass* of a fixed CVE is
-still novel and in-scope. Pending.
+## Novelty
+No new CVE-worthy default-config bug surfaced. The config-conditional missing-cap items are
+hardening gaps worth reporting upstream as defense-in-depth, not as exploitable CVEs.
