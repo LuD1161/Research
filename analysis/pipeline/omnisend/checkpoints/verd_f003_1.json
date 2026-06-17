@@ -1,0 +1,6 @@
+{
+  "is_real": true,
+  "severity": "high",
+  "reasoning": "All three links in the chain are confirmed by the source code. (1) resolve_wordpress_settings() lines 57-58 assigns $data['exploreOmnisendLink'] (raw JSON from the remote API) directly to self::$landing_page_url with no sanitization. (2) landing-page.html lines 20 and 100 echo Omnisend\\Internal\\Connection::$landing_page_url bare inside href attributes — no esc_url(), no esc_attr(). A javascript: URI or attribute-breaking payload lands verbatim in the rendered HTML. (3) display() enforces manage_options (admin-only gate) then unconditionally calls resolve_wordpress_settings() before requiring the template, so the mutation always precedes the sink on the landing-page code path. The get_signup_url() domain-allowlist guard (naked_domain === 'omnisend.com') is NOT applied here — it is only used for the signup_url path. Threat model: requires Omnisend's own API to return a malicious value (supply-chain) or a TLS-breaking MitM; plain network interception is not feasible. This raises exploitability bar but does not eliminate the defect. The fix is to wrap both echo sites with esc_url().",
+  "_done": true
+}
