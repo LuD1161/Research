@@ -1,0 +1,157 @@
+{
+  "summary": "Router-driven durable discovery + adversarial verify + reachability verify",
+  "agentCount": 23,
+  "logs": [
+    "manifest: 15 files at tier>=1 (MANIFEST=/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review/analysis/pipeline/ajax-search-for-woocommerce/manifest.json)",
+    "[disc:f022] failed: API Error: [SSL: SSLV3_ALERT_BAD_RECORD_MAC] sslv3 alert bad record mac (_ssl.c:2546)",
+    "[disc:f038] failed: API Error: [SSL: SSLV3_ALERT_BAD_RECORD_MAC] sslv3 alert bad record mac (_ssl.c:2546)",
+    "[disc:f033] failed: API Error: [SSL: SSLV3_ALERT_BAD_RECORD_MAC] sslv3 alert bad record mac (_ssl.c:2546)",
+    "[disc:f037] failed: API Error: [SSL: SSLV3_ALERT_BAD_RECORD_MAC] sslv3 alert bad record mac (_ssl.c:2546)",
+    "[disc:f035] failed: API Error: Server is temporarily limiting requests (not your usage limit) · {\"detail\":\"Rate limited. Retry after 0.3s\"}",
+    "[disc:f046] failed: API Error: Server is temporarily limiting requests (not your usage limit) · {\"detail\":\"Rate limited. Retry after 0.3s\"}",
+    "[disc:f007] failed: API Error: Server is temporarily limiting requests (not your usage limit) · {\"detail\":\"Rate limited. Retry after 0.2s\"}",
+    "[disc:f017] failed: API Error: Server is temporarily limiting requests (not your usage limit) · {\"detail\":\"Rate limited. Retry after 0.1s\"}",
+    "[disc:f023] failed: API Error: Server is temporarily limiting requests (not your usage limit) · {\"detail\":\"Rate limited. Retry after 0.1s\"}",
+    "[disc:f040] failed: API Error: Server is temporarily limiting requests (not your usage limit) · {\"detail\":\"Rate limited. Retry after 0.0s\"}",
+    "[disc:f013] failed: API Error: Server is temporarily limiting requests (not your usage limit) · {\"detail\":\"Rate limited. Retry after 0.1s\"}",
+    "discover a0 w0: files=14 failed=0",
+    "[disc:f050] failed: API Error: Server is temporarily limiting requests (not your usage limit) · {\"detail\":\"Rate limited. Retry after 0.2s\"}",
+    "[sync:disc-a0w1] failed: API Error: Server is temporarily limiting requests (not your usage limit) · {\"detail\":\"Rate limited. Retry after 0.2s\"}",
+    "discover a0 w1: files=15 failed=0",
+    "verifying 5 raw findings",
+    "[verd:f021.1] failed: API Error: Server is temporarily limiting requests (not your usage limit) · {\"detail\":\"Rate limited. Retry after 0.1s\"}",
+    "[verd:f021.2] failed: API Error: Server is temporarily limiting requests (not your usage limit) · {\"detail\":\"Rate limited. Retry after 0.1s\"}",
+    "[verd:f034.0] failed: API Error: Server is temporarily limiting requests (not your usage limit) · {\"detail\":\"Rate limited. Retry after 0.1s\"}",
+    "[verd:f021.0] failed: API Error: Server is temporarily limiting requests (not your usage limit) · {\"detail\":\"Rate limited. Retry after 0.1s\"}",
+    "[verd:f034.1] failed: API Error: Server is temporarily limiting requests (not your usage limit) · {\"detail\":\"Rate limited. Retry after 0.1s\"}",
+    "[sync:verd-a0w0] failed: API Error: Server is temporarily limiting requests (not your usage limit) · {\"detail\":\"Rate limited. Retry after 0.1s\"}",
+    "verify a0 w0: done=5 failed=0",
+    "reachability check: 0 of 0 confirmed findings qualify",
+    "reachability: 0 findings downgraded, 0 unchanged"
+  ],
+  "result": {
+    "run": "ajax-search-for-woocommerce",
+    "plugin": "/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review/analysis/pipeline/ajax-search-for-woocommerce/manifest.json",
+    "files_reviewed": 15,
+    "raw_findings": 5,
+    "confirmed_count": 0,
+    "confirmed": [],
+    "all_with_verdicts": [
+      {
+        "id": "f021",
+        "rel": "includes/Engines/WordPressNative/DetailsBox.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Engines/WordPressNative/DetailsBox.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "missing_csrf_protection",
+          "location": "getResultDetails() — line 29-103, registered at lines 18/20-21",
+          "severity": "low",
+          "reachability": "Any unauthenticated visitor on the internet; registered via wp_ajax_nopriv_ (and wc_ajax_ which is also public/unauthenticated). The phpcs:ignore comment at line 35 explicitly suppresses the nonce-check warning, confirming intentional omission.",
+          "justification": "getResultDetails() reads $_POST['items'] with no nonce or referer verification whatsoever; a cross-origin request can be forged to make any logged-in user's browser query product/taxonomy detail HTML on their behalf, leaking whatever canUserSee() would permit for that user's session — a read-only CSRF whose value is limited but not zero (e.g., probing whether a private product exists for an admin user).",
+          "detection_pattern": {
+            "grep_pattern": "wp_ajax_nopriv_",
+            "anti_pattern": "check_ajax_referer|wp_verify_nonce",
+            "section_name": "CSRF: public AJAX handler without nonce",
+            "description": "Finds wp_ajax_nopriv_ registrations (publicly callable AJAX handlers) and flags those whose corresponding callback does not contain a nonce verification call. Even read-only handlers can leak data via CSRF if the response differs by auth context."
+          }
+        },
+        "verdict": null
+      },
+      {
+        "id": "f021",
+        "rel": "includes/Engines/WordPressNative/DetailsBox.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Engines/WordPressNative/DetailsBox.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "unescaped_filter_output_in_html",
+          "location": "getTaxonomyDetails() — lines 207-223",
+          "severity": "low",
+          "reachability": "Requires a third-party plugin or theme that hooks the filter dgwt/wcas/suggestion_details/taxonomy/headline; not reachable by an unauthenticated attacker in a default installation.",
+          "justification": "$title is assembled with safe HTML strings (esc_html applied to $termName at line 211) and then passed through apply_filters() at lines 213-219, after which the full $title string is echo'd without any escaping at line 223. Any plugin hooking dgwt/wcas/suggestion_details/taxonomy/headline and returning malicious HTML would have it injected verbatim into the response; the risk is low because filter hooks require server-level access, but the pattern breaks the contract that caller-owned HTML should be escaped at the final output point.",
+          "detection_pattern": {
+            "grep_pattern": "echo.*apply_filters",
+            "anti_pattern": "esc_html|esc_attr|esc_url|wp_kses",
+            "section_name": "XSS: unescaped apply_filters output echoed",
+            "description": "Catches direct echo of apply_filters() return values without an escaping wrapper. Filter hooks can be registered by any installed plugin, so unescaped filter output is a latent stored-XSS vector whenever the filter return value is not already trusted HTML."
+          }
+        },
+        "verdict": null
+      },
+      {
+        "id": "f021",
+        "rel": "includes/Engines/WordPressNative/DetailsBox.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Engines/WordPressNative/DetailsBox.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "missing_content_type_header",
+          "location": "getResultDetails() — line 101",
+          "severity": "low",
+          "reachability": "Any caller of the public AJAX endpoint.",
+          "justification": "The handler uses echo json_encode(...) instead of wp_send_json() or wp_send_json_success(); WordPress's wp_send_json() calls wp_die() with the correct application/json Content-Type, while the raw echo leaves the response with the default text/html Content-Type. Browsers may MIME-sniff the JSON response as HTML in legacy modes, potentially executing embedded script fragments injected via the dgwt/wcas/suggestion_details/output filter.",
+          "detection_pattern": {
+            "grep_pattern": "echo json_encode",
+            "anti_pattern": "wp_send_json|header.*application/json",
+            "section_name": "Missing Content-Type: JSON response sent as text/html",
+            "description": "Finds AJAX handlers that build a JSON response with echo json_encode() instead of wp_send_json(). Without an explicit Content-Type: application/json header, browsers may MIME-sniff the response and execute embedded HTML/script content."
+          }
+        },
+        "verdict": null
+      },
+      {
+        "id": "f034",
+        "rel": "includes/Integrations/Plugins/WooCommerce/WooCommerce.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Plugins/WooCommerce/WooCommerce.php",
+        "tags": [
+          "sqli"
+        ],
+        "finding": {
+          "vuln_class": "sql_injection_via_unvalidated_filter_output",
+          "location": "filter_price_sql(), line 110",
+          "severity": "medium",
+          "reachability": "Reachable on any product search page when the woocommerce_price_filter_sql filter fires (i.e., when the WC price filter widget is rendered). Exploitation requires a second plugin or theme hooking dgwt/wcas/search_page/result_post_ids and injecting non-integer values, OR a future regression in the upstream populator that lets unsanitized data into the buffer.",
+          "justification": "At line 110, apply_filters('dgwt/wcas/search_page/result_post_ids', []) output is directly implode(','-joined into raw SQL without any integer cast or $wpdb->prepare(): `$sql .= ' AND product_id IN(' . implode( ',', $post_ids ) . ')'`. The filter is a public WordPress hook; any plugin can inject non-integer elements into the returned array, breaking out of the IN() clause.",
+          "detection_pattern": {
+            "grep_pattern": "implode\\(\\s*['\"],\\s*['\"]\\s*,\\s*\\$",
+            "anti_pattern": "array_map\\s*\\(\\s*['\"]intval['\"]|array_map\\s*\\(\\s*['\"]absint['\"]|\\$wpdb->prepare",
+            "section_name": "SQL Injection: implode() array into IN() clause without integer cast",
+            "description": "Catches any place where a PHP array is joined with commas directly into a SQL fragment via implode(). Without array_map('intval', ...) or $wpdb->prepare(), if any element is non-integer (e.g., injected via a WordPress filter), SQL injection is possible. Files matching the grep pattern but lacking integer-cast or prepare() in close proximity are suspicious."
+          }
+        },
+        "verdict": null
+      },
+      {
+        "id": "f034",
+        "rel": "includes/Integrations/Plugins/WooCommerce/WooCommerce.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/ajax-search-for-woocommerce/includes/Integrations/Plugins/WooCommerce/WooCommerce.php",
+        "tags": [
+          "sqli"
+        ],
+        "finding": {
+          "vuln_class": "sql_injection_via_unvalidated_filter_output",
+          "location": "filter_counts_query(), line 153",
+          "severity": "medium",
+          "reachability": "Reachable on any product search page when the woocommerce_get_filtered_term_product_counts_query filter fires (i.e., layered nav / attribute filters active). Same second-plugin precondition as the price-filter finding.",
+          "justification": "At line 153, the same pattern recurs in filter_counts_query(): `$query['where'] .= \" AND $wpdb->posts.ID IN(\" . implode( ',', $post_ids ) . ')'`. The $post_ids array comes from the untyped public filter dgwt/wcas/search_page/result_post_ids with no integer validation, allowing SQL injection if any hook returns non-integer elements.",
+          "detection_pattern": {
+            "grep_pattern": "\\$query\\[.where.\\].*\\.=.*implode",
+            "anti_pattern": "array_map\\s*\\(\\s*['\"]intval['\"]|array_map\\s*\\(\\s*['\"]absint['\"]|\\$wpdb->prepare",
+            "section_name": "SQL Injection: unguarded concatenation into SQL WHERE clause via implode",
+            "description": "Catches direct string concatenation into a SQL where clause using implode() on an array, without integer sanitization. Common pattern in WooCommerce filter integration code where post ID arrays flow through WordPress hooks and are then embedded in raw SQL."
+          }
+        },
+        "verdict": null
+      }
+    ],
+    "reachability_applied": 0,
+    "reachability_downgraded": 0
+  }
+}
