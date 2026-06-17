@@ -1,0 +1,7 @@
+{
+  "gate_breachable": true,
+  "gate_type": "no gate — default config",
+  "adjusted_severity": "high",
+  "reasoning": "The vulnerable code path is directly reachable with zero configuration. The exported default function (line 55: export default (ip) => {...}) is the library's primary public API — any consumer can call it directly. No non-default options are required; the function accepts only a single ip string and the ipv6_check(ip) call at line 61 is reached unconditionally whenever ipaddr.js parses the input as IPv6. ipaddr.js accepts mixed-case IPv6 strings (e.g., ::FFFF:127.0.0.1) as valid and returns kind() === 'ipv6', but the raw un-normalized string is passed to ipv6_check() without any case normalization. By contrast, the IPv4 path (line 59) correctly uses parsed.toNormalizedString() before calling ipv4_check() — this inconsistency is the root of the bypass. The regexes on lines 43 (::ffff: mapped), 45 (64:ff9b:: NAT64), and 49 (2001:db8:: documentation) have no /i flag and only match lowercase; uppercase variants such as ::FFFF:127.0.0.1, 64:FF9B::192.168.1.1, and 2001:DB8::1 pass through all 13 regexes undetected and the function returns false (not private) instead of true. The parameter is user-controlled in the library's primary real-world use case: SSRF-protection middleware that passes attacker-supplied IP/hostname strings to this function to decide whether to block the request. No schema validation, allowlist, or type-coercion guards the input before the sink. The bypass is unconditional at default configuration.",
+  "_done": true
+}
