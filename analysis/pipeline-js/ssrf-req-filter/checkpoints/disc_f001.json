@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "ssrf_filter_bypass_via_lookup_error_path",
+      "location": "requestFilterHandler > socket.on('lookup') callback, line 35",
+      "severity": "medium",
+      "reachability": "Reachable by any caller using the patched agent for hostname-based HTTP/HTTPS requests where DNS resolution fails or returns an error alongside an address (edge-case Node.js behavior).",
+      "justification": "The lookup event handler uses `if (error || checkIp(address)) { return false; }` — when `error` is truthy, the short-circuit OR skips the IP check and returns `false` WITHOUT calling `socket.destroy()`. If a non-standard runtime or future Node.js version emits the lookup event with both `error` and a resolved `address` (e.g., partial DNS failure with a result), the private address is never checked and the socket is not destroyed, allowing an SSRF to private infrastructure. Node.js currently aborts the TCP connect on DNS error regardless, but this relies on undocumented runtime behavior rather than explicit code-level enforcement.",
+      "detection_pattern": {
+        "grep_pattern": "socket\\.on\\(['\"]lookup['\"].*error.*\\|\\|",
+        "anti_pattern": "if\\s*\\(error\\)\\s*\\{[^}]*socket\\.destroy",
+        "section_name": "SSRF: lookup event error path missing socket.destroy",
+        "description": "Catches socket 'lookup' event handlers that use short-circuit OR (`error || condition`) instead of explicitly destroying the socket on DNS error. The correct pattern is to always call socket.destroy(error) when error is truthy, rather than relying on the runtime to abort the connection."
+      }
+    },
+    {
+      "vuln_class": "ssrf_filter_bypass_hostname_pre_check_reliance_on_lookup_event",
+      "location": "requestFilterHandler > agent.createConnection override, lines 28-41",
+      "severity": "low",
+      "reachability": "Reachable by any caller who provides a hostname (non-IP) as the request host. The entire SSRF protection for hostname-based requests depends exclusively on the 'lookup' event being emitted.",
+      "justification": "The pre-connection check at line 30 calls `checkIp(options.host)`. For any non-IP string (hostnames like 'internal.corp'), `ipaddr.isValid()` returns false, so `checkIp` returns `true` (ALLOW) and the pre-check is silently bypassed. Protection relies entirely on the 'lookup' event firing after DNS resolution. In environments using custom net.Socket implementations, mocked sockets, or certain Unix-domain-socket usages where `options.host` is undefined/absent, the lookup event may not fire, leaving the filter ineffective with no fallback.",
+      "detection_pattern": {
+        "grep_pattern": "createConnection.*options.*host.*checkIp|isValid.*host.*return true",
+        "anti_pattern": "if\\s*\\(!options\\.host\\).*socket\\.destroy|throw.*blocked.*unix",
+        "section_name": "SSRF: pre-check allows non-IP host strings through",
+        "description": "Catches SSRF filter implementations where the pre-connection check unconditionally allows non-IP host values (because IP validation returns false for hostnames), making the filter entirely dependent on a post-DNS 'lookup' event. If the lookup event is not emitted, there is no SSRF protection."
+      }
+    },
+    {
+      "vuln_class": "ssrf_filter_bypass_unix_socket_no_host",
+      "location": "requestFilterHandler > agent.createConnection override, line 29-31",
+      "severity": "low",
+      "reachability": "Reachable only if the caller uses the patched agent with a Unix-domain socket request (options.path set, options.host absent). Unix socket access already implies local system access, but the filter provides a false sense of protection.",
+      "justification": "At line 29, `const {host: address} = options` destructures `host` from the connection options. For Unix socket connections (where `options.path` is set but `options.host` is undefined), `address` is `undefined`. `ipaddr.isValid(undefined)` returns `false`, so `checkIp(undefined)` returns `true` (ALLOW). No lookup event fires for Unix sockets. The request proceeds to a local Unix socket (e.g., `/var/run/docker.sock`) without any SSRF check, silently bypassing the filter.",
+      "detection_pattern": {
+        "grep_pattern": "options\\.host.*checkIp|const.*host.*=.*options",
+        "anti_pattern": "options\\.path.*destroy|socketPath.*blocked|!options\\.host.*throw",
+        "section_name": "SSRF: Unix socket bypass via undefined host",
+        "description": "Catches SSRF filter implementations that only check `options.host` in the createConnection override and do not handle the case where `options.host` is undefined (Unix domain socket connections via `options.path`). An undefined host causes IP validation to return false, which most filters interpret as 'not an IP, allow through', bypassing protection entirely for Unix socket connections."
+      }
+    }
+  ]
+}
