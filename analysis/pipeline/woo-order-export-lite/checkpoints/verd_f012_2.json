@@ -1,0 +1,6 @@
+{
+  "is_real": false,
+  "severity": "false_positive",
+  "reasoning": "The finding claims unauthenticated parties can replay the nonce-free redirect URL to download bulk export files. This is false. The sole dispatcher ajax_gate() (class-wc-order-export-admin.php line 512-566) checks current_user_can('view_woocommerce_reports') OR current_user_can(cap_export_orders) at line 514 before any routing occurs. Unauthenticated users have no capabilities; the request dies at line 514-516 with 'You can not do it'. WordPress admin-ajax.php does execute for unauthenticated users generically, but ajax_gate() kills the request immediately. The real vulnerability is CSRF (missing nonce for the no-tab branch through ajax_gate): ajax_export_download_bulk_file has no internal nonce check (confirmed by phpcs:ignore comment at line 68 and absence of check_ajax_referer, contrast with ajax_run_one_job which does call check_ajax_referer). However the specific claim of 'unauthenticated' access is wrong — a capability-authenticated session is required. The redirect URL at line 597 is indeed nonce-free, making it CSRF-vulnerable for logged-in users, but not exploitable by unauthenticated parties. The finding's vuln_class of sensitive_data_exposure_unauthenticated does not match the actual exposure model.",
+  "_done": true
+}

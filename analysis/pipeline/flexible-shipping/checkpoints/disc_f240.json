@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "dispatch_label_if_requested(), line 80-94",
+      "severity": "high",
+      "reachability": "Any authenticated WordPress user (subscriber, customer) who can obtain a valid nonce for the action 'flexible_shipping_get_label' can reach this handler via admin-post.php; check_admin_referer() only prevents CSRF, it does not enforce role or capability.",
+      "justification": "The handler calls check_admin_referer() but never calls current_user_can() with any shipping-related capability, so any logged-in user who holds a nonce (e.g. exposed on the page they normally see) can download any shipment label by supplying an arbitrary shipment_id.",
+      "detection_pattern": {
+        "grep_pattern": "add_action\\('admin_post_",
+        "anti_pattern": "current_user_can\\(",
+        "section_name": "Access Control: admin_post_ handler without capability check",
+        "description": "Finds admin_post_ action registrations; files lacking current_user_can() nearby perform privileged actions with only CSRF protection, allowing any authenticated user to trigger them."
+      }
+    },
+    {
+      "vuln_class": "http_header_injection",
+      "location": "dispatch_label_and_die(), line 69",
+      "severity": "medium",
+      "reachability": "Triggered by any authenticated user reaching dispatch_label_if_requested(); exploitable if label_data['file_name'] from the shipment record contains newline characters.",
+      "justification": "header('Content-Disposition: attachment; filename=' . $label_data['file_name']) passes the filename from stored shipment data directly into a header() call without sanitization, quoting, or newline stripping; a stored newline in the filename allows injecting additional HTTP response headers.",
+      "detection_pattern": {
+        "grep_pattern": "header\\(.*filename=.*\\$",
+        "anti_pattern": "basename\\(|sanitize_file_name\\(",
+        "section_name": "Header Injection: unquoted/unsanitized Content-Disposition filename",
+        "description": "Finds header() calls that concatenate a variable into a Content-Disposition filename without basename() or sanitize_file_name(); newlines in the variable enable HTTP response splitting / header injection."
+      }
+    },
+    {
+      "vuln_class": "http_header_injection",
+      "location": "prepare_content_type_from_label_data(), line 37",
+      "severity": "medium",
+      "reachability": "Triggered when label_action=open is set and label_format is not 'html'; exploitable if the stored label_format value in the shipment record contains newline characters.",
+      "justification": "'application/' . $label_data['label_format'] is concatenated directly into a Content-Type header via header() without any validation or newline stripping, enabling HTTP header injection if label_format contains CRLF.",
+      "detection_pattern": {
+        "grep_pattern": "header\\(.*Content-[Tt]ype.*\\$",
+        "anti_pattern": "preg_replace|sanitize_mime_type|str_replace.*\\\\n",
+        "section_name": "Header Injection: unsanitized value in Content-Type header",
+        "description": "Finds header() calls that build a Content-Type value by concatenating a variable; without CRLF stripping or allowlisting the value can inject arbitrary HTTP headers."
+      }
+    },
+    {
+      "vuln_class": "stored_xss",
+      "location": "dispatch_label_and_die(), line 71",
+      "severity": "medium",
+      "reachability": "Reached by any authenticated user with a valid nonce when label_action=open and the shipment's label_format is 'html'; the stored label content is echoed verbatim with Content-Type: text/html.",
+      "justification": "echo $label_data['content'] outputs the raw stored label content with no escaping; when prepare_content_type() returns 'text/html' (label_format === 'html'), the browser renders arbitrary HTML/JS embedded in the label, constituting stored XSS.",
+      "detection_pattern": {
+        "grep_pattern": "echo \\$.*\\[.content.\\]",
+        "anti_pattern": "esc_html\\(|wp_kses\\(",
+        "section_name": "XSS: unescaped echo of stored content field",
+        "description": "Finds echo statements that output a 'content' array element without escaping; when served with a text/html content type this allows stored XSS from attacker-influenced stored data."
+      }
+    }
+  ]
+}

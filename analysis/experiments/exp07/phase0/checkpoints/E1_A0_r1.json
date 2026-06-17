@@ -1,0 +1,41 @@
+{
+  "findings": [
+    {
+      "vuln_class": "xss_via_unescaped_filter_output",
+      "location": "wc_price / lines 645-651",
+      "severity": "medium",
+      "justification": "The `$args['price_format']` value flows directly into sprintf() and then into the returned HTML without escaping; the value is sourced from the `woocommerce_price_format` filter (line 536) and the `wc_price_args` filter (line 596), so a malicious filter callback can inject arbitrary HTML into every rendered price."
+    },
+    {
+      "vuln_class": "xss_via_unescaped_filter_output",
+      "location": "wc_format_sale_price / lines 1360-1377",
+      "severity": "medium",
+      "justification": "When $regular_price or $sale_price are non-numeric strings they are embedded directly into HTML (lines 1360, 1369) without escaping, and the function is callable with caller-supplied raw strings, allowing stored or reflected XSS if an upstream caller passes unsanitized price strings."
+    },
+    {
+      "vuln_class": "xss_via_unescaped_filter_output",
+      "location": "wc_format_price_range / lines 1389-1398",
+      "severity": "medium",
+      "justification": "Non-numeric $from/$to arguments are passed raw into sprintf() inside HTML markup (line 1389) without any escaping, so attacker-controlled price-range strings reach the DOM unfiltered."
+    },
+    {
+      "vuln_class": "open_redirect_or_ssrf_via_insufficient_url_validation",
+      "location": "wc_sanitize_permalink / lines 77-89",
+      "severity": "low",
+      "justification": "After calling esc_url_raw(), the function only strips the literal string 'http://' (line 87) but not 'https://', 'ftp://', 'javascript:', or other schemes, so a value like 'https://evil.com' or '//evil.com' survives as a stored permalink setting and could be used for open-redirect."
+    },
+    {
+      "vuln_class": "information_exposure_via_error_silencing",
+      "location": "wc_string_to_timestamp / lines 741-759",
+      "severity": "low",
+      "justification": "The function temporarily changes the global PHP timezone with date_default_timezone_set() without a try/catch or error guard, and if strtotime() fails it returns false without surfacing an error, which could cause subtle logic bugs when timestamps are later used in financial or scheduling calculations."
+    },
+    {
+      "vuln_class": "regex_injection",
+      "location": "wc_format_postcode / lines 1049-1058",
+      "severity": "low",
+      "justification": "The $country value (e.g. 'CZ' or 'SK') is interpolated unescaped directly into a regex pattern on line 1053 (`\"/^({$country})-?(\\d+)$/\"`); while these specific countries are controlled by the switch case, the pattern would be a regex-injection sink if the switch ever falls through or country validation is relaxed."
+    }
+  ],
+  "_done": true
+}

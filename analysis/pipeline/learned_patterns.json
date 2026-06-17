@@ -1,0 +1,123 @@
+[
+  {
+    "id": "lp_001",
+    "section_name": "CSRF: AJAX dispatch without nonce verification",
+    "grep_pattern": "add_action.*wp_ajax_(nopriv_)?\\w+",
+    "anti_pattern": "check_ajax_referer|wp_verify_nonce|check_admin_referer",
+    "description": "AJAX handler registered — files matching this but lacking nonce verification may have CSRF vulnerabilities",
+    "vuln_class": "csrf_missing_nonce",
+    "source_plugin": "woo-order-export-lite",
+    "source_finding_id": "f005",
+    "added": "2026-06-16"
+  },
+  {
+    "id": "lp_002",
+    "section_name": "HTTP Header Injection via dynamic Content-Disposition",
+    "grep_pattern": "header\\s*\\(.*Content-(Disposition|Type)",
+    "anti_pattern": "sanitize_file_name|rawurlencode|preg_replace",
+    "description": "HTTP header() with Content-Disposition/Type — if filename/type is user-controlled without sanitization, CRLF injection possible",
+    "vuln_class": "http_header_injection",
+    "source_plugin": "woo-order-export-lite",
+    "source_finding_id": "f006",
+    "added": "2026-06-16"
+  },
+  {
+    "id": "lp_003",
+    "section_name": "Path Traversal: file ops on unsanitized paths",
+    "grep_pattern": "file_get_contents|fopen|readfile|include|require",
+    "anti_pattern": "realpath|wp_normalize_path|ABSPATH.*\\..*validate",
+    "description": "File read/include with no realpath() or prefix check — if path comes from user input or stored settings, path traversal possible",
+    "vuln_class": "path_traversal_file_read",
+    "source_plugin": "woo-order-export-lite",
+    "source_finding_id": "f003",
+    "added": "2026-06-16"
+  },
+  {
+    "id": "lp_004",
+    "section_name": "Broken Access Control: admin_action without capability check",
+    "grep_pattern": "add_action.*admin_(post|action)_",
+    "anti_pattern": "current_user_can",
+    "description": "admin-post/admin-action handler without capability check — nonce alone is not authorization",
+    "vuln_class": "broken_access_control",
+    "source_plugin": "advanced-google-recaptcha",
+    "source_finding_id": "f004",
+    "added": "2026-06-16"
+  },
+  {
+    "id": "lp_005",
+    "section_name": "Unauth handler: wp_ajax_nopriv with state mutation",
+    "grep_pattern": "wp_ajax_nopriv_",
+    "anti_pattern": "",
+    "description": "Unauthenticated AJAX handler — any state-changing operation here is exposed to anonymous users. Check what it does.",
+    "vuln_class": "broken_access_control",
+    "source_plugin": "advanced-google-recaptcha",
+    "source_finding_id": "f011",
+    "added": "2026-06-16"
+  },
+  {
+    "id": "lp_006",
+    "section_name": "CSS/Style Injection via unescaped style attributes",
+    "grep_pattern": "style\\s*=.*\\$|wp_add_inline_style.*\\$",
+    "anti_pattern": "esc_attr|sanitize_hex_color|wp_kses",
+    "description": "Dynamic CSS injection via inline styles or wp_add_inline_style with user-controlled values",
+    "vuln_class": "css_injection",
+    "source_plugin": "advanced-google-recaptcha",
+    "source_finding_id": "f001",
+    "added": "2026-06-16"
+  },
+  {
+    "id": "lp_007",
+    "section_name": "URL Parameter Injection in redirects",
+    "grep_pattern": "wp_redirect|wp_safe_redirect|header.*Location",
+    "anti_pattern": "esc_url|wp_validate_redirect",
+    "description": "Redirect with user-controlled URL — without esc_url/wp_validate_redirect, open redirect or parameter injection possible",
+    "vuln_class": "url_parameter_injection",
+    "source_plugin": "advanced-google-recaptcha",
+    "source_finding_id": "f011",
+    "added": "2026-06-16"
+  },
+  {
+    "id": "lp_008",
+    "section_name": "Sensitive Data Exposure: order/user data in exports",
+    "grep_pattern": "WC_Order|get_billing|get_shipping|->get_email|->get_phone",
+    "anti_pattern": "current_user_can.*manage_woocommerce",
+    "description": "WooCommerce order/billing/shipping data access — ensure proper capability gating to prevent unauthorized data export",
+    "vuln_class": "sensitive_data_exposure",
+    "source_plugin": "woo-order-export-lite",
+    "source_finding_id": "f012",
+    "added": "2026-06-16"
+  },
+  {
+    "id": "lp_009",
+    "section_name": "XSS: unescaped apply_filters output echoed",
+    "grep_pattern": "echo.*apply_filters",
+    "anti_pattern": "esc_html|esc_attr|esc_url|wp_kses",
+    "description": "Direct echo of apply_filters() return without escaping — any plugin hooking the filter can inject HTML/script",
+    "vuln_class": "unescaped_filter_output_in_html",
+    "source_plugin": "ajax-search-for-woocommerce",
+    "source_finding_id": "f021",
+    "added": "2026-06-17"
+  },
+  {
+    "id": "lp_010",
+    "section_name": "Missing Content-Type: JSON via echo json_encode",
+    "grep_pattern": "echo json_encode",
+    "anti_pattern": "wp_send_json|header.*application/json",
+    "description": "AJAX handler returns JSON via echo json_encode() instead of wp_send_json() — response served as text/html enables MIME-sniffing XSS",
+    "vuln_class": "missing_content_type_header",
+    "source_plugin": "ajax-search-for-woocommerce",
+    "source_finding_id": "f021",
+    "added": "2026-06-17"
+  },
+  {
+    "id": "lp_011",
+    "section_name": "SQL Injection: implode() array into IN() clause",
+    "grep_pattern": "implode\\(\\s*['\"],\\s*['\"]\\s*,\\s*\\$",
+    "anti_pattern": "array_map.*intval|array_map.*absint|\\$wpdb->prepare",
+    "description": "Array imploded directly into SQL IN() clause without integer cast — if array comes from filter/user input, SQL injection possible",
+    "vuln_class": "sql_injection_via_unvalidated_filter_output",
+    "source_plugin": "ajax-search-for-woocommerce",
+    "source_finding_id": "f034",
+    "added": "2026-06-17"
+  }
+]

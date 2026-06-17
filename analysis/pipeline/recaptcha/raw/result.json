@@ -1,0 +1,894 @@
+{
+  "summary": "Router-driven durable discovery + adversarial verify over a lens-routed manifest",
+  "agentCount": 56,
+  "logs": [
+    "manifest: 15 files at tier>=1 (MANIFEST=/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review/analysis/pipeline/recaptcha/manifest.json)",
+    "discover a0 w0: files=4 failed=0",
+    "discover a0 w1: files=8 failed=0",
+    "discover a0 w2: files=12 failed=0",
+    "discover a0 w3: files=15 failed=0",
+    "verifying 29 raw findings",
+    "verify a0 w0: done=4 failed=0",
+    "verify a0 w1: done=8 failed=0",
+    "verify a0 w2: done=12 failed=0",
+    "verify a0 w3: done=16 failed=0",
+    "verify a0 w4: done=20 failed=0",
+    "verify a0 w5: done=24 failed=0",
+    "verify a0 w6: done=28 failed=0",
+    "verify a0 w7: done=29 failed=0"
+  ],
+  "result": {
+    "run": "recaptcha",
+    "plugin": "/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review/analysis/pipeline/recaptcha/manifest.json",
+    "files_reviewed": 15,
+    "raw_findings": 29,
+    "confirmed_count": 10,
+    "confirmed": [
+      {
+        "id": "f001",
+        "rel": "advanced-google-recaptcha.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/advanced-google-recaptcha.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "stored_xss",
+          "location": "WPCaptcha_Functions::captcha_fields(), libs/functions.php line 597",
+          "severity": "medium",
+          "reachability": "any visitor who reaches a page with the built-in captcha form; the payload is set by an admin via the captcha_challenge_text option",
+          "justification": "The admin-controlled option `captcha_challenge_text` is echoed directly into the public HTML label without any escaping: `$output .= '<p><label ...>' . !empty($options['captcha_challenge_text'])?$options['captcha_challenge_text']:'Are you human?...'`, allowing an admin to store arbitrary HTML/script that executes for every visitor who sees the captcha form."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "Confirmed. The sink at libs/functions.php:597 echoes $options['captcha_challenge_text'] into public HTML with no escaping. The sanitize_settings() callback (setup.php:277-396) never calls sanitize_text_field, wp_kses, or any escaper on captcha_challenge_text — it passes through via array_merge. The esc_html() noted in the analysis JSON (phase2_sources_sinks, line 2393) is located in interface/tab_captcha.php:60 (the admin settings form input), not in the frontend output path. Reachability is correct: captcha_fields_print() echoes the output on every public page with the builtin captcha enabled, so every visitor receives the payload. Auth is admin-only (manage_options), making this admin-stored-XSS — severity medium is appropriate per WordPress security standards."
+        }
+      },
+      {
+        "id": "f001",
+        "rel": "advanced-google-recaptcha.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/advanced-google-recaptcha.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "css_injection",
+          "location": "WPCaptcha_Functions::login_head(), libs/functions.php lines 929 and 962-964",
+          "severity": "low",
+          "reachability": "login page visitors; payload injected by an admin via design_background_image or design_form_background_image options",
+          "justification": "Both `design_background_image` and `design_form_background_image` are output inside CSS `url()` values using `esc_attr()` (e.g., `echo 'body.login {background-image:url(' . esc_attr($options['design_background_image']) . ')...'`), which does not prevent CSS injection; an attacker controlling the option value could break out of the url() context to inject arbitrary CSS rules."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "low",
+          "reasoning": "Partially real. Line 930 (design_background_image with esc_attr()) is a genuine CSS injection sink: esc_attr() leaves ), ;, {, }, and space unencoded, so a value like 'https://x.com/x); color:red; background:url(' survives escaping and breaks out of the CSS url() context to inject arbitrary rules. The sanitize_settings() callback in setup.php never sanitizes design_background_image, so the raw value reaches the sink. Line 963 (design_form_background_image) is NOT vulnerable: esc_url() strips non-URL characters and prevents CSS context escape. The required capability is manage_options (Administrator), enforced by both add_options_page() and WordPress core options.php. Admin-controlled CSS injection is within the WordPress trust boundary; severity is correctly Low. The finding is real but overinclusive — only one of the two claimed sinks is exploitable."
+        }
+      },
+      {
+        "id": "f001",
+        "rel": "advanced-google-recaptcha.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/advanced-google-recaptcha.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "sensitive_data_exposure",
+          "location": "WPCaptcha_AJAX::get_activity_logs(), libs/ajax.php lines 482-486",
+          "severity": "medium",
+          "reachability": "authenticated admin via the Activity tab AJAX call",
+          "justification": "When `log_passwords` is enabled, the `failed_pass` column — which stores actual attempted passwords submitted by users — is returned in the AJAX response and rendered in the admin DataTable, exposing potentially reused credentials to any admin with access to the Activity log view."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "The finding is confirmed real, with one important caveat about scope.\n\n**Auth / reachability (confirmed correct):** The AJAX action `wp_ajax_wpcaptcha_run_tool` (advanced-google-recaptcha.php line 111) is registered only as `wp_ajax_*` (no `wp_ajax_nopriv_*`), so it requires a logged-in WordPress session. Inside `ajax_run_tool()` (ajax.php lines 20-24) a nonce check (`check_ajax_referer('wpcaptcha_run_tool')`) and a `current_user_can('manage_options')` capability check both gate the call before any dispatch. `get_activity_logs()` (ajax.php line 376-382) repeats BOTH checks independently. Access is therefore limited to admins only — the claimed reachability is accurate.\n\n**Sink (confirmed):** When `$options['log_passwords'] == 1`, ajax.php line 485 appends `$aRow->failed_pass` (wrapped only in `htmlspecialchars`, which is an XSS guard, not a disclosure guard) to the JSON response (`aaData`), which is rendered in the admin DataTable. The column is a `varchar(200)` in the DB schema (setup.php line 463).\n\n**Critical caveat — write path in the free plugin:** In the analysed free-plugin source, `incrementFails()` (functions.php lines 112-139) does NOT include `failed_pass` in its `$wpdb->insert()` call, and `wp_authenticate_username_password()` (functions.php lines 204-286) never passes the password to any storage function. In the free version the column will therefore always be empty (''), and the conditional at line 484 will never expose a real password even when `log_passwords` is enabled. The `tab_login_form.php` UI labels the feature as 'PRO' (line 185), strongly indicating password capture is only implemented in the paid version.\n\n**Verdict:** The *read path* (AJAX sink returning `failed_pass`) is real, correctly auth-gated to admins, and constitutes a genuine design-level sensitive-data exposure when the PRO version populates the column. The finding is correctly classified and the severity (medium) is appropriate — the risk is the storage and display of plaintext attempted passwords to any admin with Activity log access. The free-only scope means the column is empty in the analysed build, but the code path that would expose it is present in the free codebase and activated by a PRO feature flag, so the vulnerability class is valid."
+        }
+      },
+      {
+        "id": "f004",
+        "rel": "interface/tab_design.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/interface/tab_design.php",
+        "tags": [
+          "xss",
+          "access_control"
+        ],
+        "finding": {
+          "vuln_class": "broken_access_control",
+          "location": "WPCaptcha_Functions::install_template (libs/functions.php ~line 1317); registered via admin_action_wpcaptcha_install_template (advanced-google-recaptcha.php line 107)",
+          "severity": "medium",
+          "reachability": "Any authenticated WordPress user (subscriber, contributor, editor) who visits wp-admin can trigger admin_action_* hooks. The nonce is created in tab_design.php line 35 and embedded in a URL visible to any user who loads the Design tab, but more critically any logged-in user can craft a request to admin.php?action=wpcaptcha_install_template&template=<id>&_wpnonce=<valid_nonce>.",
+          "justification": "install_template() calls check_admin_referer() for CSRF protection but has no current_user_can() capability check; any authenticated user can overwrite all plugin design settings (merging a chosen template array into options and calling update_option) without needing manage_options or administrator capability."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "Confirmed real. The hook 'admin_action_wpcaptcha_install_template' is registered at advanced-google-recaptcha.php line 107 inside is_admin() (line 88), which is NOT a capability check — it means 'we are in the admin area', not 'the user is an administrator'. WordPress fires admin_action_* hooks for any logged-in user who hits wp-admin/admin.php with the matching action= parameter. The handler WPCaptcha_Functions::install_template() (libs/functions.php ~line 1317) calls only check_admin_referer('wpcaptcha_install_template') and has no current_user_can() guard whatsoever. A subscriber-level user can generate their own valid nonce via wp_create_nonce (nonces are per-user, not per-capability) and submit GET wp-admin/admin.php?action=wpcaptcha_install_template&template=<id>&_wpnonce=<own_nonce>. The CSRF check passes, array_key_exists validates the template ID against get_templates(), then array_merge overwrites all design options and update_option(WPCAPTCHA_OPTIONS_KEY, ...) persists the change. The template parameter is sanitize_key() sanitized and validated against the known template list, so there is no injection risk, but the privilege escalation (any auth user changes plugin settings) is real. The claimed reachability (any authenticated user, subscriber+) is correct. No missed guard was found."
+        }
+      },
+      {
+        "id": "f009",
+        "rel": "libs/admin.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/admin.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "broken_access_control",
+          "location": "install_template() / libs/functions.php:1317, registered via admin_action_wpcaptcha_install_template in advanced-google-recaptcha.php:107",
+          "severity": "medium",
+          "reachability": "Any authenticated WordPress user who is in wp-admin and can obtain or guess the nonce (nonce is only rendered to admins on the Design tab, so practical exploitation is admin-only; however the code itself imposes no capability gate — a subscriber with the nonce could invoke it)",
+          "justification": "install_template() calls check_admin_referer('wpcaptcha_install_template') for CSRF protection but never calls current_user_can(), so the nonce is the only access gate; CSRF protection is not authorization, and any authenticated user who possesses the nonce can overwrite plugin design options via update_option(WPCAPTCHA_OPTIONS_KEY, $options)."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "low",
+          "reasoning": "CONFIRMED REAL but severity downgraded to low. The install_template() function at libs/functions.php:1317 is registered via admin_action_wpcaptcha_install_template (advanced-google-recaptcha.php:107) inside an is_admin() block. The function calls check_admin_referer('wpcaptcha_install_template') but has NO current_user_can() check — confirmed by grep across the entire function. The sibling install_wp301() on line 14 of functions.php DOES have current_user_can('administrator'), proving the developer knew how to add such checks. The sink (update_option(WPCAPTCHA_OPTIONS_KEY, $options)) is reachable with attacker-controlled $template key via sanitize_key($_GET['template']), which selects from a whitelist of built-in templates and merges them into plugin options. The claimed reachability ('any authenticated user with the nonce') is technically correct — the code imposes no capability gate. HOWEVER: the nonce wp_create_nonce('wpcaptcha_install_template') is ONLY generated in interface/tab_design.php:35, which is only rendered by main_page() which has current_user_can('manage_options') at admin.php:278. admin_action_ hooks require the user to be logged in (wp-admin enforces auth_redirect). Therefore practical exploitation requires admin-level access to obtain the nonce from the Design tab UI, making this effectively admin-only. The flaw is a missing capability check (broken access control) — the nonce is CSRF protection, not authorization — but the actual impact is limited: an attacker who already has the nonce (obtained from an admin) can overwrite design-only options (cosmetic settings). No data exfiltration, no code execution, no privilege escalation path. Real finding, but practical impact is low."
+        }
+      },
+      {
+        "id": "f011",
+        "rel": "libs/functions.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/functions.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss",
+          "ssrf",
+          "auth_token"
+        ],
+        "finding": {
+          "vuln_class": "broken_access_control",
+          "location": "handle_unblock(), line 805-810",
+          "severity": "high",
+          "reachability": "Unauthenticated — triggered by visiting the login page with ?wpcaptcha_unblock=<key>; no session or capability required",
+          "justification": "Any visitor who knows (or guesses/leaks) the admin-configured global_unblock_key can permanently add their own IP to the plugin whitelist by issuing a GET request to wp-login.php with that key, bypassing all login-protection lockouts forever."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "high",
+          "reasoning": "Confirmed real. Hook chain: add_action('init', 'wpcaptcha::init', -1) fires on every page load with no auth gate; init() calls WPCaptcha_Functions::handle_unblock() unconditionally (advanced-google-recaptcha.php line 85). In handle_unblock() (functions.php lines 800-811), the only guard is a strict-equality match between $_GET['wpcaptcha_unblock'] and $options['global_unblock_key']; there is no nonce, no capability check, no session check — the code comment explicitly acknowledges this: 'no need for nonce check here as URL can be entered manually'. If the condition passes, the caller's IP is appended to the persistent whitelist via update_option(). The key ('agr'.md5(wp_generate_password(24)), 35 chars) is stored in wp_options and is intentionally exposed to logged-in admins via the AJAX recovery_url tool (ajax.php line 50) and emailed to locked-out users (functions.php ~line 751). An attacker who intercepts that email or obtains the key by any other means can send a single unauthenticated GET request from any IP to permanently whitelist it, bypassing all login-protection lockouts with no further interaction required. No sanitizer or capability guard was missed.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f011",
+        "rel": "libs/functions.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/functions.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss",
+          "ssrf",
+          "auth_token"
+        ],
+        "finding": {
+          "vuln_class": "url_parameter_injection",
+          "location": "handle_captcha(), lines 297 and 314",
+          "severity": "low",
+          "reachability": "Unauthenticated — any user triggering captcha verification on login/registration",
+          "justification": "The sanitized g-recaptcha-response value is directly concatenated into the Google verification URL (`?secret=...&response=<user_value>`); sanitize_text_field() strips tags but not URL metacharacters, so a value like `foo&secret=attacker_key` would inject an additional query parameter and allow substituting the secret key in the outbound verification request."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "low",
+          "reasoning": "The finding is confirmed real. At lines 297 and 314 of handle_captcha(), the POST parameter g-recaptcha-response is processed only by sanitize_text_field() before being concatenated into the wp_remote_get URL. sanitize_text_field() strips HTML tags and percent-encoded sequences but does NOT encode or strip ampersand (&) characters. An attacker can submit g-recaptcha-response=foo&secret=ATTACKER_SECRET and the resulting verification URL becomes https://www.google.com/recaptcha/api/siteverify?secret=SITE_SECRET&response=foo&secret=ATTACKER_SECRET. wp_remote_get passes the URL string raw to curl without re-encoding the query string. The reachability is correct: this is triggered by any unauthenticated user submitting a login or registration form with reCAPTCHA enabled. The severity is low rather than critical because exploitation requires: (1) Google's API using the last duplicate secret= parameter value, and (2) the attacker submitting a valid reCAPTCHA token generated against their own account. If both conditions hold, an attacker can bypass reCAPTCHA verification by injecting their own secret key and submitting a self-generated token. The code has no URL encoding of the response value before concatenation, no use of urlencode/rawurlencode/http_build_query, and no guard against metacharacters. The vulnerability class (url_parameter_injection) is correct.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f011",
+        "rel": "libs/functions.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/functions.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss",
+          "ssrf",
+          "auth_token"
+        ],
+        "finding": {
+          "vuln_class": "stored_css_injection",
+          "location": "login_head(), line 1074-1075",
+          "severity": "medium",
+          "reachability": "Admin-only — requires an administrator to save malicious custom CSS through the plugin settings",
+          "justification": "The design_custom_css option is output inside a <style> block using esc_html(), which encodes < and > but does NOT prevent CSS injection payloads like `} body { background-image: url(//attacker.com) }` that exfiltrate page data or inject visible content visible to all login page visitors."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "Confirmed real. The sink at functions.php lines 1074-1075 echoes `design_custom_css` inside a `<style>` block using `esc_html()`. That escaper encodes `<`, `>`, `&`, `\"`, and `'` as HTML entities, but CSS injection payloads such as `} body { background-image: url(//attacker.com) }` contain none of those characters and pass through completely unmodified. The `sanitize_settings()` callback in setup.php (lines 277-396) applies no sanitization to `design_custom_css` — there is no `wp_kses()`, `sanitize_textarea_field()`, or equivalent filter for this key. The value is stored raw via `register_setting()`. The hook `add_action('login_head', ...)` fires on the WordPress login page for all visitors, so injected CSS is rendered to every user hitting the login page. Auth is correctly identified as administrator-only (`manage_options` capability via WordPress settings API). The correct escaper would be `wp_strip_all_tags()` or a CSS-specific allowlist. The wrong-context escaper (`esc_html` inside `<style>`) is the confirmed vulnerability. No additional guards or sanitizers were missed."
+        }
+      },
+      {
+        "id": "f012",
+        "rel": "libs/setup.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/setup.php",
+        "tags": [
+          "sqli",
+          "xss",
+          "ssrf"
+        ],
+        "finding": {
+          "vuln_class": "stored_xss",
+          "location": "functions.php:597 (captcha form output, triggered by sanitize_settings in setup.php which does not sanitize captcha_challenge_text)",
+          "severity": "medium",
+          "reachability": "Reachable by any administrator who can save plugin settings; output rendered on the public-facing login page to all visitors when captcha type is 'builtin'.",
+          "justification": "At functions.php:597, `$options['captcha_challenge_text']` is concatenated directly into HTML output with no escaping: `'<p><label ...>' . !empty($options['captcha_challenge_text'])?$options['captcha_challenge_text']:'...'`; the value is stored by `sanitize_settings` (setup.php:277) without any sanitization of this field, so a payload like `<script>...</script>` set by an admin persists and executes in every visitor's browser on the login page."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "The finding is confirmed by direct code inspection. Three conditions are all satisfied:\n\n1. SINK (functions.php:597): The expression `'<p><label ...>' . !empty($options['captcha_challenge_text'])?$options['captcha_challenge_text']:'Are you human? Please solve: '` outputs `captcha_challenge_text` raw, with no escaping function (no esc_html, esc_attr, wp_kses, etc.). PHP operator precedence causes `.` to bind before `?:`, so the ternary evaluates the concatenated string as the condition and $options['captcha_challenge_text'] is emitted verbatim as the true branch. Confirmed by running the equivalent PHP: a `<script>alert(1)</script>` payload passes through intact.\n\n2. STORAGE (setup.php:277, sanitize_settings): The entire sanitize_settings function was inspected. It handles boolean/integer fields via isset checks, and clears site/secret keys in certain modes, but applies zero sanitization to captcha_challenge_text — no sanitize_text_field, no wp_kses, no strip_tags, no esc_* call touches this field. The value is persisted as-is via WordPress options (register_setting at line 171).\n\n3. REACHABILITY: The output is produced by captcha_fields() called from captcha_fields_print() (line 485-488), which is hooked to public-facing WordPress forms. The builtin captcha branch (line 596) is triggered when captcha type is 'builtin'. This rendered HTML is echoed directly to all visitors on the login page with no escaping. Setting captcha_challenge_text requires 'manage_options' capability (admin level). On single-site WordPress, all admins have 'unfiltered_html' so this is admin-only stored XSS — the canonical medium severity for admin-required stored XSS, since a malicious admin or a compromised admin account can use it to target all public visitors.\n\nNote: The comment at line 487 claiming 'all variables are already escaped' is incorrect with respect to captcha_challenge_text.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f012",
+        "rel": "libs/setup.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/setup.php",
+        "tags": [
+          "sqli",
+          "xss",
+          "ssrf"
+        ],
+        "finding": {
+          "vuln_class": "stored_xss_css_injection",
+          "location": "functions.php:1074-1078 (login_head output), sanitize_settings in setup.php does not sanitize design_custom_css",
+          "severity": "low",
+          "reachability": "Requires administrator privileges to set the design_custom_css option; output is rendered inside a public-facing login page <style> block.",
+          "justification": "The `design_custom_css` option is saved in `sanitize_settings` (setup.php) without any sanitization, and then at functions.php:1075 it is output via `esc_html()` inside a `<style>` block: `esc_html()` does not neutralize CSS syntax characters such as `{}`, allowing an admin to inject arbitrary CSS rules including `expression()` or `url()` data-URI tricks visible to all login-page visitors."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "low",
+          "reasoning": "The finding is confirmed real. Full code path verified: (1) design_custom_css is saved via register_setting with sanitize_settings() as callback (setup.php:171), but sanitize_settings() (lines 277-396) never touches design_custom_css — it is passed through array_merge() unsanitized. (2) The sink is functions.php:1074-1075: echo esc_html($options['design_custom_css']) inside a <style> block opened at line 908 and closed at line 1078, rendered on every login page via add_action('login_head', ...) registered in advanced-google-recaptcha.php:182. (3) esc_html() encodes only <, >, &, \", ' — all CSS syntax characters ({, }, ;, :, (, ), @, /) pass through unchanged, so arbitrary CSS rules are injectable. (4) Reachability is correctly stated: only manage_options (administrator) can save these settings (admin.php:278 checks current_user_can('manage_options')). (5) Severity is correctly low: CSS injection without JS is not XSS in any modern browser (expression() is IE6-only), output is limited to the login page style block, and WordPress admins already have arbitrary code execution capability via plugin/theme installs — this does not cross any privilege boundary. The finding's technical description is accurate."
+        }
+      }
+    ],
+    "all_with_verdicts": [
+      {
+        "id": "f001",
+        "rel": "advanced-google-recaptcha.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/advanced-google-recaptcha.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "stored_xss",
+          "location": "WPCaptcha_AJAX::get_locks_logs(), libs/ajax.php line 352",
+          "severity": "medium",
+          "reachability": "authenticated admin only — the AJAX handler enforces manage_options; the injected payload is rendered in the admin Activity tab DataTable",
+          "justification": "The `reason` column value fetched from `wpcatcha_accesslocks` is appended to the JSON output array as raw HTML (`$row[] = $aRow->$col`) with no escaping; the DataTable renders it as innerHTML, so a stored payload injected into the reason field (e.g. via a crafted lockdown trigger) executes in the admin browser."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "The sink is real: ajax.php line 352 outputs $aRow->reason from wpcatcha_accesslocks with no escaping, and DataTables 1.10.16 renders aaData array values as innerHTML. However, the attack path is broken at the source. Every call to lockDown() passes a hard-coded string literal as the reason argument ('Too many captcha fails', 'Too many fails', 'Invalid Username' — functions.php lines 229, 242, 246). There are no other callers of lockDown() anywhere in the plugin. The one incrementFails() call that receives external input (line 455, $error->get_error_code()) writes to wpcatcha_login_fails, not wpcatcha_accesslocks, and furthermore passes through pretty_fail_errors() which is a whitelist switch returning 'Unknown' for unrecognized codes. No attacker-controlled value can reach the reason column of wpcatcha_accesslocks. The auth check (manage_options) is correctly applied but is irrelevant since the vulnerability does not exist.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f001",
+        "rel": "advanced-google-recaptcha.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/advanced-google-recaptcha.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "stored_xss",
+          "location": "WPCaptcha_Functions::captcha_fields(), libs/functions.php line 597",
+          "severity": "medium",
+          "reachability": "any visitor who reaches a page with the built-in captcha form; the payload is set by an admin via the captcha_challenge_text option",
+          "justification": "The admin-controlled option `captcha_challenge_text` is echoed directly into the public HTML label without any escaping: `$output .= '<p><label ...>' . !empty($options['captcha_challenge_text'])?$options['captcha_challenge_text']:'Are you human?...'`, allowing an admin to store arbitrary HTML/script that executes for every visitor who sees the captcha form."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "Confirmed. The sink at libs/functions.php:597 echoes $options['captcha_challenge_text'] into public HTML with no escaping. The sanitize_settings() callback (setup.php:277-396) never calls sanitize_text_field, wp_kses, or any escaper on captcha_challenge_text — it passes through via array_merge. The esc_html() noted in the analysis JSON (phase2_sources_sinks, line 2393) is located in interface/tab_captcha.php:60 (the admin settings form input), not in the frontend output path. Reachability is correct: captcha_fields_print() echoes the output on every public page with the builtin captcha enabled, so every visitor receives the payload. Auth is admin-only (manage_options), making this admin-stored-XSS — severity medium is appropriate per WordPress security standards."
+        }
+      },
+      {
+        "id": "f001",
+        "rel": "advanced-google-recaptcha.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/advanced-google-recaptcha.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "css_injection",
+          "location": "WPCaptcha_Functions::login_head(), libs/functions.php lines 929 and 962-964",
+          "severity": "low",
+          "reachability": "login page visitors; payload injected by an admin via design_background_image or design_form_background_image options",
+          "justification": "Both `design_background_image` and `design_form_background_image` are output inside CSS `url()` values using `esc_attr()` (e.g., `echo 'body.login {background-image:url(' . esc_attr($options['design_background_image']) . ')...'`), which does not prevent CSS injection; an attacker controlling the option value could break out of the url() context to inject arbitrary CSS rules."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "low",
+          "reasoning": "Partially real. Line 930 (design_background_image with esc_attr()) is a genuine CSS injection sink: esc_attr() leaves ), ;, {, }, and space unencoded, so a value like 'https://x.com/x); color:red; background:url(' survives escaping and breaks out of the CSS url() context to inject arbitrary rules. The sanitize_settings() callback in setup.php never sanitizes design_background_image, so the raw value reaches the sink. Line 963 (design_form_background_image) is NOT vulnerable: esc_url() strips non-URL characters and prevents CSS context escape. The required capability is manage_options (Administrator), enforced by both add_options_page() and WordPress core options.php. Admin-controlled CSS injection is within the WordPress trust boundary; severity is correctly Low. The finding is real but overinclusive — only one of the two claimed sinks is exploitable."
+        }
+      },
+      {
+        "id": "f001",
+        "rel": "advanced-google-recaptcha.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/advanced-google-recaptcha.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "sensitive_data_exposure",
+          "location": "WPCaptcha_AJAX::get_activity_logs(), libs/ajax.php lines 482-486",
+          "severity": "medium",
+          "reachability": "authenticated admin via the Activity tab AJAX call",
+          "justification": "When `log_passwords` is enabled, the `failed_pass` column — which stores actual attempted passwords submitted by users — is returned in the AJAX response and rendered in the admin DataTable, exposing potentially reused credentials to any admin with access to the Activity log view."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "The finding is confirmed real, with one important caveat about scope.\n\n**Auth / reachability (confirmed correct):** The AJAX action `wp_ajax_wpcaptcha_run_tool` (advanced-google-recaptcha.php line 111) is registered only as `wp_ajax_*` (no `wp_ajax_nopriv_*`), so it requires a logged-in WordPress session. Inside `ajax_run_tool()` (ajax.php lines 20-24) a nonce check (`check_ajax_referer('wpcaptcha_run_tool')`) and a `current_user_can('manage_options')` capability check both gate the call before any dispatch. `get_activity_logs()` (ajax.php line 376-382) repeats BOTH checks independently. Access is therefore limited to admins only — the claimed reachability is accurate.\n\n**Sink (confirmed):** When `$options['log_passwords'] == 1`, ajax.php line 485 appends `$aRow->failed_pass` (wrapped only in `htmlspecialchars`, which is an XSS guard, not a disclosure guard) to the JSON response (`aaData`), which is rendered in the admin DataTable. The column is a `varchar(200)` in the DB schema (setup.php line 463).\n\n**Critical caveat — write path in the free plugin:** In the analysed free-plugin source, `incrementFails()` (functions.php lines 112-139) does NOT include `failed_pass` in its `$wpdb->insert()` call, and `wp_authenticate_username_password()` (functions.php lines 204-286) never passes the password to any storage function. In the free version the column will therefore always be empty (''), and the conditional at line 484 will never expose a real password even when `log_passwords` is enabled. The `tab_login_form.php` UI labels the feature as 'PRO' (line 185), strongly indicating password capture is only implemented in the paid version.\n\n**Verdict:** The *read path* (AJAX sink returning `failed_pass`) is real, correctly auth-gated to admins, and constitutes a genuine design-level sensitive-data exposure when the PRO version populates the column. The finding is correctly classified and the severity (medium) is appropriate — the risk is the storage and display of plaintext attempted passwords to any admin with Activity log access. The free-only scope means the column is empty in the analysed build, but the code path that would expose it is present in the free codebase and activated by a PRO feature flag, so the vulnerability class is valid."
+        }
+      },
+      {
+        "id": "f004",
+        "rel": "interface/tab_design.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/interface/tab_design.php",
+        "tags": [
+          "xss",
+          "access_control"
+        ],
+        "finding": {
+          "vuln_class": "broken_access_control",
+          "location": "WPCaptcha_Functions::install_template (libs/functions.php ~line 1317); registered via admin_action_wpcaptcha_install_template (advanced-google-recaptcha.php line 107)",
+          "severity": "medium",
+          "reachability": "Any authenticated WordPress user (subscriber, contributor, editor) who visits wp-admin can trigger admin_action_* hooks. The nonce is created in tab_design.php line 35 and embedded in a URL visible to any user who loads the Design tab, but more critically any logged-in user can craft a request to admin.php?action=wpcaptcha_install_template&template=<id>&_wpnonce=<valid_nonce>.",
+          "justification": "install_template() calls check_admin_referer() for CSRF protection but has no current_user_can() capability check; any authenticated user can overwrite all plugin design settings (merging a chosen template array into options and calling update_option) without needing manage_options or administrator capability."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "Confirmed real. The hook 'admin_action_wpcaptcha_install_template' is registered at advanced-google-recaptcha.php line 107 inside is_admin() (line 88), which is NOT a capability check — it means 'we are in the admin area', not 'the user is an administrator'. WordPress fires admin_action_* hooks for any logged-in user who hits wp-admin/admin.php with the matching action= parameter. The handler WPCaptcha_Functions::install_template() (libs/functions.php ~line 1317) calls only check_admin_referer('wpcaptcha_install_template') and has no current_user_can() guard whatsoever. A subscriber-level user can generate their own valid nonce via wp_create_nonce (nonces are per-user, not per-capability) and submit GET wp-admin/admin.php?action=wpcaptcha_install_template&template=<id>&_wpnonce=<own_nonce>. The CSRF check passes, array_key_exists validates the template ID against get_templates(), then array_merge overwrites all design options and update_option(WPCAPTCHA_OPTIONS_KEY, ...) persists the change. The template parameter is sanitize_key() sanitized and validated against the known template list, so there is no injection risk, but the privilege escalation (any auth user changes plugin settings) is real. The claimed reachability (any authenticated user, subscriber+) is correct. No missed guard was found."
+        }
+      },
+      {
+        "id": "f004",
+        "rel": "interface/tab_design.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/interface/tab_design.php",
+        "tags": [
+          "xss",
+          "access_control"
+        ],
+        "finding": {
+          "vuln_class": "xss",
+          "location": "WPCaptcha_Tab_Design::display (interface/tab_design.php line 35), $template_id used bare inside wp_kses_wf HTML string",
+          "severity": "low",
+          "reachability": "Admin-only page; $template_id comes from WPCaptcha_Functions::get_templates() which returns a hardcoded array with fixed string keys ('white', 'orange', 'green', 'blue'). No attacker-controlled data reaches this variable in the current implementation.",
+          "justification": "While $template_id is concatenated without esc_attr() into an HTML class attribute and href URL inside the string passed to wp_kses_wf(), all template IDs are hardcoded constants; however if get_templates() were ever extended to include user-supplied or DB-sourced keys, this would be a stored XSS in an admin context - flagged as a latent risk rather than an immediately exploitable bug."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "n/a",
+          "reasoning": "The $template_id variable in tab_design.php line 35 is the iteration key of the array returned by WPCaptcha_Functions::get_templates(). That function (libs/functions.php lines 1082-1315) is a fully hardcoded static method that constructs and returns a PHP array with literal string keys: 'white', 'orange' (implied), 'red', 'green', 'blue', 'gray'. No apply_filters() hook wraps the return value, no database read populates the keys, and no user-controlled input touches the array at any point. The install_template() handler (line 1324) applies sanitize_key() to $_GET['template'] and validates it with array_key_exists() against the same hardcoded array before persisting — so no attacker-controlled string ever becomes a stored template key. The page is also admin-only (requires manage_options capability). While $template_id is concatenated without esc_attr() into a class attribute and without esc_url() wrapping in the href, the source is compile-time constants making this an unexploitable code-quality issue. No attacker-controlled data reaches the sink in the current codebase. Classified as false positive / latent theoretical risk only."
+        }
+      },
+      {
+        "id": "f009",
+        "rel": "libs/admin.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/admin.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "broken_access_control",
+          "location": "install_template() / libs/functions.php:1317, registered via admin_action_wpcaptcha_install_template in advanced-google-recaptcha.php:107",
+          "severity": "medium",
+          "reachability": "Any authenticated WordPress user who is in wp-admin and can obtain or guess the nonce (nonce is only rendered to admins on the Design tab, so practical exploitation is admin-only; however the code itself imposes no capability gate — a subscriber with the nonce could invoke it)",
+          "justification": "install_template() calls check_admin_referer('wpcaptcha_install_template') for CSRF protection but never calls current_user_can(), so the nonce is the only access gate; CSRF protection is not authorization, and any authenticated user who possesses the nonce can overwrite plugin design options via update_option(WPCAPTCHA_OPTIONS_KEY, $options)."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "low",
+          "reasoning": "CONFIRMED REAL but severity downgraded to low. The install_template() function at libs/functions.php:1317 is registered via admin_action_wpcaptcha_install_template (advanced-google-recaptcha.php:107) inside an is_admin() block. The function calls check_admin_referer('wpcaptcha_install_template') but has NO current_user_can() check — confirmed by grep across the entire function. The sibling install_wp301() on line 14 of functions.php DOES have current_user_can('administrator'), proving the developer knew how to add such checks. The sink (update_option(WPCAPTCHA_OPTIONS_KEY, $options)) is reachable with attacker-controlled $template key via sanitize_key($_GET['template']), which selects from a whitelist of built-in templates and merges them into plugin options. The claimed reachability ('any authenticated user with the nonce') is technically correct — the code imposes no capability gate. HOWEVER: the nonce wp_create_nonce('wpcaptcha_install_template') is ONLY generated in interface/tab_design.php:35, which is only rendered by main_page() which has current_user_can('manage_options') at admin.php:278. admin_action_ hooks require the user to be logged in (wp-admin enforces auth_redirect). Therefore practical exploitation requires admin-level access to obtain the nonce from the Design tab UI, making this effectively admin-only. The flaw is a missing capability check (broken access control) — the nonce is CSRF protection, not authorization — but the actual impact is limited: an attacker who already has the nonce (obtained from an admin) can overwrite design-only options (cosmetic settings). No data exfiltration, no code execution, no privilege escalation path. Real finding, but practical impact is low."
+        }
+      },
+      {
+        "id": "f009",
+        "rel": "libs/admin.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/admin.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "stored_xss",
+          "location": "admin_notices() / libs/admin.php:128",
+          "severity": "low",
+          "reachability": "Latent: current callers of add_notice() only pass hardcoded translated strings so the sink is not currently reachable with attacker-controlled data; exploitable if any future code or a third-party plugin calls WPCaptcha_Admin::add_notice() with user-controlled $type or $text",
+          "justification": "Line 128 concatenates $notice['type'] directly into a double-quoted HTML class attribute and $notice['text'] directly into a <p> body without esc_attr()/esc_html(); wp_kses_wf does not entity-encode attribute values, so a $notice['type'] value containing a double-quote would break out of the class attribute and allow event-handler injection."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "low",
+          "reasoning": "The sink at admin.php:128 is structurally dangerous: wp_kses_wf() calls wp_kses() but includes <script> in its allowed_tags allowlist, meaning script tags in $notice['type'] or $notice['text'] would NOT be stripped. However, the finding's reachability claim is correct — all current callers of WPCaptcha_Admin::add_notice() pass hardcoded translated strings for both $text and $type (functions.php:1338 passes 'success'/'error' and __('Template activated.'), functions.php:1340 passes 'error' and __('Unknown template ID.')). The install_template() path that calls add_notice() is nonce-protected (check_admin_referer), gated to admin-only via the admin_action hook, and uses sanitize_key() on the GET parameter before it reaches array_key_exists() — the value passed to add_notice() is always a hardcoded string, never the raw GET input. There is no hook, filter, AJAX endpoint, or REST route that exposes add_notice() to attacker-controlled input at any privilege level below administrator. Since administrators have write access to the wp_options table by other means, this is not an exploitable privilege-escalation path. The sink is latent — dangerous if future code or a third-party plugin calls add_notice() with user-controlled data, but not currently reachable. Marked is_real=false per the 'default false unless code proves it' directive."
+        }
+      },
+      {
+        "id": "f010",
+        "rel": "libs/ajax.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/ajax.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss",
+          "ssrf"
+        ],
+        "finding": {
+          "vuln_class": "url_parameter_injection",
+          "location": "verify_captcha(), lines 173 and 186",
+          "severity": "low",
+          "reachability": "Authenticated administrators only (manage_options capability required via ajax_run_tool at line 22)",
+          "justification": "Both $secret_key and $response are sanitized with sanitize_text_field() (which does not encode & or = characters) then directly concatenated into the Google reCAPTCHA siteverify URL, allowing an admin to inject additional query parameters and manipulate the outbound verification request."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "low",
+          "reasoning": "The code path is technically reachable: an authenticated administrator POSTs to the AJAX handler, passes check_ajax_referer('wpcaptcha_run_tool') and current_user_can('manage_options'), then supplies captcha_secret_key and captcha_response values that are sanitized with sanitize_text_field() (which strips HTML tags and invalid UTF-8 but does NOT encode '&', '=', or '#'). Those values are concatenated directly into the Google siteverify URL at lines 173 and 186 without URL-encoding, so an admin-controlled value like 'key&extra=val' would inject an extra query parameter into the outbound request. However, the finding does not constitute a real vulnerability: (1) the actor is a fully authenticated WordPress administrator with manage_options capability, who already has unrestricted control over the site including the reCAPTCHA configuration — they can modify the keys directly via settings without any URL injection; (2) the injection target is a hardcoded Google API endpoint, so there is no SSRF to an attacker-controlled host and no sensitive data exfiltration path; (3) the only effect is that the admin could malform their own reCAPTCHA verification call, a self-harm scenario with no privilege escalation or cross-user impact; (4) WordPress security convention treats administrator-only findings as out-of-scope. The auth guard at line 22 (current_user_can + wp_send_json_error which calls wp_die) and nonce check at line 20 are both effective. is_real=false because the finding has no exploitable security consequence beyond what the actor already controls."
+        }
+      },
+      {
+        "id": "f010",
+        "rel": "libs/ajax.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/ajax.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss",
+          "ssrf"
+        ],
+        "finding": {
+          "vuln_class": "stored_xss",
+          "location": "get_locks_logs(), line 352",
+          "severity": "low",
+          "reachability": "Authenticated administrators only (manage_options check at line 247); requires attacker-controlled data in the reason column of the accesslocks table",
+          "justification": "The 'reason' column value from the DB is echoed into the JSON output array without any HTML escaping at line 352 ($row[] = $aRow->$col for $col === 'reason'); in the current codebase reason is populated only with hardcoded strings, but any future code path that stores arbitrary input there would create stored XSS in the admin DataTable."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "n/a",
+          "reasoning": "The sink at get_locks_logs() line 352 is confirmed: $aRow->$col for col='reason' is echoed unescaped into a JSON aaData array rendered by jQuery DataTables as HTML, behind a manage_options check. However, the write path for the accesslocks.reason column is fully enumerated: lockDown() in libs/functions.php is called at exactly three sites (line 229: 'Too many captcha fails', line 242: 'Too many fails', line 246: 'Invalid Username'). All three pass hardcoded string literals. No user-controlled input reaches the reason column of wpcatcha_accesslocks in the current codebase. The finding correctly acknowledges this, qualifying it as a future/speculative risk ('any future code path that stores arbitrary input there'). A speculative future code path does not constitute a present vulnerability. The sink is real, the auth gate is correctly identified as manage_options, but there is no attacker-controlled data reaching the unescaped output in the shipped code. Verdict: not a real finding under the code-must-prove-it standard.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f010",
+        "rel": "libs/ajax.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/ajax.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss",
+          "ssrf"
+        ],
+        "finding": {
+          "vuln_class": "missing_output_encoding",
+          "location": "get_locks_logs(), lines 344-345 and 359",
+          "severity": "low",
+          "reachability": "Authenticated administrators (manage_options) viewing the locks log DataTable",
+          "justification": "The DB integer field $aRow->accesslock_ID is embedded into HTML attribute values (data-lock-id=\"...\") without esc_attr(); while the column is numeric in practice, any corruption or unexpected value could break the attribute context."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "informational",
+          "reasoning": "accesslock_ID is declared as bigint(20) NOT NULL AUTO_INCREMENT in setup.php (line 470) — a MySQL-generated integer with no external input path. The data flow is: MySQL AUTO_INCREMENT -> $wpdb->get_results() -> $aRow->accesslock_ID -> HTML attribute. No attacker-controlled value ever populates this column; MySQL enforces the integer type at the storage layer and rejects non-integer inserts. The sink is also behind check_ajax_referer('wpcaptcha_run_tool') and current_user_can('manage_options'), so only authenticated administrators can reach it. The 'corruption scenario' the finding relies on (a non-integer ending up in an AUTO_INCREMENT bigint) is outside a realistic threat model. Absence of esc_attr() is a coding style gap, not an exploitable vulnerability — the value is guaranteed to be a positive integer string and cannot break HTML attribute context.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f011",
+        "rel": "libs/functions.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/functions.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss",
+          "ssrf",
+          "auth_token"
+        ],
+        "finding": {
+          "vuln_class": "broken_access_control",
+          "location": "handle_unblock(), line 805-810",
+          "severity": "high",
+          "reachability": "Unauthenticated — triggered by visiting the login page with ?wpcaptcha_unblock=<key>; no session or capability required",
+          "justification": "Any visitor who knows (or guesses/leaks) the admin-configured global_unblock_key can permanently add their own IP to the plugin whitelist by issuing a GET request to wp-login.php with that key, bypassing all login-protection lockouts forever."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "high",
+          "reasoning": "Confirmed real. Hook chain: add_action('init', 'wpcaptcha::init', -1) fires on every page load with no auth gate; init() calls WPCaptcha_Functions::handle_unblock() unconditionally (advanced-google-recaptcha.php line 85). In handle_unblock() (functions.php lines 800-811), the only guard is a strict-equality match between $_GET['wpcaptcha_unblock'] and $options['global_unblock_key']; there is no nonce, no capability check, no session check — the code comment explicitly acknowledges this: 'no need for nonce check here as URL can be entered manually'. If the condition passes, the caller's IP is appended to the persistent whitelist via update_option(). The key ('agr'.md5(wp_generate_password(24)), 35 chars) is stored in wp_options and is intentionally exposed to logged-in admins via the AJAX recovery_url tool (ajax.php line 50) and emailed to locked-out users (functions.php ~line 751). An attacker who intercepts that email or obtains the key by any other means can send a single unauthenticated GET request from any IP to permanently whitelist it, bypassing all login-protection lockouts with no further interaction required. No sanitizer or capability guard was missed.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f011",
+        "rel": "libs/functions.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/functions.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss",
+          "ssrf",
+          "auth_token"
+        ],
+        "finding": {
+          "vuln_class": "auth_token_logic",
+          "location": "handle_unblock(), line 818",
+          "severity": "low",
+          "reachability": "Unauthenticated — anyone with a valid unblock email link",
+          "justification": "The transient-based unblock token comparison uses loose == operator (`$unblock_transient == $unblock_key`); while not exploitable via type juggling here because both sides are strings, it is non-constant-time and could theoretically be affected by PHP type coercions in edge cases involving numeric-string transient values."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "The type-juggling claim is false. `$unblock_key` is always produced by sanitize_key() applied to a token prefixed with 'agr' (e.g., 'agr' + 32-char md5 hex = 35 chars), so neither operand in `$unblock_transient == $unblock_key` can be coerced to a numeric type by PHP loose comparison — the 'agr' prefix makes both sides non-numeric strings, making == and === identical in behavior here. The non-constant-time comparison is technically accurate but not practically exploitable: the token is a large random value, there is no timing oracle accessible over the network (jitter dominates), and the token is single-use (stored in a transient that expires in 1 hour). Additionally, a length inconsistency undermines even theoretical reachability: the generated key is 35 chars ('agr' + 32 hex chars from md5), but line 815 only accepts input of exactly 32 chars — so no legitimately generated unblock key would even pass the strlen guard into the comparison on line 818. The finding self-contradicts by acknowledging it is 'not exploitable via type juggling.' No sanitizer was missed; the code path is internally inconsistent such that the comparison at line 818 is unreachable via valid tokens. Defaulting to is_real=false per instructions."
+        }
+      },
+      {
+        "id": "f011",
+        "rel": "libs/functions.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/functions.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss",
+          "ssrf",
+          "auth_token"
+        ],
+        "finding": {
+          "vuln_class": "captcha_bypass",
+          "location": "handle_captcha(), lines 326-338 (builtin branch)",
+          "severity": "medium",
+          "reachability": "Unauthenticated — any user submitting a form protected by the built-in captcha",
+          "justification": "The built-in captcha stores wp_hash(answer) as a hidden form field; since valid answers are only integers 0-20 (sum/difference of two 0-10 random numbers), an attacker can precompute wp_hash() for all 21 possible values offline and forge a valid token for any captcha challenge, fully bypassing the captcha."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "The finding's core claim is false. It asserts an attacker can precompute wp_hash() for all 21 possible captcha answers (integers 0-20) offline, because the answer space is small. This is incorrect: WordPress wp_hash() is hash_hmac('md5', $data, $secret_key) where the key is SECURE_AUTH_KEY from wp-config.php — a server-side secret never exposed to clients. An attacker cannot compute wp_hash(N) for any N without knowing that secret key. The token placed in the hidden form field (wp_hash($captcha['value']) at line 602) is therefore not forgeable offline. The verification at line 330 (wp_hash($captcha_val) === $captcha_tokens[$captcha_id]) correctly computes a keyed HMAC of the user-submitted answer and compares to the server-issued token. There is a separate, lesser design weakness — tokens are not session-bound or nonce-protected, so a valid (answer, token) pair obtained by loading the form can be replayed across multiple submissions — but this requires first legitimately receiving a token from the server, which means loading the form and reading the HTML. That is a replay issue, not a bypass from offline precomputation as claimed. The stated reachability and bypass mechanism in the finding are not supported by the code."
+        }
+      },
+      {
+        "id": "f011",
+        "rel": "libs/functions.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/functions.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss",
+          "ssrf",
+          "auth_token"
+        ],
+        "finding": {
+          "vuln_class": "url_parameter_injection",
+          "location": "handle_captcha(), lines 297 and 314",
+          "severity": "low",
+          "reachability": "Unauthenticated — any user triggering captcha verification on login/registration",
+          "justification": "The sanitized g-recaptcha-response value is directly concatenated into the Google verification URL (`?secret=...&response=<user_value>`); sanitize_text_field() strips tags but not URL metacharacters, so a value like `foo&secret=attacker_key` would inject an additional query parameter and allow substituting the secret key in the outbound verification request."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "low",
+          "reasoning": "The finding is confirmed real. At lines 297 and 314 of handle_captcha(), the POST parameter g-recaptcha-response is processed only by sanitize_text_field() before being concatenated into the wp_remote_get URL. sanitize_text_field() strips HTML tags and percent-encoded sequences but does NOT encode or strip ampersand (&) characters. An attacker can submit g-recaptcha-response=foo&secret=ATTACKER_SECRET and the resulting verification URL becomes https://www.google.com/recaptcha/api/siteverify?secret=SITE_SECRET&response=foo&secret=ATTACKER_SECRET. wp_remote_get passes the URL string raw to curl without re-encoding the query string. The reachability is correct: this is triggered by any unauthenticated user submitting a login or registration form with reCAPTCHA enabled. The severity is low rather than critical because exploitation requires: (1) Google's API using the last duplicate secret= parameter value, and (2) the attacker submitting a valid reCAPTCHA token generated against their own account. If both conditions hold, an attacker can bypass reCAPTCHA verification by injecting their own secret key and submitting a self-generated token. The code has no URL encoding of the response value before concatenation, no use of urlencode/rawurlencode/http_build_query, and no guard against metacharacters. The vulnerability class (url_parameter_injection) is correct.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f011",
+        "rel": "libs/functions.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/functions.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss",
+          "ssrf",
+          "auth_token"
+        ],
+        "finding": {
+          "vuln_class": "stored_css_injection",
+          "location": "login_head(), line 1074-1075",
+          "severity": "medium",
+          "reachability": "Admin-only — requires an administrator to save malicious custom CSS through the plugin settings",
+          "justification": "The design_custom_css option is output inside a <style> block using esc_html(), which encodes < and > but does NOT prevent CSS injection payloads like `} body { background-image: url(//attacker.com) }` that exfiltrate page data or inject visible content visible to all login page visitors."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "Confirmed real. The sink at functions.php lines 1074-1075 echoes `design_custom_css` inside a `<style>` block using `esc_html()`. That escaper encodes `<`, `>`, `&`, `\"`, and `'` as HTML entities, but CSS injection payloads such as `} body { background-image: url(//attacker.com) }` contain none of those characters and pass through completely unmodified. The `sanitize_settings()` callback in setup.php (lines 277-396) applies no sanitization to `design_custom_css` — there is no `wp_kses()`, `sanitize_textarea_field()`, or equivalent filter for this key. The value is stored raw via `register_setting()`. The hook `add_action('login_head', ...)` fires on the WordPress login page for all visitors, so injected CSS is rendered to every user hitting the login page. Auth is correctly identified as administrator-only (`manage_options` capability via WordPress settings API). The correct escaper would be `wp_strip_all_tags()` or a CSS-specific allowlist. The wrong-context escaper (`esc_html` inside `<style>`) is the confirmed vulnerability. No additional guards or sanitizers were missed."
+        }
+      },
+      {
+        "id": "f012",
+        "rel": "libs/setup.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/setup.php",
+        "tags": [
+          "sqli",
+          "xss",
+          "ssrf"
+        ],
+        "finding": {
+          "vuln_class": "stored_xss",
+          "location": "functions.php:597 (captcha form output, triggered by sanitize_settings in setup.php which does not sanitize captcha_challenge_text)",
+          "severity": "medium",
+          "reachability": "Reachable by any administrator who can save plugin settings; output rendered on the public-facing login page to all visitors when captcha type is 'builtin'.",
+          "justification": "At functions.php:597, `$options['captcha_challenge_text']` is concatenated directly into HTML output with no escaping: `'<p><label ...>' . !empty($options['captcha_challenge_text'])?$options['captcha_challenge_text']:'...'`; the value is stored by `sanitize_settings` (setup.php:277) without any sanitization of this field, so a payload like `<script>...</script>` set by an admin persists and executes in every visitor's browser on the login page."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "The finding is confirmed by direct code inspection. Three conditions are all satisfied:\n\n1. SINK (functions.php:597): The expression `'<p><label ...>' . !empty($options['captcha_challenge_text'])?$options['captcha_challenge_text']:'Are you human? Please solve: '` outputs `captcha_challenge_text` raw, with no escaping function (no esc_html, esc_attr, wp_kses, etc.). PHP operator precedence causes `.` to bind before `?:`, so the ternary evaluates the concatenated string as the condition and $options['captcha_challenge_text'] is emitted verbatim as the true branch. Confirmed by running the equivalent PHP: a `<script>alert(1)</script>` payload passes through intact.\n\n2. STORAGE (setup.php:277, sanitize_settings): The entire sanitize_settings function was inspected. It handles boolean/integer fields via isset checks, and clears site/secret keys in certain modes, but applies zero sanitization to captcha_challenge_text — no sanitize_text_field, no wp_kses, no strip_tags, no esc_* call touches this field. The value is persisted as-is via WordPress options (register_setting at line 171).\n\n3. REACHABILITY: The output is produced by captcha_fields() called from captcha_fields_print() (line 485-488), which is hooked to public-facing WordPress forms. The builtin captcha branch (line 596) is triggered when captcha type is 'builtin'. This rendered HTML is echoed directly to all visitors on the login page with no escaping. Setting captcha_challenge_text requires 'manage_options' capability (admin level). On single-site WordPress, all admins have 'unfiltered_html' so this is admin-only stored XSS — the canonical medium severity for admin-required stored XSS, since a malicious admin or a compromised admin account can use it to target all public visitors.\n\nNote: The comment at line 487 claiming 'all variables are already escaped' is incorrect with respect to captcha_challenge_text.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f012",
+        "rel": "libs/setup.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/setup.php",
+        "tags": [
+          "sqli",
+          "xss",
+          "ssrf"
+        ],
+        "finding": {
+          "vuln_class": "stored_xss_css_injection",
+          "location": "functions.php:1074-1078 (login_head output), sanitize_settings in setup.php does not sanitize design_custom_css",
+          "severity": "low",
+          "reachability": "Requires administrator privileges to set the design_custom_css option; output is rendered inside a public-facing login page <style> block.",
+          "justification": "The `design_custom_css` option is saved in `sanitize_settings` (setup.php) without any sanitization, and then at functions.php:1075 it is output via `esc_html()` inside a `<style>` block: `esc_html()` does not neutralize CSS syntax characters such as `{}`, allowing an admin to inject arbitrary CSS rules including `expression()` or `url()` data-URI tricks visible to all login-page visitors."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "low",
+          "reasoning": "The finding is confirmed real. Full code path verified: (1) design_custom_css is saved via register_setting with sanitize_settings() as callback (setup.php:171), but sanitize_settings() (lines 277-396) never touches design_custom_css — it is passed through array_merge() unsanitized. (2) The sink is functions.php:1074-1075: echo esc_html($options['design_custom_css']) inside a <style> block opened at line 908 and closed at line 1078, rendered on every login page via add_action('login_head', ...) registered in advanced-google-recaptcha.php:182. (3) esc_html() encodes only <, >, &, \", ' — all CSS syntax characters ({, }, ;, :, (, ), @, /) pass through unchanged, so arbitrary CSS rules are injectable. (4) Reachability is correctly stated: only manage_options (administrator) can save these settings (admin.php:278 checks current_user_can('manage_options')). (5) Severity is correctly low: CSS injection without JS is not XSS in any modern browser (expression() is IE6-only), output is limited to the login page style block, and WordPress admins already have arbitrary code execution capability via plugin/theme installs — this does not cross any privilege boundary. The finding's technical description is accurate."
+        }
+      },
+      {
+        "id": "f014",
+        "rel": "libs/utility.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/utility.php",
+        "tags": [
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "xss_stored_or_reflected",
+          "location": "create_toggle_switch, line 121",
+          "severity": "medium",
+          "reachability": "Reachable by any caller passing attacker-influenced $name (e.g., a setting key read from DB or URL param); rendered in admin UI HTML",
+          "justification": "The $name parameter is interpolated verbatim into id=, for=, name=, and value= HTML attributes without esc_attr(), so a malicious value breaks out of the attribute context and injects arbitrary HTML/JS."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "The finding is a false positive. The $name parameter to create_toggle_switch() is passed as a hardcoded string literal at every call site in the codebase (e.g., 'login_protection', 'captcha_show_login', 'firewall_block_bots', etc. — verified across tab_captcha.php, tab_design.php, tab_firewall.php, tab_geoip.php, tab_login_form.php). No call site passes user input, a URL parameter, or a DB-read value as $name. The claimed reachability ('a setting key read from DB or URL param') is not supported by any code path in the plugin. Additionally, the output path through wp_kses_wf() calls wp_kses($html, $allowed_tags) which re-parses and sanitizes the HTML including attribute values, providing a secondary mitigation even if $name were somehow attacker-influenced.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f014",
+        "rel": "libs/utility.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/utility.php",
+        "tags": [
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "xss_stored_or_reflected",
+          "location": "create_select_options, lines 172-174",
+          "severity": "medium",
+          "reachability": "Any caller passing $options array with attacker-influenced 'val' or 'label' entries (e.g., values read from DB/user input)",
+          "justification": "$tmp['val'] and $tmp['label'] are interpolated directly into <option> tag attribute and content positions without esc_attr()/esc_html(), allowing attribute breakout and HTML injection."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "The finding is not valid for two independent reasons. First, the output mitigation: create_select_options builds $out and, when $output is true (the default), passes it through WPCaptcha_Utility::wp_kses_wf(), which calls wp_kses() with an explicit allowlist that includes <option> and its attributes. WordPress wp_kses() attribute-encodes values inside allowed attributes, defeating both attribute-breakout and script-injection attempts. Second, the reachability claim is false: all three actual call sites (tab_captcha.php line 53, tab_login_form.php line 232, tab_geoip.php line 31) pass only hardcoded developer-defined literal arrays — no data read from the database, GET/POST parameters, or any other attacker-controlled source ever reaches the $options parameter. The $tmp['val'] and $tmp['label'] values are constants like 'disabled'/'Disabled', 'builtin'/'Built-in Math Captcha', etc. There is no plausible attack path: neither the missing esc_attr()/esc_html() at the interpolation site nor a hypothetical injection-capable caller exists in the codebase.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f014",
+        "rel": "libs/utility.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/utility.php",
+        "tags": [
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "xss_stored_or_reflected",
+          "location": "create_radio_group, lines 192-194",
+          "severity": "medium",
+          "reachability": "Any caller passing $name or $options with attacker-influenced 'val' or 'label' entries",
+          "justification": "$name, $tmp['val'], and $tmp['label'] are interpolated into id=, name=, value= attributes and label text without any escaping, enabling attribute injection or HTML injection."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "The finding is a false positive for three compounding reasons. First, create_radio_group (lines 186-203) is dead code: a codebase-wide search across all PHP files in the plugin finds zero callers; the function is defined but never invoked. Second, the output path when $output=true passes through wp_kses_wf (line 199), which calls wp_kses($html, $allowed_tags). This sanitizer strips unrecognized event-handler attributes (onX), so stored/reflected XSS via attribute injection of JavaScript handlers is blocked. Third, the <label> tag that wraps the radio inputs is not present in the $allowed_tags whitelist built in wp_kses_wf (input, textarea, select, option, optgroup, a, div, li, span, style, fieldset, link, form, script, table, canvas are listed; label is absent), meaning the outer wrapper would be stripped and the output would be malformed even before any XSS payload executes. Additionally, comparable functions that ARE called (create_select_options, create_toggle_switch) are always passed hardcoded constant arrays -- not user-controlled data -- confirming that $options arrays in this codebase pattern are developer-defined, not attacker-influenced. Reachability is zero: no call site exists, no user data flows into this function, and the wp_kses layer provides defence-in-depth even in a hypothetical future caller scenario.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f014",
+        "rel": "libs/utility.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/utility.php",
+        "tags": [
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "xss_reflected",
+          "location": "parse_user_agent, line 255",
+          "severity": "medium",
+          "reachability": "Any HTTP request; $browser_name, $browser_version[0], and $os are derived from HTTP_* request headers via $_SERVER and flow into the return string which is stored/displayed in logs",
+          "justification": "$browser_name, $browser_version[0], and $os originate from HTTP request headers and are concatenated into an HTML string without esc_html(), enabling XSS when the result is rendered in the activity log UI."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "parse_user_agent() is dead code: it is defined in libs/utility.php lines 213-259 but has zero callers anywhere in the plugin. The activity log display in ajax.php line 490 explicitly shows 'Available in PRO' for user-agent data, meaning user-agent display is a PRO-only feature absent from this codebase. The wpc_login_fails database schema (setup.php lines 457-466) has no user_agent column, and incrementFails() (functions.php lines 112-140) never calls parse_user_agent() nor stores any user-agent value. Even if the string concatenation at utility.php line 255 lacks esc_html(), the function is never invoked, so there is no reachable sink and no exploitable XSS. The finding is false."
+        }
+      },
+      {
+        "id": "f014",
+        "rel": "libs/utility.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/utility.php",
+        "tags": [
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "xss_filter_bypass",
+          "location": "wp_kses_wf, lines 501-507",
+          "severity": "high",
+          "reachability": "All HTML output from this file passes through wp_kses_wf(), which is intended as the XSS sanitizer; exploitable by any input that ends up in HTML rendered via this function",
+          "justification": "The custom wp_kses allowlist explicitly whitelists the <script> tag (with src= and type= attributes), meaning any attacker-controlled HTML reaching wp_kses_wf() can include arbitrary script tags that wp_kses will pass through unstripped."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "The <script> tag is genuinely whitelisted in wp_kses_wf() at lines 501-507 of utility.php — that is a real misconfiguration. However, the finding's reachability claim is false. Exploitability requires attacker-controlled HTML containing a <script> element to reach wp_kses_wf(). Examination of all 8 call sites shows none permit this: (1) utility.php:100 — hardcoded 'checked=checked' string; (2) utility.php:126 — toggle-switch HTML from internal plugin options; (3) utility.php:179,199 — select/radio HTML from internal plugin arrays; (4) admin.php:128 — notice text from DB option WPCAPTCHA_NOTICES_KEY, populated only by add_notice() with hardcoded translated strings; (5) admin.php:353 — tab icon, hardcoded or filterable only by admins via wpcaptcha_tabs; (6) functions.php:786 — display_message embedding $wpcaptcha_recovery_email which is passed through sanitize_email() at line 731, stripping angle brackets and preventing any tag injection; (7) wf-flyout.php:115 — CSS wrapped in <style> from config values already through sanitize_text_field(); (8) wf-flyout.php:164 — flyout HTML where labels use esc_html(), hrefs esc_url(), classes esc_attr(). No unauthenticated or low-privilege attacker can supply a <script> element to any of these paths. The whitelisted script tag is a code quality defect but not an exploitable XSS vulnerability given the actual data flows."
+        }
+      },
+      {
+        "id": "f014",
+        "rel": "libs/utility.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/utility.php",
+        "tags": [
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "xss_filter_bypass",
+          "location": "wp_kses_wf, lines 467-472",
+          "severity": "medium",
+          "reachability": "Same as above — all HTML output routed through wp_kses_wf()",
+          "justification": "The allowlist also whitelists <style> tags, allowing injected CSS (e.g., expression()-based attacks in older IE, or CSS data exfiltration) to pass through the kses sanitizer."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "The <style> tag is present in the wp_kses_wf() allowlist (lines 467-472), which is accurate. However, the finding fails on the reachability prong. All identified callers of wp_kses_wf() pass developer-controlled PHP string literals, not attacker-controlled input: utility.php (checked(), create_toggle_switch(), create_select_options(), create_radio_group()) builds $out from hardcoded HTML templates; admin.php line 128 uses $notice['text'] populated only by add_notice() calls with PHP string literals; functions.php line 786 uses $display_message set to hardcoded error strings; setup.php passes phpversion() and get_bloginfo(); tab_design.php uses $template_id from a hardcoded PHP array returned by get_templates(). No code path was found where attacker-controlled data containing a <style> tag reaches wp_kses_wf(). Additionally, all call sites are within the wp-admin interface (admin_menu hooks, admin notices) requiring administrator privilege, so even if a path existed the privilege bar is high. The <style> allowlist is an overly broad sanitizer configuration but not an exploitable XSS vector given the absence of any attacker-controlled input reaching the function. The also-present <script> allowlist (lines 501-507) is a separate, potentially higher-severity concern not claimed here."
+        }
+      },
+      {
+        "id": "f014",
+        "rel": "libs/utility.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/libs/utility.php",
+        "tags": [
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "improper_input_validation",
+          "location": "getUserIP, line 146",
+          "severity": "low",
+          "reachability": "Any request triggering IP logging; REMOTE_ADDR is attacker-controlled in some proxy/load-balancer configurations",
+          "justification": "sanitize_url() is applied to an IP address — it is not an IP validator and does not strip all invalid characters — so a non-standard REMOTE_ADDR value passes through and is stored in logs, potentially causing second-order issues if the IP is later used in SQL or HTML contexts."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "low",
+          "reasoning": "getUserIP() at line 145-146 reads $_SERVER['REMOTE_ADDR'] through wp_unslash() then sanitize_url(). While sanitize_url() is semantically wrong for an IP address (it is a URL sanitizer), the claimed second-order sinks do not exist in the codebase. (1) SQL: every use of $ip is passed through $wpdb->prepare() with a %s placeholder (countFails, isLockedDown) or via $wpdb->insert() which also escapes internally — no SQL injection. (2) HTML/XSS: in ajax.php lines 353-356 and 488-490, the login_attempt_IP and accesslock_IP columns are never echoed; the code substitutes hardcoded 'Available in PRO' strings, so no stored-XSS path exists in the free plugin. (3) REMOTE_ADDR is not an HTTP header and is not attacker-controlled except in misconfigured reverse-proxy setups, which is a server-level issue outside the plugin's control. (4) anonymous_logging md5() path sanitizes further. The sanitize_url() misuse is a code quality issue, but no reachable exploitable sink is present."
+        }
+      },
+      {
+        "id": "f015",
+        "rel": "wf-flyout/wf-flyout.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/wf-flyout/wf-flyout.php",
+        "tags": [
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "css_injection_wrong_context_escaping",
+          "location": "admin_head(), lines 98-110",
+          "severity": "medium",
+          "reachability": "Requires write access to wf-flyout/config.php (filesystem); config values are hardcoded PHP, not admin-editable DB options. Exploitable by an attacker with filesystem write or a co-installed plugin that monkey-patches the config array.",
+          "justification": "CSS property values (icon_right, icon_bottom, icon_border, icon_padding, icon_size, menu_accent_color) are sanitized with sanitize_text_field and interpolated directly inside a <style> block; sanitize_text_field strips HTML tags but does not prevent CSS injection — a value containing } closes the current rule, and a value containing </style> breaks out of the style block entirely into HTML, enabling XSS."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "informational",
+          "reasoning": "The CSS injection pattern exists in code: sanitize_text_field() does not prevent } or </style> from appearing in CSS property values interpolated into the <style> block in admin_head() (lines 97-113). The wp_kses_wf() output sanitizer calls wp_kses() which allows the <style> tag (explicitly listed in allowed_tags at line 467) and does not sanitize the inner CSS text content of that block, so malicious CSS values would reach the browser. However, the attack is not practically exploitable: all config values (icon_right, icon_bottom, icon_border, icon_padding, icon_size, menu_accent_color, custom_css) are hardcoded in config.php as PHP literals. They are not stored in the database and are not settable through any WordPress admin UI or AJAX endpoint. An attacker must have direct filesystem write access to config.php to inject a malicious value. Filesystem write access is equivalent to arbitrary code execution — at that privilege level, CSS injection provides no meaningful uplift over simply writing malicious PHP. The co-plugin monkey-patching scenario (modifying $config after require_once) is also a code-execution-level primitive. Because the attacker prerequisite (filesystem write or co-installed malicious plugin with code exec) already subsumes the impact of the claimed CSS injection XSS, the finding does not represent an independently exploitable vulnerability. Marking is_real=false: the code pattern is imperfect but the finding as a security vulnerability is not valid given the required attacker capability.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f015",
+        "rel": "wf-flyout/wf-flyout.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/wf-flyout/wf-flyout.php",
+        "tags": [
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "css_injection_wrong_context_escaping",
+          "location": "admin_head(), line 112",
+          "severity": "medium",
+          "reachability": "Same as above — custom_css comes from hardcoded config.php; exploitation requires filesystem access or a co-installed plugin modifying $this->config['custom_css'].",
+          "justification": "The custom_css config value (a full CSS blob) is passed through sanitize_text_field and concatenated into a <style> block; sanitize_text_field only strips HTML tags and extra whitespace, so a payload like </style><script>alert(1)</script> would pass through if angle brackets are not stripped, and more practically a value with } and a new rule or @import can inject arbitrary CSS (style hijacking, data exfiltration via CSS)."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "The custom_css value at line 112 of wf-flyout.php is sourced exclusively from config.php, a static hardcoded PHP array literal shipped with the plugin. No attacker-controlled input (HTTP request, database, user-supplied data) flows into $this->config['custom_css'] at any point in the codebase. The finding's own reachability statement acknowledges this: exploitation requires filesystem write access, which collapses this to a post-exploitation scenario rather than a web vulnerability. Additionally, the sanitization chain is double-layered: sanitize_text_field() (which strips HTML tags) is applied to custom_css before concatenation, and then wp_kses_wf() applies wp_kses() with an allowlist to the entire $out string, which would strip any unexpected script tags even if sanitize_text_field() missed them. The sink is only reached in admin_head on admin-only plugin screens, further reducing impact. There is no real vulnerability here."
+        }
+      },
+      {
+        "id": "f015",
+        "rel": "wf-flyout/wf-flyout.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/wf-flyout/wf-flyout.php",
+        "tags": [
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "stored_xss_unescaped_html_attribute",
+          "location": "admin_footer(), line 151",
+          "severity": "medium",
+          "reachability": "Requires control over $this->config['menu_items'][n]['data']; values come from hardcoded config.php (not DB), so exploitation needs filesystem write or a co-installed plugin. wp_kses provides a post-hoc backstop that strips unknown attributes including event handlers.",
+          "justification": "The 'data' field of each menu item is concatenated directly into the opening <a> tag without any escaping: '<a ' . $item['data'] . ' href=...'; this inserts raw arbitrary HTML at the attribute position, allowing injection of event handlers like onmouseover=alert(1) — the sole defense is the wp_kses allowlist filter applied after the string is fully built, which can be circumvented if the allowlist is later expanded or if the injected attribute is already in the allowed list."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "The unescaped concatenation at line 151 (`'<a ' . $item['data'] . ' href=...'`) is real code, but exploitation requires attacker control over `$item['data']`. That value originates exclusively from the hardcoded `wf-flyout/config.php` file loaded via `require_once` in `load_config()` — there is no DB read, no `$_GET`/`$_POST`, and no option table path feeding this field. All `data` values in `config.php` are developer-hardcoded strings (e.g., `data-pro-feature=\"flyout\"`). Achieving attacker control requires filesystem write access, which constitutes full server compromise already beyond WordPress scope. Additionally, the `wp_kses_wf` backstop at line 164 calls `wp_kses($html, $allowed_tags)` which strips any attribute not in the `<a>` allowlist (href, class, id, target, data-*, style, role, aria-controls, aria-selected, disabled). Event handlers like `onmouseover` are definitively stripped — this is not a speculative future guard but an active one. The claim that the allowlist could be expanded later is speculative and not a present vulnerability. The finding correctly identifies a code smell (unescaped concatenation in HTML attribute position) but the source is not attacker-controlled and the sanitizer does block the claimed injection vector."
+        }
+      },
+      {
+        "id": "f015",
+        "rel": "wf-flyout/wf-flyout.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/advanced-google-recaptcha/wf-flyout/wf-flyout.php",
+        "tags": [
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "wrong_context_escaping_html_attribute",
+          "location": "admin_footer(), line 154",
+          "severity": "low",
+          "reachability": "Same as above — icon value from hardcoded config.php menu_items array; wp_kses backstop applies.",
+          "justification": "The dashicons icon class name is inserted into an HTML class attribute using sanitize_text_field, which does not encode the double-quote character; a value containing \" class=\"injected could break out of the class attribute and inject additional attributes into the <span> tag, though wp_kses provides a backstop."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "informational",
+          "reasoning": "The sink at wf-flyout.php line 154 uses sanitize_text_field() instead of esc_attr() for the dashicons icon class inserted into an HTML class attribute. While sanitize_text_field() does not encode double-quotes and is technically wrong for an attribute context, the source of $item['icon'] is the hardcoded static config.php file shipped with the plugin (values like 'wp-captcha.png', 'dashicons-universal-access'). There is no code path by which an attacker or even an admin can influence this value at runtime: it is not read from get_option(), $_{GET,POST,REQUEST}, user meta, or any other dynamic source. The value is a compile-time constant in the plugin's own distributed source. Additionally, the entire $out string is passed through WPCaptcha_Utility::wp_kses_wf() before echoing, which calls wp_kses() with an allowlist that only permits class, style, id, data-*, and aria-hidden on <span> tags — stripping any injected attributes even if a double-quote escape were possible. The finding is a code-quality observation (wrong escaping function for context) but is not a security vulnerability because no attacker-controlled data reaches the sink.",
+          "_done": true
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "css_injection_wrong_context_escaping",
+      "location": "admin_head(), lines 98-110",
+      "severity": "medium",
+      "reachability": "Requires write access to wf-flyout/config.php (filesystem); config values are hardcoded PHP, not admin-editable DB options. Exploitable by an attacker with filesystem write or a co-installed plugin that monkey-patches the config array.",
+      "justification": "CSS property values (icon_right, icon_bottom, icon_border, icon_padding, icon_size, menu_accent_color) are sanitized with sanitize_text_field and interpolated directly inside a <style> block; sanitize_text_field strips HTML tags but does not prevent CSS injection — a value containing } closes the current rule, and a value containing </style> breaks out of the style block entirely into HTML, enabling XSS."
+    },
+    {
+      "vuln_class": "css_injection_wrong_context_escaping",
+      "location": "admin_head(), line 112",
+      "severity": "medium",
+      "reachability": "Same as above — custom_css comes from hardcoded config.php; exploitation requires filesystem access or a co-installed plugin modifying $this->config['custom_css'].",
+      "justification": "The custom_css config value (a full CSS blob) is passed through sanitize_text_field and concatenated into a <style> block; sanitize_text_field only strips HTML tags and extra whitespace, so a payload like </style><script>alert(1)</script> would pass through if the < and > were not stripped, but more practically a value with } and a new rule or @import can inject arbitrary CSS (style hijacking, data exfiltration via CSS)."
+    },
+    {
+      "vuln_class": "stored_xss_unescaped_html_attribute",
+      "location": "admin_footer(), line 151",
+      "severity": "medium",
+      "reachability": "Requires control over $this->config['menu_items'][n]['data']; values come from hardcoded config.php (not DB), so exploitation needs filesystem write or a co-installed plugin. wp_kses provides a post-hoc backstop that strips unknown attributes including event handlers.",
+      "justification": "The 'data' field of each menu item is concatenated directly into the opening <a> tag without any escaping: '<a ' . $item['data'] . ' href=...'; this inserts raw arbitrary HTML at the attribute position, allowing injection of event handlers like onmouseover=alert(1) — the sole defense is the wp_kses allowlist filter applied after the string is fully built, which can be circumvented if the allowlist is later expanded or if the attribute is in the allowed list."
+    },
+    {
+      "vuln_class": "wrong_context_escaping_html_attribute",
+      "location": "admin_footer(), line 154",
+      "severity": "low",
+      "reachability": "Same as above — icon value from hardcoded config.php menu_items array; wp_kses backstop applies.",
+      "justification": "The dashicons icon class name is inserted into an HTML class attribute using sanitize_text_field, which does not encode the double-quote character; a value containing \" class=\"injected could break out of the class attribute and inject additional attributes into the <span> tag, though wp_kses provides a backstop."
+    }
+  ]
+}

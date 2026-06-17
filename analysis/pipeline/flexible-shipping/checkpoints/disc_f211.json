@@ -1,0 +1,31 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "nonce_action_poisoning",
+      "location": "processAjaxNoticeDismiss(), lines 75-77",
+      "severity": "medium",
+      "reachability": "Any logged-in WordPress user who can generate a nonce (all authenticated users can call wp_create_nonce()). Handler is registered as wp_ajax_ (requires login).",
+      "justification": "The nonce action string passed to check_ajax_referer() is constructed from attacker-supplied POST data: $optionName = OPTION_NAME_PREFIX . sanitize_text_field($_POST['notice_name']). An authenticated attacker controls the action string the nonce is verified against — they can pre-generate a valid nonce for any action they choose and then supply the matching notice_name, trivially bypassing the intent of nonce binding to a specific server-defined notice.",
+      "detection_pattern": {
+        "grep_pattern": "check_ajax_referer\\s*\\(\\s*\\$",
+        "anti_pattern": "check_ajax_referer\\s*\\(\\s*'[^$]",
+        "section_name": "CSRF/Nonce: dynamic action string from user input",
+        "description": "Detects check_ajax_referer() calls where the action argument is a variable rather than a hard-coded string literal. When the action string is derived from request input, an attacker can supply any notice_name and pre-generate a matching nonce, defeating the CSRF protection's binding to a specific operation. Anti-pattern matches the safe form where the action is a literal string."
+      }
+    },
+    {
+      "vuln_class": "arbitrary_option_write",
+      "location": "processAjaxNoticeDismiss(), lines 75-76, 86",
+      "severity": "medium",
+      "reachability": "Any authenticated user with edit_posts capability (Contributor level and above). Handler requires login via wp_ajax_ hook.",
+      "justification": "update_option($optionName, ...) is called where $optionName = OPTION_NAME_PREFIX . $noticeName and $noticeName is attacker-controlled (only sanitize_text_field applied, which does not restrict option-name characters). A Contributor+ user can write to any wp_options row whose name begins with OPTION_NAME_PREFIX by supplying an arbitrary notice_name, including overwriting existing plugin settings stored under that prefix. The severity depends on what OPTION_NAME_PREFIX resolves to at runtime.",
+      "detection_pattern": {
+        "grep_pattern": "update_option\\s*\\(\\s*\\$",
+        "anti_pattern": "update_option\\s*\\(\\s*'[^$]",
+        "section_name": "Arbitrary Option Write: user-controlled option name",
+        "description": "Detects update_option() calls where the option name argument is a variable. When the option name is derived from request input without strict allowlisting against a fixed set of known option names, an authenticated attacker can write to unintended rows in wp_options. Anti-pattern matches the safe form where the option name is a hard-coded string literal."
+      }
+    }
+  ]
+}

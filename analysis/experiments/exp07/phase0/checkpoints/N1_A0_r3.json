@@ -1,0 +1,41 @@
+{
+  "findings": [
+    {
+      "vuln_class": "request_method_confusion",
+      "location": "ajax_scanner, line 33",
+      "severity": "medium",
+      "justification": "Nonce verification and all input reads use $_REQUEST instead of $_POST, which allows GET-based requests to carry these parameters and can weaken CSRF protection in certain server/proxy configurations."
+    },
+    {
+      "vuln_class": "missing_capability_whitelist",
+      "location": "ajax_scanner, lines 47-49",
+      "severity": "medium",
+      "justification": "An authenticated admin can supply arbitrary strings via $_REQUEST['capabilities'] to control the capability scanner scope; sanitize_key does not restrict to a whitelist of valid WordPress capabilities, so an attacker with admin access could target arbitrary user groups."
+    },
+    {
+      "vuln_class": "side_effect_in_reporting_function",
+      "location": "scan_recommendations, lines 204-208",
+      "severity": "high",
+      "justification": "scan_recommendations() automatically revokes capabilities and destroys all sessions for detected users as a side effect of generating the report HTML, meaning any code path that calls it (including the AJAX endpoint when completed=true) triggers irreversible account changes without a separate confirmation step."
+    },
+    {
+      "vuln_class": "stored_html_without_full_sanitization",
+      "location": "scan_recommendations / ajax_scanner, lines 153-512 / line 512",
+      "severity": "medium",
+      "justification": "The $content string built in scan_recommendations() is stored to the database via update_option('um_secure_scan_result_content', $content) and contains concatenated raw HTML using esc_url/admin_url but without wp_kses applied to the full accumulated string before storage."
+    },
+    {
+      "vuln_class": "untrusted_filter_for_security_decision",
+      "location": "scan_recommendations, line 150",
+      "severity": "low",
+      "justification": "Active plugin status is determined via apply_filters('active_plugins', ...) which can be overridden by any installed plugin, potentially causing the security scanner to give false assurances about security plugins being active."
+    },
+    {
+      "vuln_class": "type_confusion_in_option_fallback",
+      "location": "scan_recommendations, line 253",
+      "severity": "low",
+      "justification": "get_option('um_secure_scanned_details', $susp_accounts) passes an array of WP_User objects as the default value, so if the option is absent $option is an array of user objects and the subsequent $option['scanned_caps'] access will produce a PHP warning and undefined behavior rather than a clean fallback."
+    }
+  ],
+  "_done": true
+}

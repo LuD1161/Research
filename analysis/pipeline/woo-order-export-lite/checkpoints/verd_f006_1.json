@@ -1,0 +1,6 @@
+{
+  "is_real": false,
+  "severity": "none",
+  "reasoning": "The finding claims stored XSS via jQuery('#output_preview').html(html) in buttons.js line 20. The sink exists in code, but is unreachable with any supported format. The JS logic in woe_show_preview() routes to .html() only in the else branch — i.e., only when the format is neither flat nor object. flat_formats = ['XLS','CSV','TSV','PDF','HTML'] and object_formats = ['XML','JSON'] (set in class-wc-order-export-admin.php line 382-383). The plugin ships exactly seven formatters: csv, html, json, pdf, tsv, xls, xml. These two sets jointly cover all seven, leaving no format that falls through to the .html() sink. For HTML and PDF formats (which do emit raw HTML from order data without escaping in the formatter), the flat-format branch fires first and routes to .text(), which renders the content as plain text. The server side does send unescaped HTML order data in the json response (build_file in preview mode with HTML formatter calls fwrite with raw row values — no esc_html), so the PHP side produces dangerous payload, but the JS consumer always reaches .text() rather than .html() for every reachable format. Auth is real: ajax_gate() enforces current_user_can('view_woocommerce_reports') plus nonce. The .html() sink is dead code.",
+  "_done": true
+}

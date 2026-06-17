@@ -1,0 +1,29 @@
+{
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "actionIndex (line 17)",
+      "severity": "medium",
+      "justification": "actionIndex is reachable via the wp_ajax_smart-slider3 hook (AdminHelper.php line 35-38), which dispatches through display_admin_ajax() without calling checkForCap(); actionIndex itself calls only validateToken() (a wp_verify_nonce nonce check) and never calls current_user_can() or validatePermission(), so any authenticated WordPress user regardless of role can enumerate the server's image directory tree and receive the absolute server filesystem path via the fullPath field in the JSON response."
+    },
+    {
+      "vuln_class": "information_disclosure",
+      "location": "actionIndex (line 88-93)",
+      "severity": "low",
+      "justification": "The JSON response unconditionally includes the fullPath key containing the absolute server filesystem path of the browsed directory, which can be used by an attacker to aid further exploitation such as local file inclusion or path-based attacks."
+    },
+    {
+      "vuln_class": "stored_xss_via_svg_upload",
+      "location": "actionUpload (line 139-259)",
+      "severity": "high",
+      "justification": "SVG files with MIME type image/svg+xml pass the allowedMimes check and are written to disk by BulletProof without any XML/content sanitization, so a user with the upload_files capability can upload a crafted SVG containing arbitrary JavaScript that executes in the browser when the file is served and loaded by an admin."
+    },
+    {
+      "vuln_class": "missing_exit_after_error",
+      "location": "actionUpload (lines 140-147)",
+      "severity": "low",
+      "justification": "The upload-disabled (N2_IMAGE_UPLOAD_DISABLE) and capability (current_user_can) checks at lines 140-147 call $this->response->error() which does invoke PageFlow::exitApplication() and terminate execution, so in practice the flow halts correctly; however, the early-exit relies entirely on the ResponseAjax side-effect rather than an explicit return/die after each guard, making the control flow fragile if the response layer is ever refactored."
+    }
+  ],
+  "_done": true
+}

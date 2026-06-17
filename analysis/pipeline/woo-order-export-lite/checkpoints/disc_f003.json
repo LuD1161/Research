@@ -1,0 +1,33 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "path_traversal_file_read",
+      "location": "drawLogo() lines 135-162",
+      "severity": "medium",
+      "reachability": "Any user who can control PDF export settings (typically admin or shop manager) can supply the logo source path; the value flows into getimagesize($source) at line 146 and $this->Image($source, ...) at line 162 with no realpath() check or path-prefix restriction, allowing traversal to arbitrary local files that get embedded into the generated PDF.",
+      "justification": "The logo source from header_props['logo']['source'] is passed directly to getimagesize() and FPDF's Image() without any canonicalization or prefix validation, enabling a path like ../wp-config.php to be embedded into the PDF output."
+    },
+    {
+      "vuln_class": "path_traversal_file_read",
+      "location": "isImageCell() line 381, getMaxImageHeight() line 367, Row() lines 300 and 314",
+      "severity": "medium",
+      "reachability": "The image cell value comes from order row data assembled during export; a user who can influence exported order data (e.g. a product image field) and trigger a PDF export can supply a path that passes the file_exists() check but traverses outside the intended directory.",
+      "justification": "isImageCell() validates only that file_exists($value['value']) is true and type === 'image', but there is no realpath() canonicalization or directory-prefix check before the value is passed to getimagesize() and $this->Image(), so a path like ../../wp-config.php that exists on disk would be accepted and embedded."
+    },
+    {
+      "vuln_class": "http_header_injection",
+      "location": "_httpencode() lines 584-586, output_to_destination() lines 550 and 560",
+      "severity": "medium",
+      "reachability": "Reached whenever output_to_destination() is called with dest='I' or dest='D' and a caller-controlled $name; if the caller can embed CRLF sequences or double-quote characters in $name, they flow unfiltered into the Content-Disposition header.",
+      "justification": "When _isascii($value) returns true, _httpencode() returns param . '=\"' . $value . '\"' with no stripping of \\r, \\n, or '\"', so a filename containing CRLF allows injecting arbitrary HTTP response headers (e.g. Set-Cookie or Location) from the inline/download PDF endpoints."
+    },
+    {
+      "vuln_class": "incomplete_input_validation",
+      "location": "convert_color() lines 782-786",
+      "severity": "low",
+      "reachability": "Any code path that passes a color array through setProperties/setHeaderProperty/setTableRowProperty and ultimately calls convert_color(); the third element (blue channel, index 2) of the array is not validated.",
+      "justification": "The loop in convert_color() runs for $i = 0 and $i = 1 only (condition $i < 2), so index 2 is sliced into the result without the numeric/range check applied to indices 0 and 1, potentially allowing a non-integer value to reach SetTextColor() or SetFillColor() and trigger unexpected FPDF behavior."
+    }
+  ]
+}

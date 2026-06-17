@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "missing_input_sanitization_before_external_transmission",
+      "location": "prepare_payload() lines 48-51; handle_ajax_request() lines 72-74",
+      "severity": "low",
+      "reachability": "Any authenticated user with the 'edit_posts' capability (Contributor and above) can reach handle_ajax_request via wp_ajax_ hook after passing a valid nonce.",
+      "justification": "Raw $_REQUEST['selected_option'] and $_REQUEST['additional_info'] are copied verbatim into the payload array and transmitted to WPDesk's external tracking server via send_payload() with no sanitization, type-checking, or length restriction, allowing a Contributor to inject arbitrary data into WPDesk's telemetry pipeline.",
+      "detection_pattern": {
+        "grep_pattern": "\\$_REQUEST\\[|\\$_POST\\[|\\$_GET\\[",
+        "anti_pattern": "sanitize_text_field|sanitize_textarea_field|intval|absint|wp_kses",
+        "section_name": "Unsanitized input forwarded to external endpoint",
+        "description": "Catches AJAX or form handlers that read raw superglobal values and forward them externally or store them without sanitization; the anti_pattern confirms a sanitization call is present near the input read."
+      }
+    },
+    {
+      "vuln_class": "double_invocation_logic_error",
+      "location": "handle_ajax_request() lines 73-74",
+      "severity": "low",
+      "reachability": "Same as above — any Contributor-level authenticated user.",
+      "justification": "prepare_payload($_REQUEST) is called twice on consecutive lines: once to assign $payload (line 73) and again as the argument to send_payload_to_wpdesk() (line 74), causing apply_filters('wpdesk_tracker_user_feedback_data', ...) to fire twice and sending a second HTTP request to the external endpoint, which could double-count feedback events in WPDesk's analytics.",
+      "detection_pattern": {
+        "grep_pattern": "prepare_payload",
+        "anti_pattern": "prepare_payload.*//.*once|single.*prepare_payload",
+        "section_name": "Duplicate function call causing double external submission",
+        "description": "Flags functions named prepare_payload (or similar) called more than once in the same handler context, which may indicate accidental double-submission to external services."
+      }
+    },
+    {
+      "vuln_class": "overly_permissive_capability_check",
+      "location": "handle_ajax_request() line 69",
+      "severity": "low",
+      "reachability": "Any logged-in user with the 'edit_posts' capability, which includes Contributors — the lowest non-subscriber role in WordPress.",
+      "justification": "The capability gate current_user_can('edit_posts') allows Contributors to submit feedback telemetry to an external WPDesk server; a more appropriate capability would be 'manage_options' (admin) or 'activate_plugins' since this is a plugin-management telemetry feature, not a content-editing feature.",
+      "detection_pattern": {
+        "grep_pattern": "current_user_can\\(['\"]edit_posts['\"]\\)",
+        "anti_pattern": "current_user_can\\(['\"]manage_options['\"]\\)|current_user_can\\(['\"]activate_plugins['\"]\\)",
+        "section_name": "Weak capability: edit_posts used for admin/telemetry action",
+        "description": "Detects handlers that gate privileged or administrative operations only on edit_posts (a Contributor-level capability) rather than a properly scoped admin capability."
+      }
+    }
+  ]
+}

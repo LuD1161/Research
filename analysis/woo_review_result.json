@@ -1,0 +1,52 @@
+{
+  "summary": "Exhaustive open-ended security review of WooCommerce attack surface (1763 files / 89 batches) with Opus 4.8, adversarial verify, then aggregate",
+  "agentCount": 90,
+  "logs": [
+    "Wave 1/18 done (batches 0-4). Cumulative findings: 1.",
+    "Wave 2/18 done (batches 5-9). Cumulative findings: 1.",
+    "Wave 3/18 done (batches 10-14). Cumulative findings: 1.",
+    "Wave 4/18 done (batches 15-19). Cumulative findings: 1.",
+    "Wave 5/18 done (batches 20-24). Cumulative findings: 1.",
+    "Wave 6/18 done (batches 25-29). Cumulative findings: 1.",
+    "Wave 7/18 done (batches 30-34). Cumulative findings: 1.",
+    "Wave 8/18 done (batches 35-39). Cumulative findings: 1.",
+    "Wave 9/18 done (batches 40-44). Cumulative findings: 1.",
+    "Wave 10/18 done (batches 45-49). Cumulative findings: 1.",
+    "Wave 11/18 done (batches 50-54). Cumulative findings: 1.",
+    "Wave 12/18 done (batches 55-59). Cumulative findings: 1.",
+    "Wave 13/18 done (batches 60-64). Cumulative findings: 1.",
+    "Wave 14/18 done (batches 65-69). Cumulative findings: 1.",
+    "Wave 15/18 done (batches 70-74). Cumulative findings: 1.",
+    "Wave 16/18 done (batches 75-79). Cumulative findings: 1.",
+    "Wave 17/18 done (batches 80-84). Cumulative findings: 1.",
+    "Wave 18/18 done (batches 85-88). Cumulative findings: 1.",
+    "Reviewed 89 batches. Raw findings: 1. Verified-real: 0."
+  ],
+  "result": {
+    "batches": 89,
+    "raw_findings": 1,
+    "confirmed_count": 0,
+    "confirmed": [],
+    "all_with_verdicts": [
+      {
+        "file": "/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review/plugins/src/woocommerce/includes/admin/class-wc-admin-post-types.php",
+        "line": 720,
+        "title": "Coupon description (post_excerpt) echoed without escaping into textarea on coupon edit screen",
+        "vuln_class": "Stored XSS",
+        "severity": "low",
+        "auth_required": "shop_manager",
+        "data_flow": "$_POST['excerpt'] saved as shop_coupon post_excerpt -> stored -> edit_form_after_title() echoes $post->post_excerpt raw (no esc_textarea) inside <textarea id=\"woocommerce-coupon-description\"> on the coupon edit screen",
+        "entry_point": "admin 'edit_form_after_title' action on shop_coupon edit screen (post.php). Authoring a coupon requires publish_shop_coupons (shop_manager/admin). Output is unescaped (phpcs EscapeOutput.OutputNotEscaped explicitly disabled).",
+        "confidence": "medium",
+        "batch": 1,
+        "verdict": {
+          "is_real": false,
+          "confidence": "high",
+          "severity": "none",
+          "auth_required": "administrator (single-site, requires unfiltered_html); not exploitable by shop_manager as claimed",
+          "reasoning": "The sink is real: edit_form_after_title() at class-wc-admin-post-types.php:720 echoes $post->post_excerpt raw (no esc_textarea) inside a <textarea>, with phpcs EscapeOutput explicitly disabled. However, the stored-XSS exploit path does NOT hold at the claimed shop_manager privilege because WordPress core neutralizes the stored value on every write path.\n\nStorage path analysis:\n1. On the post.php coupon edit screen, the description field is name=\"excerpt\". It is saved by WordPress CORE edit_post()/wp_update_post(), NOT by WooCommerce. WooCommerce's own coupon save handler (class-wc-meta-box-coupon-data.php:357 save()) never reads $_POST['excerpt'] and never calls set_description() — it only sets code, amounts, dates, etc. So post_excerpt is written through core sanitize_post('db'), whose 'pre_post_excerpt' filter is wp_filter_post_kses, registered by kses_init_filters() for any user WITHOUT the unfiltered_html capability.\n2. shop_manager does NOT have unfiltered_html (confirmed in class-wc-install.php:2384-2429 role definition and get_core_capabilities; only WP-core caps + WC shop caps are granted). Therefore kses runs on a shop_manager's input. kses strips <script> (not in $allowedposttags) AND strips the </textarea> closing tag (textarea is not an allowed post tag), so the payload cannot break out of the textarea — it stays inert text inside the field. No XSS.\n3. The WC coupon data store update() (class-wc-coupon-data-store-cpt.php:178-208) does use a direct $wpdb->update that bypasses kses, but ONLY when doing_action('save_post'); and in that branch it writes get_description('edit'), which is the value loaded by read() from the DB AFTER core's kses-filtered edit_post() write in the same request. set_description() is never called during the admin save, so the raw $_POST never reaches that $wpdb path. The non-save_post (pure CRUD/REST) branch uses wp_update_post(), which again applies kses for users lacking unfiltered_html. The REST coupon endpoint also requires edit_shop_coupons (shop_manager/admin) and likewise gets kses-filtered.\n\nThe only actor who can store raw </textarea><script> is one possessing unfiltered_html — i.e., an administrator on single-site (multisite admins also lack it by default). An administrator already has full unrestricted HTML/JS/theme-edit capability by design, so this is not a privilege-boundary crossing and not a meaningful stored-XSS finding. Conclusion: the missing esc_textarea is a defense-in-depth/hardening nit, but core kses prevents exploitation at the stated shop_manager level. Refuted."
+        }
+      }
+    ]
+  }
+}

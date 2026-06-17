@@ -1,0 +1,35 @@
+{
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "actionIndex (line 17)",
+      "severity": "medium",
+      "justification": "actionIndex performs only a nonce check (validateToken) with no capability check; the wp_ajax_smart-slider3 hook dispatcher (display_admin_ajax, AdminHelper.php line 155) skips the checkForCap() guard that all other handlers use, so any logged-in WordPress user (e.g. subscriber) can enumerate server-side directories and filenames under the images folder."
+    },
+    {
+      "vuln_class": "information_disclosure",
+      "location": "actionIndex (line 90)",
+      "severity": "low",
+      "justification": "The AJAX response includes the absolute server filesystem path as 'fullPath', leaking the server's directory layout to any caller who can reach the endpoint."
+    },
+    {
+      "vuln_class": "path_traversal_via_symlink",
+      "location": "actionIndex (lines 42-54), actionUpload (lines 207-211)",
+      "severity": "medium",
+      "justification": "When the realpath()-resolved path falls outside $root, both handlers re-assign $path to $originalFullPath (the unresolved, attacker-controlled string) if any ancestor is a symlink, without re-verifying that the symlink target remains within $root, allowing a symlink placed inside the images folder to redirect directory listing or file uploads to arbitrary server paths."
+    },
+    {
+      "vuln_class": "missing_svg_sanitization",
+      "location": "actionUpload (lines 244-246)",
+      "severity": "medium",
+      "justification": "SVG files are accepted for upload (mime image/svg+xml) and written to disk via BulletProof without any XML/SVG sanitization to strip embedded <script> or event-handler attributes, enabling stored XSS if the SVG is later served with an inline content type or embedded in a page."
+    },
+    {
+      "vuln_class": "execution_continues_after_error",
+      "location": "actionUpload (lines 140-148)",
+      "severity": "medium",
+      "justification": "After the N2_IMAGE_UPLOAD_DISABLE check and current_user_can check both call $this->response->error(), execution falls through to $this->validateToken() and the upload logic if ResponseAjax::error() does not terminate the PHP process (though PageFlow::exitApplication is called, any mis-implementation or output buffering issue could allow continuation)."
+    }
+  ],
+  "_done": true
+}

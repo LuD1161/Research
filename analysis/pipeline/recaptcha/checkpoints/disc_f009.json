@@ -1,0 +1,19 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "install_template() / libs/functions.php:1317, registered via admin_action_wpcaptcha_install_template in advanced-google-recaptcha.php:107",
+      "severity": "medium",
+      "reachability": "Any authenticated WordPress user who is in wp-admin and can obtain or guess the nonce (nonce is only rendered to admins on the Design tab, so practical exploitation is admin-only; however the code itself imposes no capability gate — a subscriber with the nonce could invoke it)",
+      "justification": "install_template() calls check_admin_referer('wpcaptcha_install_template') for CSRF protection but never calls current_user_can(), so the nonce is the only access gate; CSRF protection is not authorization, and any authenticated user who possesses the nonce can overwrite plugin design options via update_option(WPCAPTCHA_OPTIONS_KEY, $options)."
+    },
+    {
+      "vuln_class": "stored_xss",
+      "location": "admin_notices() / libs/admin.php:128",
+      "severity": "low",
+      "reachability": "Latent: current callers of add_notice() only pass hardcoded translated strings so the sink is not currently reachable with attacker-controlled data; exploitable if any future code or a third-party plugin calls WPCaptcha_Admin::add_notice() with user-controlled $type or $text",
+      "justification": "Line 128 concatenates $notice['type'] directly into a double-quoted HTML class attribute and $notice['text'] directly into a <p> body without esc_attr()/esc_html(); wp_kses_wf does not entity-encode attribute values, so a $notice['type'] value containing a double-quote would break out of the class attribute and allow event-handler injection."
+    }
+  ]
+}

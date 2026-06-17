@@ -1,0 +1,6 @@
+{
+  "is_real": false,
+  "severity": "none",
+  "reasoning": "The type-juggling claim is false. `$unblock_key` is always produced by sanitize_key() applied to a token prefixed with 'agr' (e.g., 'agr' + 32-char md5 hex = 35 chars), so neither operand in `$unblock_transient == $unblock_key` can be coerced to a numeric type by PHP loose comparison — the 'agr' prefix makes both sides non-numeric strings, making == and === identical in behavior here. The non-constant-time comparison is technically accurate but not practically exploitable: the token is a large random value, there is no timing oracle accessible over the network (jitter dominates), and the token is single-use (stored in a transient that expires in 1 hour). Additionally, a length inconsistency undermines even theoretical reachability: the generated key is 35 chars ('agr' + 32 hex chars from md5), but line 815 only accepts input of exactly 32 chars — so no legitimately generated unblock key would even pass the strlen guard into the comparison on line 818. The finding self-contradicts by acknowledging it is 'not exploitable via type juggling.' No sanitizer was missed; the code path is internally inconsistent such that the comparison at line 818 is unreachable via valid tokens. Defaulting to is_real=false per instructions.",
+  "_done": true
+}

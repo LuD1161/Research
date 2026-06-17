@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "missing_csrf_protection",
+      "location": "getResultDetails() — line 29-103, registered at lines 18/20-21",
+      "severity": "low",
+      "reachability": "Any unauthenticated visitor on the internet; registered via wp_ajax_nopriv_ (and wc_ajax_ which is also public/unauthenticated). The phpcs:ignore comment at line 35 explicitly suppresses the nonce-check warning, confirming intentional omission.",
+      "justification": "getResultDetails() reads $_POST['items'] with no nonce or referer verification whatsoever; a cross-origin request can be forged to make any logged-in user's browser query product/taxonomy detail HTML on their behalf, leaking whatever canUserSee() would permit for that user's session — a read-only CSRF whose value is limited but not zero (e.g., probing whether a private product exists for an admin user).",
+      "detection_pattern": {
+        "grep_pattern": "wp_ajax_nopriv_",
+        "anti_pattern": "check_ajax_referer|wp_verify_nonce",
+        "section_name": "CSRF: public AJAX handler without nonce",
+        "description": "Finds wp_ajax_nopriv_ registrations (publicly callable AJAX handlers) and flags those whose corresponding callback does not contain a nonce verification call. Even read-only handlers can leak data via CSRF if the response differs by auth context."
+      }
+    },
+    {
+      "vuln_class": "unescaped_filter_output_in_html",
+      "location": "getTaxonomyDetails() — lines 207-223",
+      "severity": "low",
+      "reachability": "Requires a third-party plugin or theme that hooks the filter dgwt/wcas/suggestion_details/taxonomy/headline; not reachable by an unauthenticated attacker in a default installation.",
+      "justification": "$title is assembled with safe HTML strings (esc_html applied to $termName at line 211) and then passed through apply_filters() at line 213-219, after which the full $title string is echo'd without any escaping at line 223. Any plugin hooking dgwt/wcas/suggestion_details/taxonomy/headline and returning malicious HTML would have it injected verbatim into the response; the risk is low because filter hooks require server-level access, but the pattern breaks the contract that caller-owned HTML should be escaped at the final output point.",
+      "detection_pattern": {
+        "grep_pattern": "echo.*apply_filters",
+        "anti_pattern": "esc_html|esc_attr|esc_url|wp_kses",
+        "section_name": "XSS: unescaped apply_filters output echoed",
+        "description": "Catches direct echo of apply_filters() return values without an escaping wrapper. Filter hooks can be registered by any installed plugin, so unescaped filter output is a latent stored-XSS vector whenever the filter return value is not already trusted HTML."
+      }
+    },
+    {
+      "vuln_class": "missing_content_type_header",
+      "location": "getResultDetails() — line 101",
+      "severity": "low",
+      "reachability": "Any caller of the public AJAX endpoint.",
+      "justification": "The handler uses echo json_encode(...) instead of wp_send_json() or wp_send_json_success(); WordPress's wp_send_json() calls wp_die() with the correct application/json Content-Type, while the raw echo leaves the response with the default text/html Content-Type. Browsers may MIME-sniff the JSON response as HTML in legacy modes, potentially executing embedded script fragments injected via the dgwt/wcas/suggestion_details/output filter.",
+      "detection_pattern": {
+        "grep_pattern": "echo json_encode",
+        "anti_pattern": "wp_send_json|header.*application/json",
+        "section_name": "Missing Content-Type: JSON response sent as text/html",
+        "description": "Finds AJAX handlers that build a JSON response with echo json_encode() instead of wp_send_json(). Without an explicit Content-Type: application/json header, browsers may MIME-sniff the response and execute embedded HTML/script content."
+      }
+    }
+  ]
+}
