@@ -1,0 +1,31 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "object_injection",
+      "location": "getTestProductFilterByWBW(), line 710",
+      "severity": "medium",
+      "reachability": "Runs automatically for any authenticated admin on the troubleshooting settings page (via localizeSettings() at line 207). The DB row must first be poisoned — requires write access to the WBW Product Filter settings table (shop-admin level or a compromised WBW plugin).",
+      "justification": "unserialize($filter['setting_data']) is called on data fetched from a third-party plugin's database table with no allowed_classes restriction; a poisoned serialized payload in that table triggers object injection during every admin page load without any AJAX call.",
+      "detection_pattern": {
+        "grep_pattern": "unserialize\\s*\\(",
+        "anti_pattern": "unserialize\\s*\\(.*allowed_classes",
+        "section_name": "Object Injection: unserialize without allowed_classes",
+        "description": "Matches any call to unserialize() that does not specify the allowed_classes option. PHP unserialize without allowed_classes can trigger __wakeup/__destruct on arbitrary classes present in the codebase (POP chain), making it exploitable whenever the serialized input originates from DB rows, options, or transients written by users or other plugins."
+      }
+    },
+    {
+      "vuln_class": "credential_forwarding",
+      "location": "getTestLoopbackRequests(), lines 319-325",
+      "severity": "low",
+      "reachability": "Runs when the async troubleshooting test 'LoopbackRequests' is executed (authenticated admin, wp_ajax_dgwt_wcas_troubleshooting_test with nonce). Requires the inbound request to carry HTTP Basic Auth headers.",
+      "justification": "Helpers::getBasicAuthHeader() extracts PHP_AUTH_USER and PHP_AUTH_PW from the inbound request's Authorization header and re-forwards them as the Authorization header in the outbound wp_remote_get() call to home_url(); wp_remote_get() follows redirects by default, so any open-redirect at home_url() could relay the credentials to an attacker-controlled host.",
+      "detection_pattern": {
+        "grep_pattern": "PHP_AUTH_USER|PHP_AUTH_PW",
+        "anti_pattern": "wp_remote_get\\s*\\([^)]*'redirection'\\s*=>\\s*0",
+        "section_name": "Credential Forwarding: Basic Auth headers echoed to outbound HTTP request",
+        "description": "Matches code that reads PHP_AUTH_USER or PHP_AUTH_PW from $_SERVER (the inbound Basic Auth credentials) to construct an Authorization header for an outbound HTTP request. If the target URL follows redirects or is partly attacker-controlled, the site's own admin credentials can be exfiltrated."
+      }
+    }
+  ]
+}
