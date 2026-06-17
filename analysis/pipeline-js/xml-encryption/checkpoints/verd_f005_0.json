@@ -1,0 +1,6 @@
+{
+  "is_real": true,
+  "severity": "low",
+  "reasoning": "The null dereference is real and reachable. In utils.js pemToCert(), RegExp.exec() returns null when pem does not contain a valid PEM certificate header/footer. The code immediately accesses cert.length on line 15 without a null guard, which throws TypeError. The guard at encryptKeyInfo line 46 (`if (!options.pem)`) only filters falsy values — any non-empty, non-PEM string bypasses it and reaches pemToCert. However, the call site in encryptKeyInfoWithScheme (xmlenc.js lines 19-38) wraps the entire operation in a try/catch that delivers the TypeError to the callback as an error. The process does not crash. The net effect is that any caller passing a malformed certificate gets an error callback instead of a successful encryption — identical to a validation failure, not a process-level DoS. No schema validation (zod/joi/ajv) is present. The parameter is documented as user-supplied. The code defect (missing null check after exec()) is genuine and the reachability path described in the finding is accurate. Severity 'low' is appropriate: it is a code quality bug that causes operation failure for malformed input, not a process crash or security control bypass.",
+  "_done": true
+}
