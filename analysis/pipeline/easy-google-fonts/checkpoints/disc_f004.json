@@ -1,0 +1,31 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "information_disclosure",
+      "location": "get_customizer_data() / customize_preview_init hook, lines 60-78 and 89-111",
+      "severity": "low",
+      "reachability": "Any authenticated user with the 'customize' capability (by default: admins; some themes/plugins grant it to editors). The data is embedded in the JavaScript global 'egfCustomizePreview' in the Customizer preview iframe front-end page.",
+      "justification": "get_customizer_data() returns the Google API key (line 91: Utils\\get_google_api_key()) and a capability boolean-map (lines 95-100) and serializes them via wp_localize_script into both the controls panel and the preview iframe; any user who reaches the Customizer can read the raw API key from the page source or JS console, enabling API quota abuse.",
+      "detection_pattern": {
+        "grep_pattern": "wp_localize_script\\s*\\([^,]+,\\s*[^,]+,\\s*.*api_key",
+        "anti_pattern": "wp_localize_script.*api_key.*esc_",
+        "section_name": "Information Disclosure: API key in localized script",
+        "description": "Catches wp_localize_script calls that embed an api_key field in the JS payload. Any credential (API key, token) injected this way is readable by any user who can trigger the enqueue hook, and may appear in page source accessible to logged-in users with lower privileges than intended."
+      }
+    },
+    {
+      "vuln_class": "logic_error_incorrect_defaults",
+      "location": "customize_dynamic_setting_args filter (first registration), line 160; second registration, line 203",
+      "severity": "low",
+      "reachability": "Internal WordPress Customizer flow when dynamic settings are registered — no direct external trigger required; exercised whenever the Customizer loads with a matching tt_font_theme_options[...] setting ID.",
+      "justification": "Both dynamic setting registration callbacks use an inverted ternary: `isset($setting_props['default']) ? '' : $setting_props['default']` (line 160) and `isset($setting_props['default'][$setting_key_prop]) ? '' : $setting_props['default'][$setting_key_prop]` (line 203). When the key exists (the normal case), '' is returned instead of the actual default; this means every dynamically registered setting gets an empty-string default rather than the structured font-array default, causing sanitize_callback to receive an unexpected type and potentially bypassing default-based validation.",
+      "detection_pattern": {
+        "grep_pattern": "isset\\s*\\([^)]+\\)\\s*\\?\\s*''\\s*:",
+        "anti_pattern": "isset\\s*\\([^)]+\\)\\s*\\?\\s*[^'\"\\s][^:]+:",
+        "section_name": "Logic Error: Inverted isset ternary produces always-empty default",
+        "description": "Matches the pattern `isset(...) ? '' : <value>` which is the inverted form of the correct null-coalescing pattern. This causes the non-null branch (the common case) to silently return an empty string, discarding the intended default value and potentially sending an unexpected type to downstream sanitization or validation logic."
+      }
+    }
+  ]
+}
