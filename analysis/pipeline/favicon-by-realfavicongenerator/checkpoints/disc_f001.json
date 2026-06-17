@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "install_new_favicon(), lines 225-293; register_admin_actions(), lines 78-81",
+      "severity": "medium",
+      "reachability": "Authenticated administrators only in practice. The wp_ajax_nopriv_ hook (line 79) registers the same handler for unauthenticated users, but it is inside register_admin_actions() which is gated by is_super_admin() on line 65. Because the Admin class is loaded only when is_admin() is true (main plugin line 47) and admin-ajax.php sets is_admin() true, an unauthenticated caller hits the is_super_admin() guard and the nopriv hook is never registered. The handler is reachable only by super admins. However, install_new_favicon() contains zero current_user_can() checks — only a nonce check — so any authenticated user who can craft a valid nonce for the favicon_generation action can trigger a full favicon overwrite.",
+      "justification": "install_new_favicon() performs privileged state-changing operations (downloading remote files, unpacking a ZIP into wp-content, overwriting stored options) with only wp_verify_nonce() as the gate and no current_user_can('manage_options') or equivalent capability check, violating defence-in-depth access control.",
+      "detection_pattern": {
+        "grep_pattern": "wp_ajax_nopriv_",
+        "anti_pattern": "current_user_can",
+        "section_name": "Broken Access Control: AJAX handler without capability check",
+        "description": "Finds wp_ajax_nopriv_ handler registrations. Files that register such hooks but lack a current_user_can() call in the handler body allow unauthenticated or low-privileged users to trigger state-changing actions. Even where the nopriv hook turns out to be dead code, the absence of a capability check in the handler means nonce theft or confusion is the only barrier."
+      }
+    },
+    {
+      "vuln_class": "xss_wrong_escape_context",
+      "location": "admin/views/appearance.php, line 80; admin/class-favicon-by-realfavicongenerator-admin.php, lines 540, 544, 562, 566",
+      "severity": "low",
+      "reachability": "Admin-only pages. The esc_html() misuse on the img src (appearance.php:80) operates on a server-controlled URL derived from stored options (no direct user input). The href misuse on lines 540/544/562/566 operates on URLs built by add_parameter_to_current_url() which already calls esc_url_raw() internally.",
+      "justification": "esc_html() is used in URL output contexts (img src attribute on appearance.php:80; href attributes on admin-class lines 540/544/562/566) where esc_url() is required. esc_html() does not strip javascript: URIs, meaning a javascript: value reaching these sinks would survive the escaping. The immediate exploitability is low because the URL values are server-generated or internally sanitized, but the wrong escape function removes a security layer.",
+      "detection_pattern": {
+        "grep_pattern": "esc_html\\(.*url\\|esc_html\\(.*_url\\b",
+        "anti_pattern": "esc_url\\(",
+        "section_name": "XSS: esc_html() used in URL attribute context",
+        "description": "Matches echo/print of values through esc_html() where the output context is a URL attribute (src, href, action). esc_html() does not sanitize javascript: or data: URIs, so it provides no protection against protocol-based XSS. The correct function for URL contexts is esc_url() (for echoing) or esc_url_raw() (for storage)."
+      }
+    },
+    {
+      "vuln_class": "xss_wrong_escape_context",
+      "location": "admin/views/appearance.php, lines 223-236 (JS string literals with esc_html())",
+      "severity": "low",
+      "reachability": "Admin users who can influence the values embedded in the JavaScript block. $new_favicon_params_url is attacker-supplied from $_REQUEST['json_result_url'] (filtered via FILTER_SANITIZE_URL and FILTER_SANITIZE_SPECIAL_CHARS at admin-class lines 149-153) and is then embedded in a JS single-quoted string at appearance.php line 275 using esc_html(). The callback URL at line 225 embeds $_GET['page'] processed via esc_url_raw() then esc_html().",
+      "justification": "PHP values embedded inside JavaScript string literals must be escaped with esc_js() or wp_json_encode() — not esc_html(). esc_html() converts < > & \" to HTML entities which the HTML parser decodes before the JS engine sees them, but it does not escape backslash or forward-slash sequences relevant to JS string injection. FILTER_SANITIZE_SPECIAL_CHARS encodes < > & to numeric HTML entities; those entities are decoded by the browser HTML parser before JS parses the string, so a crafted URL with JS metacharacters (e.g. a backslash-newline sequence) could break out of the string literal.",
+      "detection_pattern": {
+        "grep_pattern": "echo esc_html\\(",
+        "anti_pattern": "esc_js\\|wp_json_encode",
+        "section_name": "XSS: PHP value in JS context escaped with esc_html instead of esc_js",
+        "description": "Flags echo esc_html() calls inside <script> blocks or inline event handlers. esc_html() produces HTML entity encoding, which is correct for HTML text nodes but wrong for JavaScript string literals. Browser HTML-decodes attribute/script content before JS parsing, so HTML entities in a JS string can reconstruct injection payloads. esc_js() or json_encode() is required for JS contexts."
+      }
+    },
+    {
+      "vuln_class": "information_disclosure",
+      "location": "install_new_favicon(), lines 283-290; download_result_json(), lines 211-223",
+      "severity": "low",
+      "reachability": "Any user who can trigger install_new_favicon() (currently super-admin only). Exception messages including internal path names (zip_path at line 261, esc_html() applied), network error text, and API error messages are JSON-encoded and returned in the AJAX response without sanitization beyond what is applied at throw-site.",
+      "justification": "The catch block at line 283-290 calls json_encode($e->getMessage()) and echoes it directly. Some exception messages contain server-side paths (e.g., the sprintf at line 261 includes esc_html($zip_path)) or network error details. While esc_html() is applied at the throw sites for some messages, others (e.g., lines 214, 219) pass esc_url() or already-escaped values; the uniformity is not guaranteed across all throw paths, making this a disclosure risk.",
+      "detection_pattern": {
+        "grep_pattern": "json_encode.*getMessage\\|echo.*getMessage",
+        "anti_pattern": "esc_html.*getMessage",
+        "section_name": "Information Disclosure: raw exception message echoed to client",
+        "description": "Matches patterns where exception getMessage() is directly JSON-encoded or echoed. Exception messages frequently contain internal path names, query strings, or network error details that aid attackers in reconnaissance. The correct approach is to log the raw message server-side and return a generic error string to the client."
+      }
+    }
+  ]
+}
