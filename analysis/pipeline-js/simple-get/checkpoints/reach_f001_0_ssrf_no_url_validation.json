@@ -1,0 +1,7 @@
+{
+  "gate_breachable": true,
+  "gate_type": "no gate — default config",
+  "adjusted_severity": "high",
+  "reasoning": "simpleGet is exported directly via module.exports = simpleGet (line 2) and is the primary public API of the package. All entry points (simpleGet(url, cb), simpleGet.concat(url, cb), simpleGet.get/post/put/patch/head/delete) are attached to the exported function and accept a raw URL string as their first argument — this is the documented primary usage pattern. No non-default options are required to reach the vulnerable code path. In simpleGet() (lines 18-22), opts.url is destructured via url.parse() and the resulting hostname/port/protocol/auth/path fields are forwarded verbatim to http.request() or https.request() (line 49) with no allowlist, no private-IP/loopback/link-local filter, and no schema validation anywhere in the codebase. The vulnerable parameter (the URL) is by definition user-controlled in any application that uses this library to fetch a user-supplied URL. Additionally, 3xx redirects are followed recursively (lines 50-68) and each redirect target is again fed into url.parse() then back into simpleGet() without re-validation, enabling SSRF via open redirect chains. There is no gate of any kind: no isPrivateIP, blockPrivate, SSRF guard, allowedHosts check, joi/zod/ajv schema validation, or {unsafe:true} toggle. The vulnerability is exploitable at default configuration with the library's normal, documented usage pattern.",
+  "_done": true
+}
