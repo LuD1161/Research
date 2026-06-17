@@ -16,11 +16,11 @@ export const meta = {
 
 const ROOT = '/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review'
 // ---- set per run -----------------------------------------------------------------
-const RUN = 'umroute'
+const RUN = 'recaptcha'
 const MANIFEST = `${ROOT}/analysis/pipeline/${RUN}/manifest.json`
 const CK = `${ROOT}/analysis/pipeline/${RUN}/checkpoints`
-const WAVE = 6 // keep modest: Sonnet server-side burst throttle trips ~14-wide
-const TIER_MIN = 2 // review tier>=this (2 = handlers / source+sink). Set 1 for full sweep.
+const WAVE = 4 // keep modest: Sonnet server-side burst throttle trips ~14-wide
+const TIER_MIN = 1 // small plugin -> exhaustive sweep of all tier>=1 files
 
 const DISC_SCHEMA = {
   type: 'object', additionalProperties: true, required: ['findings'],
