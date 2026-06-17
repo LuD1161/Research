@@ -1,0 +1,367 @@
+{
+  "slug": "saml2-js",
+  "run": "saml2-js",
+  "manifest": "/DATA/openclaw/Repos/Research/analysis/pipeline-js/saml2-js/manifest.json",
+  "files_reviewed": 2,
+  "raw_findings": 13,
+  "confirmed_count": 1,
+  "confirmed": [
+    {
+      "id": "f002",
+      "rel": "lib-js/saml2.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/saml2-js/node_modules/saml2-js/lib-js/saml2.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "deserialize",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "open_redirect_via_idp_controlled_sso_url",
+        "location": "create_logout_request_url lines 862-881; create_logout_response_url lines 903-918",
+        "severity": "medium",
+        "reachability": "Reachable in multi-tenant deployments where IdP configuration (sso_logout_url) is stored in a database or fetched from an external source controlled by a tenant.",
+        "justification": "`url.parse(identity_provider.sso_logout_url, true)` at line 862 parses an IdP-supplied URL with no allowlist validation, then builds a redirect destination via `url.format(uri)` and returns it as the redirect target; an attacker controlling IdP configuration can redirect users to an arbitrary URL.",
+        "detection_pattern": {
+          "grep_pattern": "url\\.parse.*sso_logout_url|url\\.format.*sso_login_url",
+          "anti_pattern": "allowlist.*sso_url|validate.*sso_logout_url",
+          "section_name": "SSRF: IdP-controlled redirect URL",
+          "description": "Flags SAML libraries that build redirect URLs directly from IdP-supplied SSO URLs without allowlist validation, enabling open redirect or SSRF in multi-tenant deployments."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "medium",
+        "reasoning": "Confirmed. In both `create_logout_request_url` (line 862) and `create_logout_response_url` (line 903), `identity_provider.sso_logout_url` is passed directly to `url.parse()` with no scheme check, no allowlist, and no validation. The `IdentityProvider` constructor (line 935) stores `options.sso_logout_url` verbatim \u2014 there is no joi/zod/ajv schema, no regex guard, and no allowlist anywhere in the file. Both functions return `url.format(uri)` via `cb(null, url.format(uri), ...)` as the redirect destination for the caller to send the browser to. The attacker-controlled input path is: tenant supplies IdP metadata with a crafted `sso_logout_url` (e.g. `https://evil.com`) -> stored in DB -> `IdentityProvider` instantiated with it -> `create_logout_request_url` or `create_logout_response_url` called -> `url.format(uri)` returned -> application redirects user browser to attacker domain. No sanitizer or guard was missed. The reachability qualifier (multi-tenant deployments where tenants control IdP config) is accurate and makes this a real but deployment-context-dependent finding. In single-tenant deployments with static admin-controlled config the risk is negligible; in multi-tenant SaaS SSO scenarios it is a genuine open redirect. Severity medium is appropriate.",
+        "_done": true
+      },
+      "reachability": {
+        "gate_breachable": true,
+        "gate_type": "no gate \u2014 default config",
+        "adjusted_severity": "medium",
+        "reasoning": "Both `create_logout_request_url` and `create_logout_response_url` are methods on `ServiceProvider`, which is exported via `module.exports.ServiceProvider`. `IdentityProvider` is also exported via `module.exports.IdentityProvider`. The `IdentityProvider` constructor stores `options.sso_logout_url` verbatim with no validation (line 935) \u2014 no scheme allowlist, no regex guard, no joi/zod/ajv schema. Both vulnerable methods are public prototype methods on the exported `ServiceProvider` class, directly callable by any consumer. No non-default option is required to trigger the vulnerable path; the code unconditionally calls `url.parse(identity_provider.sso_logout_url, true)` and returns `url.format(uri)` as the redirect destination. In multi-tenant deployments where tenants supply their own IdP metadata (a normal SAML use-case), a tenant can set `sso_logout_url` to an arbitrary URL (e.g., `https://evil.com`) and cause the application to redirect users there. The gate is entirely absent at the library level \u2014 any input validation must be supplied by the application, and the library provides no guardrails. Severity remains medium because exploitation requires attacker control over IdP configuration, which is typical in multi-tenant SaaS but not universal.",
+        "_done": true
+      }
+    }
+  ],
+  "all_with_verdicts": [
+    {
+      "id": "f001",
+      "rel": "index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/saml2-js/node_modules/saml2-js/index.js",
+      "tags": [],
+      "finding": {
+        "vuln_class": "saml_signature_bypass_ignore_signature",
+        "location": "parse_authn_response / line 589",
+        "severity": "critical",
+        "reachability": "Reachable by any caller of post_assert or redirect_assert that passes options.ignore_signature=true; the entire assertion signature check is unconditionally skipped and the attacker-supplied XML is trusted as-is.",
+        "justification": "Line 589: `if (ignore_signature) { return cb_wf(null, (new xmldom.DOMParser()).parseFromString(result)); }` \u2014 when this flag is set, a forged or replayed SAML assertion passes without any cryptographic check.",
+        "detection_pattern": {
+          "grep_pattern": "ignore_signature",
+          "anti_pattern": "ignore_signature.*false|ignore_signature.*=.*false",
+          "section_name": "SAML: signature verification bypass flag",
+          "description": "Detects SAML libraries that expose an ignore_signature flag; when set to true this completely disables signature verification and allows arbitrary assertion forgery."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f001",
+      "rel": "index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/saml2-js/node_modules/saml2-js/index.js",
+      "tags": [],
+      "finding": {
+        "vuln_class": "saml_signature_wrapping",
+        "location": "parse_authn_response / lines 596-622",
+        "severity": "high",
+        "reachability": "Reachable by any unauthenticated attacker who can craft a SAML response; the signed outer envelope may differ from the unsigned inner assertion accepted by the application.",
+        "justification": "check_saml_signature is called on both the extracted assertion string and the full saml_response_str (line 597); get_signed_data returns all signed references and the loop accepts the first signed_dom that contains a saml:Assertion (line 609). An attacker can craft a response where the outer signed envelope contains a benign assertion but the actual assertion parsed from the response is unsigned/modified \u2014 classic XML Signature Wrapping.",
+        "detection_pattern": {
+          "grep_pattern": "getSignedReferences|getSignedXml|checkSignature",
+          "anti_pattern": "validateSignedData|assertSignedElement",
+          "section_name": "SAML: XML Signature Wrapping via getSignedReferences",
+          "description": "Detects SAML code that uses getSignedReferences without verifying the signed element IS the assertion consumed downstream; enables signature wrapping attacks where a valid signature on a dummy element co-exists with an unsigned malicious assertion."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f001",
+      "rel": "index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/saml2-js/node_modules/saml2-js/index.js",
+      "tags": [],
+      "finding": {
+        "vuln_class": "prototype_pollution_via_xml_attribute_key",
+        "location": "parse_assertion_attributes / lines 475-484",
+        "severity": "medium",
+        "reachability": "Reachable if the IdP (or a MITM in allow_unencrypted mode) can supply arbitrary attribute Names in the SAML assertion; assertion_attributes[attribute_name] sets a key directly on a plain object without sanitisation.",
+        "justification": "Line 480: `assertion_attributes[attribute_name] = ...` where attribute_name is taken verbatim from the XML attribute Name value. An attribute named __proto__ or constructor would pollute the object prototype chain for downstream code.",
+        "detection_pattern": {
+          "grep_pattern": "\\[attribute_name\\]|\\[attrName\\]|\\[key\\]",
+          "anti_pattern": "hasOwnProperty|Object\\.create\\(null\\)|Object\\.defineProperty",
+          "section_name": "Prototype Pollution: unchecked XML attribute key assignment",
+          "description": "Detects direct property assignment using XML-derived keys without hasOwnProperty guard or null-prototype objects; enables prototype pollution when an attacker controls the key."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f001",
+      "rel": "index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/saml2-js/node_modules/saml2-js/index.js",
+      "tags": [],
+      "finding": {
+        "vuln_class": "xml_external_entity_xxe",
+        "location": "add_namespaces_to_child_assertions / line 523; parse_authn_response / line 807; check_saml_signature / line 353",
+        "severity": "medium",
+        "reachability": "Reachable by any attacker who can supply a crafted SAML response (unauthenticated in IdP-initiated flows); depends on @xmldom/xmldom version's default entity-expansion behaviour.",
+        "justification": "Multiple DOMParser.parseFromString calls (lines 353, 523, 607, 807) operate on attacker-controlled XML. Older versions of @xmldom/xmldom expand external entities by default; if the deployed version does not explicitly disable entity expansion, XXE is possible leading to SSRF or file read.",
+        "detection_pattern": {
+          "grep_pattern": "parseFromString|DOMParser",
+          "anti_pattern": "resolveEntities.*false|entityExpansion.*false|XMLReader",
+          "section_name": "XXE: DOMParser on attacker-controlled XML",
+          "description": "Detects DOMParser usage on external input without explicit entity-expansion hardening; relevant for xmldom-based parsers that historically expanded entities by default."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f001",
+      "rel": "index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/saml2-js/node_modules/saml2-js/index.js",
+      "tags": [],
+      "finding": {
+        "vuln_class": "audience_restriction_regex_bypass",
+        "location": "parse_authn_response / line 652",
+        "severity": "medium",
+        "reachability": "Reachable when sp_audience is configured as a RegExp (a supported configuration path documented by line 652's _.isRegExp check); an overly-broad pattern allows assertions intended for other SPs to be accepted.",
+        "justification": "Line 652: `_.isRegExp(sp_audience) && sp_audience.test(audienceValue)` \u2014 if the application operator passes a broad regex like /.*/ or /example\\.com/ (without anchoring), a malicious IdP could include any audience URI and bypass the restriction.",
+        "detection_pattern": {
+          "grep_pattern": "isRegExp.*audience|audience.*test\\(",
+          "anti_pattern": "audience.*===|audience.*strict",
+          "section_name": "SAML: RegExp audience restriction bypass",
+          "description": "Detects SAML audience validation that allows RegExp matching; if the regex is not anchored or is overly broad, a malicious assertion with a crafted audience URI satisfies the check."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f001",
+      "rel": "index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/saml2-js/node_modules/saml2-js/index.js",
+      "tags": [],
+      "finding": {
+        "vuln_class": "saml_assertion_confusion_allow_unencrypted",
+        "location": "parse_authn_response / lines 576-584",
+        "severity": "high",
+        "reachability": "Reachable when allow_unencrypted_assertion is true (a configurable default exposed via ServiceProvider shared_options); an attacker can strip the EncryptedAssertion wrapper and supply a plaintext assertion that bypasses decryption-based access controls.",
+        "justification": "Lines 577-584: when allow_unencrypted is true and the error is 'Expected 1 EncryptedAssertion; found 0', the code falls back to extracting a plain saml:Assertion from the response without any additional check that the assertion was originally intended to be unencrypted by the IdP.",
+        "detection_pattern": {
+          "grep_pattern": "allow_unencrypted|allowUnencrypted",
+          "anti_pattern": "allow_unencrypted.*false|requireEncryptedAssertion",
+          "section_name": "SAML: unencrypted assertion fallback bypass",
+          "description": "Detects SAML implementations that fall back to accepting plaintext assertions when decryption fails; enables downgrade attacks where an attacker strips encryption and replays a forged assertion."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f002",
+      "rel": "lib-js/saml2.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/saml2-js/node_modules/saml2-js/lib-js/saml2.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "deserialize",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "auth_bypass_empty_certificate_list",
+        "location": "parse_authn_response, lines 589-591 (ignore_signature branch)",
+        "severity": "critical",
+        "reachability": "Reachable by any caller that sets options.ignore_signature = true; this flows from request_options merged via set_option_defaults, so an attacker who can influence per-request options (or a developer misconfiguration) gets a completely unverified assertion accepted.",
+        "justification": "When `options.ignore_signature` is true, the function at line 589 immediately calls `cb_wf(null, DOMParser.parseFromString(result))` with zero cryptographic verification, accepting any forged SAML assertion; the flag is caller-controlled and flows directly from request_options into parse_authn_response.",
+        "detection_pattern": {
+          "grep_pattern": "ignore_signature\\s*[=:]{1,3}\\s*true|if\\s*\\(\\s*ignore_signature\\s*\\)",
+          "anti_pattern": "ignore_signature.*false|throw.*ignore_signature",
+          "section_name": "AUTH/TOKEN: ignore_signature bypass",
+          "description": "Catches SAML libraries that accept a caller-supplied ignore_signature flag which completely skips cryptographic verification of the assertion, enabling acceptance of forged tokens."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f002",
+      "rel": "lib-js/saml2.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/saml2-js/node_modules/saml2-js/lib-js/saml2.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "deserialize",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "auth_bypass_missing_inresponseto_validation",
+        "location": "parse_response_header lines 396-406; _assert lines 808-824",
+        "severity": "high",
+        "reachability": "Reachable by any attacker who can deliver a SAML Response to the SP assertion consumer endpoint (typically unauthenticated).",
+        "justification": "parse_response_header parses InResponseTo and returns it in response_header.in_response_to, but nowhere in _assert or parse_authn_response is this value cross-checked against a stored nonce/ID of an actually-issued request; the library provides no replay-prevention, making it susceptible to SAML assertion replay attacks.",
+        "detection_pattern": {
+          "grep_pattern": "InResponseTo|in_response_to",
+          "anti_pattern": "requestId.*in_response_to|nonce.*in_response_to|cache.*request_id",
+          "section_name": "AUTH/TOKEN: missing InResponseTo validation",
+          "description": "Flags SAML response parsers that read InResponseTo but do not cross-check the value against a persisted set of request IDs, leaving the SP open to assertion replay."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f002",
+      "rel": "lib-js/saml2.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/saml2-js/node_modules/saml2-js/lib-js/saml2.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "deserialize",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "prototype_pollution_via_user_controlled_object_key",
+        "location": "parse_assertion_attributes line 480; parse_authn_response line 670",
+        "severity": "high",
+        "reachability": "Reachable via a forged or IdP-controlled SAML Assertion; if signature is bypassed or the attacker controls the IdP, setting an Attribute Name to __proto__ or constructor pollutes the returned user object and potentially Object.prototype.",
+        "justification": "At line 480, `assertion_attributes[attribute_name] = ...` writes IdP-supplied Attribute Name values as plain object keys with no sanitization; when attribute_name is __proto__, this pollutes Object.prototype in vulnerable Node.js/V8 versions, and even in hardened runtimes, clobbering constructor spreads to the user object via _.extend(user, ...) at line 670.",
+        "detection_pattern": {
+          "grep_pattern": "\\[attribute_name\\]\\s*=|\\[key\\]\\s*=|\\[field\\]\\s*=",
+          "anti_pattern": "__proto__|hasOwnProperty.*attribute_name|Object\\.create\\(null\\)",
+          "section_name": "PROTOTYPE POLLUTION: user-key object assignment",
+          "description": "Catches code that assigns parsed/user-controlled string keys directly to plain-object properties without sanitizing __proto__ or constructor, enabling prototype pollution from attacker-supplied data."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f002",
+      "rel": "lib-js/saml2.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/saml2-js/node_modules/saml2-js/lib-js/saml2.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "deserialize",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "auth_bypass_missing_conditions_element",
+        "location": "parse_authn_response lines 627-658",
+        "severity": "high",
+        "reachability": "Reachable by any attacker who can deliver a signed (or unverified) SAML Assertion that omits the Conditions element.",
+        "justification": "The Conditions element check at line 628 is `if (conditions != null)` \u2014 if the element is absent, both the timing check and the AudienceRestriction check are silently skipped, so a signed assertion with no Conditions element is accepted for any audience and at any time.",
+        "detection_pattern": {
+          "grep_pattern": "getElementsByTagNameNS.*Conditions",
+          "anti_pattern": "throw.*Conditions|required.*Conditions|length.*!==.*1",
+          "section_name": "AUTH/TOKEN: optional Conditions element bypass",
+          "description": "Flags SAML parsers that treat the Conditions element as optional; absence of Conditions should be an error, not a pass-through, because it carries the validity window and audience restriction."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f002",
+      "rel": "lib-js/saml2.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/saml2-js/node_modules/saml2-js/lib-js/saml2.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "deserialize",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "auth_bypass_audience_restriction_skipped_when_empty",
+        "location": "parse_authn_response lines 646-657",
+        "severity": "medium",
+        "reachability": "Reachable when the IdP or an attacker sends an assertion with an AudienceRestriction wrapper that contains zero Audience children.",
+        "justification": "At line 648, audience validation only triggers `if (audiences.length > 0)`; an AudienceRestriction with no Audience children is silently accepted, meaning a stolen assertion from another SP may be replayed here if the Audience sub-elements are stripped while keeping the AudienceRestriction wrapper.",
+        "detection_pattern": {
+          "grep_pattern": "AudienceRestriction|audiences\\.length",
+          "anti_pattern": "audiences\\.length\\s*===\\s*0.*error|throw.*audience",
+          "section_name": "AUTH/TOKEN: empty AudienceRestriction bypass",
+          "description": "Catches SAML audience validation that accepts an AudienceRestriction element with zero Audience children as valid, which can permit cross-SP assertion replay."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f002",
+      "rel": "lib-js/saml2.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/saml2-js/node_modules/saml2-js/lib-js/saml2.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "deserialize",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "xxe_via_xmldom_domparser",
+        "location": "check_saml_signature line 353; _assert line 806; parse_authn_response lines 590, 606",
+        "severity": "medium",
+        "reachability": "Reachable by any caller submitting a SAML Response (typically an unauthenticated POST endpoint).",
+        "justification": "`new xmldom.DOMParser().parseFromString(xml)` is called on attacker-controlled XML at multiple points with no entity-disabling options passed to the constructor; in older @xmldom/xmldom versions that resolved external entities by default, this enables blind XXE leading to SSRF or local file read.",
+        "detection_pattern": {
+          "grep_pattern": "new DOMParser\\(\\)\\.parseFromString|xmldom.*parseFromString",
+          "anti_pattern": "resolveEntities.*false|expandEntityReferences.*false|DOCTYPE.*disallow",
+          "section_name": "DESERIALIZATION: XXE via xmldom DOMParser",
+          "description": "Catches xmldom DOMParser instantiations without explicit entity-disabling options that parse attacker-controlled XML, potentially enabling XXE if the installed xmldom version resolves external entities."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f002",
+      "rel": "lib-js/saml2.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/saml2-js/node_modules/saml2-js/lib-js/saml2.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "deserialize",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "open_redirect_via_idp_controlled_sso_url",
+        "location": "create_logout_request_url lines 862-881; create_logout_response_url lines 903-918",
+        "severity": "medium",
+        "reachability": "Reachable in multi-tenant deployments where IdP configuration (sso_logout_url) is stored in a database or fetched from an external source controlled by a tenant.",
+        "justification": "`url.parse(identity_provider.sso_logout_url, true)` at line 862 parses an IdP-supplied URL with no allowlist validation, then builds a redirect destination via `url.format(uri)` and returns it as the redirect target; an attacker controlling IdP configuration can redirect users to an arbitrary URL.",
+        "detection_pattern": {
+          "grep_pattern": "url\\.parse.*sso_logout_url|url\\.format.*sso_login_url",
+          "anti_pattern": "allowlist.*sso_url|validate.*sso_logout_url",
+          "section_name": "SSRF: IdP-controlled redirect URL",
+          "description": "Flags SAML libraries that build redirect URLs directly from IdP-supplied SSO URLs without allowlist validation, enabling open redirect or SSRF in multi-tenant deployments."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "medium",
+        "reasoning": "Confirmed. In both `create_logout_request_url` (line 862) and `create_logout_response_url` (line 903), `identity_provider.sso_logout_url` is passed directly to `url.parse()` with no scheme check, no allowlist, and no validation. The `IdentityProvider` constructor (line 935) stores `options.sso_logout_url` verbatim \u2014 there is no joi/zod/ajv schema, no regex guard, and no allowlist anywhere in the file. Both functions return `url.format(uri)` via `cb(null, url.format(uri), ...)` as the redirect destination for the caller to send the browser to. The attacker-controlled input path is: tenant supplies IdP metadata with a crafted `sso_logout_url` (e.g. `https://evil.com`) -> stored in DB -> `IdentityProvider` instantiated with it -> `create_logout_request_url` or `create_logout_response_url` called -> `url.format(uri)` returned -> application redirects user browser to attacker domain. No sanitizer or guard was missed. The reachability qualifier (multi-tenant deployments where tenants control IdP config) is accurate and makes this a real but deployment-context-dependent finding. In single-tenant deployments with static admin-controlled config the risk is negligible; in multi-tenant SaaS SSO scenarios it is a genuine open redirect. Severity medium is appropriate.",
+        "_done": true
+      }
+    }
+  ],
+  "reachability_applied": 1,
+  "reachability_downgraded": 0
+}

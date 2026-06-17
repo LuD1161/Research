@@ -1,6 +1,6 @@
 # JS/npm Security Review Pipeline — Package Tracker
 
-Updated: 2026-06-17 01:10 PDT
+Updated: 2026-06-17 01:50 PDT
 
 ## Status Legend
 - `[ ]` = pending (not started)
@@ -10,7 +10,7 @@ Updated: 2026-06-17 01:10 PDT
 
 ---
 
-## Batch 1–3: Small packages (1–2 files each) — DONE
+## Batch 1–3: Small packages — DONE
 
 - [x] method-override (1 file) — 3 raw → 2 confirmed (1 MED breach, 1 LOW)
 - [x] simple-get (1 file) — 6 raw → 2 confirmed (2 HIGH breach: SSRF + redirect SSRF)
@@ -21,16 +21,16 @@ Updated: 2026-06-17 01:10 PDT
 - [x] decompress (1 file) — 3 raw → 3 confirmed (3 HIGH breach: path traversal + symlink + hardlink)
 - [x] multiparty (1 file) — 4 raw → 3 confirmed (1 MED breach: filename, 2 LOW)
 
-## Batch 4: Medium packages (2–5 files each)
+## Batch 4: Medium packages — DONE
 
-- [ ] url-join (2 files, tier-1+2)
-- [ ] saml2-js (2 files, tier-2) — 965-line main file, 6 security tags
-- [ ] request-ip (2 files, tier-2)
-- [ ] st (2 files, tier-1+2) — path traversal target
-- [ ] xml-encryption (5 files, tier-2) — padding oracle target
-- [ ] node-rsa (5 files, tier-1) — dist-only, pointed at dist/
+- [x] url-join (2 files) — 3 raw → 0 confirmed (all rejected in verify)
+- [x] saml2-js (2 files) — 13 raw → 1 confirmed (1 MED breach: open redirect via IdP URL)
+- [x] request-ip (2 files) — 7 raw → 1 confirmed (1 MED breach: IP spoofing via untrusted header)
+- [x] st (2 files) — 1 raw → 0 confirmed (clean)
+- [x] xml-encryption (5 files) — 16 raw → 7 confirmed (3 HIGH breach: XPath inj + XML inj, 4 LOW)
+- [x] node-rsa (5 files) — 20 raw → 11 confirmed (1 HIGH breach: ReDoS, 5 downgraded, 5 LOW)
 
-## Batch 5: Large packages (8+ files each)
+## Batch 5: Large packages — NOT STARTED (next session)
 
 - [ ] fast-jwt (8 files, tier-2) — recurring alg confusion
 - [ ] file-type (8 files, tier-2) — parser DoS target
@@ -53,21 +53,27 @@ Updated: 2026-06-17 01:10 PDT
 | convict | 1 | 0 | 0 | — | clean |
 | decompress | 1 | 3 | 3 | 3 HIGH | path traversal + symlink + hardlink escape |
 | multiparty | 1 | 4 | 3 | 1 MED | unsanitized filename exposure |
+| url-join | 2 | 3 | 0 | — | all rejected in adversarial verify |
+| saml2-js | 2 | 13 | 1 | 1 MED | open redirect via IdP-controlled SSO URL |
+| request-ip | 2 | 7 | 1 | 1 MED | IP spoofing via untrusted headers |
+| st | 2 | 1 | 0 | — | clean |
+| xml-encryption | 5 | 16 | 7 | 3 HIGH | XPath injection in decryptKeyInfo + XML injection |
+| node-rsa | 5 | 20 | 11 | 1 HIGH | ReDoS in PEM autodetect; Bleichenbacher oracle (downgraded) |
 
-## Totals So Far
+## Totals
 
-- **Packages reviewed:** 8 / 20
-- **Files reviewed:** 8
-- **Raw findings:** 21
-- **Confirmed findings:** 13
-- **Breachable (default-reachable):** 8 (4 HIGH, 2 MED)
-- **Workflow tokens:** 3.3M subagent tokens, 64 agents, ~14.5 min
+- **Packages reviewed:** 14 / 20
+- **Files reviewed:** 26
+- **Raw findings:** 84
+- **Confirmed findings:** 33
+- **Breachable (default-reachable) MED+:** 13 (8 HIGH, 5 MED)
+- **Clean packages:** 4 (ip, convict, url-join, st)
 
 ## Cost Tracking
 
-| Batch | Packages | Est. Cost | Actual Tokens | Est. Actual Cost |
-|-------|----------|-----------|---------------|------------------|
-| 1-3 (small) | 8 | ~$32 | 3.3M | ~$25 |
-| 4 (medium) | 6 | ~$61 | — | — |
-| 5 (large) | 6 | ~$350 | — | — |
-| **Total** | **20** | **~$441** | — | — |
+| Batch | Packages | Files | Agents | Tokens | Duration |
+|-------|----------|-------|--------|--------|----------|
+| 1-3 (small) | 8 | 8 | 64 | 3.3M | ~14 min |
+| 4 (medium) | 6 | 18 | 119 | 6.1M | ~37 min |
+| 5 (large) | 6 | 100 | — | — | — |
+| **Total** | **14** | **26** | **183** | **9.4M** | **~51 min** |

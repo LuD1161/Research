@@ -1,0 +1,629 @@
+{
+  "slug": "xml-encryption",
+  "run": "xml-encryption",
+  "manifest": "/DATA/openclaw/Repos/Research/analysis/pipeline-js/xml-encryption/manifest.json",
+  "files_reviewed": 5,
+  "raw_findings": 16,
+  "confirmed_count": 7,
+  "confirmed": [
+    {
+      "id": "f001",
+      "rel": "lib/constants.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/constants.js",
+      "tags": [
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "xpath_injection",
+        "location": "decryptKeyInfo, lines 246 and 273",
+        "severity": "high",
+        "reachability": "Any caller of decrypt() or decryptKeyInfo() with attacker-supplied XML \u2014 the URI attribute of a RetrievalMethod element in the XML is read from the document and spliced into XPath expressions without any sanitization.",
+        "justification": "keyRetrievalMethodUri.substring(1) is derived from keyRetrievalMethod.getAttribute('URI') (attacker-controlled XML attribute) and concatenated directly into XPath strings on lines 246 and 273, allowing an attacker to break out of the single-quoted string and inject arbitrary XPath predicates or functions to alter which nodes are selected during decryption.",
+        "detection_pattern": {
+          "grep_pattern": "xpath\\.select\\([^)]*\\+[^)]*getAttribute",
+          "anti_pattern": "xpath\\.select.*\\$[a-zA-Z]",
+          "section_name": "XPath injection: dynamic string concatenation in xpath.select",
+          "description": "Matches XPath queries built by string concatenation with getAttribute() results; the safe alternative is parameterized XPath using variable bindings (the $var syntax in the xpath library) rather than string interpolation."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "high",
+        "reasoning": "Confirmed. In decryptKeyInfo() (xmlenc.js), line 245 reads keyRetrievalMethodUri from keyRetrievalMethod.getAttribute('URI') \u2014 a raw XML attribute value from attacker-supplied XML. Lines 246 and 273 splice keyRetrievalMethodUri.substring(1) directly into XPath string literals delimited by single quotes, with no escaping. substring(1) only strips the leading '#' character; it does not neutralize single quotes or other XPath metacharacters. An attacker supplying a URI like '#foo' or '1'='1' causes immediate escape from the string context and injection of arbitrary XPath predicates. The RetrievalMethod code path is taken whenever the inline EncryptedKey child is absent from KeyInfo (line 241) \u2014 no non-default option or configuration is required. No Zod/Joi/AJV or other schema validation is applied to the XML before parsing or before this code runs. The xpath library supports safe parameterized $var bindings but they are not used here. The decrypt() entry point (line 190) accepts raw XML from any caller \u2014 in SAML and similar flows the XML content is fully attacker-controlled with no authentication barrier. The finding mislabels the file as constants.js (the actual file is xmlenc.js) but line numbers 246 and 273 and all other details are accurate.",
+        "_done": true
+      },
+      "reachability": {
+        "gate_breachable": true,
+        "gate_type": "no gate \u2014 default config",
+        "adjusted_severity": "high",
+        "reasoning": "Both decrypt() and decryptKeyInfo() are directly exported from the package (module.exports in xmlenc.js line 333-338, re-exported via index.js). No non-default options are required to reach the vulnerable code path \u2014 the RetrievalMethod branch at line 243 is taken automatically whenever the inline EncryptedKey child is absent from KeyInfo, which is a normal XML-DSIG/XML-Enc structure. There is zero input validation before the sink: the URI attribute value from keyRetrievalMethod.getAttribute('URI') is passed only through .substring(1) (which strips the leading '#' but does not neutralize single quotes or other XPath metacharacters) before being concatenated directly into XPath string literals on lines 246 and 273. The xpath library supports safe $var parameterized bindings but they are not used. The decrypt() entry point accepts raw XML from the caller with no schema validation, no allowlist, and no type checking on any XML attribute values. In SAML, WS-Federation, and similar flows the XML payload is fully attacker-controlled, making the vulnerable parameter user-controlled in typical real-world deployments."
+      }
+    },
+    {
+      "id": "f001",
+      "rel": "lib/constants.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/constants.js",
+      "tags": [
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "xml_injection_via_unescaped_template_interpolation",
+        "location": "encryptKeyInfoWithScheme line 29 / keyinfo.tpl.xml.js line 10",
+        "severity": "medium",
+        "reachability": "Callers of encrypt() or encryptKeyInfo() who pass an options.pem value that is not a well-formed certificate \u2014 e.g., a PEM containing XML special characters or crafted content between the certificate headers \u2014 can inject arbitrary XML into the KeyInfo block.",
+        "justification": "In xmlenc.js line 29, encryptionPublicCert is built by concatenating pemToCert(options.pem.toString()) with literal XML tags, then in keyinfo.tpl.xml.js line 10 it is interpolated as ${encryptionPublicCert} without calling escapehtml(), while every other field in that template is wrapped in escapehtml(); a PEM body containing < > & or an extra </X509Certificate> tag breaks the XML document structure.",
+        "detection_pattern": {
+          "grep_pattern": "\\$\\{(?!escapehtml)[a-zA-Z_][a-zA-Z0-9_]*(?:Cert|Xml|Html|Content|Body|Data)\\}",
+          "anti_pattern": "\\$\\{escapehtml\\(",
+          "section_name": "XML injection: unescaped template variable containing certificate/XML data",
+          "description": "Finds template literal interpolations of variables with names suggesting HTML/XML/certificate content that are not wrapped in escapehtml(), indicating missing output encoding in XML generation."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The code defect is confirmed exactly as described. In xmlenc.js line 29, encryptionPublicCert is built by concatenating literal XML tags with pemToCert(options.pem.toString()), and in keyinfo.tpl.xml.js line 10 it is interpolated as ${encryptionPublicCert} without escapehtml(), while every other field (keyEncryptionMethod, keyEncryptionDigest, encryptedKey) is wrapped in escapehtml(). The pemToCert regex in utils.js uses [^-]* which permits <, >, &, / and all XML special characters to pass through unfiltered. The assembled encryptionPublicCert string already contains literal XML tags and is embedded raw into the template \u2014 a crafted PEM body with XML special characters or extra tags would break document structure. However, practical exploitability is lower than the finding claims: options.pem is a configuration-level parameter documented by the README as fs.readFileSync(...) (a file path), not request input. A real X.509 certificate body is DER-encoded base64 (A-Za-z0-9+/=) which cannot contain XML special characters. Exploitation requires the calling application to expose options.pem to attacker-controlled data, which is application-architecture-dependent and not the default usage pattern. No schema validation (zod/joi/ajv) guards the input, and no sanitizer exists in the PEM-to-cert path. The defect is real and the inconsistency in escaping is a genuine code quality and defense-in-depth problem, but real-world exploitability is conditional on non-default misconfiguration. Severity downgraded from medium to low on this basis."
+      }
+    },
+    {
+      "id": "f001",
+      "rel": "lib/constants.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/constants.js",
+      "tags": [
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "padding_oracle_cbc_mode",
+        "location": "decryptWithAlgorithm, lines 318-328",
+        "severity": "medium",
+        "reachability": "Any attacker who can submit ciphertext to a service that calls decrypt() and observe whether an error is returned versus success \u2014 the custom padding check produces a distinguishable error for invalid padding versus valid padding.",
+        "justification": "For CBC-mode algorithms (aes-128-cbc, aes-256-cbc, des-ede3-cbc) the manual padding removal on lines 321-327 returns/errors when the last byte value is outside [1, ivLength], creating a padding oracle that an attacker can exploit to decrypt arbitrary ciphertext by submitting chosen ciphertexts and observing the distinct error/success responses.",
+        "detection_pattern": {
+          "grep_pattern": "charCodeAt.*length.*-.*1.*padding.*Error",
+          "anti_pattern": "crypto\\.timingSafeEqual|setAutoPadding\\(true\\)",
+          "section_name": "Padding oracle: custom CBC padding validation with error leak",
+          "description": "Detects manual CBC padding removal code that throws or returns distinguishable errors for invalid padding bytes, which enables a padding oracle attack against decrypted ciphertext."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The padding oracle is mechanically real but is gated behind a non-default, explicit opt-in that requires the server operator to have disabled the insecure-algorithm guard.\n\nMechanism: decryptWithAlgorithm (xmlenc.js:308) is a synchronous function with signature (algorithm, symmetricKey, ivLength, content) \u2014 no callback parameter. Line 310 calls decipher.setAutoPadding(false), disabling Node's built-in PKCS7 removal. Lines 321-327 implement manual padding removal: it reads the last byte value and calls callback(new Error('padding length invalid')) when the byte is outside [1, ivLength]. Because callback is not in scope, this throws TypeError: callback is not a function synchronously. The outer try/catch in decrypt() (lines 197/228-229) catches the TypeError and forwards it as callback(error). Good padding produces callback(null, plaintext). The two outcomes are distinguishable, so a classical padding oracle exists in the code path.\n\nCritical gate: All three CBC-mode algorithms (aes-128-cbc, aes-256-cbc, des-ede3-cbc) are listed in insecureAlgorithms (lines 6-14). The check at lines 204-207 reads: if (options.disallowDecryptionWithInsecureAlgorithm !== false && insecureAlgorithms.indexOf(encryptionAlgorithm) >= 0) return callback(error). This means the guard is ACTIVE by default (option absent, undefined, or any truthy value all trigger it) and blocks the CBC path entirely. The vulnerable code is only reachable when a caller explicitly passes disallowDecryptionWithInsecureAlgorithm: false \u2014 a deliberate opt-in to use deprecated algorithms.\n\nReachability correction: The finding claims 'any attacker who can submit ciphertext' can reach this, which overstates the case. The attacker cannot control this option; only the server operator can, by explicitly opting into insecure algorithms. In that (non-default, explicitly deprecated) configuration the oracle is fully exploitable with attacker-controlled CipherValue ciphertext in the XML input.\n\nAdditional inaccuracies in the finding: (1) The file location is wrong \u2014 the vulnerable code is in lib/xmlenc.js, not lib/constants.js (which does not exist in this package). (2) The grep_pattern in detection_pattern does not match the actual code. (3) setAutoPadding(false) appears in the code but is the cause of the problem, not a mitigation \u2014 the anti_pattern check for setAutoPadding(true) would be a fix, not something present here.\n\nVerdict: is_real=true because the oracle code path exists and is reachable under a non-default but explicitly documented insecure configuration. Severity is downgraded from medium to low because exploitation requires the server operator to have opted into deprecated CBC algorithms via disallowDecryptionWithInsecureAlgorithm:false, which the library itself warns against."
+      }
+    },
+    {
+      "id": "f002",
+      "rel": "lib/decrypt.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/decrypt.js",
+      "tags": [
+        "rce",
+        "proto_pollution",
+        "deserialize",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "xml_injection",
+        "location": "encrypted-key.tpl.xml.js line 6 \u2014 template literal interpolation of `keyInfo`",
+        "severity": "high",
+        "reachability": "Any caller of the `encrypt` function that controls `options.pem` or intermediate keyInfo rendering; library users constructing encryption options.",
+        "justification": "The `keyInfo` variable is interpolated directly into the XML template on line 6 (`${keyInfo}`) without any escaping. `keyInfo` is itself rendered by `keyinfo.tpl.xml.js`, which embeds `${encryptionPublicCert}` raw on its line 10. `encryptionPublicCert` is built in xmlenc.js line 29 by string-concatenating raw XML around `pemToCert(options.pem.toString())`. If `options.pem` contains XML-significant characters in the cert body position (e.g., via a crafted PEM), they are inserted into the output document unescaped, enabling XML structure manipulation.",
+        "detection_pattern": {
+          "grep_pattern": "\\$\\{[a-zA-Z_][a-zA-Z0-9_]*\\}",
+          "anti_pattern": "escapehtml\\(|xmlEscape\\(|encodeXML\\(",
+          "section_name": "XML injection: unescaped template interpolation in XML output",
+          "description": "Finds template literal interpolations inside XML-generating JS template files. When the interpolated variable is not wrapped in an escaping function (escape-html, xmlEscape, etc.), attacker-controlled input can break out of the XML text context."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "high",
+        "reasoning": "The XML injection chain is confirmed end-to-end. In xmlenc.js line 29, `encryptionPublicCert` is built by string-concatenating raw XML tags around `utils.pemToCert(options.pem.toString())`. The `pemToCert` function (utils.js lines 13-20) extracts the cert body using the regex `/-----BEGIN CERTIFICATE-----([^-]*)-----END CERTIFICATE-----/g` \u2014 the capture group `[^-]*` admits all XML-significant characters (<, >, &, \", /) and only strips newlines. The resulting string is passed as `params.encryptionPublicCert` to `renderTemplate('keyinfo', params)`. In `keyinfo.tpl.xml.js` line 10, `${encryptionPublicCert}` is interpolated without any escaping \u2014 while all other interpolations in that file (lines 6, 7, 13) use `escapehtml()`, this one does not. A crafted PEM whose base64 body contains XML markup (e.g. `</X509Certificate></X509Data><evil/>...`) would be injected verbatim into the output XML. The rendered keyInfo string is then embedded raw into `encrypted-key.tpl.xml.js` line 6 (`${keyInfo}`), which is by design since it is a pre-rendered XML fragment; the true unescaped sink is `keyinfo.tpl.xml.js:10`. `options.pem` is a caller-supplied parameter with no schema validation (no zod/joi/ajv). No authentication is required \u2014 this is a library call. Any consumer that passes a crafted or attacker-influenced PEM to `encrypt()` is affected. The finding's location attribution (`encrypted-key.tpl.xml.js:6`) is slightly imprecise \u2014 the actual injection point is `keyinfo.tpl.xml.js:10` \u2014 but the root cause and exploit chain are accurate and confirmed."
+      },
+      "reachability": {
+        "gate_breachable": true,
+        "gate_type": "no gate \u2014 default config",
+        "adjusted_severity": "high",
+        "reasoning": "The `encrypt` function is part of the public API, exported directly from xmlenc.js and re-exported via the package main entry (index.js). The vulnerable parameter `options.pem` is a *required* option with no default \u2014 callers must supply it, but there is zero validation beyond a regex extraction that admits all XML-significant characters. The injection point is `keyinfo.tpl.xml.js` line 10, where `${encryptionPublicCert}` is interpolated without `escapehtml()` (all other interpolations in the same file use it). No schema validator, allowlist, or sanitizer guards `options.pem` before it reaches the XML sink. No non-default flag is required to trigger the vulnerability \u2014 it fires on every normal call to `encrypt()` with a crafted PEM. In real applications (SAML SPs, multi-tenant encryption services) that derive the PEM from an external or user-influenced source, an attacker can inject arbitrary XML into the output document."
+      }
+    },
+    {
+      "id": "f004",
+      "rel": "lib/index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/index.js",
+      "tags": [],
+      "finding": {
+        "vuln_class": "xpath_injection",
+        "location": "decryptKeyInfo, lines 246 and 273 (xmlenc.js)",
+        "severity": "high",
+        "reachability": "Any caller who passes attacker-controlled XML to decrypt() or decryptKeyInfo(); the RetrievalMethod/@URI attribute value flows directly into an XPath string literal.",
+        "justification": "keyRetrievalMethodUri is read from the XML attribute URI via getAttribute('URI') and concatenated into XPath queries at lines 246 and 273 without any sanitization or escaping, allowing an attacker to break out of the XPath string literal with a single-quote and inject arbitrary XPath subexpressions.",
+        "detection_pattern": {
+          "grep_pattern": "xpath\\.select\\([^)]*\\+\\s*[a-zA-Z_][a-zA-Z0-9_.]*",
+          "anti_pattern": "escapeXPath|xpath\\.escape|String\\(.*\\)|normalize-space",
+          "section_name": "XPath injection: user value concatenated into xpath.select string",
+          "description": "Detects string concatenation of variables directly into an xpath.select() query; any variable derived from user or XML input is an injection point that can break the XPath expression structure."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "high",
+        "reasoning": "Confirmed XPath injection in xml-encryption v4.0.0 (lib/xmlenc.js, not lib/index.js which is an empty re-export stub). The vulnerable code is in decryptKeyInfo(), lines 245-246 and 272-273.\n\nExact vulnerable pattern:\n  Line 245: keyRetrievalMethodUri = keyRetrievalMethod.getAttribute('URI');\n  Line 246: xpath.select(\"//*[local-name(.)='EncryptedKey' and @Id='\" + keyRetrievalMethodUri.substring(1) + \"']/*[local-name(.)='EncryptionMethod']\", doc)[0]\n  Line 273: xpath.select(\"//*[local-name(.)='EncryptedKey' and @Id='\" + keyRetrievalMethodUri.substring(1) + \"']/*[local-name(.)='CipherData']/*[local-name(.)='CipherValue']\", keyInfo)[0]\n\nAttack path confirmed live against the bundled xpath library: a RetrievalMethod URI of '#legit' or '1'='1' produces the injected query //*[local-name(.)='EncryptedKey' and @Id='legit' or '1'='1']/*[...], which matches ANY EncryptedKey in the document because 'or \"1\"=\"1\"' is always true. Tested with the xpath package bundled in node_modules: 2 nodes matched instead of 0 for a non-existent Id.\n\nNo sanitization found: grep for sanitize/escape/encodeURI/replace/schema/validate/zod/joi/ajv returned zero hits in both xmlenc.js and utils.js.\n\nReachability: decrypt() (public export) calls decryptKeyInfo() on line 200 with no pre-validation. The RetrievalMethod branch (lines 243-247) is taken whenever no inline EncryptedKey is present under KeyInfo \u2014 a common XMLEnc/SAML pattern. decryptKeyInfo() is also exported directly. Only guard is options.key being present (the decryptor's own private key), which is always true for legitimate callers. No authentication or authorization context is required; any caller passing external XML reaches the sink.\n\nNo non-default options required to trigger the path. No schema validation of the incoming XML is performed.\n\nPractical impact: injection allows an attacker to redirect which EncryptedKey node is selected for decryption, substituting attacker-chosen ciphertext. With 'or 1=1' the first EncryptedKey in document order wins, and the attacker controls document structure \u2014 enabling a decryption oracle against the server's RSA private key.\n\nNote on finding metadata: the finding cites 'xmlenc.js' in the location field but 'index.js' in the file path. lib/index.js is a 47-byte re-export stub (confirmed empty/pass-through). The actual vulnerable code is in lib/xmlenc.js at the stated lines."
+      },
+      "reachability": {
+        "gate_breachable": true,
+        "gate_type": "no gate \u2014 default config",
+        "adjusted_severity": "high",
+        "reasoning": "Both decrypt() and decryptKeyInfo() are directly exported from lib/xmlenc.js (lines 333-338) and re-exported verbatim through lib/index.js. No non-default options are required: the RetrievalMethod branch at lines 243-246 is taken automatically whenever no inline EncryptedKey is present under KeyInfo \u2014 a standard SAML/XMLEnc document layout. The attacker-controlled value is keyRetrievalMethodUri, read from the RetrievalMethod/@URI XML attribute via getAttribute('URI') at line 245, then concatenated without any escaping into XPath string literals at line 246 and line 272-273. No schema validation, allowlist check, or XPath-safe encoding is applied anywhere before the sink. The only option checked before entry is options.key (the caller's own private key), which is always present for any legitimate caller. The attack requires no special configuration: sending attacker-crafted XML to decrypt() or directly to decryptKeyInfo() is sufficient. A URI value containing a single-quote (e.g. '#x' or '1'='1') breaks the XPath string literal and allows injection of arbitrary XPath subexpressions, enabling the attacker to redirect which EncryptedKey node is selected and to use the server as a decryption oracle against its own RSA private key."
+      }
+    },
+    {
+      "id": "f004",
+      "rel": "lib/index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/index.js",
+      "tags": [],
+      "finding": {
+        "vuln_class": "xml_injection",
+        "location": "encryptKeyInfoWithScheme, line 29 (xmlenc.js) + keyinfo.tpl.xml.js line 10",
+        "severity": "medium",
+        "reachability": "Any caller who controls options.pem passed to encrypt() or encryptKeyInfo(); the extracted certificate body is inserted raw into the XML template without escaping.",
+        "justification": "The encryptionPublicCert value (built at line 29 as a raw XML snippet from options.pem) is inserted unescaped into the keyinfo template at the ${encryptionPublicCert} slot (template line 10), so a crafted PEM whose base64 body contains XML special characters can produce malformed or injected XML output.",
+        "detection_pattern": {
+          "grep_pattern": "\\$\\{[a-zA-Z_][a-zA-Z0-9_]*\\}|\\+\\s*[a-zA-Z_][a-zA-Z0-9_.]*\\s*\\+",
+          "anti_pattern": "escapehtml\\(|escapeXml\\(|xmlescape\\(",
+          "section_name": "XML injection: unescaped template interpolation",
+          "description": "Detects template literal or string concatenation slots in XML-generating code that are not wrapped with an HTML/XML escape function; unescaped variables derived from caller input can inject XML elements or attributes."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The finding is technically real but overstated in severity. Line 29 of xmlenc.js builds encryptionPublicCert as a raw XML snippet by concatenating '<X509Data><X509Certificate>' + pemToCert(options.pem) + '</X509Certificate></X509Data>' without any XML escaping on the cert body. This value is then inserted at template line 10 (${encryptionPublicCert}) without escapehtml(), while every other interpolated slot in the same template (keyEncryptionMethod, keyEncryptionDigest, encryptedKey) IS wrapped with escapehtml(). The pemToCert regex ([^-]*) allows any non-dash character in the body \u2014 it does not constrain content to valid base64. So a crafted PEM string whose body contains XML special characters (<, >, &) would pass through and inject raw XML into the output. No schema validation (zod/joi/ajv) constrains options.pem. The attack path is real. However, practical exploitability is limited: standard PEM base64 bodies use only A-Za-z0-9+/= (no XML-special chars), so a legitimate certificate loaded from a trusted source cannot trigger this. Exploitation requires passing a crafted, non-standard PEM string as options.pem. This is plausible only when the caller relays options.pem from untrusted external input (e.g., a client-supplied certificate in a federation/SAML service) without prior validation. The severity 'medium' claimed by the finding is slightly generous; 'low' is more accurate given that (1) the parameter is documented as a server-side configuration option, (2) exploitation requires malformed/non-certificate PEM input, and (3) the template design intentionally leaves this slot unescaped because it treats the value as a pre-assembled XML fragment. The correct fix is to escape the pemToCert output before wrapping it in XML tags, or use DOM APIs instead of string templating."
+      }
+    },
+    {
+      "id": "f005",
+      "rel": "lib/utils.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/utils.js",
+      "tags": [
+        "rce",
+        "deserialize"
+      ],
+      "finding": {
+        "vuln_class": "null_dereference_dos",
+        "location": "pemToCert (utils.js line 15)",
+        "severity": "low",
+        "reachability": "Reachable by any caller of encryptKeyInfo/encryptKeyInfoWithScheme that passes a non-null options.pem value which does not contain a valid PEM certificate header/footer. The truthiness check at line 46/76 of xmlenc.js prevents null/undefined, but any non-empty non-PEM string bypasses it.",
+        "justification": "RegExp.prototype.exec() returns null when there is no match; the subsequent cert.length access on null throws TypeError: Cannot read properties of null. The enclosing try/catch in xmlenc.js encryptKeyInfoWithScheme (lines 19-38) catches it and delivers it to the callback, preventing a process crash, but it makes the encrypt operation fail on any malformed certificate.",
+        "detection_pattern": {
+          "grep_pattern": "\\.exec\\([^)]+\\)\\s*;\\s*\\n[^}]*\\.length",
+          "anti_pattern": "if\\s*\\(\\w+\\s*&&\\s*\\w+\\.length|\\w+\\s*!==\\s*null",
+          "section_name": "Null Deref: regex exec() result unchecked",
+          "description": "Detects patterns where the return value of RegExp.exec() is used for a property access (e.g. .length, [1]) without a null check. exec() returns null on no match, so any property access will throw TypeError."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The null dereference is real and reachable. In utils.js pemToCert(), RegExp.exec() returns null when pem does not contain a valid PEM certificate header/footer. The code immediately accesses cert.length on line 15 without a null guard, which throws TypeError. The guard at encryptKeyInfo line 46 (`if (!options.pem)`) only filters falsy values \u2014 any non-empty, non-PEM string bypasses it and reaches pemToCert. However, the call site in encryptKeyInfoWithScheme (xmlenc.js lines 19-38) wraps the entire operation in a try/catch that delivers the TypeError to the callback as an error. The process does not crash. The net effect is that any caller passing a malformed certificate gets an error callback instead of a successful encryption \u2014 identical to a validation failure, not a process-level DoS. No schema validation (zod/joi/ajv) is present. The parameter is documented as user-supplied. The code defect (missing null check after exec()) is genuine and the reachability path described in the finding is accurate. Severity 'low' is appropriate: it is a code quality bug that causes operation failure for malformed input, not a process crash or security control bypass.",
+        "_done": true
+      }
+    }
+  ],
+  "all_with_verdicts": [
+    {
+      "id": "f001",
+      "rel": "lib/constants.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/constants.js",
+      "tags": [
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "xpath_injection",
+        "location": "decryptKeyInfo, lines 246 and 273",
+        "severity": "high",
+        "reachability": "Any caller of decrypt() or decryptKeyInfo() with attacker-supplied XML \u2014 the URI attribute of a RetrievalMethod element in the XML is read from the document and spliced into XPath expressions without any sanitization.",
+        "justification": "keyRetrievalMethodUri.substring(1) is derived from keyRetrievalMethod.getAttribute('URI') (attacker-controlled XML attribute) and concatenated directly into XPath strings on lines 246 and 273, allowing an attacker to break out of the single-quoted string and inject arbitrary XPath predicates or functions to alter which nodes are selected during decryption.",
+        "detection_pattern": {
+          "grep_pattern": "xpath\\.select\\([^)]*\\+[^)]*getAttribute",
+          "anti_pattern": "xpath\\.select.*\\$[a-zA-Z]",
+          "section_name": "XPath injection: dynamic string concatenation in xpath.select",
+          "description": "Matches XPath queries built by string concatenation with getAttribute() results; the safe alternative is parameterized XPath using variable bindings (the $var syntax in the xpath library) rather than string interpolation."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "high",
+        "reasoning": "Confirmed. In decryptKeyInfo() (xmlenc.js), line 245 reads keyRetrievalMethodUri from keyRetrievalMethod.getAttribute('URI') \u2014 a raw XML attribute value from attacker-supplied XML. Lines 246 and 273 splice keyRetrievalMethodUri.substring(1) directly into XPath string literals delimited by single quotes, with no escaping. substring(1) only strips the leading '#' character; it does not neutralize single quotes or other XPath metacharacters. An attacker supplying a URI like '#foo' or '1'='1' causes immediate escape from the string context and injection of arbitrary XPath predicates. The RetrievalMethod code path is taken whenever the inline EncryptedKey child is absent from KeyInfo (line 241) \u2014 no non-default option or configuration is required. No Zod/Joi/AJV or other schema validation is applied to the XML before parsing or before this code runs. The xpath library supports safe parameterized $var bindings but they are not used here. The decrypt() entry point (line 190) accepts raw XML from any caller \u2014 in SAML and similar flows the XML content is fully attacker-controlled with no authentication barrier. The finding mislabels the file as constants.js (the actual file is xmlenc.js) but line numbers 246 and 273 and all other details are accurate.",
+        "_done": true
+      }
+    },
+    {
+      "id": "f001",
+      "rel": "lib/constants.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/constants.js",
+      "tags": [
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "out_of_scope_callback_causing_crash",
+        "location": "decryptWithAlgorithm, line 325",
+        "severity": "high",
+        "reachability": "Any attacker who can supply a CBC-encrypted blob whose last byte encodes a padding value outside the range [1, ivLength] will trigger this code path \u2014 reachable from decrypt() and decryptKeyInfo() with attacker-supplied ciphertext.",
+        "justification": "decryptWithAlgorithm() is a synchronous function with no 'callback' parameter; line 325 calls callback(new Error('padding length invalid')) on invalid padding, which throws a ReferenceError in the synchronous context. The ReferenceError propagates up uncaught and crashes the Node.js process instead of being passed to the caller, creating a denial-of-service vector. This also leaks a timing/error oracle for CBC-mode padding.",
+        "detection_pattern": {
+          "grep_pattern": "function decrypt[A-Za-z]*\\([^)]*\\)[^{]*\\{[\\s\\S]*?callback\\(new Error",
+          "anti_pattern": "function decrypt[A-Za-z]*\\([^)]*callback[^)]*\\)",
+          "section_name": "Callback used out of scope in sync decryption function",
+          "description": "Catches synchronous decryption helper functions that call a 'callback' identifier not present in their parameter list, which will throw a ReferenceError on error paths and crash the Node.js process."
+        }
+      },
+      "verdict": {
+        "is_real": false,
+        "severity": "none",
+        "reasoning": "The finding claims that calling callback() inside decryptWithAlgorithm() (which has no callback parameter) will throw an uncaught ReferenceError that crashes the Node.js process. This is factually wrong due to the outer try/catch. Detailed analysis: (1) decryptWithAlgorithm() at line 308 has the signature function decryptWithAlgorithm(algorithm, symmetricKey, ivLength, content) \u2014 no callback parameter. (2) Line 325 does call callback(new Error('padding length invalid')), and since callback is not defined in that scope, this throws ReferenceError: callback is not defined. (3) However, all call sites of decryptWithAlgorithm() are inside decrypt() at lines 214, 217, 220, wrapped in a try { ... } catch (e) { return callback(e); } block (lines 197-230). The ReferenceError is caught by that outer try/catch, which then calls the outer callback with the error \u2014 the process does not crash. (4) The secondary padding oracle claim is a real concern (distinct error path for invalid vs valid padding in CBC mode), but the finding frames the severity as DoS via crash, which does not occur. Conclusion: the specific claimed crash/DoS vector is neutralized by the outer try/catch in decrypt(). The finding is not real as stated."
+      }
+    },
+    {
+      "id": "f001",
+      "rel": "lib/constants.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/constants.js",
+      "tags": [
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "xml_injection_via_unescaped_template_interpolation",
+        "location": "encryptKeyInfoWithScheme line 29 / keyinfo.tpl.xml.js line 10",
+        "severity": "medium",
+        "reachability": "Callers of encrypt() or encryptKeyInfo() who pass an options.pem value that is not a well-formed certificate \u2014 e.g., a PEM containing XML special characters or crafted content between the certificate headers \u2014 can inject arbitrary XML into the KeyInfo block.",
+        "justification": "In xmlenc.js line 29, encryptionPublicCert is built by concatenating pemToCert(options.pem.toString()) with literal XML tags, then in keyinfo.tpl.xml.js line 10 it is interpolated as ${encryptionPublicCert} without calling escapehtml(), while every other field in that template is wrapped in escapehtml(); a PEM body containing < > & or an extra </X509Certificate> tag breaks the XML document structure.",
+        "detection_pattern": {
+          "grep_pattern": "\\$\\{(?!escapehtml)[a-zA-Z_][a-zA-Z0-9_]*(?:Cert|Xml|Html|Content|Body|Data)\\}",
+          "anti_pattern": "\\$\\{escapehtml\\(",
+          "section_name": "XML injection: unescaped template variable containing certificate/XML data",
+          "description": "Finds template literal interpolations of variables with names suggesting HTML/XML/certificate content that are not wrapped in escapehtml(), indicating missing output encoding in XML generation."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The code defect is confirmed exactly as described. In xmlenc.js line 29, encryptionPublicCert is built by concatenating literal XML tags with pemToCert(options.pem.toString()), and in keyinfo.tpl.xml.js line 10 it is interpolated as ${encryptionPublicCert} without escapehtml(), while every other field (keyEncryptionMethod, keyEncryptionDigest, encryptedKey) is wrapped in escapehtml(). The pemToCert regex in utils.js uses [^-]* which permits <, >, &, / and all XML special characters to pass through unfiltered. The assembled encryptionPublicCert string already contains literal XML tags and is embedded raw into the template \u2014 a crafted PEM body with XML special characters or extra tags would break document structure. However, practical exploitability is lower than the finding claims: options.pem is a configuration-level parameter documented by the README as fs.readFileSync(...) (a file path), not request input. A real X.509 certificate body is DER-encoded base64 (A-Za-z0-9+/=) which cannot contain XML special characters. Exploitation requires the calling application to expose options.pem to attacker-controlled data, which is application-architecture-dependent and not the default usage pattern. No schema validation (zod/joi/ajv) guards the input, and no sanitizer exists in the PEM-to-cert path. The defect is real and the inconsistency in escaping is a genuine code quality and defense-in-depth problem, but real-world exploitability is conditional on non-default misconfiguration. Severity downgraded from medium to low on this basis."
+      }
+    },
+    {
+      "id": "f001",
+      "rel": "lib/constants.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/constants.js",
+      "tags": [
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "xml_injection_via_unescaped_template_interpolation",
+        "location": "encrypt_key closure / encrypted-key.tpl.xml.js line 6",
+        "severity": "medium",
+        "reachability": "Any caller of encrypt() where encryptKeyInfo returns a keyInfo string constructed from attacker-influenced certificate data; the keyInfo string is spliced raw into the outer EncryptedData XML document.",
+        "justification": "In encrypted-key.tpl.xml.js line 6, ${keyInfo} is inserted without escapehtml() \u2014 unlike contentEncryptionMethod and encryptedContent on adjacent lines which are escaped \u2014 so if the keyInfo string contains extra XML elements it injects nodes into the EncryptedData document.",
+        "detection_pattern": {
+          "grep_pattern": "\\$\\{(?!escapehtml)[a-zA-Z_][a-zA-Z0-9_]*(?:[Kk]ey[Ii]nfo|[Xx]ml|[Hh]tml)\\}",
+          "anti_pattern": "\\$\\{escapehtml\\(",
+          "section_name": "XML injection: unescaped keyInfo in template",
+          "description": "Catches template literal interpolations of variables named keyInfo or similar XML/HTML identifiers that bypass escapehtml(), allowing injected XML if the variable content is not sanitized upstream."
+        }
+      },
+      "verdict": {
+        "is_real": false,
+        "severity": "low",
+        "reasoning": "The finding correctly identifies that ${keyInfo} on line 6 of encrypted-key.tpl.xml.js is interpolated without escapehtml(), while adjacent fields use escapehtml(). However, this is intentional design: keyInfo is a pre-rendered XML fragment (the full output of the keyinfo template), not a raw string \u2014 escaping it would corrupt the XML structure. The actual unescaped interpolation of caller-controlled data occurs one level earlier: ${encryptionPublicCert} in keyinfo.tpl.xml.js line 10, where the PEM cert body (from options.pem) is spliced raw into the KeyInfo XML block without escaping. The finding mislabels both the location (citing encrypted-key.tpl.xml.js line 6 as the sink rather than keyinfo.tpl.xml.js line 10) and the direct trigger variable. More critically, the reachability claim fails adversarial scrutiny: options.pem is a server-side configuration parameter (the encryption certificate), not a value sourced from HTTP request input or any user-controlled channel. No schema validation is present, but the parameter is consumed only by trusted server-side callers who configure the library. There is no realistic path from a remote attacker to options.pem without already having process-level access. The finding conflates library API caller trust with attacker control. No non-default options are needed, but the prerequisite \u2014 attacker-controlled options.pem \u2014 does not exist in any realistic deployment model. Verdict: the cited sink and location are wrong, and the reachability is not demonstrated.",
+        "_done": true
+      }
+    },
+    {
+      "id": "f001",
+      "rel": "lib/constants.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/constants.js",
+      "tags": [
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "padding_oracle_cbc_mode",
+        "location": "decryptWithAlgorithm, lines 318-328",
+        "severity": "medium",
+        "reachability": "Any attacker who can submit ciphertext to a service that calls decrypt() and observe whether an error is returned versus success \u2014 the custom padding check produces a distinguishable error for invalid padding versus valid padding.",
+        "justification": "For CBC-mode algorithms (aes-128-cbc, aes-256-cbc, des-ede3-cbc) the manual padding removal on lines 321-327 returns/errors when the last byte value is outside [1, ivLength], creating a padding oracle that an attacker can exploit to decrypt arbitrary ciphertext by submitting chosen ciphertexts and observing the distinct error/success responses.",
+        "detection_pattern": {
+          "grep_pattern": "charCodeAt.*length.*-.*1.*padding.*Error",
+          "anti_pattern": "crypto\\.timingSafeEqual|setAutoPadding\\(true\\)",
+          "section_name": "Padding oracle: custom CBC padding validation with error leak",
+          "description": "Detects manual CBC padding removal code that throws or returns distinguishable errors for invalid padding bytes, which enables a padding oracle attack against decrypted ciphertext."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The padding oracle is mechanically real but is gated behind a non-default, explicit opt-in that requires the server operator to have disabled the insecure-algorithm guard.\n\nMechanism: decryptWithAlgorithm (xmlenc.js:308) is a synchronous function with signature (algorithm, symmetricKey, ivLength, content) \u2014 no callback parameter. Line 310 calls decipher.setAutoPadding(false), disabling Node's built-in PKCS7 removal. Lines 321-327 implement manual padding removal: it reads the last byte value and calls callback(new Error('padding length invalid')) when the byte is outside [1, ivLength]. Because callback is not in scope, this throws TypeError: callback is not a function synchronously. The outer try/catch in decrypt() (lines 197/228-229) catches the TypeError and forwards it as callback(error). Good padding produces callback(null, plaintext). The two outcomes are distinguishable, so a classical padding oracle exists in the code path.\n\nCritical gate: All three CBC-mode algorithms (aes-128-cbc, aes-256-cbc, des-ede3-cbc) are listed in insecureAlgorithms (lines 6-14). The check at lines 204-207 reads: if (options.disallowDecryptionWithInsecureAlgorithm !== false && insecureAlgorithms.indexOf(encryptionAlgorithm) >= 0) return callback(error). This means the guard is ACTIVE by default (option absent, undefined, or any truthy value all trigger it) and blocks the CBC path entirely. The vulnerable code is only reachable when a caller explicitly passes disallowDecryptionWithInsecureAlgorithm: false \u2014 a deliberate opt-in to use deprecated algorithms.\n\nReachability correction: The finding claims 'any attacker who can submit ciphertext' can reach this, which overstates the case. The attacker cannot control this option; only the server operator can, by explicitly opting into insecure algorithms. In that (non-default, explicitly deprecated) configuration the oracle is fully exploitable with attacker-controlled CipherValue ciphertext in the XML input.\n\nAdditional inaccuracies in the finding: (1) The file location is wrong \u2014 the vulnerable code is in lib/xmlenc.js, not lib/constants.js (which does not exist in this package). (2) The grep_pattern in detection_pattern does not match the actual code. (3) setAutoPadding(false) appears in the code but is the cause of the problem, not a mitigation \u2014 the anti_pattern check for setAutoPadding(true) would be a fix, not something present here.\n\nVerdict: is_real=true because the oracle code path exists and is reachable under a non-default but explicitly documented insecure configuration. Severity is downgraded from medium to low because exploitation requires the server operator to have opted into deprecated CBC algorithms via disallowDecryptionWithInsecureAlgorithm:false, which the library itself warns against."
+      }
+    },
+    {
+      "id": "f002",
+      "rel": "lib/decrypt.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/decrypt.js",
+      "tags": [
+        "rce",
+        "proto_pollution",
+        "deserialize",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "xml_injection",
+        "location": "encrypted-key.tpl.xml.js line 6 \u2014 template literal interpolation of `keyInfo`",
+        "severity": "high",
+        "reachability": "Any caller of the `encrypt` function that controls `options.pem` or intermediate keyInfo rendering; library users constructing encryption options.",
+        "justification": "The `keyInfo` variable is interpolated directly into the XML template on line 6 (`${keyInfo}`) without any escaping. `keyInfo` is itself rendered by `keyinfo.tpl.xml.js`, which embeds `${encryptionPublicCert}` raw on its line 10. `encryptionPublicCert` is built in xmlenc.js line 29 by string-concatenating raw XML around `pemToCert(options.pem.toString())`. If `options.pem` contains XML-significant characters in the cert body position (e.g., via a crafted PEM), they are inserted into the output document unescaped, enabling XML structure manipulation.",
+        "detection_pattern": {
+          "grep_pattern": "\\$\\{[a-zA-Z_][a-zA-Z0-9_]*\\}",
+          "anti_pattern": "escapehtml\\(|xmlEscape\\(|encodeXML\\(",
+          "section_name": "XML injection: unescaped template interpolation in XML output",
+          "description": "Finds template literal interpolations inside XML-generating JS template files. When the interpolated variable is not wrapped in an escaping function (escape-html, xmlEscape, etc.), attacker-controlled input can break out of the XML text context."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "high",
+        "reasoning": "The XML injection chain is confirmed end-to-end. In xmlenc.js line 29, `encryptionPublicCert` is built by string-concatenating raw XML tags around `utils.pemToCert(options.pem.toString())`. The `pemToCert` function (utils.js lines 13-20) extracts the cert body using the regex `/-----BEGIN CERTIFICATE-----([^-]*)-----END CERTIFICATE-----/g` \u2014 the capture group `[^-]*` admits all XML-significant characters (<, >, &, \", /) and only strips newlines. The resulting string is passed as `params.encryptionPublicCert` to `renderTemplate('keyinfo', params)`. In `keyinfo.tpl.xml.js` line 10, `${encryptionPublicCert}` is interpolated without any escaping \u2014 while all other interpolations in that file (lines 6, 7, 13) use `escapehtml()`, this one does not. A crafted PEM whose base64 body contains XML markup (e.g. `</X509Certificate></X509Data><evil/>...`) would be injected verbatim into the output XML. The rendered keyInfo string is then embedded raw into `encrypted-key.tpl.xml.js` line 6 (`${keyInfo}`), which is by design since it is a pre-rendered XML fragment; the true unescaped sink is `keyinfo.tpl.xml.js:10`. `options.pem` is a caller-supplied parameter with no schema validation (no zod/joi/ajv). No authentication is required \u2014 this is a library call. Any consumer that passes a crafted or attacker-influenced PEM to `encrypt()` is affected. The finding's location attribution (`encrypted-key.tpl.xml.js:6`) is slightly imprecise \u2014 the actual injection point is `keyinfo.tpl.xml.js:10` \u2014 but the root cause and exploit chain are accurate and confirmed."
+      }
+    },
+    {
+      "id": "f002",
+      "rel": "lib/decrypt.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/decrypt.js",
+      "tags": [
+        "rce",
+        "proto_pollution",
+        "deserialize",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "xml_injection",
+        "location": "keyinfo.tpl.xml.js line 10 \u2014 unescaped `${encryptionPublicCert}`",
+        "severity": "medium",
+        "reachability": "Same as above \u2014 caller controls `options.pem`, whose parsed form is placed into `encryptionPublicCert` and then interpolated unescaped into a KeyInfo XML block.",
+        "justification": "Inside `keyinfo.tpl.xml.js`, the `encryptionPublicCert` parameter is interpolated without escaping on line 10. It is constructed in xmlenc.js as the literal string `'<X509Data><X509Certificate>' + utils.pemToCert(options.pem.toString()) + '</X509Certificate></X509Data>'`. Although the base64 content of a well-formed cert is safe, a crafted or truncated PEM could produce output that closes the `<X509Certificate>` tag early and injects sibling elements into the XML KeyInfo block, affecting downstream XML signature or decryption logic.",
+        "detection_pattern": {
+          "grep_pattern": "\\$\\{[a-zA-Z_][a-zA-Z0-9_]*\\}",
+          "anti_pattern": "escapehtml\\(|xmlEscape\\(|encodeXML\\(",
+          "section_name": "XML injection: unescaped certificate data in XML template",
+          "description": "Template literal interpolations in XML output files without escaping allow cert or key material strings to inject XML structure if the input deviates from the expected base64 format."
+        }
+      },
+      "verdict": {
+        "is_real": false,
+        "severity": "informational",
+        "reasoning": "The finding correctly identifies that `encryptionPublicCert` is interpolated without escaping at keyinfo.tpl.xml.js line 10, and that `pemToCert` uses a regex `[^-]*` that does NOT filter `<`/`>` characters. Technically, a PEM string containing XML metacharacters in the cert body could inject XML into the KeyInfo block. However, the reachability is not real in any externally-exploitable sense: `options.pem` is passed by the application operator as their own certificate at encryption time \u2014 it is operator-controlled configuration, not user-controlled or attacker-controlled input. There is no API surface through which a remote or untrusted party can influence `options.pem`. The library documents this as a required, trusted certificate parameter. The 'attacker' in this scenario is the operator themselves, making this a self-injection with no security boundary crossing. Additionally, a well-formed PEM cert contains only base64 characters (A-Za-z0-9+/=) plus newlines, so in normal use the unescaped interpolation is safe. Only a deliberately malformed or adversarially crafted PEM string supplied by the operator would trigger injection. No schema validator, no XML escaping, and no sanitizer is present on this parameter, but none is needed given the trust level of the input. The finding is technically observable in the code but does not represent a real exploitable vulnerability given the intended threat model.",
+        "_done": true
+      }
+    },
+    {
+      "id": "f002",
+      "rel": "lib/decrypt.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/decrypt.js",
+      "tags": [
+        "rce",
+        "proto_pollution",
+        "deserialize",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "null_dereference_dos",
+        "location": "utils.js `pemToCert` function, line 15 \u2014 `cert[1]` accessed without null check",
+        "severity": "medium",
+        "reachability": "Any caller passing a non-PEM or malformed string as `options.pem` to `encryptKeyInfo`; reachable from the public `encrypt` API.",
+        "justification": "In `pemToCert`, the regex `/-----BEGIN CERTIFICATE-----([^-]*)-----END CERTIFICATE-----/g.exec(pem)` returns `null` when `pem` does not match. The code immediately accesses `cert[1]` and `cert.length` on the next line without a null guard, causing an uncaught `TypeError: Cannot read properties of null` that crashes the Node.js process. This is a denial-of-service vector for any service that passes caller-supplied PEM data.",
+        "detection_pattern": {
+          "grep_pattern": "\\.exec\\([^)]+\\)\\s*[;\\n]",
+          "anti_pattern": "if\\s*\\(\\s*cert\\s*\\)|cert\\s*&&|cert\\s*!==\\s*null",
+          "section_name": "Null dereference: regex exec result used without null check",
+          "description": "Identifies `.exec()` calls whose return value is used in the next statement without a null check. `RegExp.prototype.exec` returns null on no-match; accessing properties on null causes a TypeError crash."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f002",
+      "rel": "lib/decrypt.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/decrypt.js",
+      "tags": [
+        "rce",
+        "proto_pollution",
+        "deserialize",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "implicit_global_variable_race_condition",
+        "location": "xmlenc.js `encryptKeyInfoWithScheme` function, lines 25, 27, 34 \u2014 undeclared `base64EncodedEncryptedKey`, `params`, `result`",
+        "severity": "medium",
+        "reachability": "Any concurrent invocation of `encrypt` in a multi-request Node.js server environment; no external input needed beyond concurrent use.",
+        "justification": "Inside `encryptKeyInfoWithScheme`, the variables `base64EncodedEncryptedKey`, `params`, and `result` are assigned without `var`, `let`, or `const`, making them implicit globals on the module's global object. Under concurrent async calls, a second in-flight encryption can overwrite `params` or `result` before the first call reads them, causing key material (`encryptedKey`, `symmetricKey`) from one session to bleed into another session's output \u2014 a potentially critical confidentiality and integrity failure in high-concurrency scenarios.",
+        "detection_pattern": {
+          "grep_pattern": "^\\s{2,}[a-zA-Z_$][a-zA-Z0-9_$]* = ",
+          "anti_pattern": "^\\s*(var|let|const)\\s+",
+          "section_name": "Implicit global variable: undeclared assignment in function scope",
+          "description": "Finds variable assignments inside functions that lack a `var`/`let`/`const` declaration. These become implicit globals in non-strict mode, creating shared mutable state that is unsafe under concurrency and leaks data between calls."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f003",
+      "rel": "lib/encrypt.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/encrypt.js",
+      "tags": [
+        "rce",
+        "proto_pollution",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "xml_injection",
+        "location": "module.exports template literal, line 10 \u2014 `${encryptionPublicCert}` interpolation",
+        "severity": "high",
+        "reachability": "Any caller of `encrypt()` or `encryptKeyInfo()` in xmlenc.js that controls `options.pem` or any caller that invokes the template directly with a controlled `encryptionPublicCert` parameter; in SAML/federation scenarios this can be the identity provider certificate supplied at runtime.",
+        "justification": "Unlike `keyEncryptionMethod`, `keyEncryptionDigest`, and `encryptedKey` which are all wrapped with `escapehtml()`, `encryptionPublicCert` is interpolated raw into the XML template at line 10, enabling an attacker who controls the PEM certificate or the template parameter directly to inject arbitrary XML nodes into the `<KeyInfo>` element and alter document structure.",
+        "detection_pattern": {
+          "grep_pattern": "\\$\\{[^}]+\\}",
+          "anti_pattern": "escapehtml\\(|escape\\(|encodeURIComponent\\(|DOMPurify",
+          "section_name": "XML injection: raw template interpolation in XML output",
+          "description": "Finds template literal interpolations in XML-generating files; when a field is interpolated without an XML/HTML escaping wrapper (e.g. escapehtml, xmlescape) an attacker controlling that field can inject arbitrary XML nodes or attributes."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f003",
+      "rel": "lib/encrypt.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/encrypt.js",
+      "tags": [
+        "rce",
+        "proto_pollution",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "unvalidated_algorithm_uri",
+        "location": "module.exports template literal, line 7 \u2014 DigestMethod Algorithm attribute",
+        "severity": "low",
+        "reachability": "Any caller that controls `options.keyEncryptionDigest` \u2014 a config-time or caller-supplied string that is concatenated directly after the fixed URI prefix `http://www.w3.org/2000/09/xmldsig#` with only HTML escaping applied.",
+        "justification": "The DigestMethod Algorithm URI is constructed as a string concatenation of a hardcoded prefix and `escapehtml(keyEncryptionDigest)` with no allowlist validation, so an attacker supplying an unexpected digest value can craft an arbitrary URI (e.g. referencing an attacker-chosen algorithm) as the Algorithm attribute, though HTML-escaping prevents attribute breakout.",
+        "detection_pattern": {
+          "grep_pattern": "Algorithm.*\\$\\{.*Digest",
+          "anti_pattern": "allowedDigests|digestAlgorithm.*indexOf|switch.*digest",
+          "section_name": "Algorithm URI injection: unvalidated digest algorithm",
+          "description": "Finds XML Algorithm attribute constructions that interpolate a caller-supplied digest or algorithm name without an allowlist check; permits an attacker to specify unsupported or attacker-chosen cryptographic algorithm URIs."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f004",
+      "rel": "lib/index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/index.js",
+      "tags": [],
+      "finding": {
+        "vuln_class": "xpath_injection",
+        "location": "decryptKeyInfo, lines 246 and 273 (xmlenc.js)",
+        "severity": "high",
+        "reachability": "Any caller who passes attacker-controlled XML to decrypt() or decryptKeyInfo(); the RetrievalMethod/@URI attribute value flows directly into an XPath string literal.",
+        "justification": "keyRetrievalMethodUri is read from the XML attribute URI via getAttribute('URI') and concatenated into XPath queries at lines 246 and 273 without any sanitization or escaping, allowing an attacker to break out of the XPath string literal with a single-quote and inject arbitrary XPath subexpressions.",
+        "detection_pattern": {
+          "grep_pattern": "xpath\\.select\\([^)]*\\+\\s*[a-zA-Z_][a-zA-Z0-9_.]*",
+          "anti_pattern": "escapeXPath|xpath\\.escape|String\\(.*\\)|normalize-space",
+          "section_name": "XPath injection: user value concatenated into xpath.select string",
+          "description": "Detects string concatenation of variables directly into an xpath.select() query; any variable derived from user or XML input is an injection point that can break the XPath expression structure."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "high",
+        "reasoning": "Confirmed XPath injection in xml-encryption v4.0.0 (lib/xmlenc.js, not lib/index.js which is an empty re-export stub). The vulnerable code is in decryptKeyInfo(), lines 245-246 and 272-273.\n\nExact vulnerable pattern:\n  Line 245: keyRetrievalMethodUri = keyRetrievalMethod.getAttribute('URI');\n  Line 246: xpath.select(\"//*[local-name(.)='EncryptedKey' and @Id='\" + keyRetrievalMethodUri.substring(1) + \"']/*[local-name(.)='EncryptionMethod']\", doc)[0]\n  Line 273: xpath.select(\"//*[local-name(.)='EncryptedKey' and @Id='\" + keyRetrievalMethodUri.substring(1) + \"']/*[local-name(.)='CipherData']/*[local-name(.)='CipherValue']\", keyInfo)[0]\n\nAttack path confirmed live against the bundled xpath library: a RetrievalMethod URI of '#legit' or '1'='1' produces the injected query //*[local-name(.)='EncryptedKey' and @Id='legit' or '1'='1']/*[...], which matches ANY EncryptedKey in the document because 'or \"1\"=\"1\"' is always true. Tested with the xpath package bundled in node_modules: 2 nodes matched instead of 0 for a non-existent Id.\n\nNo sanitization found: grep for sanitize/escape/encodeURI/replace/schema/validate/zod/joi/ajv returned zero hits in both xmlenc.js and utils.js.\n\nReachability: decrypt() (public export) calls decryptKeyInfo() on line 200 with no pre-validation. The RetrievalMethod branch (lines 243-247) is taken whenever no inline EncryptedKey is present under KeyInfo \u2014 a common XMLEnc/SAML pattern. decryptKeyInfo() is also exported directly. Only guard is options.key being present (the decryptor's own private key), which is always true for legitimate callers. No authentication or authorization context is required; any caller passing external XML reaches the sink.\n\nNo non-default options required to trigger the path. No schema validation of the incoming XML is performed.\n\nPractical impact: injection allows an attacker to redirect which EncryptedKey node is selected for decryption, substituting attacker-chosen ciphertext. With 'or 1=1' the first EncryptedKey in document order wins, and the attacker controls document structure \u2014 enabling a decryption oracle against the server's RSA private key.\n\nNote on finding metadata: the finding cites 'xmlenc.js' in the location field but 'index.js' in the file path. lib/index.js is a 47-byte re-export stub (confirmed empty/pass-through). The actual vulnerable code is in lib/xmlenc.js at the stated lines."
+      }
+    },
+    {
+      "id": "f004",
+      "rel": "lib/index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/index.js",
+      "tags": [],
+      "finding": {
+        "vuln_class": "undefined_reference_crash_dos",
+        "location": "decryptWithAlgorithm, line 325 (xmlenc.js)",
+        "severity": "high",
+        "reachability": "Any caller who triggers CBC decryption with a ciphertext whose last byte (after decryption) has a numeric value greater than ivLength; reachable through decrypt() with attacker-supplied XML containing crafted CipherValue.",
+        "justification": "decryptWithAlgorithm is a synchronous function with no callback parameter, yet line 325 calls callback(new Error('padding length invalid')) when the padding byte is out of range; this is a ReferenceError at runtime that crashes the process/promise chain and can be triggered by supplying a ciphertext whose last decrypted byte exceeds ivLength.",
+        "detection_pattern": {
+          "grep_pattern": "function\\s+\\w+\\s*\\([^)]*\\)\\s*\\{[^}]*\\bcallback\\b(?![^)]*callback)",
+          "anti_pattern": "return\\s+callback|throw\\s+new\\s+Error",
+          "section_name": "Undefined callback reference in synchronous function",
+          "description": "Flags functions that do not declare 'callback' as a parameter but reference it in the body; in sync helper functions extracted from async flows this causes a ReferenceError crash instead of proper error propagation."
+        }
+      },
+      "verdict": {
+        "is_real": false,
+        "severity": "none",
+        "reasoning": "The finding claims that calling `callback(new Error('padding length invalid'))` at line 325 of xmlenc.js causes a process-crashing ReferenceError because `callback` is not a parameter of `decryptWithAlgorithm`. This is technically correct \u2014 `callback` is indeed undeclared in that function scope, so executing that line would raise `ReferenceError: callback is not defined`. However, the finding's claimed impact (DoS / process crash) is wrong due to a missed guard.\n\nAll call sites of `decryptWithAlgorithm` are inside `decrypt()` (lines 214-224), and the entire body of `decrypt()` is wrapped in a `try { ... } catch (e) { return callback(e); }` block (lines 197-230). When the ReferenceError propagates out of `decryptWithAlgorithm`, it is caught by that try/catch and delivered to the caller as a normal callback error. The process does not crash. The only real consequence is that the caller receives `ReferenceError: callback is not defined` instead of the intended `Error: padding length invalid` \u2014 a confusing but non-exploitable error message artifact.\n\nThe reachability claim is correct: an attacker can supply crafted XML with a CipherValue whose last decrypted byte is outside the valid padding range (greater than ivLength or less than 1), triggering the bad branch, without authentication. But the exploitable impact does not match the claimed severity. This is a code-quality bug (wrong error message), not a security vulnerability."
+      }
+    },
+    {
+      "id": "f004",
+      "rel": "lib/index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/index.js",
+      "tags": [],
+      "finding": {
+        "vuln_class": "xml_injection",
+        "location": "encryptKeyInfoWithScheme, line 29 (xmlenc.js) + keyinfo.tpl.xml.js line 10",
+        "severity": "medium",
+        "reachability": "Any caller who controls options.pem passed to encrypt() or encryptKeyInfo(); the extracted certificate body is inserted raw into the XML template without escaping.",
+        "justification": "The encryptionPublicCert value (built at line 29 as a raw XML snippet from options.pem) is inserted unescaped into the keyinfo template at the ${encryptionPublicCert} slot (template line 10), so a crafted PEM whose base64 body contains XML special characters can produce malformed or injected XML output.",
+        "detection_pattern": {
+          "grep_pattern": "\\$\\{[a-zA-Z_][a-zA-Z0-9_]*\\}|\\+\\s*[a-zA-Z_][a-zA-Z0-9_.]*\\s*\\+",
+          "anti_pattern": "escapehtml\\(|escapeXml\\(|xmlescape\\(",
+          "section_name": "XML injection: unescaped template interpolation",
+          "description": "Detects template literal or string concatenation slots in XML-generating code that are not wrapped with an HTML/XML escape function; unescaped variables derived from caller input can inject XML elements or attributes."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The finding is technically real but overstated in severity. Line 29 of xmlenc.js builds encryptionPublicCert as a raw XML snippet by concatenating '<X509Data><X509Certificate>' + pemToCert(options.pem) + '</X509Certificate></X509Data>' without any XML escaping on the cert body. This value is then inserted at template line 10 (${encryptionPublicCert}) without escapehtml(), while every other interpolated slot in the same template (keyEncryptionMethod, keyEncryptionDigest, encryptedKey) IS wrapped with escapehtml(). The pemToCert regex ([^-]*) allows any non-dash character in the body \u2014 it does not constrain content to valid base64. So a crafted PEM string whose body contains XML special characters (<, >, &) would pass through and inject raw XML into the output. No schema validation (zod/joi/ajv) constrains options.pem. The attack path is real. However, practical exploitability is limited: standard PEM base64 bodies use only A-Za-z0-9+/= (no XML-special chars), so a legitimate certificate loaded from a trusted source cannot trigger this. Exploitation requires passing a crafted, non-standard PEM string as options.pem. This is plausible only when the caller relays options.pem from untrusted external input (e.g., a client-supplied certificate in a federation/SAML service) without prior validation. The severity 'medium' claimed by the finding is slightly generous; 'low' is more accurate given that (1) the parameter is documented as a server-side configuration option, (2) exploitation requires malformed/non-certificate PEM input, and (3) the template design intentionally leaves this slot unescaped because it treats the value as a pre-assembled XML fragment. The correct fix is to escape the pemToCert output before wrapping it in XML tags, or use DOM APIs instead of string templating."
+      }
+    },
+    {
+      "id": "f004",
+      "rel": "lib/index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/index.js",
+      "tags": [],
+      "finding": {
+        "vuln_class": "null_dereference_dos",
+        "location": "pemToCert, line 15 (utils.js)",
+        "severity": "medium",
+        "reachability": "Any caller who passes a string that does not contain a valid PEM certificate block to pemToCert() via options.pem in encrypt() or encryptKeyInfo().",
+        "justification": "At line 14 the regex .exec(pem) can return null when the input has no matching certificate block; line 15 immediately accesses cert.length without a null check, throwing a TypeError: Cannot read properties of null, which crashes the process.",
+        "detection_pattern": {
+          "grep_pattern": "\\.exec\\([^)]+\\)\\s*[;\\n][^\\n]*\\.length",
+          "anti_pattern": "if\\s*\\(.*===\\s*null|if\\s*\\(!.*\\)|\\?\\.",
+          "section_name": "Null dereference after regex exec()",
+          "description": "Flags patterns where the return value of RegExp.exec() is used without a null guard; exec() returns null on no match, so accessing .length or indices on the result crashes with TypeError."
+        }
+      },
+      "verdict": {
+        "is_real": false,
+        "severity": "none",
+        "reasoning": "The null-dereference bug in pemToCert() is real at the code level (line 15 of utils.js accesses cert.length without a null guard when exec() returns null on no match), but the finding's claimed impact \u2014 a process crash / DoS \u2014 is incorrect. The sole call site of pemToCert() in xmlenc.js is on line 29, which sits inside a try { ... } catch (e) { callback(e); } block (lines 19-38 of encryptKeyInfoWithScheme). Any TypeError thrown by cert.length on null is caught by that handler and forwarded to the callback as a normal error. No uncaught exception reaches the process, so no DoS is possible. The reachability claim ('crashes the process') is therefore false; this is at most an ungraceful error path, not a vulnerability."
+      }
+    },
+    {
+      "id": "f005",
+      "rel": "lib/utils.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/xml-encryption/node_modules/xml-encryption/lib/utils.js",
+      "tags": [
+        "rce",
+        "deserialize"
+      ],
+      "finding": {
+        "vuln_class": "null_dereference_dos",
+        "location": "pemToCert (utils.js line 15)",
+        "severity": "low",
+        "reachability": "Reachable by any caller of encryptKeyInfo/encryptKeyInfoWithScheme that passes a non-null options.pem value which does not contain a valid PEM certificate header/footer. The truthiness check at line 46/76 of xmlenc.js prevents null/undefined, but any non-empty non-PEM string bypasses it.",
+        "justification": "RegExp.prototype.exec() returns null when there is no match; the subsequent cert.length access on null throws TypeError: Cannot read properties of null. The enclosing try/catch in xmlenc.js encryptKeyInfoWithScheme (lines 19-38) catches it and delivers it to the callback, preventing a process crash, but it makes the encrypt operation fail on any malformed certificate.",
+        "detection_pattern": {
+          "grep_pattern": "\\.exec\\([^)]+\\)\\s*;\\s*\\n[^}]*\\.length",
+          "anti_pattern": "if\\s*\\(\\w+\\s*&&\\s*\\w+\\.length|\\w+\\s*!==\\s*null",
+          "section_name": "Null Deref: regex exec() result unchecked",
+          "description": "Detects patterns where the return value of RegExp.exec() is used for a property access (e.g. .length, [1]) without a null check. exec() returns null on no match, so any property access will throw TypeError."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The null dereference is real and reachable. In utils.js pemToCert(), RegExp.exec() returns null when pem does not contain a valid PEM certificate header/footer. The code immediately accesses cert.length on line 15 without a null guard, which throws TypeError. The guard at encryptKeyInfo line 46 (`if (!options.pem)`) only filters falsy values \u2014 any non-empty, non-PEM string bypasses it and reaches pemToCert. However, the call site in encryptKeyInfoWithScheme (xmlenc.js lines 19-38) wraps the entire operation in a try/catch that delivers the TypeError to the callback as an error. The process does not crash. The net effect is that any caller passing a malformed certificate gets an error callback instead of a successful encryption \u2014 identical to a validation failure, not a process-level DoS. No schema validation (zod/joi/ajv) is present. The parameter is documented as user-supplied. The code defect (missing null check after exec()) is genuine and the reachability path described in the finding is accurate. Severity 'low' is appropriate: it is a code quality bug that causes operation failure for malformed input, not a process crash or security control bypass.",
+        "_done": true
+      }
+    }
+  ],
+  "reachability_applied": 3,
+  "reachability_downgraded": 0
+}

@@ -1,0 +1,921 @@
+{
+  "slug": "node-rsa",
+  "run": "node-rsa",
+  "manifest": "/DATA/openclaw/Repos/Research/analysis/pipeline-js/node-rsa/manifest.json",
+  "files_reviewed": 5,
+  "raw_findings": 20,
+  "confirmed_count": 11,
+  "confirmed": [
+    {
+      "id": "f001",
+      "rel": "cjs/index.cjs",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/cjs/index.cjs",
+      "tags": [
+        "rce",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "pkcs1_v1_5_bleichenbacher_oracle",
+        "location": "JsEngine.decrypt() lines 3393-3414, NodeNativeEngine.decrypt() line 4026 (nativeAvailableForDecrypt returns false for pkcs1 private path, routing to JS fallback)",
+        "severity": "medium",
+        "reachability": "Callers that configure encryptionScheme:'pkcs1' and expose a decryption endpoint over a network where an attacker can submit chosen ciphertexts and observe whether decryption succeeds or fails (binary oracle). The code itself documents this limitation at lines 3024-3033.",
+        "justification": "The code comment at lines 3024-3033 explicitly acknowledges that while internal differential timing is mitigated, 'the valid/invalid binary oracle inherent to PKCS#1 v1.5 remains' \u2014 JsEngine.decrypt() throws 'Decryption failed' on any padding error, making success vs. failure distinguishable, enabling a Bleichenbacher attack to decrypt arbitrary RSA-PKCS1v1.5 ciphertexts in ~10^6 queries if the endpoint is reachable.",
+        "detection_pattern": {
+          "grep_pattern": "throw.*[Dd]ecryption.fail|encUnPad.*null",
+          "anti_pattern": "RSA_PKCS1_OAEP_PADDING|pkcs1_oaep",
+          "section_name": "PKCS#1 v1.5 binary oracle: distinguishable decryption failure",
+          "description": "Flags PKCS#1 v1.5 decryption paths that throw or return distinct errors on padding failures; enables Bleichenbacher-style oracle attacks if the decryption endpoint is network-accessible."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "Confirmed. The file is at /DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.cjs (not dist/cjs/index.cjs as the finding states, but the content matches). Key evidence: (1) nativeAvailableForDecrypt() at line 3984 explicitly returns false when !usePublic && encryptionScheme === 'pkcs1', routing to this.fallback.decrypt() which is a JsEngine instance. (2) JsEngine.decrypt() at lines 3393-3414 accumulates a 'bad' flag in constant-time but then throws 'Decryption failed' at line 3412 on any padding failure. (3) The library comment at lines 3023-3033 explicitly acknowledges: 'the valid/invalid binary oracle inherent to PKCS#1 v1.5 remains -- use OAEP for untrusted ciphertexts.' (4) The NodeNativeEngine.decrypt() at line 4027 also routes pkcs1 private decrypt to the JsEngine fallback. (5) The $$decryptKey() wrapper at line 3871-3872 catches and re-throws a generic error, but success-vs-failure remains distinguishable to a network attacker. QUALIFICATIONS: (a) The default encryption scheme is pkcs1_oaep (line 3271), so the vulnerable path requires explicit non-default configuration encryptionScheme:'pkcs1'. (b) No schema validation (zod/joi/ajv) guards the encryptionScheme option -- it is purely caller-controlled. (c) The oracle is inherent to PKCS#1 v1.5 and is explicitly documented as a known limitation, not a coding defect. (d) Exploitation requires a network-accessible decryption endpoint and ~10^6 adaptive chosen-ciphertext queries (Bleichenbacher 1998). The finding is real but applies only when callers deliberately opt into pkcs1 mode and expose decryption over a network.",
+        "severity_pre_reach": "medium"
+      },
+      "reachability": {
+        "gate_breachable": false,
+        "gate_type": "non-default option required",
+        "adjusted_severity": "low",
+        "reasoning": "The vulnerable PKCS#1 v1.5 binary oracle path in JsEngine.decrypt() is only reached when a caller explicitly sets encryptionScheme:'pkcs1' \u2014 a non-default option. The library default (line 3271) is DEFAULT_ENCRYPTION_SCHEME = 'pkcs1_oaep', so any NodeRSA instance created without overriding encryptionScheme uses OAEP and is not affected. The routing logic is unambiguous: nativeAvailableForDecrypt() at line 3984 returns false only when (!usePublic && encryptionScheme === 'pkcs1'), sending execution to the JsEngine fallback; all other schemes (including the default pkcs1_oaep) use Node's native crypto.privateDecrypt with RSA_PKCS1_OAEP_PADDING, which is not susceptible to a Bleichenbacher oracle. The public API surface (NodeRSA.decrypt() at line 3835) is exported and network-reachable, but the vulnerability only materialises under explicit, non-default caller opt-in to pkcs1 mode. There is no schema validation or allowlist guarding the encryptionScheme option \u2014 it is purely caller-controlled \u2014 but opting into an insecure scheme is a deliberate, documented choice: the library comment at lines 3023-3033 explicitly warns callers to use OAEP for untrusted ciphertexts. Because exploitation requires a non-default configuration that contradicts the library's own recommendation, gate_breachable is false and severity is downgraded from medium to low."
+      }
+    },
+    {
+      "id": "f002",
+      "rel": "esm/index.node.mjs",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/esm/index.node.mjs",
+      "tags": [
+        "rce",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "redos",
+        "location": "opensshFormat.autoImport (line 2144-2154), pkcs1Format.autoImport (line 2641-2652), pkcs8Format.autoImport (line 2756-2767) in /DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js",
+        "severity": "high",
+        "reachability": "Any caller passing a string to importKey() without specifying a format causes all autoImport functions to run their regex against the input; an unauthenticated user who controls key material (e.g., a server that imports user-supplied PEM strings) triggers this path.",
+        "justification": "All four autoImport methods use the regex `(([A-Za-z0-9+/=]+\\s*)+)` inside a lookahead with a subsequent backreference `\\1`; the nested quantifiers combined with the alternation between base64-char and whitespace produce catastrophic polynomial (O(n^2) or worse) backtracking on inputs that match the PEM header but contain a long non-matching body (e.g., a string starting with `-----BEGIN RSA PRIVATE KEY-----` followed by N spaces and no closing tag).",
+        "detection_pattern": {
+          "grep_pattern": "\\(\\([A-Za-z0-9+/=]+\\\\s\\*\\)\\+\\)",
+          "anti_pattern": "String\\.raw|new RegExp|safe-regex|recheck",
+          "section_name": "ReDoS: nested quantifiers in PEM autodetect regex",
+          "description": "Detects the specific nested-quantifier pattern `(([A-Za-z0-9+/=]+\\s*)+)` inside PEM/SSH format-detection regexes; this pattern causes catastrophic backtracking on inputs that share the PEM header prefix but lack a valid closing delimiter."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The vulnerability is confirmed real by direct code inspection.\n\n1. REGEX CONFIRMED: Three autoImport methods contain the exact nested-quantifier pattern `(([A-Za-z0-9+/=]+\\s*)+)` inside a lookahead with back-reference `\\1`. Confirmed at:\n   - opensshFormat.autoImport lines 2144 and 2150 (OPENSSH PRIVATE KEY and ssh-rsa public)\n   - pkcs1Format.autoImport lines 2641 and 2647 (RSA PRIVATE KEY and RSA PUBLIC KEY)\n   - pkcs8Format.autoImport lines 2756 and 2762 (PRIVATE KEY and PUBLIC KEY)\n\n2. CALL CHAIN IS DIRECT AND UNGUARDED: importKey(keyData, format) at line 3791 calls detectAndImport() at line 2805. When format is undefined/null (the default), detectAndImport() iterates ALL registered formats via Object.values(FORMATS) and calls autoImport on each. No length limit, no schema validation (no zod/joi/ajv), no allow-listing before regex execution.\n\n3. REACHABILITY IS CORRECT: The public API entry point is importKey() and the constructor shorthand new NodeRSA(key) also calls importKey internally (line 3761). Any caller passing a string without specifying format triggers all three vulnerable handlers in sequence. This is the documented, default usage pattern.\n\n4. FOURTH autoImport IS NOT VULNERABLE: componentsFormat.autoImport (line 1937) returns false immediately for non-object input, so string inputs bypass it without running any regex.\n\n5. CATASTROPHIC BACKTRACKING IS REAL: The pattern `(([A-Za-z0-9+/=]+\\s*)+)` has nested quantifiers where the outer + drives repetition of the inner group. V8 uses a backtracking NFA for this construct. On an input matching the PEM header prefix but lacking the closing delimiter, the engine must exhaustively try all partitions of N characters across the outer group repetitions before failing, producing O(n^2) or worse behaviour.\n\n6. NO MITIGATING GUARDS FOUND: No input sanitizer, no regex timeout, no character-count guard before the regex test calls. The g flag on the regex literal does not mitigate \u2014 the literal is re-evaluated per .test() call (lastIndex resets), and regardless the backtracking happens within a single .test() call.\n\n7. AUTH REQUIREMENT: None. Any unauthenticated attacker who can cause a server to call importKey() with their string (e.g., submitting a PEM string via API) can trigger this event-loop-blocking DoS.",
+        "severity_pre_reach": "high"
+      },
+      "reachability": {
+        "gate_breachable": false,
+        "gate_type": "V8 backtracking budget (Irregexp) limits regex execution \u2014 not exploitable on Node 16+",
+        "adjusted_severity": "low",
+        "reasoning": "The code pattern is confirmed real: three autoImport functions (opensshFormat, pkcs1Format, pkcs8Format) contain the nested-quantifier regex `(([A-Za-z0-9+/=]+\\s*)+)` inside a lookahead+backreference, with an unsanitized call chain from importKey() / new NodeRSA(string) to all three handlers when no format is specified. However, a prior empirical verification on Node 22 / V8 12.4 (observation 1349) established that the vulnerability is not exploitable on any currently supported runtime: V8's Irregexp engine enforces a backtracking budget of approximately 1 million operations (introduced in V8 8.8, shipping with Node 16). When that budget is exhausted the engine returns a non-match immediately rather than continuing. Empirical testing with a 500,000-character adversarial input completed in under 25ms; 1,000 iterations of a 200-character adversarial input completed in under 1ms. Because Node 16 is the oldest supported LTS and the budget mitigation is unconditional (no opt-out flag), there is no default or non-default configuration that restores exploitability on a supported runtime. The gate is therefore not breachable, and severity is downgraded from high to low."
+      }
+    },
+    {
+      "id": "f002",
+      "rel": "esm/index.node.mjs",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/esm/index.node.mjs",
+      "tags": [
+        "rce",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "bleichenbacher_pkcs1v15_oracle",
+        "location": "Pkcs1Scheme.encUnPad / JsEngine.decrypt / NodeNativeEngine.decrypt (lines 3031-3064, 3389-3410, 4022-4038) in /DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js",
+        "severity": "medium",
+        "reachability": "Reached when the library is configured with `encryptionScheme: 'pkcs1'` (non-default; default is pkcs1_oaep) and a server exposes a decryption oracle \u2014 i.e., it decrypts attacker-supplied ciphertexts and returns either success or a generic error.",
+        "justification": "The code comment at line 3019-3030 explicitly acknowledges that 'the valid/invalid binary oracle inherent to PKCS#1 v1.5 remains'; the $$decryptKey wrapper re-throws a single 'Error during decryption' which closes the error-message oracle but not the binary-success/failure oracle observable by the caller; an attacker with ~2^20 adaptive chosen-ciphertext queries can recover the plaintext (Bleichenbacher 1998).",
+        "detection_pattern": {
+          "grep_pattern": "RSA_PKCS1_PADDING|encryptionScheme.*pkcs1[^_]",
+          "anti_pattern": "RSA_PKCS1_OAEP_PADDING|pkcs1_oaep",
+          "section_name": "AUTH/TOKEN: PKCS#1 v1.5 Bleichenbacher oracle",
+          "description": "Flags PKCS#1 v1.5 padding mode usage for RSA decryption; without full Bleichenbacher countermeasures (synthetic random plaintext on bad padding), any oracle exposing success/failure allows adaptive chosen-ciphertext attacks."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The Bleichenbacher PKCS#1 v1.5 oracle finding is confirmed real but requires non-default configuration. Key evidence: (1) DEFAULT_ENCRYPTION_SCHEME is 'pkcs1_oaep' (line 3267) \u2014 the vulnerable 'pkcs1' path requires explicit opt-in via encryptionScheme:'pkcs1'. (2) The code comment at lines 3019-3030 explicitly acknowledges the binary oracle remains: 'the valid/invalid binary oracle inherent to PKCS#1 v1.5 remains \u2014 use OAEP for untrusted ciphertexts.' The comment also confirms the full Bleichenbacher mitigation (synthetic random plaintext per RFC 8017 \u00a77.2.2 NOTE) was NOT implemented. (3) encUnPad (line 3031-3064) uses constant-time comparison internally but still returns null vs. Buffer \u2014 the JS engine decrypt() (line 3408) throws 'Decryption failed' on any null result. The $$decryptKey wrapper (line 3867-3869) normalizes the message to 'Error during decryption' but the throw-vs-return binary oracle remains observable by the calling application. (4) NodeNativeEngine.decrypt() (lines 4022-4038) checks nativeAvailableForDecrypt() which returns false for pkcs1 private-key decryption (line 3980), so it falls back to the JS engine \u2014 no separate native path escapes the analysis. (5) No input schema validation (zod/joi/ajv) is present; the buffer goes directly into ensureEngine().decrypt() with only a chunk-length modulus check. Reachability: Correct as stated \u2014 requires (a) caller sets encryptionScheme:'pkcs1' and (b) application exposes a decryption oracle (attacker submits chosen ciphertexts and observes success/failure). The cited file path in the finding (.esm/index.node.mjs) does not exist; the correct file is index.node.js, but line numbers 3031-3064 and 3389-3410 match exactly in that file and all code analysis is accurate. Severity 'medium' is appropriate: real cryptographic weakness, non-default trigger, no standalone exploit without an application-layer oracle.",
+        "_done": true,
+        "severity_pre_reach": "medium"
+      },
+      "reachability": {
+        "gate_breachable": false,
+        "gate_type": "non-default option required",
+        "adjusted_severity": "low",
+        "reasoning": "The Bleichenbacher PKCS#1 v1.5 oracle is real but gated behind a non-default configuration. DEFAULT_ENCRYPTION_SCHEME (line 3267) is 'pkcs1_oaep'; the vulnerable path is only activated when a caller explicitly passes encryptionScheme:'pkcs1'. The public API is fully exported ($$decryptKey / decrypt), so reachability is not blocked by visibility \u2014 but the gate is the non-default option requirement. Even when 'pkcs1' is chosen: (1) encUnPad (lines 3031-3064) uses constant-time bitwise accumulation with a single return-null for all failure modes, closing the timing sub-oracle; (2) the JS engine decrypt() (line 3408) throws 'Decryption failed' on any null result; (3) the $$decryptKey wrapper (lines 3862-3869) normalizes all exceptions to 'Error during decryption', collapsing the error-message oracle. What remains is only the binary throw-vs-return oracle observable by the calling application \u2014 which requires the application itself to expose a decryption oracle to an attacker (attacker submits chosen ciphertexts and observes success/failure at the application layer). Because exploitation requires both (a) an explicit non-default opt-in and (b) an application-layer oracle architecture, this is not default-reachable. Severity is downgraded from medium to low accordingly."
+      }
+    },
+    {
+      "id": "f002",
+      "rel": "esm/index.node.mjs",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/esm/index.node.mjs",
+      "tags": [
+        "rce",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "weak_cryptography_default_hash",
+        "location": "PssScheme (line 3112: DEFAULT_HASH3='sha1'), OaepScheme (line 2852: DEFAULT_HASH='sha1') in /DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js",
+        "severity": "low",
+        "reachability": "Reached when callers use PSS signing or OAEP encryption without explicitly specifying a hash algorithm; the library silently falls back to SHA-1 for both MGF1 and the hash function.",
+        "justification": "SHA-1 is cryptographically broken for collision resistance (SHAttered 2017); while PSS pre-hashes the message and OAEP uses it only for label hashing (making direct collision exploitation harder), the default promotes SHA-1 in new code and weakens the overall security margin; NIST deprecated SHA-1 for all uses in SP 800-131A Rev 2.",
+        "detection_pattern": {
+          "grep_pattern": "DEFAULT_HASH.*=.*['\"]sha1['\"]",
+          "anti_pattern": "DEFAULT_HASH.*=.*['\"]sha256['\"]|DEFAULT_HASH.*=.*['\"]sha384['\"]|DEFAULT_HASH.*=.*['\"]sha512['\"]",
+          "section_name": "AUTH/TOKEN: SHA-1 as default signing/OAEP hash",
+          "description": "Detects module-level constants that establish SHA-1 as the default hash for RSA-PSS or RSA-OAEP; SHA-1 should not be the fallback in modern cryptographic code."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The OAEP sha1 default is confirmed real and active. In makeDefaultOptions() at line 3279-3280 of /DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js, the default options object explicitly sets encryptionSchemeOptions: { hash: 'sha1' }. This is the actual effective default for OAEP encryption \u2014 not the module-level DEFAULT_HASH constant fallback at line 2873, which is dead code when called through the normal options path. Any caller using OAEP encryption (pkcs1_oaep, the default encryption scheme) without overriding the hash will silently use sha1 for both the label hash and the MGF1 mask generation function. For PSS signing the finding is partially inaccurate: makeDefaultOptions() sets signingSchemeOptions: { hash: 'sha256' } (line 3278), so DEFAULT_HASH3='sha1' at line 3112 is unreachable dead code for the signing path. No schema validation (zod/joi/ajv) guards the hash option; callers pass it directly via setOptions or the constructor. The vulnerability does not require non-default configuration \u2014 it IS the default configuration for OAEP. The sha1 weakness in OAEP is limited in exploitability (sha1 is used only for label hashing and MGF1, not for message integrity in the collision sense), but it still constitutes a documented weak cryptography default that violates NIST SP 800-131A Rev 2 guidance. Severity is correctly rated low."
+      }
+    },
+    {
+      "id": "f003",
+      "rel": "index.browser.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.browser.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "redos",
+        "location": "autoImport functions in opensshFormat (lines 2145, 2151), pkcs1Format (lines 2642, 2648), pkcs8Format (lines 2757, 2763)",
+        "severity": "high",
+        "reachability": "Any caller of importKey() or NodeRSA constructor that passes a string/Uint8Array key \u2014 reachable without authentication. detectAndImport() iterates all four format providers calling autoImport() on every attempt, so all six regex paths run on unrecognized input.",
+        "justification": "All six autoImport regexes use the nested-quantifier pattern `(?=(([A-Za-z0-9+/=]+\\s*)+))\\1` inside a `^[\\S\\s]*...$` anchor. The inner group `([A-Za-z0-9+/=]+\\s*)+` is a classic catastrophic backtracking pattern: when input contains a long base64-like segment without a matching end marker, the engine explores O(2^n) backtracking paths. A 10 KB crafted string with no valid PEM footer can lock the JS event loop for seconds.",
+        "detection_pattern": {
+          "grep_pattern": "\\(\\[A-Za-z0-9+/=\\]+\\\\s\\*\\)\\+",
+          "anti_pattern": "simple non-backtracking split or indexOf-based PEM boundary detection instead of a single regex test",
+          "section_name": "ReDoS: nested quantifiers in PEM format detection",
+          "description": "Matches nested `+` quantifiers on base64 character classes inside lookaheads or other anchored regexes used to detect PEM blocks \u2014 a classic ReDoS pattern exploitable when input length is attacker-controlled."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "high",
+        "reasoning": "All six autoImport regexes in opensshFormat (lines 2145, 2151), pkcs1Format (lines 2642, 2648), and pkcs8Format (lines 2757, 2763) contain the catastrophic backtracking pattern `([A-Za-z0-9+/=]+\\s*)+` inside a lookahead. When a BEGIN marker is present but the END marker is absent or mismatched, the regex engine must explore all partitions of a long base64-like segment across the outer and inner repetitions \u2014 O(2^n) backtracking paths. The call chain is fully confirmed: NodeRSA constructor (line 3761) accepts string|Uint8Array and calls importKey(), which calls detectAndImport() (line 2797), which \u2014 when no format is specified \u2014 iterates all four FORMATS providers calling autoImport() on each. componentsFormat.autoImport() (line 1938) bails out immediately for non-object input, so string input reaches all three PEM-based providers, executing all six vulnerable regexes sequentially on the same input. No length limit, no content sanitization, no schema validation (no zod/joi/ajv) exists anywhere in the path. The only guard is an empty-string check (line 3793), which does not mitigate the attack. No non-default options are required \u2014 the default constructor path (`new NodeRSA(keyString)`) is the vulnerable path. A crafted ~10 KB string containing a PEM BEGIN marker but no END marker (e.g., '-----BEGIN RSA PRIVATE KEY-----' + 'A'.repeat(10000)) is sufficient to trigger multi-second event loop stalls in Node.js/browser JS runtimes. The package README explicitly documents the constructor as accepting raw key strings from callers, making attacker-controlled input the intended use case. Reachability without authentication is confirmed.",
+        "_done": true
+      },
+      "reachability": {
+        "gate_breachable": true,
+        "gate_type": "no gate \u2014 default config",
+        "adjusted_severity": "high",
+        "reasoning": "The vulnerable path is the default-config public API. The NodeRSA constructor (line 3761) accepts string|Uint8Array directly and calls importKey() with no format argument. importKey() (line 3792) applies only an empty-string check (line 3793) and then calls detectAndImport() with format=undefined. detectAndImport() iterates all four FORMATS providers calling autoImport() on each; componentsFormat.autoImport() exits immediately for non-object input, so string input reaches all three PEM-based providers (opensshFormat, pkcs1Format, pkcs8Format) in sequence, executing all six vulnerable regexes. No non-default options, no schema validation (no zod/joi/ajv), no length limit, and no content sanitization exist anywhere in the path. The only guard is the empty-string check which does not mitigate the attack. A crafted ~10 KB string with a PEM BEGIN marker but no END marker (e.g., '-----BEGIN RSA PRIVATE KEY-----' + 'A'.repeat(10000)) is sufficient to trigger multi-second event loop stalls. The package README documents the constructor as accepting raw key strings, making attacker-controlled input the intended and primary use case. Reachability without authentication at default configuration is fully confirmed."
+      }
+    },
+    {
+      "id": "f003",
+      "rel": "index.browser.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.browser.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "weak_crypto_default",
+        "location": "DEFAULT_HASH (line 2853) in OaepScheme, DEFAULT_HASH3 (line 3113) in PssScheme, encryptionSchemeOptions default (line 3281)",
+        "severity": "medium",
+        "reachability": "Any caller that constructs NodeRSA without explicitly specifying encryptionSchemeOptions.hash or signingSchemeOptions.hash \u2014 i.e. the majority of default usage. PSS signing default is sha1; OAEP encryption default is sha1.",
+        "justification": "SHA-1 is set as the default hash for both PSS signing (DEFAULT_HASH3 = 'sha1' at line 3113) and OAEP encryption (DEFAULT_HASH = 'sha1' at line 2853, confirmed by encryptionSchemeOptions: { hash: 'sha1' } in makeDefaultOptions at line 3281). SHA-1 is broken for collision resistance (SHAttered attack). For PSS, a collision in the hash allows an attacker to find two messages with the same EMSA-PSS encoding, enabling signature forgery under certain conditions. NIST deprecated SHA-1 for digital signatures in 2011.",
+        "detection_pattern": {
+          "grep_pattern": "DEFAULT_HASH.*=.*['\"]sha1['\"]",
+          "anti_pattern": "DEFAULT_HASH.*=.*['\"]sha256['\"]",
+          "section_name": "Weak crypto: SHA-1 as default hash algorithm",
+          "description": "Flags packages that hard-code SHA-1 as a default hashing algorithm for cryptographic schemes \u2014 a broken algorithm for signature and integrity purposes per NIST SP 800-131A."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The finding is partially confirmed but significantly overstated. OAEP SHA-1 default is real: line 3281 in makeDefaultOptions sets encryptionSchemeOptions: { hash: 'sha1' }, and the OaepScheme.hash() method at line 2874 falls back to DEFAULT_HASH ('sha1') via the ?? operator when no hash is explicitly provided. Any caller constructing NodeRSA without specifying encryptionScheme options gets SHA-1 for OAEP encryption. There is no sanitizer or guard that blocks this \u2014 the warning at lines 3332-3336 only fires for md4/md5, not sha1. The PSS signing claim is INCORRECT: makeDefaultOptions at line 3279 sets signingSchemeOptions: { hash: 'sha256' }, not sha1. DEFAULT_HASH3 = 'sha1' (line 3113) is only reachable if signingSchemeOptions is empty/bypassed after construction, which does not happen in the normal NodeRSA() constructor path (line 3755 always calls makeDefaultOptions which pre-sets sha256). The reachability claim that 'PSS signing default is sha1' is false. Regarding OAEP SHA-1: SHA-1 is broken for collision resistance (SHAttered), and while OAEP security proofs rely on the hash being collision-resistant for the label hash, the practical attack surface is lower than for signatures \u2014 there is no known practical OAEP-SHA-1 break in typical use. The severity is downgraded from medium to low because: (1) the PSS claim is wrong, (2) OAEP-SHA-1 has no known practical exploit despite being theoretically weak, and (3) this is a library default, not an attacker-controlled input path \u2014 no user/network data controls the hash selection. The missing warning for sha1 (vs the md4/md5 warning that does exist) is a real gap in security guidance."
+      }
+    },
+    {
+      "id": "f003",
+      "rel": "index.browser.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.browser.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "bleichenbacher_oracle",
+        "location": "Pkcs1Scheme.encUnPad / JsEngine.decrypt (lines 3021-3065, 3390-3411)",
+        "severity": "medium",
+        "reachability": "Any application that uses pkcs1 (non-OAEP) decryption and exposes the decrypt result or error to an attacker in a way that distinguishes padding-valid from padding-invalid outcomes (network API, timing, error message). The code comment at line 3028 explicitly acknowledges this residual oracle.",
+        "justification": "The encUnPad method for PKCS#1 v1.5 accumulates a bad flag and returns null for all failure modes (constant-time internally), but the caller at line 3407 propagates null into a bad flag and ultimately throws 'Error during decryption' at line 3869. Any application that returns a different HTTP status, response body, or timing for decrypt success vs. failure exposes the classic Bleichenbacher '98 adaptive chosen-ciphertext attack, allowing plaintext recovery in O(10^6) queries. The code comment at line 3028 explicitly acknowledges the full Manger/Bleichenbacher fix was not implemented.",
+        "detection_pattern": {
+          "grep_pattern": "encUnPad.*null|pkcs1.*decrypt.*throw",
+          "anti_pattern": "synthetic-plaintext Bleichenbacher mitigation|RFC 8017.*7\\.2\\.2.*NOTE",
+          "section_name": "Bleichenbacher oracle: PKCS#1 v1.5 binary decrypt oracle",
+          "description": "Identifies PKCS#1 v1.5 decrypt implementations that return distinct null/throw on bad padding rather than synthetic plaintext per RFC 8017 \u00a77.2.2 NOTE \u2014 the unmitigated form exposes an adaptive chosen-ciphertext oracle."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The binary Bleichenbacher oracle is real but requires a non-default opt-in to the 'pkcs1' encryption scheme. The default scheme (line 3268) is 'pkcs1_oaep', which is not vulnerable. The vulnerable path activates only when a caller explicitly sets encryptionScheme: 'pkcs1'.\n\nCode path confirmed:\n1. encUnPad (lines 3032-3065) is internally constant-time: all checks (header byte, pad type, PS validity, minimum PS length) accumulate into a single bitwise 'bad' flag with no early return; one 'return null' covers all failure modes. The code comment at line 3021 explicitly confirms this.\n2. The code comment at lines 3026-3030 explicitly acknowledges that the full Bleichenbacher mitigation (RFC 8017 \u00a77.2.2 NOTE \u2014 return synthetic plaintext) was NOT implemented, and states 'the valid/invalid binary oracle inherent to PKCS#1 v1.5 remains \u2014 use OAEP for untrusted ciphertexts.'\n3. JsEngine.decrypt (lines 3390-3411) accumulates bad flag and throws 'Decryption failed' at line 3409. This is re-wrapped at line 3869 as 'Error during decryption'. Success vs failure is distinguishable at the API level.\n4. The public decrypt() API (line 3832) accepts attacker-controlled ciphertext bytes directly with no schema validation (no zod/joi/ajv guards).\n\nKey mitigating factor: DEFAULT_ENCRYPTION_SCHEME = 'pkcs1_oaep' (line 3268). Any application using defaults is NOT exposed. The finding's claimed reachability ('any application that uses pkcs1 decryption') is accurate but restricted to the non-default opt-in case.\n\nReachability: Real for applications that explicitly configure encryptionScheme: 'pkcs1' AND expose decrypt results or errors to an untrusted network caller in a way that distinguishes success from failure. The internal timing oracle is closed (constant-time unpadding), but the binary success/failure distinction is an inherent API-level oracle enabling Bleichenbacher '98 adaptive chosen-ciphertext attacks in O(10^6) queries.\n\nSeverity confirmed at medium: the attack requires non-default configuration, but when present the oracle is fully exploitable with no guards.",
+        "severity_pre_reach": "medium"
+      },
+      "reachability": {
+        "gate_breachable": false,
+        "gate_type": "non-default option required",
+        "adjusted_severity": "low",
+        "reasoning": "The vulnerable PKCS#1 v1.5 decrypt path (encUnPad returning null -> JsEngine.decrypt throwing 'Decryption failed' -> $$decryptKey re-wrapping as 'Error during decryption') is only reached when the caller explicitly sets encryptionScheme: 'pkcs1'. The default at line 3268 is DEFAULT_ENCRYPTION_SCHEME = 'pkcs1_oaep', which is not vulnerable to Bleichenbacher '98. The public decrypt() API (line 3832) IS exported, but at default configuration it routes through OAEP and the oracle does not exist. A caller must opt in to the legacy scheme. The internal timing oracle within encUnPad is closed (constant-time, single bad flag, no early return), but the binary success/failure distinction remains at the API level for non-default pkcs1 opt-in callers. Severity downgraded from medium to low because exploitation requires deliberate non-default configuration, which implies the developer knowingly chose the legacy scheme."
+      }
+    },
+    {
+      "id": "f004",
+      "rel": "index.node.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "weak_default_cryptographic_algorithm",
+        "location": "PssScheme class, line 3112 (DEFAULT_HASH3 = 'sha1'); NodeNativePssScheme.sign/verify, lines 4173/4185 (hash ?? DEFAULT_PSS_HASH where DEFAULT_PSS_HASH = 'sha1' at line 4087)",
+        "severity": "medium",
+        "reachability": "Reachable by any caller that creates a NodeRSA instance with the 'pss' signing scheme and does not explicitly set a hash \u2014 both the pure-JS PssScheme and the NodeNativePssScheme default to SHA-1 for all sign/verify operations.",
+        "justification": "Both pure-JS (line 3112: DEFAULT_HASH3 = 'sha1') and native (line 4087: DEFAULT_PSS_HASH = 'sha1') PSS implementations default to SHA-1 as the hash algorithm. SHA-1 is deprecated by NIST (SP 800-131A Rev 2) for digital signatures. Callers who omit the hash option silently use a broken algorithm without any warning.",
+        "detection_pattern": {
+          "grep_pattern": "DEFAULT.*=.*['\"]sha1['\"]",
+          "anti_pattern": "DEFAULT.*=.*['\"]sha256['\"]",
+          "section_name": "Weak default hash: SHA-1 for PSS/signing",
+          "description": "Catches module-level DEFAULT_HASH constants set to sha1 in signing scheme implementations. SHA-1 is deprecated for signatures; the default should be sha256 or stronger."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The finding is real but significantly overstated in its reachability claim. The true default path (caller creates NodeRSA with no options) uses SHA-256, not SHA-1: makeDefaultOptions() at line 3275-3288 sets signingSchemeOptions: { hash: 'sha256' }, so the ?? DEFAULT_PSS_HASH / ?? DEFAULT_HASH3 fallbacks at lines 4173/4185 and 3122 are never reached in the default case. SHA-1 is only reached when a caller explicitly passes the signing scheme as the bare string 'pss' (e.g. setOptions({ signingScheme: 'pss' })): the applyOptions() branch at line 3312-3313 sets signingSchemeOptions = {} (empty, no hash key), causing the SHA-1 fallback to fire silently. Same applies to the object form { scheme: 'pss' } with no hash key (line 3323). The finding's claim that 'any caller who does not explicitly set a hash silently uses SHA-1' is incorrect \u2014 the default is SHA-256. The actual vulnerable path requires a non-default, explicit caller action (passing 'pss' as a bare string without a hash), not mere omission. No schema validation (zod/joi/ajv) guards this path. No warning is emitted for the SHA-1 fallback (unlike md4/md5 which get a console.warn at line 3331-3334). The bug is real: callers who explicitly opt into PSS via string form without a hash get silent SHA-1 downgrade. But severity is low because it requires deliberate non-default misconfiguration, not passive omission, and no NIST deprecation warning is issued."
+      }
+    },
+    {
+      "id": "f004",
+      "rel": "index.node.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "weak_algorithm_accepted_without_error",
+        "location": "applyOptions function, lines 3331-3335: signingSchemeOptions.hash === 'md4' || 'md5' emits console.warn only",
+        "severity": "medium",
+        "reachability": "Any caller that sets setOptions({signingScheme:'pkcs1-md5'}) or passes signingScheme as an object with hash='md5'. The code emits console.warn but does not throw, so production code using MD5 for RSA signatures silently proceeds.",
+        "justification": "At lines 3331-3335, when the signing hash is 'md4' or 'md5', only console.warn is emitted rather than throwing. MD5 is cryptographically broken for signatures (chosen-prefix collisions). The allowlist check at line 3328 includes md4 and md5 in NODE_HASHES so they pass validation and proceed to signing. Callers relying on the library to enforce secure configurations are not protected.",
+        "detection_pattern": {
+          "grep_pattern": "console\\.warn.*md5|console\\.warn.*md4",
+          "anti_pattern": "throw.*md5|throw.*md4",
+          "section_name": "Weak hash: MD5/MD4 accepted with warn-only",
+          "description": "Catches packages that warn but do not reject MD4/MD5 for signing operations. Broken hashes should cause a thrown error, not merely a console warning."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "Confirmed. At lines 3331-3335 of /DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js, when signingSchemeOptions.hash is 'md4' or 'md5', the code emits console.warn but does not throw. The critical detail is that the allowedHashes guard at line 3328 explicitly permits md4 and md5 because NODE_HASHES (lines 3248-3257) includes both \u2014 so they pass validation and signing proceeds silently. Reachability is confirmed via two paths: (1) string form setOptions({signingScheme:'pkcs1-md5'}) \u2014 line 3306 splits on '-' yielding scheme='pkcs1' and hash='md5', which passes the allowedHashes check and hits warn-only; (2) object form setOptions({signingScheme:{scheme:'pkcs1',hash:'md5'}}) \u2014 lines 3320-3323 extract the hash directly, same outcome. No schema validation (zod/joi/ajv) is present. The default options at line 3278 use sha256, so this requires explicit non-default caller configuration; however the library documents signingScheme as a user-controlled parameter. The finding is real: the library design accepts cryptographically broken hashes for signing with warn-only semantics, giving callers a false sense of security that the library enforces safe configurations.",
+        "_done": true,
+        "severity_pre_reach": "medium"
+      },
+      "reachability": {
+        "gate_breachable": false,
+        "gate_type": "non-default option required",
+        "adjusted_severity": "low",
+        "reasoning": "The vulnerable code path (warn-only on md4/md5) is only reachable when a caller explicitly sets a non-default signingScheme. The library defaults to signingScheme='pss' with hash='sha256' (lines 3268, 3278), so the broken-hash branch is never entered under default configuration. To reach the warn-only path, a caller must explicitly pass signingScheme:'pkcs1-md5' or an equivalent object form. The allowlist at line 3328 does not protect against md4/md5 \u2014 both are present in NODE_HASHES \u2014 but the opt-in nature of the configuration means this requires deliberate misconfiguration. The public API (setOptions / constructor options) is exported and reachable, but gate_breachable is false because exploitation requires explicit non-default caller configuration. Severity is downgraded from medium to low because a developer must actively choose a broken hash; the library does not silently select it."
+      }
+    },
+    {
+      "id": "f004",
+      "rel": "index.node.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "information_exposure_through_error_message_suppression",
+        "location": "$$encryptKey lines 3858-3860, $$decryptKey lines 3867-3869, NodeNativePkcs1Scheme.verify lines 4153-4155, NodeNativePssScheme.verify lines 4200-4202",
+        "severity": "low",
+        "reachability": "All encrypt/decrypt/verify callers. Any exception from the underlying crypto primitive is swallowed.",
+        "justification": "All four crypto entry points use bare catch blocks that discard the original error. In $$encryptKey/$$decryptKey a generic string is thrown, masking programming errors. In the two native verify methods, exceptions silently return false \u2014 making a corrupted-key error or a missing-library error indistinguishable from a legitimately invalid signature. While discarding errors in decrypt provides some defense against timing oracles, the wholesale suppression in verify hides faults that indicate a mis-configured key or environment.",
+        "detection_pattern": {
+          "grep_pattern": "catch.*\\{[\\s]*return false",
+          "anti_pattern": "catch.*err.*\\{.*log|catch.*e.*\\{.*throw",
+          "section_name": "Silent catch in cryptographic verify",
+          "description": "Catches verify() implementations that silently return false on all exceptions, making it impossible to distinguish deliberate invalid signatures from crypto errors caused by wrong keys or missing modules."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "All four code patterns are confirmed in the file exactly as described. $$encryptKey (lines 3854-3860) and $$decryptKey (lines 3863-3869) use bare catch blocks that discard the original error and throw a generic string, suppressing diagnostic information. NodeNativePkcs1Scheme.verify (lines 4139-4156) and NodeNativePssScheme.verify (lines 4184-4203) silently return false on any exception, making a corrupted-key error, a missing-module error, or a malformed-input error indistinguishable from a legitimately invalid signature. Reachability is correct: these are the internal entry points called by all encrypt/decrypt/verify callers with no authentication guard or special config required. The node-native engine is the default. No schema validation (zod/joi/ajv) or sanitizer was missed. The vuln class label is slightly inaccurate (this suppresses error info FROM the developer, it does not expose it TO an attacker), but the described behavior is real. Security impact is low: callers still receive false from verify and should reject; the risk is misdiagnosed key misconfiguration or environment issues, not an exploitable bypass. The finding is real at the stated low severity.",
+        "_done": true
+      }
+    },
+    {
+      "id": "f005",
+      "rel": "src/index.d.ts",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/src/index.d.ts",
+      "tags": [
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "prototype_property_access_via_user_key",
+        "location": "NodeRSA.importKey (line 3795), NodeRSA.exportKey (line 3805)",
+        "severity": "low",
+        "reachability": "Any caller who supplies a user-controlled string as the format argument to importKey() or exportKey(). Requires attacker control of the format parameter.",
+        "justification": "The lookup `EXPORT_FORMAT_ALIASES[format]` at lines 3795 and 3805 uses a user-supplied string as a plain-object property key with no hasOwnProperty guard or Object.create(null) map. Passing '__proto__' or 'constructor' resolves to inherited Object prototype members rather than alias strings; the `?? format` fallback then passes the raw inherited value to formatParse() which calls .split('-') on it, throwing a TypeError crash on non-string values. While not directly exploitable for privilege escalation, it is a prototype-access antipattern that can cause denial-of-service via crash.",
+        "detection_pattern": {
+          "grep_pattern": "FORMAT_ALIASES\\[|schemeMap\\[|formatMap\\[",
+          "anti_pattern": "Object\\.create\\(null\\)|hasOwnProperty|Object\\.prototype\\.hasOwnProperty\\.call",
+          "section_name": "Prototype lookup: user-controlled key on plain object map",
+          "description": "Flags user-supplied strings used directly as property keys on plain object lookup tables without hasOwnProperty guards or null-prototype maps. Can leak prototype properties or cause unexpected crashes with __proto__/constructor keys."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The vulnerability is confirmed real. EXPORT_FORMAT_ALIASES at line 3269 of dist/index.node.js is a plain object literal (not Object.create(null)), inheriting from Object.prototype. At importKey (line 3795) and exportKey (line 3805), the user-supplied format string is used as a direct property key: EXPORT_FORMAT_ALIASES[format] ?? format. For prototype property names that return non-string truthy values (e.g., 'constructor' returns the Object function, 'toString'/'valueOf' return their respective functions, '__proto__' returns Object.prototype), the ?? fallback does NOT apply because the inherited value is truthy. The non-string value is then passed directly to formatParse() at line 2795, which calls .split('-') on it, producing TypeError: split is not a function. This is a confirmed DoS crash path. There is no runtime input validation (only TypeScript types, erased at runtime), no hasOwnProperty guard, no null-prototype map, and the format parameter is explicitly typed as Format | string in the public API, making arbitrary strings a documented use case. The finding's stated file path (dist/src/index.d.ts) does not exist; the actual implementation is dist/index.node.js (4245 lines). Line numbers 3795 and 3805 match exactly in the JS source. Severity is low: no privilege escalation, no data exfiltration, crash only, and requires attacker control of the format argument (not a default-path injection)."
+      }
+    }
+  ],
+  "all_with_verdicts": [
+    {
+      "id": "f001",
+      "rel": "cjs/index.cjs",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/cjs/index.cjs",
+      "tags": [
+        "rce",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "redos_catastrophic_backtracking",
+        "location": "opensshFormat.autoImport (lines 2148, 2154), pkcs1Format.autoImport (lines 2645, 2651), pkcs8Format.autoImport (lines 2760, 2766)",
+        "severity": "high",
+        "reachability": "Any caller passing attacker-controlled key material to importKey() without specifying a format triggers autoImport, which tries each format's regex in sequence. The regexes are applied to the full string before any structural parsing, so a crafted ~50 kB string with no END marker causes multi-second hangs.",
+        "justification": "All four autoImport functions use regexes of the form /^[\\S\\s]*-----BEGIN ...-----\\s*(?=(([A-Za-z0-9+/=]+\\s*)+))\\1-----END ...-----[\\S\\s]*$/g \u2014 the inner group ([A-Za-z0-9+/=]+\\s*)+ with nested quantifiers plus a backreference inside a lookahead causes exponential backtracking when the END delimiter is absent or misplaced.",
+        "detection_pattern": {
+          "grep_pattern": "\\(\\([A-Za-z0-9+/=]+\\\\s\\*\\)\\+\\)",
+          "anti_pattern": "String\\.prototype\\.indexOf|startsWith|split",
+          "section_name": "ReDoS: nested quantifiers in PEM autodetect regex",
+          "description": "Catches nested-quantifier patterns used for PEM/SSH key format autodetection; exponential backtracking occurs when the input lacks the closing delimiter."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f001",
+      "rel": "cjs/index.cjs",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/cjs/index.cjs",
+      "tags": [
+        "rce",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "weak_default_hash_algorithm",
+        "location": "PssScheme.hash() line 3126 (DEFAULT_HASH3 = 'sha1'), NodeNativePssScheme.sign/verify lines 4177/4189 (DEFAULT_PSS_HASH = 'sha1'), OaepScheme.hash() line 2877 (DEFAULT_HASH = 'sha1')",
+        "severity": "medium",
+        "reachability": "Affects all callers that construct NodeRSA with the default signingScheme ('pss') or encryptionScheme ('pkcs1_oaep') without explicitly setting a hash option. This is the common out-of-the-box usage.",
+        "justification": "The PSS signing scheme defaults to SHA-1 (cryptographically deprecated for signatures since 2011; NIST SP 800-131A requires SHA-2 for new systems). OAEP also defaults to SHA-1 for both the hash and MGF, weakening ciphertext indistinguishability against future SHA-1 collision-class attacks.",
+        "detection_pattern": {
+          "grep_pattern": "DEFAULT.*['\"]sha1['\"]",
+          "anti_pattern": "DEFAULT.*['\"]sha256['\"]|DEFAULT.*['\"]sha384['\"]|DEFAULT.*['\"]sha512['\"]",
+          "section_name": "Weak default: SHA-1 as default hash",
+          "description": "Identifies packages that hard-code SHA-1 as the default hash for signing or OAEP \u2014 callers who omit the hash option silently use a deprecated algorithm."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f001",
+      "rel": "cjs/index.cjs",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/cjs/index.cjs",
+      "tags": [
+        "rce",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "unhandled_json_parse_exception",
+        "location": "NodeRSA.$getDecryptedData() line 3887",
+        "severity": "low",
+        "reachability": "Reached when a caller invokes decrypt(ciphertext, 'json') and the decrypted plaintext is not valid JSON. This can occur with wrong keys, corrupted ciphertexts, or when an adversary controls the ciphertext in a scenario where decryption succeeds but payload is crafted.",
+        "justification": "Line 3887 calls JSON.parse(toUtf8(bytes)) with no surrounding try/catch; a SyntaxError propagates through the catch-all in $$decryptKey (lines 3871-3873) which rethrows as 'Error during decryption', leaking that the ciphertext decrypted successfully but payload is malformed \u2014 a mild oracle distinguishable from a true decryption failure.",
+        "detection_pattern": {
+          "grep_pattern": "JSON\\.parse\\([^)]*\\)",
+          "anti_pattern": "try\\s*\\{[^}]*JSON\\.parse",
+          "section_name": "Unsafe JSON.parse: unguarded deserialization",
+          "description": "Flags bare JSON.parse calls not wrapped in try/catch; thrown SyntaxErrors can crash callers or leak information about successful decryption when used in crypto decode paths."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f001",
+      "rel": "cjs/index.cjs",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/cjs/index.cjs",
+      "tags": [
+        "rce",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "pkcs1_v1_5_bleichenbacher_oracle",
+        "location": "JsEngine.decrypt() lines 3393-3414, NodeNativeEngine.decrypt() line 4026 (nativeAvailableForDecrypt returns false for pkcs1 private path, routing to JS fallback)",
+        "severity": "medium",
+        "reachability": "Callers that configure encryptionScheme:'pkcs1' and expose a decryption endpoint over a network where an attacker can submit chosen ciphertexts and observe whether decryption succeeds or fails (binary oracle). The code itself documents this limitation at lines 3024-3033.",
+        "justification": "The code comment at lines 3024-3033 explicitly acknowledges that while internal differential timing is mitigated, 'the valid/invalid binary oracle inherent to PKCS#1 v1.5 remains' \u2014 JsEngine.decrypt() throws 'Decryption failed' on any padding error, making success vs. failure distinguishable, enabling a Bleichenbacher attack to decrypt arbitrary RSA-PKCS1v1.5 ciphertexts in ~10^6 queries if the endpoint is reachable.",
+        "detection_pattern": {
+          "grep_pattern": "throw.*[Dd]ecryption.fail|encUnPad.*null",
+          "anti_pattern": "RSA_PKCS1_OAEP_PADDING|pkcs1_oaep",
+          "section_name": "PKCS#1 v1.5 binary oracle: distinguishable decryption failure",
+          "description": "Flags PKCS#1 v1.5 decryption paths that throw or return distinct errors on padding failures; enables Bleichenbacher-style oracle attacks if the decryption endpoint is network-accessible."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "medium",
+        "reasoning": "Confirmed. The file is at /DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.cjs (not dist/cjs/index.cjs as the finding states, but the content matches). Key evidence: (1) nativeAvailableForDecrypt() at line 3984 explicitly returns false when !usePublic && encryptionScheme === 'pkcs1', routing to this.fallback.decrypt() which is a JsEngine instance. (2) JsEngine.decrypt() at lines 3393-3414 accumulates a 'bad' flag in constant-time but then throws 'Decryption failed' at line 3412 on any padding failure. (3) The library comment at lines 3023-3033 explicitly acknowledges: 'the valid/invalid binary oracle inherent to PKCS#1 v1.5 remains -- use OAEP for untrusted ciphertexts.' (4) The NodeNativeEngine.decrypt() at line 4027 also routes pkcs1 private decrypt to the JsEngine fallback. (5) The $$decryptKey() wrapper at line 3871-3872 catches and re-throws a generic error, but success-vs-failure remains distinguishable to a network attacker. QUALIFICATIONS: (a) The default encryption scheme is pkcs1_oaep (line 3271), so the vulnerable path requires explicit non-default configuration encryptionScheme:'pkcs1'. (b) No schema validation (zod/joi/ajv) guards the encryptionScheme option -- it is purely caller-controlled. (c) The oracle is inherent to PKCS#1 v1.5 and is explicitly documented as a known limitation, not a coding defect. (d) Exploitation requires a network-accessible decryption endpoint and ~10^6 adaptive chosen-ciphertext queries (Bleichenbacher 1998). The finding is real but applies only when callers deliberately opt into pkcs1 mode and expose decryption over a network."
+      }
+    },
+    {
+      "id": "f002",
+      "rel": "esm/index.node.mjs",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/esm/index.node.mjs",
+      "tags": [
+        "rce",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "redos",
+        "location": "opensshFormat.autoImport (line 2144-2154), pkcs1Format.autoImport (line 2641-2652), pkcs8Format.autoImport (line 2756-2767) in /DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js",
+        "severity": "high",
+        "reachability": "Any caller passing a string to importKey() without specifying a format causes all autoImport functions to run their regex against the input; an unauthenticated user who controls key material (e.g., a server that imports user-supplied PEM strings) triggers this path.",
+        "justification": "All four autoImport methods use the regex `(([A-Za-z0-9+/=]+\\s*)+)` inside a lookahead with a subsequent backreference `\\1`; the nested quantifiers combined with the alternation between base64-char and whitespace produce catastrophic polynomial (O(n^2) or worse) backtracking on inputs that match the PEM header but contain a long non-matching body (e.g., a string starting with `-----BEGIN RSA PRIVATE KEY-----` followed by N spaces and no closing tag).",
+        "detection_pattern": {
+          "grep_pattern": "\\(\\([A-Za-z0-9+/=]+\\\\s\\*\\)\\+\\)",
+          "anti_pattern": "String\\.raw|new RegExp|safe-regex|recheck",
+          "section_name": "ReDoS: nested quantifiers in PEM autodetect regex",
+          "description": "Detects the specific nested-quantifier pattern `(([A-Za-z0-9+/=]+\\s*)+)` inside PEM/SSH format-detection regexes; this pattern causes catastrophic backtracking on inputs that share the PEM header prefix but lack a valid closing delimiter."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "high",
+        "reasoning": "The vulnerability is confirmed real by direct code inspection.\n\n1. REGEX CONFIRMED: Three autoImport methods contain the exact nested-quantifier pattern `(([A-Za-z0-9+/=]+\\s*)+)` inside a lookahead with back-reference `\\1`. Confirmed at:\n   - opensshFormat.autoImport lines 2144 and 2150 (OPENSSH PRIVATE KEY and ssh-rsa public)\n   - pkcs1Format.autoImport lines 2641 and 2647 (RSA PRIVATE KEY and RSA PUBLIC KEY)\n   - pkcs8Format.autoImport lines 2756 and 2762 (PRIVATE KEY and PUBLIC KEY)\n\n2. CALL CHAIN IS DIRECT AND UNGUARDED: importKey(keyData, format) at line 3791 calls detectAndImport() at line 2805. When format is undefined/null (the default), detectAndImport() iterates ALL registered formats via Object.values(FORMATS) and calls autoImport on each. No length limit, no schema validation (no zod/joi/ajv), no allow-listing before regex execution.\n\n3. REACHABILITY IS CORRECT: The public API entry point is importKey() and the constructor shorthand new NodeRSA(key) also calls importKey internally (line 3761). Any caller passing a string without specifying format triggers all three vulnerable handlers in sequence. This is the documented, default usage pattern.\n\n4. FOURTH autoImport IS NOT VULNERABLE: componentsFormat.autoImport (line 1937) returns false immediately for non-object input, so string inputs bypass it without running any regex.\n\n5. CATASTROPHIC BACKTRACKING IS REAL: The pattern `(([A-Za-z0-9+/=]+\\s*)+)` has nested quantifiers where the outer + drives repetition of the inner group. V8 uses a backtracking NFA for this construct. On an input matching the PEM header prefix but lacking the closing delimiter, the engine must exhaustively try all partitions of N characters across the outer group repetitions before failing, producing O(n^2) or worse behaviour.\n\n6. NO MITIGATING GUARDS FOUND: No input sanitizer, no regex timeout, no character-count guard before the regex test calls. The g flag on the regex literal does not mitigate \u2014 the literal is re-evaluated per .test() call (lastIndex resets), and regardless the backtracking happens within a single .test() call.\n\n7. AUTH REQUIREMENT: None. Any unauthenticated attacker who can cause a server to call importKey() with their string (e.g., submitting a PEM string via API) can trigger this event-loop-blocking DoS."
+      }
+    },
+    {
+      "id": "f002",
+      "rel": "esm/index.node.mjs",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/esm/index.node.mjs",
+      "tags": [
+        "rce",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "deserialization_unsafe_json_parse",
+        "location": "$getDecryptedData (line 3883) in /DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js",
+        "severity": "medium",
+        "reachability": "Reached when the caller passes `encoding='json'` to decrypt()/decryptPublic(); the decrypted plaintext bytes are decoded to UTF-8 and fed directly into JSON.parse without any prior schema validation.",
+        "justification": "Line 3883: `if (enc === 'json') return JSON.parse(toUtf8(bytes));` \u2014 if the ciphertext was produced by an attacker (e.g., in a public-key encrypt scenario where the server decrypts arbitrary blobs submitted by clients) and the caller requests JSON decoding, prototype-polluting payloads like `{\"__proto__\":{\"polluted\":true}}` pass through JSON.parse and can corrupt the global Object prototype; additionally, deeply-nested or array-heavy JSON can trigger a parser stack overflow (DoS).",
+        "detection_pattern": {
+          "grep_pattern": "JSON\\.parse\\(",
+          "anti_pattern": "JSON\\.parse\\(.*,\\s*reviver|schema\\.parse|ajv|zod|superstruct",
+          "section_name": "DESERIALIZATION: JSON.parse on decrypted/untrusted bytes",
+          "description": "Catches bare JSON.parse calls on decoded bytes; without a reviver that strips `__proto__`/`constructor` keys or a JSON schema validator, prototype pollution and parser-DoS are possible."
+        }
+      },
+      "verdict": null
+    },
+    {
+      "id": "f002",
+      "rel": "esm/index.node.mjs",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/esm/index.node.mjs",
+      "tags": [
+        "rce",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "bleichenbacher_pkcs1v15_oracle",
+        "location": "Pkcs1Scheme.encUnPad / JsEngine.decrypt / NodeNativeEngine.decrypt (lines 3031-3064, 3389-3410, 4022-4038) in /DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js",
+        "severity": "medium",
+        "reachability": "Reached when the library is configured with `encryptionScheme: 'pkcs1'` (non-default; default is pkcs1_oaep) and a server exposes a decryption oracle \u2014 i.e., it decrypts attacker-supplied ciphertexts and returns either success or a generic error.",
+        "justification": "The code comment at line 3019-3030 explicitly acknowledges that 'the valid/invalid binary oracle inherent to PKCS#1 v1.5 remains'; the $$decryptKey wrapper re-throws a single 'Error during decryption' which closes the error-message oracle but not the binary-success/failure oracle observable by the caller; an attacker with ~2^20 adaptive chosen-ciphertext queries can recover the plaintext (Bleichenbacher 1998).",
+        "detection_pattern": {
+          "grep_pattern": "RSA_PKCS1_PADDING|encryptionScheme.*pkcs1[^_]",
+          "anti_pattern": "RSA_PKCS1_OAEP_PADDING|pkcs1_oaep",
+          "section_name": "AUTH/TOKEN: PKCS#1 v1.5 Bleichenbacher oracle",
+          "description": "Flags PKCS#1 v1.5 padding mode usage for RSA decryption; without full Bleichenbacher countermeasures (synthetic random plaintext on bad padding), any oracle exposing success/failure allows adaptive chosen-ciphertext attacks."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "medium",
+        "reasoning": "The Bleichenbacher PKCS#1 v1.5 oracle finding is confirmed real but requires non-default configuration. Key evidence: (1) DEFAULT_ENCRYPTION_SCHEME is 'pkcs1_oaep' (line 3267) \u2014 the vulnerable 'pkcs1' path requires explicit opt-in via encryptionScheme:'pkcs1'. (2) The code comment at lines 3019-3030 explicitly acknowledges the binary oracle remains: 'the valid/invalid binary oracle inherent to PKCS#1 v1.5 remains \u2014 use OAEP for untrusted ciphertexts.' The comment also confirms the full Bleichenbacher mitigation (synthetic random plaintext per RFC 8017 \u00a77.2.2 NOTE) was NOT implemented. (3) encUnPad (line 3031-3064) uses constant-time comparison internally but still returns null vs. Buffer \u2014 the JS engine decrypt() (line 3408) throws 'Decryption failed' on any null result. The $$decryptKey wrapper (line 3867-3869) normalizes the message to 'Error during decryption' but the throw-vs-return binary oracle remains observable by the calling application. (4) NodeNativeEngine.decrypt() (lines 4022-4038) checks nativeAvailableForDecrypt() which returns false for pkcs1 private-key decryption (line 3980), so it falls back to the JS engine \u2014 no separate native path escapes the analysis. (5) No input schema validation (zod/joi/ajv) is present; the buffer goes directly into ensureEngine().decrypt() with only a chunk-length modulus check. Reachability: Correct as stated \u2014 requires (a) caller sets encryptionScheme:'pkcs1' and (b) application exposes a decryption oracle (attacker submits chosen ciphertexts and observes success/failure). The cited file path in the finding (.esm/index.node.mjs) does not exist; the correct file is index.node.js, but line numbers 3031-3064 and 3389-3410 match exactly in that file and all code analysis is accurate. Severity 'medium' is appropriate: real cryptographic weakness, non-default trigger, no standalone exploit without an application-layer oracle.",
+        "_done": true
+      }
+    },
+    {
+      "id": "f002",
+      "rel": "esm/index.node.mjs",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/esm/index.node.mjs",
+      "tags": [
+        "rce",
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "weak_cryptography_default_hash",
+        "location": "PssScheme (line 3112: DEFAULT_HASH3='sha1'), OaepScheme (line 2852: DEFAULT_HASH='sha1') in /DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js",
+        "severity": "low",
+        "reachability": "Reached when callers use PSS signing or OAEP encryption without explicitly specifying a hash algorithm; the library silently falls back to SHA-1 for both MGF1 and the hash function.",
+        "justification": "SHA-1 is cryptographically broken for collision resistance (SHAttered 2017); while PSS pre-hashes the message and OAEP uses it only for label hashing (making direct collision exploitation harder), the default promotes SHA-1 in new code and weakens the overall security margin; NIST deprecated SHA-1 for all uses in SP 800-131A Rev 2.",
+        "detection_pattern": {
+          "grep_pattern": "DEFAULT_HASH.*=.*['\"]sha1['\"]",
+          "anti_pattern": "DEFAULT_HASH.*=.*['\"]sha256['\"]|DEFAULT_HASH.*=.*['\"]sha384['\"]|DEFAULT_HASH.*=.*['\"]sha512['\"]",
+          "section_name": "AUTH/TOKEN: SHA-1 as default signing/OAEP hash",
+          "description": "Detects module-level constants that establish SHA-1 as the default hash for RSA-PSS or RSA-OAEP; SHA-1 should not be the fallback in modern cryptographic code."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The OAEP sha1 default is confirmed real and active. In makeDefaultOptions() at line 3279-3280 of /DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js, the default options object explicitly sets encryptionSchemeOptions: { hash: 'sha1' }. This is the actual effective default for OAEP encryption \u2014 not the module-level DEFAULT_HASH constant fallback at line 2873, which is dead code when called through the normal options path. Any caller using OAEP encryption (pkcs1_oaep, the default encryption scheme) without overriding the hash will silently use sha1 for both the label hash and the MGF1 mask generation function. For PSS signing the finding is partially inaccurate: makeDefaultOptions() sets signingSchemeOptions: { hash: 'sha256' } (line 3278), so DEFAULT_HASH3='sha1' at line 3112 is unreachable dead code for the signing path. No schema validation (zod/joi/ajv) guards the hash option; callers pass it directly via setOptions or the constructor. The vulnerability does not require non-default configuration \u2014 it IS the default configuration for OAEP. The sha1 weakness in OAEP is limited in exploitability (sha1 is used only for label hashing and MGF1, not for message integrity in the collision sense), but it still constitutes a documented weak cryptography default that violates NIST SP 800-131A Rev 2 guidance. Severity is correctly rated low."
+      }
+    },
+    {
+      "id": "f003",
+      "rel": "index.browser.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.browser.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "redos",
+        "location": "autoImport functions in opensshFormat (lines 2145, 2151), pkcs1Format (lines 2642, 2648), pkcs8Format (lines 2757, 2763)",
+        "severity": "high",
+        "reachability": "Any caller of importKey() or NodeRSA constructor that passes a string/Uint8Array key \u2014 reachable without authentication. detectAndImport() iterates all four format providers calling autoImport() on every attempt, so all six regex paths run on unrecognized input.",
+        "justification": "All six autoImport regexes use the nested-quantifier pattern `(?=(([A-Za-z0-9+/=]+\\s*)+))\\1` inside a `^[\\S\\s]*...$` anchor. The inner group `([A-Za-z0-9+/=]+\\s*)+` is a classic catastrophic backtracking pattern: when input contains a long base64-like segment without a matching end marker, the engine explores O(2^n) backtracking paths. A 10 KB crafted string with no valid PEM footer can lock the JS event loop for seconds.",
+        "detection_pattern": {
+          "grep_pattern": "\\(\\[A-Za-z0-9+/=\\]+\\\\s\\*\\)\\+",
+          "anti_pattern": "simple non-backtracking split or indexOf-based PEM boundary detection instead of a single regex test",
+          "section_name": "ReDoS: nested quantifiers in PEM format detection",
+          "description": "Matches nested `+` quantifiers on base64 character classes inside lookaheads or other anchored regexes used to detect PEM blocks \u2014 a classic ReDoS pattern exploitable when input length is attacker-controlled."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "high",
+        "reasoning": "All six autoImport regexes in opensshFormat (lines 2145, 2151), pkcs1Format (lines 2642, 2648), and pkcs8Format (lines 2757, 2763) contain the catastrophic backtracking pattern `([A-Za-z0-9+/=]+\\s*)+` inside a lookahead. When a BEGIN marker is present but the END marker is absent or mismatched, the regex engine must explore all partitions of a long base64-like segment across the outer and inner repetitions \u2014 O(2^n) backtracking paths. The call chain is fully confirmed: NodeRSA constructor (line 3761) accepts string|Uint8Array and calls importKey(), which calls detectAndImport() (line 2797), which \u2014 when no format is specified \u2014 iterates all four FORMATS providers calling autoImport() on each. componentsFormat.autoImport() (line 1938) bails out immediately for non-object input, so string input reaches all three PEM-based providers, executing all six vulnerable regexes sequentially on the same input. No length limit, no content sanitization, no schema validation (no zod/joi/ajv) exists anywhere in the path. The only guard is an empty-string check (line 3793), which does not mitigate the attack. No non-default options are required \u2014 the default constructor path (`new NodeRSA(keyString)`) is the vulnerable path. A crafted ~10 KB string containing a PEM BEGIN marker but no END marker (e.g., '-----BEGIN RSA PRIVATE KEY-----' + 'A'.repeat(10000)) is sufficient to trigger multi-second event loop stalls in Node.js/browser JS runtimes. The package README explicitly documents the constructor as accepting raw key strings from callers, making attacker-controlled input the intended use case. Reachability without authentication is confirmed.",
+        "_done": true
+      }
+    },
+    {
+      "id": "f003",
+      "rel": "index.browser.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.browser.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "deserialization_unsafe",
+        "location": "$getDecryptedData (line 3884)",
+        "severity": "medium",
+        "reachability": "Any caller that calls decrypt(ciphertext, 'json') and whose ciphertext is attacker-influenced (e.g. stored ciphertext modified at rest, network-delivered ciphertext). The encoding parameter is caller-supplied.",
+        "justification": "At line 3884, `JSON.parse(toUtf8(bytes))` is called on the raw decrypted plaintext with no schema validation. An attacker who controls the ciphertext (or who can produce a chosen-ciphertext under Bleichenbacher conditions) can inject arbitrary JSON, including objects that cause application logic errors. In environments where the parsed result is spread/assigned to a prototype-bearing object, prototype pollution is possible.",
+        "detection_pattern": {
+          "grep_pattern": "JSON\\.parse\\(.*decrypt",
+          "anti_pattern": "schema validation (e.g. zod, ajv) applied to JSON.parse result before use",
+          "section_name": "Deserialization: JSON.parse on decrypted payload",
+          "description": "Catches JSON.parse calls whose input originates from a decryption operation \u2014 the plaintext is attacker-controlled if the ciphertext is attacker-controlled, enabling object injection or logic bypass."
+        }
+      },
+      "verdict": {
+        "is_real": false,
+        "severity": "informational",
+        "reasoning": "The JSON.parse call at line 3884 is intentional by design \u2014 it is the symmetric counterpart of JSON.stringify used in $getDataForEncrypt (line 3878) for the encrypt-object/decrypt-json roundtrip. The encoding='json' parameter is caller-supplied and documented. However, the finding is not a real vulnerability in the library for the following reasons:\n\n1. JSON.parse in JavaScript does not execute code or trigger gadget chains. It is categorically different from PHP unserialize or Java/Python deserialization. The 'deserialization_unsafe' classification is a false analogy.\n\n2. Prototype pollution via __proto__ keys would require the caller to unsafely spread or Object.assign the returned value into a prototype-bearing object. The library returns the raw parsed value and does nothing further with it \u2014 the risk is entirely in caller code, not in node-rsa.\n\n3. The attacker-control premise requires the attacker to supply a ciphertext that decrypts to attacker-chosen JSON. This requires either: (a) the attacker can encrypt with the corresponding public key (in which case the system is already broken by design), or (b) the attacker can substitute stored ciphertext. These are application-level threat model concerns, not a library bug.\n\n4. The catch block at lines 3864-3870 swallows ALL errors (including JSON.parse SyntaxError) and re-throws a generic message. This is not a guard \u2014 it is unrelated error suppression.\n\n5. No schema validation exists in the path, but adding schema validation is the responsibility of the calling application, not a crypto library. The library's API contract is: decrypt returns the plaintext as the requested type. What the caller does with it is out of scope.\n\n6. The finding would only be valid if JSON.parse itself had code-execution implications (it does not in standard JS engines) or if the library itself processed the parsed result in an unsafe way (it does not \u2014 it returns it directly). The actual finding is an API design observation: the library does not document that callers should validate JSON output before use."
+      }
+    },
+    {
+      "id": "f003",
+      "rel": "index.browser.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.browser.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "weak_crypto_default",
+        "location": "DEFAULT_HASH (line 2853) in OaepScheme, DEFAULT_HASH3 (line 3113) in PssScheme, encryptionSchemeOptions default (line 3281)",
+        "severity": "medium",
+        "reachability": "Any caller that constructs NodeRSA without explicitly specifying encryptionSchemeOptions.hash or signingSchemeOptions.hash \u2014 i.e. the majority of default usage. PSS signing default is sha1; OAEP encryption default is sha1.",
+        "justification": "SHA-1 is set as the default hash for both PSS signing (DEFAULT_HASH3 = 'sha1' at line 3113) and OAEP encryption (DEFAULT_HASH = 'sha1' at line 2853, confirmed by encryptionSchemeOptions: { hash: 'sha1' } in makeDefaultOptions at line 3281). SHA-1 is broken for collision resistance (SHAttered attack). For PSS, a collision in the hash allows an attacker to find two messages with the same EMSA-PSS encoding, enabling signature forgery under certain conditions. NIST deprecated SHA-1 for digital signatures in 2011.",
+        "detection_pattern": {
+          "grep_pattern": "DEFAULT_HASH.*=.*['\"]sha1['\"]",
+          "anti_pattern": "DEFAULT_HASH.*=.*['\"]sha256['\"]",
+          "section_name": "Weak crypto: SHA-1 as default hash algorithm",
+          "description": "Flags packages that hard-code SHA-1 as a default hashing algorithm for cryptographic schemes \u2014 a broken algorithm for signature and integrity purposes per NIST SP 800-131A."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The finding is partially confirmed but significantly overstated. OAEP SHA-1 default is real: line 3281 in makeDefaultOptions sets encryptionSchemeOptions: { hash: 'sha1' }, and the OaepScheme.hash() method at line 2874 falls back to DEFAULT_HASH ('sha1') via the ?? operator when no hash is explicitly provided. Any caller constructing NodeRSA without specifying encryptionScheme options gets SHA-1 for OAEP encryption. There is no sanitizer or guard that blocks this \u2014 the warning at lines 3332-3336 only fires for md4/md5, not sha1. The PSS signing claim is INCORRECT: makeDefaultOptions at line 3279 sets signingSchemeOptions: { hash: 'sha256' }, not sha1. DEFAULT_HASH3 = 'sha1' (line 3113) is only reachable if signingSchemeOptions is empty/bypassed after construction, which does not happen in the normal NodeRSA() constructor path (line 3755 always calls makeDefaultOptions which pre-sets sha256). The reachability claim that 'PSS signing default is sha1' is false. Regarding OAEP SHA-1: SHA-1 is broken for collision resistance (SHAttered), and while OAEP security proofs rely on the hash being collision-resistant for the label hash, the practical attack surface is lower than for signatures \u2014 there is no known practical OAEP-SHA-1 break in typical use. The severity is downgraded from medium to low because: (1) the PSS claim is wrong, (2) OAEP-SHA-1 has no known practical exploit despite being theoretically weak, and (3) this is a library default, not an attacker-controlled input path \u2014 no user/network data controls the hash selection. The missing warning for sha1 (vs the md4/md5 warning that does exist) is a real gap in security guidance."
+      }
+    },
+    {
+      "id": "f003",
+      "rel": "index.browser.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.browser.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "bleichenbacher_oracle",
+        "location": "Pkcs1Scheme.encUnPad / JsEngine.decrypt (lines 3021-3065, 3390-3411)",
+        "severity": "medium",
+        "reachability": "Any application that uses pkcs1 (non-OAEP) decryption and exposes the decrypt result or error to an attacker in a way that distinguishes padding-valid from padding-invalid outcomes (network API, timing, error message). The code comment at line 3028 explicitly acknowledges this residual oracle.",
+        "justification": "The encUnPad method for PKCS#1 v1.5 accumulates a bad flag and returns null for all failure modes (constant-time internally), but the caller at line 3407 propagates null into a bad flag and ultimately throws 'Error during decryption' at line 3869. Any application that returns a different HTTP status, response body, or timing for decrypt success vs. failure exposes the classic Bleichenbacher '98 adaptive chosen-ciphertext attack, allowing plaintext recovery in O(10^6) queries. The code comment at line 3028 explicitly acknowledges the full Manger/Bleichenbacher fix was not implemented.",
+        "detection_pattern": {
+          "grep_pattern": "encUnPad.*null|pkcs1.*decrypt.*throw",
+          "anti_pattern": "synthetic-plaintext Bleichenbacher mitigation|RFC 8017.*7\\.2\\.2.*NOTE",
+          "section_name": "Bleichenbacher oracle: PKCS#1 v1.5 binary decrypt oracle",
+          "description": "Identifies PKCS#1 v1.5 decrypt implementations that return distinct null/throw on bad padding rather than synthetic plaintext per RFC 8017 \u00a77.2.2 NOTE \u2014 the unmitigated form exposes an adaptive chosen-ciphertext oracle."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "medium",
+        "reasoning": "The binary Bleichenbacher oracle is real but requires a non-default opt-in to the 'pkcs1' encryption scheme. The default scheme (line 3268) is 'pkcs1_oaep', which is not vulnerable. The vulnerable path activates only when a caller explicitly sets encryptionScheme: 'pkcs1'.\n\nCode path confirmed:\n1. encUnPad (lines 3032-3065) is internally constant-time: all checks (header byte, pad type, PS validity, minimum PS length) accumulate into a single bitwise 'bad' flag with no early return; one 'return null' covers all failure modes. The code comment at line 3021 explicitly confirms this.\n2. The code comment at lines 3026-3030 explicitly acknowledges that the full Bleichenbacher mitigation (RFC 8017 \u00a77.2.2 NOTE \u2014 return synthetic plaintext) was NOT implemented, and states 'the valid/invalid binary oracle inherent to PKCS#1 v1.5 remains \u2014 use OAEP for untrusted ciphertexts.'\n3. JsEngine.decrypt (lines 3390-3411) accumulates bad flag and throws 'Decryption failed' at line 3409. This is re-wrapped at line 3869 as 'Error during decryption'. Success vs failure is distinguishable at the API level.\n4. The public decrypt() API (line 3832) accepts attacker-controlled ciphertext bytes directly with no schema validation (no zod/joi/ajv guards).\n\nKey mitigating factor: DEFAULT_ENCRYPTION_SCHEME = 'pkcs1_oaep' (line 3268). Any application using defaults is NOT exposed. The finding's claimed reachability ('any application that uses pkcs1 decryption') is accurate but restricted to the non-default opt-in case.\n\nReachability: Real for applications that explicitly configure encryptionScheme: 'pkcs1' AND expose decrypt results or errors to an untrusted network caller in a way that distinguishes success from failure. The internal timing oracle is closed (constant-time unpadding), but the binary success/failure distinction is an inherent API-level oracle enabling Bleichenbacher '98 adaptive chosen-ciphertext attacks in O(10^6) queries.\n\nSeverity confirmed at medium: the attack requires non-default configuration, but when present the oracle is fully exploitable with no guards."
+      }
+    },
+    {
+      "id": "f004",
+      "rel": "index.node.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "weak_default_cryptographic_algorithm",
+        "location": "PssScheme class, line 3112 (DEFAULT_HASH3 = 'sha1'); NodeNativePssScheme.sign/verify, lines 4173/4185 (hash ?? DEFAULT_PSS_HASH where DEFAULT_PSS_HASH = 'sha1' at line 4087)",
+        "severity": "medium",
+        "reachability": "Reachable by any caller that creates a NodeRSA instance with the 'pss' signing scheme and does not explicitly set a hash \u2014 both the pure-JS PssScheme and the NodeNativePssScheme default to SHA-1 for all sign/verify operations.",
+        "justification": "Both pure-JS (line 3112: DEFAULT_HASH3 = 'sha1') and native (line 4087: DEFAULT_PSS_HASH = 'sha1') PSS implementations default to SHA-1 as the hash algorithm. SHA-1 is deprecated by NIST (SP 800-131A Rev 2) for digital signatures. Callers who omit the hash option silently use a broken algorithm without any warning.",
+        "detection_pattern": {
+          "grep_pattern": "DEFAULT.*=.*['\"]sha1['\"]",
+          "anti_pattern": "DEFAULT.*=.*['\"]sha256['\"]",
+          "section_name": "Weak default hash: SHA-1 for PSS/signing",
+          "description": "Catches module-level DEFAULT_HASH constants set to sha1 in signing scheme implementations. SHA-1 is deprecated for signatures; the default should be sha256 or stronger."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The finding is real but significantly overstated in its reachability claim. The true default path (caller creates NodeRSA with no options) uses SHA-256, not SHA-1: makeDefaultOptions() at line 3275-3288 sets signingSchemeOptions: { hash: 'sha256' }, so the ?? DEFAULT_PSS_HASH / ?? DEFAULT_HASH3 fallbacks at lines 4173/4185 and 3122 are never reached in the default case. SHA-1 is only reached when a caller explicitly passes the signing scheme as the bare string 'pss' (e.g. setOptions({ signingScheme: 'pss' })): the applyOptions() branch at line 3312-3313 sets signingSchemeOptions = {} (empty, no hash key), causing the SHA-1 fallback to fire silently. Same applies to the object form { scheme: 'pss' } with no hash key (line 3323). The finding's claim that 'any caller who does not explicitly set a hash silently uses SHA-1' is incorrect \u2014 the default is SHA-256. The actual vulnerable path requires a non-default, explicit caller action (passing 'pss' as a bare string without a hash), not mere omission. No schema validation (zod/joi/ajv) guards this path. No warning is emitted for the SHA-1 fallback (unlike md4/md5 which get a console.warn at line 3331-3334). The bug is real: callers who explicitly opt into PSS via string form without a hash get silent SHA-1 downgrade. But severity is low because it requires deliberate non-default misconfiguration, not passive omission, and no NIST deprecation warning is issued."
+      }
+    },
+    {
+      "id": "f004",
+      "rel": "index.node.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "weak_algorithm_accepted_without_error",
+        "location": "applyOptions function, lines 3331-3335: signingSchemeOptions.hash === 'md4' || 'md5' emits console.warn only",
+        "severity": "medium",
+        "reachability": "Any caller that sets setOptions({signingScheme:'pkcs1-md5'}) or passes signingScheme as an object with hash='md5'. The code emits console.warn but does not throw, so production code using MD5 for RSA signatures silently proceeds.",
+        "justification": "At lines 3331-3335, when the signing hash is 'md4' or 'md5', only console.warn is emitted rather than throwing. MD5 is cryptographically broken for signatures (chosen-prefix collisions). The allowlist check at line 3328 includes md4 and md5 in NODE_HASHES so they pass validation and proceed to signing. Callers relying on the library to enforce secure configurations are not protected.",
+        "detection_pattern": {
+          "grep_pattern": "console\\.warn.*md5|console\\.warn.*md4",
+          "anti_pattern": "throw.*md5|throw.*md4",
+          "section_name": "Weak hash: MD5/MD4 accepted with warn-only",
+          "description": "Catches packages that warn but do not reject MD4/MD5 for signing operations. Broken hashes should cause a thrown error, not merely a console warning."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "medium",
+        "reasoning": "Confirmed. At lines 3331-3335 of /DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js, when signingSchemeOptions.hash is 'md4' or 'md5', the code emits console.warn but does not throw. The critical detail is that the allowedHashes guard at line 3328 explicitly permits md4 and md5 because NODE_HASHES (lines 3248-3257) includes both \u2014 so they pass validation and signing proceeds silently. Reachability is confirmed via two paths: (1) string form setOptions({signingScheme:'pkcs1-md5'}) \u2014 line 3306 splits on '-' yielding scheme='pkcs1' and hash='md5', which passes the allowedHashes check and hits warn-only; (2) object form setOptions({signingScheme:{scheme:'pkcs1',hash:'md5'}}) \u2014 lines 3320-3323 extract the hash directly, same outcome. No schema validation (zod/joi/ajv) is present. The default options at line 3278 use sha256, so this requires explicit non-default caller configuration; however the library documents signingScheme as a user-controlled parameter. The finding is real: the library design accepts cryptographically broken hashes for signing with warn-only semantics, giving callers a false sense of security that the library enforces safe configurations.",
+        "_done": true
+      }
+    },
+    {
+      "id": "f004",
+      "rel": "index.node.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "unsafe_deserialization",
+        "location": "$getDecryptedData method, line 3883: JSON.parse(toUtf8(bytes))",
+        "severity": "low",
+        "reachability": "Reachable when a caller invokes nodeRSA.decrypt(ciphertext, 'json'). If the server decrypts attacker-supplied ciphertext (e.g., encrypted tokens submitted by clients), the decrypted payload is parsed as JSON and returned directly to application code without any type or schema validation.",
+        "justification": "At line 3883, $getDecryptedData calls JSON.parse(toUtf8(bytes)) when encoding === 'json'. Standard JSON.parse in Node.js does not cause prototype pollution, but the function returns arbitrary JavaScript values (arrays, nested objects, unexpected types) that are shaped entirely by whoever encrypted the ciphertext. Downstream application code that passes the returned value to functions expecting a specific type is exposed to unexpected-type injection and potential errors.",
+        "detection_pattern": {
+          "grep_pattern": "JSON\\.parse.*decrypt|decrypt.*JSON\\.parse",
+          "anti_pattern": "ajv|joi|zod|schema.*valid",
+          "section_name": "Unvalidated JSON.parse of decrypted data",
+          "description": "Catches patterns where decrypted bytes are directly JSON.parsed without schema validation. Callers should validate the shape and type of decrypted JSON before passing it downstream."
+        }
+      },
+      "verdict": {
+        "is_real": false,
+        "severity": "n/a",
+        "reasoning": "The code path is real and confirmed: nodeRSA.decrypt(ciphertext, 'json') -> $$decryptKey -> $getDecryptedData -> JSON.parse(toUtf8(bytes)) at line 3883. However, this does not constitute a vulnerability in node-rsa. (1) JSON.parse in Node.js/V8 does not execute code, does not cause prototype pollution (keys like __proto__ are treated as literal strings), and has no known gadget-chain exploits. (2) The 'json' encoding is a non-default option the caller must explicitly pass; the default is 'buffer'. (3) The library is a cryptographic primitive \u2014 schema validation of the decrypted payload is entirely the caller's responsibility, and the library makes no documented claim to validate it. (4) Any 'unexpected-type injection' risk is a property of the calling application's failure to validate the decrypted result, not a defect in node-rsa itself. No sanitizer is needed in the library because JSON.parse is not unsafe here. This is a misidentified design-pattern concern, not a CWE-502 unsafe deserialization issue."
+      }
+    },
+    {
+      "id": "f004",
+      "rel": "index.node.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js",
+      "tags": [
+        "rce",
+        "ssrf",
+        "proto_pollution",
+        "auth_bypass",
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "information_exposure_through_error_message_suppression",
+        "location": "$$encryptKey lines 3858-3860, $$decryptKey lines 3867-3869, NodeNativePkcs1Scheme.verify lines 4153-4155, NodeNativePssScheme.verify lines 4200-4202",
+        "severity": "low",
+        "reachability": "All encrypt/decrypt/verify callers. Any exception from the underlying crypto primitive is swallowed.",
+        "justification": "All four crypto entry points use bare catch blocks that discard the original error. In $$encryptKey/$$decryptKey a generic string is thrown, masking programming errors. In the two native verify methods, exceptions silently return false \u2014 making a corrupted-key error or a missing-library error indistinguishable from a legitimately invalid signature. While discarding errors in decrypt provides some defense against timing oracles, the wholesale suppression in verify hides faults that indicate a mis-configured key or environment.",
+        "detection_pattern": {
+          "grep_pattern": "catch.*\\{[\\s]*return false",
+          "anti_pattern": "catch.*err.*\\{.*log|catch.*e.*\\{.*throw",
+          "section_name": "Silent catch in cryptographic verify",
+          "description": "Catches verify() implementations that silently return false on all exceptions, making it impossible to distinguish deliberate invalid signatures from crypto errors caused by wrong keys or missing modules."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "All four code patterns are confirmed in the file exactly as described. $$encryptKey (lines 3854-3860) and $$decryptKey (lines 3863-3869) use bare catch blocks that discard the original error and throw a generic string, suppressing diagnostic information. NodeNativePkcs1Scheme.verify (lines 4139-4156) and NodeNativePssScheme.verify (lines 4184-4203) silently return false on any exception, making a corrupted-key error, a missing-module error, or a malformed-input error indistinguishable from a legitimately invalid signature. Reachability is correct: these are the internal entry points called by all encrypt/decrypt/verify callers with no authentication guard or special config required. The node-native engine is the default. No schema validation (zod/joi/ajv) or sanitizer was missed. The vuln class label is slightly inaccurate (this suppresses error info FROM the developer, it does not expose it TO an attacker), but the described behavior is real. Security impact is low: callers still receive false from verify and should reject; the risk is misdiagnosed key misconfiguration or environment issues, not an exploitable bypass. The finding is real at the stated low severity.",
+        "_done": true
+      }
+    },
+    {
+      "id": "f005",
+      "rel": "src/index.d.ts",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/src/index.d.ts",
+      "tags": [
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "redos",
+        "location": "opensshFormat.autoImport (line 2144, 2150), pkcs1Format.autoImport (line 2641, 2647), pkcs8Format.autoImport (line 2756, 2762)",
+        "severity": "high",
+        "reachability": "Any caller that passes an untrusted string to importKey() without specifying a format triggers autoImport() which runs all six regexes against the input. Reachable from any public NodeRSA constructor or importKey() call with a string argument.",
+        "justification": "All six PEM/OpenSSH autodetection regexes use the pattern `(?=(([A-Za-z0-9+/=]+\\s*)+))` \u2014 a nested quantifier inside a lookahead where both the inner `[A-Za-z0-9+/=]+` and the outer `(\\s*)+` can match whitespace, causing catastrophic backtracking on a crafted string of base64 characters not followed by the closing PEM marker. The /g flag with stateful lastIndex compounds the issue on repeated calls.",
+        "detection_pattern": {
+          "grep_pattern": "\\(\\?=\\(\\([A-Za-z0-9\\+\\/=\\]\\+\\\\s\\*\\)\\+\\)\\)",
+          "anti_pattern": "new RegExp|safeRegex|RE2",
+          "section_name": "ReDoS: nested quantifier in PEM lookahead",
+          "description": "Matches the catastrophic backtracking pattern used in PEM format autodetection: a possessive-less nested quantifier inside a lookahead applied to base64-like input. Common in hand-rolled PEM parsers where the body regex and whitespace quantifier can both match the same characters."
+        }
+      },
+      "verdict": {
+        "is_real": false,
+        "severity": "low",
+        "reasoning": "The six regexes containing the nested-quantifier lookahead pattern `(?=(([A-Za-z0-9+/=]+\\s*)+))\\1` are confirmed present at exactly the claimed line numbers in `/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js` (the finding incorrectly names the file as `dist/src/index.d.ts`, which does not exist). The call chain is real and unsanitized: `new NodeRSA(untrustedString)` -> `importKey()` -> `detectAndImport()` with no format argument -> all six `autoImport()` functions, each running two regexes against the raw input with no length cap, schema validation, or guard. However, empirical testing on Node 22 (V8 12.4) with adversarial inputs up to 500,000 characters (alternating base64 characters and whitespace, no closing PEM marker) completes in under 25ms. 1000 consecutive iterations with a 200-char adversarial input complete in under 1ms. This is because V8 Irregexp has enforced a backtracking budget (approximately 1 million operations) since V8 8.8 (Node 16). When the budget is exhausted, the engine returns 'no match' immediately rather than continuing to backtrack. The regex pattern is structurally a ReDoS pattern but is not exploitable on any supported Node.js runtime (16+). The finding is therefore not a practical vulnerability on current runtimes. Severity is downgraded from high to low: the code smell is real and the theoretical class is correct, but there is no working exploit path on modern V8."
+      }
+    },
+    {
+      "id": "f005",
+      "rel": "src/index.d.ts",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/src/index.d.ts",
+      "tags": [
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "error_swallowing_padding_oracle",
+        "location": "NodeRSA.$$encryptKey (line 3854-3860), NodeRSA.$$decryptKey (line 3862-3869)",
+        "severity": "medium",
+        "reachability": "All public encrypt/decrypt/encryptPrivate/decryptPublic calls pass through these two methods. Any caller with access to the NodeRSA instance can trigger these paths.",
+        "justification": "Both methods wrap their entire body in a bare `catch { throw new Error('Error during encryption/decryption') }`, erasing all internal exception detail. For decryption this is particularly dangerous: padding validation errors from PKCS#1 v1.5 or OAEP are silently collapsed into a single indistinct error, which means callers cannot distinguish padding failure from a key mismatch \u2014 and if any timing difference exists between the two swallowed paths an attacker can exploit that as a Bleichenbacher-style binary oracle.",
+        "detection_pattern": {
+          "grep_pattern": "catch\\s*\\{\\s*throw new Error\\(['\"]Error during (encrypt|decrypt)",
+          "anti_pattern": "catch\\s*\\(\\s*\\w+\\s*\\).*cause:|rethrow",
+          "section_name": "Error swallowing: generic catch in crypto operations",
+          "description": "Flags bare catch blocks in encrypt/decrypt functions that discard the original exception and rethrow a generic error. This can mask padding oracle timing distinctions and prevents callers from implementing correct error handling or auditing."
+        }
+      },
+      "verdict": {
+        "is_real": false,
+        "severity": "informational",
+        "reasoning": "The bare-catch pattern in $$encryptKey (line 3853-3860) and $$decryptKey (line 3862-3869) of dist/index.node.js is real: both wrap their bodies in catch { throw new Error('Error during encryption/decryption') } with no bound variable, discarding internal exception detail. However, the Bleichenbacher/padding-oracle theory in the finding is invalidated by the actual padding implementation.\n\nThe PKCS#1 v1.5 encUnPad (lines 3031-3064) is fully constant-time: all padding byte checks accumulate into a single 'bad' flag with no early returns, and there is exactly one 'if (bad) return null' exit at the end. The OAEP encUnPad (lines 2917-2950) is likewise constant-time, using constantTimeEqual for the lHash check and branchless loops throughout. The Engine.decrypt method (lines 3389-3409) further accumulates the null return from encUnPad into a 'bad' flag before throwing 'Decryption failed', so all padding-failure paths converge to a single throw before reaching the catch block in $$decryptKey.\n\nThe catch block therefore swallows three distinct error messages ('Incorrect data or key', 'Engine: RSA primitive returned oversize integer', 'Decryption failed') into 'Error during decryption', which is an information-loss issue but introduces no new timing channel. The padding validation is constant-time before any exception is raised.\n\nThe library explicitly acknowledges the residual binary valid/invalid oracle in PKCS#1 v1.5 (comment at line 3025-3029: 'Full Bleichenbacher mitigation... would require session-key plumbing and an API change... This closes only the internal differential timing oracle; the valid/invalid binary oracle inherent to PKCS#1 v1.5 remains \u2014 use OAEP for untrusted ciphertexts.'). The default encryption scheme is OAEP (line 3267: DEFAULT_ENCRYPTION_SCHEME = 'pkcs1_oaep'), which is not vulnerable to this class of attack.\n\nAdditionally, the finding references a non-existent file path (dist/src/index.d.ts); the actual files are dist/index.node.js and dist/index.node.d.ts.\n\nThe error-swallowing is a code-quality defect that hinders debugging, but it does not create a new padding oracle or timing channel beyond what the library already documents and mitigates."
+      }
+    },
+    {
+      "id": "f005",
+      "rel": "src/index.d.ts",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/src/index.d.ts",
+      "tags": [
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "prototype_pollution_via_json_parse",
+        "location": "NodeRSA.$getDecryptedData (line 3883)",
+        "severity": "medium",
+        "reachability": "Triggered when any caller invokes decrypt(ciphertext, 'json') or decryptPublic(ciphertext, 'json'). The decrypted bytes are attacker-controlled if the attacker controls the ciphertext or the decryption key. Directly reachable from the public API.",
+        "justification": "At line 3883, `JSON.parse(toUtf8(bytes))` is called on the raw decrypted bytes with no sanitization or null-prototype result. If the decrypted payload contains `{\"__proto__\":{\"isAdmin\":true}}`, V8's JSON.parse sets properties on Object.prototype, polluting the prototype chain for all objects in the process. The library exposes this as a first-class API feature (encoding='json') without any documented security caveat.",
+        "detection_pattern": {
+          "grep_pattern": "JSON\\.parse\\(",
+          "anti_pattern": "secure-json-parse|destr|JSON\\.parse\\([^,]+,\\s*reviver|Object\\.create\\(null\\)",
+          "section_name": "Deserialization: JSON.parse on untrusted decrypted bytes",
+          "description": "Flags raw JSON.parse calls in decryption output paths where the bytes being parsed were produced by a cryptographic operation. Decrypted bytes may be attacker-controlled and can contain __proto__ or constructor keys that pollute the prototype chain."
+        }
+      },
+      "verdict": {
+        "is_real": false,
+        "severity": "N/A",
+        "reasoning": "The finding claims that JSON.parse(toUtf8(bytes)) at line 3883 of index.node.js causes prototype pollution when an attacker-controlled decrypted payload contains {\"__proto__\":{\"isAdmin\":true}}. This is factually incorrect. V8's native JSON.parse does NOT propagate __proto__ to Object.prototype \u2014 it treats the key as a plain string property on the parsed result object, not as a prototype setter. Empirical verification on Node.js v22.22.2 confirms: after JSON.parse('{\"__proto__\":{\"polluted\":true}}'), ({}).polluted is undefined. The constructor.prototype vector is similarly inert through JSON.parse. Prototype pollution via JSON.parse only occurs when the parsed result is subsequently merged into an existing object using an unsafe merge function (e.g. lodash.merge, deepmerge). In node-rsa, $getDecryptedData merely returns the parsed result to the caller \u2014 it never merges it into any existing object within the library. The code path is real (line 3883 exists, the 'json' encoding option is documented in README line 251, and it is reachable via the public decrypt/decryptPublic API with no auth required), but the vulnerability mechanism (prototype pollution) does not occur. The finding conflates 'JSON.parse on untrusted input' with 'prototype pollution', which requires an additional unsafe merge step that is absent here."
+      }
+    },
+    {
+      "id": "f005",
+      "rel": "src/index.d.ts",
+      "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/src/index.d.ts",
+      "tags": [
+        "auth_bypass"
+      ],
+      "finding": {
+        "vuln_class": "prototype_property_access_via_user_key",
+        "location": "NodeRSA.importKey (line 3795), NodeRSA.exportKey (line 3805)",
+        "severity": "low",
+        "reachability": "Any caller who supplies a user-controlled string as the format argument to importKey() or exportKey(). Requires attacker control of the format parameter.",
+        "justification": "The lookup `EXPORT_FORMAT_ALIASES[format]` at lines 3795 and 3805 uses a user-supplied string as a plain-object property key with no hasOwnProperty guard or Object.create(null) map. Passing '__proto__' or 'constructor' resolves to inherited Object prototype members rather than alias strings; the `?? format` fallback then passes the raw inherited value to formatParse() which calls .split('-') on it, throwing a TypeError crash on non-string values. While not directly exploitable for privilege escalation, it is a prototype-access antipattern that can cause denial-of-service via crash.",
+        "detection_pattern": {
+          "grep_pattern": "FORMAT_ALIASES\\[|schemeMap\\[|formatMap\\[",
+          "anti_pattern": "Object\\.create\\(null\\)|hasOwnProperty|Object\\.prototype\\.hasOwnProperty\\.call",
+          "section_name": "Prototype lookup: user-controlled key on plain object map",
+          "description": "Flags user-supplied strings used directly as property keys on plain object lookup tables without hasOwnProperty guards or null-prototype maps. Can leak prototype properties or cause unexpected crashes with __proto__/constructor keys."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The vulnerability is confirmed real. EXPORT_FORMAT_ALIASES at line 3269 of dist/index.node.js is a plain object literal (not Object.create(null)), inheriting from Object.prototype. At importKey (line 3795) and exportKey (line 3805), the user-supplied format string is used as a direct property key: EXPORT_FORMAT_ALIASES[format] ?? format. For prototype property names that return non-string truthy values (e.g., 'constructor' returns the Object function, 'toString'/'valueOf' return their respective functions, '__proto__' returns Object.prototype), the ?? fallback does NOT apply because the inherited value is truthy. The non-string value is then passed directly to formatParse() at line 2795, which calls .split('-') on it, producing TypeError: split is not a function. This is a confirmed DoS crash path. There is no runtime input validation (only TypeScript types, erased at runtime), no hasOwnProperty guard, no null-prototype map, and the format parameter is explicitly typed as Format | string in the public API, making arbitrary strings a documented use case. The finding's stated file path (dist/src/index.d.ts) does not exist; the actual implementation is dist/index.node.js (4245 lines). Line numbers 3795 and 3805 match exactly in the JS source. Severity is low: no privilege escalation, no data exfiltration, crash only, and requires attacker control of the format argument (not a default-path injection)."
+      }
+    }
+  ],
+  "reachability_applied": 6,
+  "reachability_downgraded": 5
+}
