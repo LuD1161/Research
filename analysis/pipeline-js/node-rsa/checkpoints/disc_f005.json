@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "redos",
+      "location": "opensshFormat.autoImport (line 2144, 2150), pkcs1Format.autoImport (line 2641, 2647), pkcs8Format.autoImport (line 2756, 2762)",
+      "severity": "high",
+      "reachability": "Any caller that passes an untrusted string to importKey() without specifying a format triggers autoImport() which runs all six regexes against the input. Reachable from any public NodeRSA constructor or importKey() call with a string argument.",
+      "justification": "All six PEM/OpenSSH autodetection regexes use the pattern `(?=(([A-Za-z0-9+/=]+\\s*)+))` — a nested quantifier inside a lookahead where both the inner `[A-Za-z0-9+/=]+` and the outer `(\\s*)+` can match whitespace, causing catastrophic backtracking on a crafted string of base64 characters not followed by the closing PEM marker. The /g flag with a stateful lastIndex compounds the issue on repeated calls.",
+      "detection_pattern": {
+        "grep_pattern": "\\(\\?=\\(\\([A-Za-z0-9+\\/=\\]\\+\\\\s\\*\\)\\+\\)\\)",
+        "anti_pattern": "new RegExp|safeRegex|rePath|RE2",
+        "section_name": "ReDoS: nested quantifier in PEM lookahead",
+        "description": "Matches the specific catastrophic backtracking pattern used in PEM format autodetection: a possessive-less nested quantifier inside a lookahead applied to base64-like input. Common in hand-rolled PEM parsers."
+      }
+    },
+    {
+      "vuln_class": "error_swallowing_padding_oracle",
+      "location": "NodeRSA.$$encryptKey (line 3854-3860), NodeRSA.$$decryptKey (line 3862-3869)",
+      "severity": "medium",
+      "reachability": "All public encrypt/decrypt/encryptPrivate/decryptPublic calls pass through these two methods. Any caller with access to the NodeRSA instance can trigger these paths.",
+      "justification": "Both methods wrap their entire body in a bare `catch { throw new Error('Error during encryption/decryption') }`, erasing all internal exception detail. For decryption this is particularly dangerous: padding validation errors (from PKCS#1 v1.5 or OAEP) are silently collapsed into a single indistinct error, which (a) hides legitimate diagnostic information and (b) means callers cannot distinguish a padding failure from a key mismatch, facilitating a Bleichenbacher-style binary oracle if response timing differs between the swallowed exception paths.",
+      "detection_pattern": {
+        "grep_pattern": "catch\\s*\\{\\s*throw new Error\\(['\"]Error during (encrypt|decrypt)",
+        "anti_pattern": "catch\\s*\\(\\s*e\\s*\\)\\s*\\{.*rethrow|cause:",
+        "section_name": "Error swallowing: generic catch in crypto operations",
+        "description": "Flags bare catch blocks in encrypt/decrypt functions that rethrow a generic error, hiding the original exception. This pattern can mask padding oracle timing distinctions and prevents callers from implementing proper error handling."
+      }
+    },
+    {
+      "vuln_class": "prototype_pollution_via_json_parse",
+      "location": "NodeRSA.$getDecryptedData (line 3883)",
+      "severity": "medium",
+      "reachability": "Triggered when a caller invokes decrypt(ciphertext, 'json'). The decrypted bytes are attacker-controlled if the attacker controls the ciphertext or the key used. Reachable from any call to decrypt() or decryptPublic() with encoding='json'.",
+      "justification": "At line 3883, `JSON.parse(toUtf8(bytes))` is called on the raw decrypted bytes without any sanitization. If the decrypted payload contains `{\"__proto__\":{\"isAdmin\":true}}` or similar, `JSON.parse` in V8 will set properties on `Object.prototype`, polluting the prototype chain for all objects in the process. This is a standard JSON.parse prototype pollution vector that the library exposes as a first-class API feature.",
+      "detection_pattern": {
+        "grep_pattern": "JSON\\.parse\\(",
+        "anti_pattern": "JSON\\.parse\\([^)]+,\\s*(reviver|sanitize|Object\\.create\\(null\\))|secure-json-parse|destr",
+        "section_name": "Deserialization: JSON.parse on untrusted decrypted bytes",
+        "description": "Flags raw JSON.parse calls in decryption output paths. Decrypted bytes may be attacker-controlled and can contain __proto__ or constructor keys that pollute the prototype chain in the calling process."
+      }
+    },
+    {
+      "vuln_class": "format_string_prototype_lookup",
+      "location": "NodeRSA.importKey (line 3795), NodeRSA.exportKey (line 3805)",
+      "severity": "low",
+      "reachability": "Any caller who supplies a user-controlled string as the format argument to importKey() or exportKey(). In practice requires attacker control of the format parameter.",
+      "justification": "The lookup `EXPORT_FORMAT_ALIASES[format]` at lines 3795 and 3805 uses a user-supplied string as a plain-object property key without a `hasOwnProperty` guard or `Object.create(null)` map. Passing `'__proto__'` or `'constructor'` resolves to inherited Object prototype members rather than alias strings. The `?? format` fallback then passes the raw inherited value to `formatParse()` which calls `.split('-')` on it, throwing a TypeError on non-string values. While not exploitable for privilege escalation, it can cause unexpected crashes and is a prototype-access antipattern.",
+      "detection_pattern": {
+        "grep_pattern": "\\[format\\]|\\[scheme\\]|\\[encoding\\]",
+        "anti_pattern": "Object\\.create\\(null\\)|hasOwnProperty|Object\\.prototype\\.hasOwnProperty\\.call",
+        "section_name": "Prototype lookup: user-controlled key on plain object",
+        "description": "Flags user-supplied strings used directly as property keys on plain object lookup tables without hasOwnProperty guards or null-prototype maps. Can leak prototype properties or cause unexpected behavior with __proto__/constructor keys."
+      }
+    }
+  ]
+}
