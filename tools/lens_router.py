@@ -125,6 +125,114 @@ def classify(text, callbacks=frozenset()):
         tier = 0
     return tags, tier, {'source': has_source, 'handler': has_handler, 'sink': has_sink}
 
+# --- Cross-file promotion: include/require tracing + directory proximity --------
+INCLUDE_RE = re.compile(
+    r"""(?:include|require)(?:_once)?\s*\(\s*['"]([^'"]+)['"]\s*\)|"""
+    r"""(?:include|require)(?:_once)?\s+['"]([^'"]+)['"]""", re.I)
+NAMESPACE_RE = re.compile(r'namespace\s+([\w\\]+)\s*;')
+USE_RE = re.compile(r'use\s+([\w\\]+)(?:\s+as\s+\w+)?\s*;')
+
+def build_include_map(rows, root):
+    """Map each file to the set of files it includes/requires (resolved to abs paths)."""
+    inc_map = {}
+    for r in rows:
+        includes = set()
+        try:
+            text = open(r['path'], encoding='utf-8', errors='ignore').read()
+        except Exception:
+            continue
+        for m in INCLUDE_RE.finditer(text):
+            inc_path = m.group(1) or m.group(2)
+            if not inc_path or inc_path.startswith('http'):
+                continue
+            # Resolve relative to the file's directory
+            base = os.path.dirname(r['path'])
+            # Handle common WP patterns: __DIR__, dirname(__FILE__), plugin_dir_path
+            inc_path = re.sub(r"'\s*\.\s*", '', inc_path)
+            inc_path = inc_path.lstrip('/')
+            candidates = [
+                os.path.normpath(os.path.join(base, inc_path)),
+                os.path.normpath(os.path.join(root, inc_path)),
+            ]
+            for c in candidates:
+                if os.path.isfile(c):
+                    includes.add(c)
+                    break
+        inc_map[r['path']] = includes
+    return inc_map
+
+def build_namespace_map(rows):
+    """Map namespace → set of file paths declaring that namespace."""
+    ns_map = {}
+    for r in rows:
+        try:
+            text = open(r['path'], encoding='utf-8', errors='ignore').read()
+        except Exception:
+            continue
+        m = NAMESPACE_RE.search(text)
+        if m:
+            ns = m.group(1)
+            ns_map.setdefault(ns, set()).add(r['path'])
+    return ns_map
+
+def promote_cross_file(rows, root):
+    """Promote tier-1 files to tier-2 based on cross-file relationships.
+
+    1. Include/require: if a tier-2 file includes/requires a tier-1 file, promote it.
+    2. Proximity: if a tier-1 file with a sink shares a directory with a tier-2 file, promote it.
+    3. Namespace: if a tier-1 file with a sink shares a namespace with a tier-2 file, promote it.
+    """
+    tier2_paths = {r['path'] for r in rows if r['tier'] == 2}
+    tier2_dirs = {os.path.dirname(p) for p in tier2_paths}
+
+    inc_map = build_include_map(rows, root)
+    ns_map = build_namespace_map(rows)
+
+    # Collect namespaces that contain tier-2 files
+    tier2_namespaces = set()
+    for ns, paths in ns_map.items():
+        if paths & tier2_paths:
+            tier2_namespaces.add(ns)
+
+    # Reverse include map: files included BY tier-2 files
+    included_by_t2 = set()
+    for src, targets in inc_map.items():
+        if src in tier2_paths:
+            included_by_t2.update(targets)
+
+    promoted = 0
+    for r in rows:
+        if r['tier'] != 1:
+            continue
+
+        reason = None
+
+        # Promotion 1: included/required by a tier-2 file
+        if r['path'] in included_by_t2:
+            reason = 'included_by_t2'
+
+        # Promotion 2: has sink + shares directory with tier-2 file
+        elif r['sink'] and os.path.dirname(r['path']) in tier2_dirs:
+            reason = 'proximity_sink'
+
+        # Promotion 3: has sink + shares namespace with tier-2 file
+        elif r['sink']:
+            try:
+                text = open(r['path'], encoding='utf-8', errors='ignore').read()
+                m = NAMESPACE_RE.search(text)
+                if m and m.group(1) in tier2_namespaces:
+                    reason = 'namespace_sink'
+            except Exception:
+                pass
+
+        if reason:
+            r['tier'] = 2
+            r['promoted'] = reason
+            promoted += 1
+
+    return promoted
+
+
 def compose_brief(rel, tags):
     parts = [GENERAL, "", f"FILE: {rel}", ""]
     if tags:
@@ -167,13 +275,18 @@ def main():
         rows.append({'path': path, 'rel': rel, 'tags': tags, 'tier': tier,
                      'lines': text.count('\n') + 1, **sig})
 
+    # Cross-file promotion: promote tier-1 files that are included by tier-2,
+    # share a directory with tier-2 (and have a sink), or share a namespace.
+    promoted = promote_cross_file(rows, root)
+
     if args.explain:
         from collections import Counter
         tc = Counter(r['tier'] for r in rows)
-        print(f"{len(rows)} php files | tier0={tc[0]} tier1={tc[1]} tier2={tc[2]}")
+        print(f"{len(rows)} php files | tier0={tc[0]} tier1={tc[1]} tier2={tc[2]} (promoted={promoted})")
         for r in rows:
             if r['tier'] > 0:
-                print(f"  T{r['tier']} {r['rel']}  [{','.join(r['tags']) or '-'}]")
+                promo = f" PROMOTED:{r['promoted']}" if r.get('promoted') else ''
+                print(f"  T{r['tier']} {r['rel']}  [{','.join(r['tags']) or '-'}]{promo}")
         return
 
     briefs_dir = os.path.abspath(args.briefs) if args.briefs else None
@@ -196,7 +309,7 @@ def main():
 
     if args.manifest:
         json.dump({'plugin_dir': root, 'files': manifest}, open(args.manifest, 'w'), indent=1)
-    print(f"manifest: {len(manifest)} review files (tier>=1) of {len(rows)} php files"
+    print(f"manifest: {len(manifest)} review files (tier>=1) of {len(rows)} php files (promoted={promoted})"
           + (f" | briefs -> {briefs_dir}" if briefs_dir else ""))
 
 if __name__ == '__main__':
