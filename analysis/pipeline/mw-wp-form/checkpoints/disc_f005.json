@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "stored_xss",
+      "location": "_sanitize() lines 197-213 / template chart/index.php lines 146-147",
+      "severity": "medium",
+      "reachability": "Authenticated admin-level user (capability: edit_pages). The chart settings form is admin-only, so this is an admin-to-admin stored XSS (lower severity than subscriber-reachable).",
+      "justification": "The _sanitize() method stores raw POST values for 'target', 'separator', and 'chart' keys with no HTML or JavaScript escaping; these are later echoed into a <script> block via bare json_encode() (without JSON_HEX_TAG | JSON_HEX_AMP), which does not escape '<', '>', or '&', allowing a stored XSS payload such as </script><script>alert(1)</script> to break out of the JSON literal.",
+      "detection_pattern": {
+        "grep_pattern": "json_encode\\s*\\(\\s*\\$",
+        "anti_pattern": "JSON_HEX_TAG|wp_json_encode",
+        "section_name": "Stored XSS: json_encode without JSON_HEX_TAG in script context",
+        "description": "Finds PHP files that echo json_encode() of a variable directly into HTML/JS context without JSON_HEX_TAG or WordPress's wp_json_encode() wrapper (which adds that flag), potentially allowing script-breaking characters to create XSS."
+      }
+    },
+    {
+      "vuln_class": "missing_input_sanitization",
+      "location": "__construct() line 32",
+      "severity": "low",
+      "reachability": "Any authenticated admin hitting the chart admin page with a crafted formkey GET parameter.",
+      "justification": "$_GET['formkey'] is stored directly into $this->formkey at line 32 without sanitize_key() or sanitize_text_field(); although a whitelist check at line 36 prevents out-of-whitelist values from proceeding, the unsanitized value is concatenated into the option name at line 119 and into admin_url() at line 124 with no escaping, violating defense-in-depth.",
+      "detection_pattern": {
+        "grep_pattern": "\\$_GET\\[.+\\]\\s*;",
+        "anti_pattern": "sanitize_key|sanitize_text_field|absint|intval",
+        "section_name": "Missing input sanitization: raw $_GET stored to property",
+        "description": "Catches files where a $_GET superglobal value is assigned to a variable or property directly without any sanitization function, which is required by WordPress coding standards and is a prerequisite for injection/XSS chains."
+      }
+    },
+    {
+      "vuln_class": "missing_capability_check_in_save_handler",
+      "location": "_save() lines 102-128",
+      "severity": "low",
+      "reachability": "The constructor is gated by current_user_can('edit_pages') in the calling code (mw-wp-form.php line 78), so the effective reach is admin-only. However, _save() itself performs no independent capability check.",
+      "justification": "_save() checks only the nonce (check_admin_referer) but omits current_user_can(), meaning any future code path that instantiates MW_WP_Form_Chart_Controller without the outer gate would allow lower-privileged users to write chart settings via update_option().",
+      "detection_pattern": {
+        "grep_pattern": "check_admin_referer",
+        "anti_pattern": "current_user_can",
+        "section_name": "Missing capability check: save handler relies on nonce only",
+        "description": "Finds admin POST handlers that call check_admin_referer() (CSRF check) but lack a co-located current_user_can() call; CSRF protection does not substitute for authorization — a nonce proves request origin, not user privilege."
+      }
+    },
+    {
+      "vuln_class": "open_redirect",
+      "location": "_save() lines 122-127",
+      "severity": "low",
+      "reachability": "Authenticated admin who triggers the save action. The redirect destination includes $this->formkey which was validated against the whitelist, so exploitation requires first compromising the whitelist or filter.",
+      "justification": "wp_redirect() is called with a URL constructed from $this->formkey (set from $_GET, whitelisted) at line 124; if a filter hook 'mwform_contact_data_post_types' injects an unexpected value that passes the in_array check, the formkey could be manipulated to redirect to an off-site URL via protocol-relative or host injection.",
+      "detection_pattern": {
+        "grep_pattern": "wp_redirect.*\\$_(GET|POST|REQUEST)",
+        "anti_pattern": "wp_safe_redirect|esc_url|home_url|admin_url",
+        "section_name": "Open redirect: wp_redirect with user-controlled input",
+        "description": "Finds calls to wp_redirect() where the URL is built from user-controlled input ($_GET, $_POST, $_REQUEST) without wp_safe_redirect() or URL validation, enabling open redirect attacks."
+      }
+    }
+  ]
+}
