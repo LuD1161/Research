@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "Omnisend_Core_Bootstrap::omnisend_register_connection_routes / class-omnisend-core-bootstrap.php lines 102-113",
+      "severity": "medium",
+      "reachability": "Any logged-in WordPress user (subscriber, customer, contributor) can POST to the REST endpoint POST /wp-json/omnisend/v1/connect",
+      "justification": "The REST route's `permission_callback` only checks `is_user_logged_in()`, so any authenticated non-admin user reaches the Connection::omnisend_post_connection callback; although the callback itself eventually checks `current_user_can('manage_options')` and returns a 200 JSON error, the architectural defect allows low-privilege users to probe the endpoint, trigger nonce-validation logic, consume API calls, and receive error details that aid enumeration. The correct authorization gate (manage_options) belongs in the permission_callback so WordPress issues a 403 before the callback runs.",
+      "detection_pattern": {
+        "grep_pattern": "permission_callback.*is_user_logged_in",
+        "anti_pattern": "permission_callback.*current_user_can",
+        "section_name": "Broken Access Control: REST route with only is_user_logged_in permission check",
+        "description": "REST routes registered with only is_user_logged_in() as the permission_callback are accessible to ALL authenticated users regardless of role. Any privileged action the callback performs requires current_user_can() in the permission_callback, not buried inside the handler."
+      }
+    },
+    {
+      "vuln_class": "xss_js_context",
+      "location": "Connection::display / includes/Internal/class-connection.php line 37",
+      "severity": "medium",
+      "reachability": "Admin-only page (manage_options required); exploitable if any installed plugin/theme hooks the omnisend_signup_wp_link filter and injects a URL containing a double-quote character",
+      "justification": "The signup URL is emitted directly into a JavaScript double-quoted string literal with `esc_url_raw` (line 37: `var plugin_omnisend_signup_url = \"<?php echo esc_url_raw( self::get_signup_url() ); ?>\";`). `esc_url_raw` does not strip or encode double-quote characters because they are valid in some URL contexts; a URL containing `\"` injected via the `omnisend_signup_wp_link` filter would terminate the JS string and allow arbitrary script injection. The correct escaper for a URL placed inside a JS string is `esc_js( esc_url( ... ) )`.",
+      "detection_pattern": {
+        "grep_pattern": "esc_url_raw.*\\$.*['\"]",
+        "anti_pattern": "esc_js\\s*\\(\\s*esc_url",
+        "section_name": "XSS: esc_url_raw used inside a JavaScript string literal",
+        "description": "esc_url_raw sanitizes for URL validity but does not HTML-encode or JS-encode double-quotes, so placing its output inside a JS double-quoted string (e.g., var x = \"<?php echo esc_url_raw(...); ?>\") can allow JS string escape via a URL containing a double-quote. The correct pattern is esc_js(esc_url(...)) or esc_attr(esc_url(...)) when the URL is inside an HTML attribute."
+      }
+    },
+    {
+      "vuln_class": "information_disclosure",
+      "location": "Connection::show_connection_view / includes/Internal/class-connection.php line 99",
+      "severity": "low",
+      "reachability": "Any visitor who can trigger the show_connection_form action with an invalid nonce — the nonce check runs inside an admin page callback so it requires admin access in practice, but the raw die() output is sent to the browser",
+      "justification": "On nonce failure the code calls `die( 'nonce verification failed: ' . __FILE__ . ':' . __LINE__ )` which outputs the full server filesystem path (the expanded value of __FILE__) in the HTTP response body. This leaks the WordPress installation path and plugin directory structure to whoever triggers the failure.",
+      "detection_pattern": {
+        "grep_pattern": "die\\s*\\(.*__FILE__",
+        "anti_pattern": "wp_die\\s*\\(",
+        "section_name": "Information Disclosure: server path leaked via die() with __FILE__",
+        "description": "Using die(__FILE__ . ...) outputs the full server filesystem path in the response. Prefer wp_die() with a generic error message to avoid disclosing the server directory layout."
+      }
+    }
+  ]
+}
