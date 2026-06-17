@@ -1,0 +1,6 @@
+{
+  "is_real": false,
+  "severity": "informational",
+  "reasoning": "The function bbq_dismiss_notice_save_option() (lines 408-424) checks wp_verify_nonce() on line 410 before current_user_can('manage_options') on line 412. The finding correctly identifies that this ordering deviates from WordPress best practice (capability check should precede nonce verification). However, the actual state-mutating sink — update_option() on line 414 — is correctly gated behind current_user_can('manage_options'), so no unauthorized state change is possible. A low-privilege logged-in user can cause the server to verify a nonce (a cheap HMAC) and then hit the exit on line 412, but no data is written, no redirect occurs, and no information is leaked. WordPress nonces are user-scoped (tied to the logged-in user session) but are not capability-scoped, so any logged-in user can produce a valid nonce for action 'bbq_dismiss_notice'. The practical consequence of the reversed ordering is: one extra HMAC verification for non-admin users who craft the request. This is a code-quality/style issue, not a security vulnerability. The finding's own justification states 'practical impact is negligible'. There is no broken access control — the protected operation remains protected. Classifying as informational (not a real vulnerability).",
+  "_done": true
+}

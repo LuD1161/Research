@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "wp_ajax_install_content_embed(), line 45-49",
+      "severity": "low",
+      "reachability": "Any authenticated user with the install_plugins capability who holds a valid nonce. Handler is registered only under wp_ajax_ (not wp_ajax_nopriv_), so unauthenticated users cannot reach it.",
+      "justification": "When $activated || $installed is true, wp_send_json_error() is called on line 48 without a preceding return. Execution continues only because wp_send_json_error() internally calls wp_die() in modern WordPress (4.7+). If wp_die() is suppressed (test environments, unit-test mocking, or severely outdated WP core), execution falls through to the plugin installer/activator below, allowing a redundant install attempt. This is a defense-in-depth gap rather than an immediately exploitable vulnerability.",
+      "detection_pattern": {
+        "grep_pattern": "wp_send_json_error\\s*\\([^)]*\\)\\s*;(?!\\s*return|\\s*die|\\s*exit)",
+        "anti_pattern": "return\\s+wp_send_json_error|die\\s*\\(|exit\\s*\\(",
+        "section_name": "Missing return after wp_send_json_error",
+        "description": "Detects wp_send_json_error() calls not preceded by return/die/exit. Relying solely on WordPress internals to terminate execution is a defense-in-depth gap; if wp_die() is mocked or the WP version is old, code continues executing past the intended early exit."
+      }
+    },
+    {
+      "vuln_class": "information_disclosure",
+      "location": "wp_ajax_install_content_embed(), lines 61, 67, 73, 110",
+      "severity": "low",
+      "reachability": "Authenticated users with install_plugins capability who trigger an installation error condition.",
+      "justification": "Unfiltered WP_Error messages from get_error_message() and get_error_messages() (lines 61, 67, 73, 110) are forwarded verbatim to the JSON error response. These messages can contain server-side file system paths, database details, or network endpoint information included by WordPress internals (e.g., filesystem credential errors, plugin download failure details). The JSON content-type prevents XSS, but path/config disclosure is possible to a privileged user. Line 84 correctly applies esc_html() but the other paths do not.",
+      "detection_pattern": {
+        "grep_pattern": "get_error_message\\(\\)",
+        "anti_pattern": "esc_html\\(.*get_error_message|wp_strip_all_tags\\(.*get_error_message",
+        "section_name": "Unfiltered WP_Error message in JSON response",
+        "description": "Detects get_error_message() calls whose output is passed to JSON responses without sanitization. While not exploitable as XSS in JSON context, the raw messages can leak file system paths, credentials, or internal server details to the caller."
+      }
+    },
+    {
+      "vuln_class": "information_disclosure",
+      "location": "wp_ajax_install_content_embed(), line 102",
+      "severity": "low",
+      "reachability": "Authenticated users with install_plugins capability on successful plugin installation.",
+      "justification": "The plugin_info value returned by $upgrader->plugin_info() (a server file system relative path like 'content-hub-embed/content-embed.php') is included as-is in the wp_send_json_success() success payload on line 102. This discloses the server-side WordPress plugin directory layout to the requesting browser. Since this requires install_plugins capability, impact is limited to already-privileged administrators.",
+      "detection_pattern": {
+        "grep_pattern": "plugin_info\\(\\)",
+        "anti_pattern": "basename\\(.*plugin_info|sanitize_text_field\\(.*plugin_info",
+        "section_name": "Plugin file path exposed in JSON success response",
+        "description": "Detects Plugin_Upgrader::plugin_info() return values sent directly to JSON responses. The value is a relative file system path; exposing it to clients discloses directory structure and plugin naming conventions."
+      }
+    },
+    {
+      "vuln_class": "type_mismatch_error_response",
+      "location": "wp_ajax_install_content_embed(), line 73",
+      "severity": "low",
+      "reachability": "Authenticated users with install_plugins capability when skin errors exist.",
+      "justification": "get_error_messages() on a WP_Error_Collection returns an array of strings, but it is assigned to $status['errorMessage'] which is typed as a scalar string throughout all other branches (lines 37, 47, 61, 67, 80, 84). Sending an array where the client expects a string can cause client-side JavaScript to mishandle the error display, and the mixed type is a correctness defect that could mask actual error details.",
+      "detection_pattern": {
+        "grep_pattern": "get_error_messages\\(\\)",
+        "anti_pattern": "implode.*get_error_messages|join.*get_error_messages|reset\\(.*get_error_messages",
+        "section_name": "Array returned where string expected for error message",
+        "description": "Detects get_error_messages() (plural) being assigned to fields that expect scalar strings. This produces an unexpected array in the JSON response that may confuse clients or conceal error detail."
+      }
+    }
+  ]
+}

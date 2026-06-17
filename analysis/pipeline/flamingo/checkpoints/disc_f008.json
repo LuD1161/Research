@@ -1,0 +1,18 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "incomplete_data_erasure",
+      "location": "flamingo_privacy_contact_eraser(), line 66; flamingo_privacy_inbound_eraser(), line 112",
+      "severity": "medium",
+      "reachability": "Reachable by any admin/privacy manager who triggers WordPress core's personal data erasure tool (wp_ajax_wp_privacy_erase_personal_data). The eraser callbacks are invoked by WP core which handles authentication.",
+      "justification": "Both erasers use `paged` (not offset-based iteration) to paginate through results, then delete records within the page. On the next page WP_Query computes OFFSET as (paged-1)*posts_per_page. Because previous-page records were deleted, remaining records have shifted to lower offsets, so page 2 skips them entirely and the eraser silently terminates with `done=true`, leaving up to N-1 batches of personal data undeleted — a GDPR-significant privacy compliance failure.",
+      "detection_pattern": {
+        "grep_pattern": "wp_privacy_personal_data_erasers",
+        "anti_pattern": "offset.*\\$page|\\$page.*offset|\\(\\$page\\s*-\\s*1\\)\\s*\\*",
+        "section_name": "Privacy Eraser: paged query with in-loop deletion causes incomplete erasure",
+        "description": "WordPress privacy erasers that use WP_Query's 'paged' argument while deleting records within the same loop will skip records on subsequent pages because deletions shift remaining rows to earlier offsets. Safe implementations use offset = (page-1)*per_page computed against a stable query (no deletions), or delete by fixed criteria each pass without relying on page offsets."
+      }
+    }
+  ]
+}

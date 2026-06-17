@@ -1,0 +1,31 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "stored_xss_js_context",
+      "location": "enqueue_admin_scripts(), line 131",
+      "severity": "low",
+      "reachability": "Requires an admin-level user (or second-order DB compromise) to influence the siteurl/plugins_url value stored in wp_options. The output is only rendered on the plugin settings page, accessible to users with edit_theme_options capability.",
+      "justification": "The inline script is built by string-concatenating admin_url() and plugins_url() directly into double-quoted JavaScript string literals without esc_js() or wp_json_encode(); if the stored siteurl contains a double-quote or backslash (possible via admin manipulation or DB tampering), an attacker can break out of the JS string context and execute arbitrary JavaScript in the admin panel.",
+      "detection_pattern": {
+        "grep_pattern": "wp_add_inline_script\\s*\\([^)]*\\.\\s*[a-zA-Z_]+\\(",
+        "anti_pattern": "wp_json_encode|esc_js",
+        "section_name": "XSS: wp_add_inline_script without JS escaping",
+        "description": "Detects wp_add_inline_script calls that concatenate PHP function return values directly into the script string. Files matching grep_pattern but not containing wp_json_encode or esc_js near the call site are candidates for JS-context XSS, especially when URL or user-controlled values are embedded in quoted JS string literals."
+      }
+    },
+    {
+      "vuln_class": "missing_esc_url",
+      "location": "add_help_tabs() / set_help_sidebar(), lines 194-197",
+      "severity": "low",
+      "reachability": "Admin-only page; admin_url() returns a known-good URL in standard WordPress installs so exploitation requires unusual site configuration or a filter hook modifying admin_url output.",
+      "justification": "The help sidebar HTML at lines 193-198 concatenates admin_url() directly into href=\"...\" attributes without wrapping in esc_url(); while admin_url() is generally safe, the WordPress coding standards require esc_url() on every URL echoed into an HTML attribute to defend against filter-injected malicious URLs.",
+      "detection_pattern": {
+        "grep_pattern": "href=[\"'].*admin_url\\(",
+        "anti_pattern": "esc_url\\s*\\(\\s*admin_url",
+        "section_name": "Missing esc_url on admin_url in href attribute",
+        "description": "Detects href attributes that embed admin_url() output without esc_url() wrapping. While low risk in default installs, any WordPress filter modifying admin_url output could inject a javascript: or data: URI; the fix is always esc_url(admin_url(...))."
+      }
+    }
+  ]
+}

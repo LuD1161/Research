@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "Main::plugins_loaded(), lines 88-96 (class-main.php)",
+      "severity": "medium",
+      "reachability": "Any authenticated user with the 'publish_posts' capability who also holds a role listed in the plugin's 'allowed_roles' setting (configurable to include 'editor' or 'author') can reach the Metabox_Article and Metabox_Taxonomy constructors, which register save hooks that persist arbitrary HTML/JS/CSS into post meta and term meta for later injection into every site visitor's <head>, <body>, and <footer>.",
+      "justification": "The gate at line 88 uses `current_user_can('publish_posts') && Common::user_has_allowed_role()`. The `user_has_allowed_role()` method (class-common.php) unconditionally includes 'administrator' and 'shop_manager' and optionally adds 'editor'/'author' from settings. When editor/author roles are enabled, those users gain the ability to inject unfiltered code snippets — a privilege that should be gated on 'manage_options' or at minimum 'unfiltered_html', not just 'publish_posts'. The downstream save handlers only verify `edit_post` capability (which editors/authors naturally possess), so the widened role assignment in settings directly enables stored code injection by non-administrators.",
+      "detection_pattern": {
+        "grep_pattern": "current_user_can\\(\\s*['\"]publish_posts['\"]\\s*\\)",
+        "anti_pattern": "current_user_can\\(\\s*['\"]unfiltered_html['\"]\\s*\\)|current_user_can\\(\\s*['\"]manage_options['\"]\\s*\\)",
+        "section_name": "Broken Access Control: code-injection gated only on publish_posts",
+        "description": "Catches handlers that gate arbitrary HTML/JS injection capability on 'publish_posts' rather than a privilege that actually controls raw HTML output (unfiltered_html or manage_options). Files matching the grep_pattern but not the anti_pattern may allow editors/authors to inject unfiltered code into page output."
+      }
+    },
+    {
+      "vuln_class": "broken_access_control",
+      "location": "Metabox_Taxonomy::save(), line 114-126 (class-metabox-taxonomy.php, invoked via constructor registered in Main::plugins_loaded())",
+      "severity": "medium",
+      "reachability": "Any user with the taxonomy's 'edit_terms' capability for a taxonomy configured in the plugin's settings. The nonce is verified but there is no check for 'publish_posts' or 'unfiltered_html'; a user who can edit terms (e.g. editor by default for built-in taxonomies) can write arbitrary code to term meta.",
+      "justification": "The save() method in Metabox_Taxonomy checks `$tax_obj->cap->edit_terms` (line 124) which for default WordPress taxonomies (category, post_tag) resolves to 'manage_categories' — a capability granted to editors. No additional capability check restricts this to users who should be allowed to inject code. The nonce prevents CSRF but does not restrict who (among those with edit_terms) can write code snippets.",
+      "detection_pattern": {
+        "grep_pattern": "edit_\\$\\{taxonomy\\}|edit_terms|manage_categories",
+        "anti_pattern": "current_user_can\\(\\s*['\"]unfiltered_html['\"]\\s*\\)|current_user_can\\(\\s*['\"]manage_options['\"]\\s*\\)",
+        "section_name": "Broken Access Control: taxonomy meta save gated only on edit_terms",
+        "description": "Identifies save handlers that use edit_terms/manage_categories as the sole capability gate for writing arbitrary HTML code to taxonomy term meta. Editors hold this capability by default, so without a higher privilege check (unfiltered_html or manage_options), editors can inject code into site output via taxonomy terms."
+      }
+    },
+    {
+      "vuln_class": "null_dereference_fatal_error",
+      "location": "Main::admin_enqueue_scripts(), line 144 (class-main.php)",
+      "severity": "low",
+      "reachability": "Any admin-page load where 'admin_enqueue_scripts' fires before 'plugins_loaded' has populated the static settings cache. In normal WordPress hook order this does not occur, but a third-party plugin invoking 'admin_enqueue_scripts' early or resetting static state could trigger a PHP fatal error (null array access on self::$settings).",
+      "justification": "Line 144 accesses `self::$settings['article']['taxonomies']` unconditionally. `self::$settings` is a static property initialized to null (line 21) and only populated after `get_settings()` is called inside `plugins_loaded()` (line 84). The 'plugins_loaded' hook fires at priority 0-10 while 'admin_enqueue_scripts' fires later, so ordinarily the cache is warm, but the static null default and the absent null-check create a fragile dependency that would produce a PHP fatal error if hook order is disturbed.",
+      "detection_pattern": {
+        "grep_pattern": "self::\\$settings\\[",
+        "anti_pattern": "null\\s*!==\\s*self::\\$settings|isset\\(\\s*self::\\$settings\\s*\\)",
+        "section_name": "Null dereference: static settings cache accessed without null guard",
+        "description": "Catches static property array accesses that lack a null-guard before the access. A null static cache will cause a PHP fatal error if the initializing action has not yet fired."
+      }
+    }
+  ]
+}

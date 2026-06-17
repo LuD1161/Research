@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "csrf_nonce_action_reuse",
+      "location": "_save_post() line 195; wp_verify_nonce call; nonce action string 'mw-wp-form'",
+      "severity": "medium",
+      "reachability": "Any authenticated user with a valid 'mw-wp-form' nonce (obtainable from the contact-data detail page or any mw-wp-form edit page) can replay it to save form settings on a different form post they may not intend to edit, because the nonce action is not scoped to a specific post_id.",
+      "justification": "The nonce action string is the bare constant MWF_Config::NAME ('mw-wp-form') for both the form-settings save handler (class.admin.php:195) and the contact-data save handler (class.contact-data.php:121), and the nonce is created identically in both url.php and contact-data/detail.php; a nonce from either page is valid for both handlers, violating the principle that distinct operations should use distinct nonce actions.",
+      "detection_pattern": {
+        "grep_pattern": "wp_create_nonce\\(\\s*[A-Za-z_:]+NAME\\s*\\)",
+        "anti_pattern": "wp_create_nonce\\(\\s*[A-Za-z_:]+NAME\\s*\\.\\s*['\"]_[a-z]+['\"]",
+        "section_name": "CSRF: non-operation-scoped nonce action",
+        "description": "Matches nonce creation using only a bare plugin-name constant as the action string; when the same constant is used across multiple different save handlers the tokens are cross-replayable. Files that also concatenate an operation suffix (e.g., '_save', '_delete', or a post_id) are less likely to be vulnerable."
+      }
+    },
+    {
+      "vuln_class": "email_header_injection",
+      "location": "_save_post() lines 205-221 (trimming loop); Mail::send() lines 89-98 (raw header construction)",
+      "severity": "medium",
+      "reachability": "Authenticated user with 'edit_pages' capability (Editor role or above) who saves form settings with a crafted mail_cc, mail_bcc, or mail_reply_to value containing an embedded CRLF sequence.",
+      "justification": "In _save_post(), the trimming loop (lines 215-221) applies trim() and mb_convert_kana() to mail_cc, mail_bcc, and mail_reply_to, but trim() only strips leading and trailing whitespace — it does not remove embedded \\r\\n sequences; these values are then stored via update_post_meta() and later consumed raw as 'Cc: ' . $this->cc and 'Bcc: ' . $this->bcc in Mail::send() (class.mail.php lines 90, 94), enabling stored email-header injection that fires on every form submission.",
+      "detection_pattern": {
+        "grep_pattern": "\\$headers\\[\\]\\s*=\\s*['\"](?:Cc|Bcc|Reply-To):\\s*['\"]\\s*\\.\\s*\\$this->",
+        "anti_pattern": "sanitize_email\\s*\\(|FILTER_VALIDATE_EMAIL|str_replace\\s*\\(\\s*[\"']\\\\r\\\\n",
+        "section_name": "Email header injection: raw CRLF in custom mail headers",
+        "description": "Matches manual construction of Cc/Bcc/Reply-To header strings by concatenating object properties without CRLF sanitization. Absence of sanitize_email(), FILTER_VALIDATE_EMAIL validation, or explicit \\r\\n stripping on the value before concatenation indicates potential stored email header injection."
+      }
+    },
+    {
+      "vuln_class": "insecure_external_resource_loading",
+      "location": "_admin_enqueue_scripts() line 171",
+      "severity": "low",
+      "reachability": "Any admin user loading a mw-wp-form edit page; the CSS is fetched from an external googleapis CDN via a protocol-relative URL without Subresource Integrity (SRI).",
+      "justification": "Line 171 loads jQuery UI CSS from '//ajax.googleapis.com/...' using wp_enqueue_style() with no 'integrity' attribute; a compromised CDN or MitM attacker on a non-HTTPS connection could substitute malicious CSS that rewrites the admin UI, and the protocol-relative scheme degrades to HTTP on non-HTTPS admin pages.",
+      "detection_pattern": {
+        "grep_pattern": "wp_enqueue_style\\s*\\([^)]*['\"]//[a-z0-9.-]+\\.googleapis\\.com",
+        "anti_pattern": "integrity.*sha[23][0-9][0-9]-",
+        "section_name": "Insecure external resource: googleapis CDN without SRI",
+        "description": "Matches wp_enqueue_style calls loading resources from googleapis via protocol-relative URLs; absence of an integrity hash means the browser cannot verify the resource has not been tampered with."
+      }
+    }
+  ]
+}

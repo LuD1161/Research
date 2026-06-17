@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "stored_xss_by_design_insufficient_privilege_boundary",
+      "location": "Metabox_Taxonomy::save() line 135-136; Common::sanitize_hfc_data() lines 521-526; Common::sanitize_html_with_scripts() lines 447-497",
+      "severity": "medium",
+      "reachability": "Any WordPress user holding the edit_terms capability for a registered taxonomy (typically Editor or above, sometimes lower on custom taxonomies) can submit the taxonomy metabox form and store arbitrary JavaScript via <script> tags in the head/body/footer fields. The stored code is then rendered unescaped into every page of that taxonomy archive via class-front.php inject_code().",
+      "justification": "sanitize_hfc_data() intentionally passes head/body/footer through sanitize_html_with_scripts(), which explicitly preserves full <script> and <style> block content (only opening-tag attributes are sanitized). The saved data is later echoed raw in class-front.php line 152-155 with the comment 'We do not use wp_kses because that would escape < > &'. This is the plugin's core feature and is documented, but the capability gate (edit_terms) is lower than unfiltered_html, meaning Editors can inject JS that fires for all site visitors on taxonomy pages.",
+      "detection_pattern": {
+        "grep_pattern": "sanitize_html_with_scripts|wp_kses.*script.*true|<script.*allowed_html",
+        "anti_pattern": "unfiltered_html.*current_user_can|capability.*unfiltered_html",
+        "section_name": "Stored XSS: script injection permitted below unfiltered_html capability",
+        "description": "Catches plugins that deliberately allow <script> tags in stored content without gating on unfiltered_html capability. Users below Administrator level can inject JavaScript that executes for all site visitors."
+      }
+    },
+    {
+      "vuln_class": "unreachable_dead_code_logic_error",
+      "location": "Metabox_Taxonomy::save() lines 129-132",
+      "severity": "low",
+      "reachability": "Internal code path only; not directly exploitable.",
+      "justification": "Line 97 returns early if $_POST['auhfc'] is not set. Lines 129-132 re-check the same condition and call delete_term_meta(), but this branch can never be reached because execution would have already returned at line 97-99. The delete logic is dead code and may represent a missing or misapplied feature (e.g., explicit empty-submission to delete the meta). If the intent was to allow deletion by submitting without the 'auhfc' key, the early-return at line 97 prevents it.",
+      "detection_pattern": {
+        "grep_pattern": "delete_term_meta|delete_post_meta",
+        "anti_pattern": "isset.*_POST.*auhfc.*delete|if.*empty.*data.*delete",
+        "section_name": "Dead code: unreachable delete branch after early-return guard",
+        "description": "Finds term/post meta deletion calls that may be dead code due to earlier isset() guards on the same POST key. Indicates unintended feature omission or logic error in save handlers."
+      }
+    },
+    {
+      "vuln_class": "type_confusion_wp_kses_array_argument",
+      "location": "Common::print_security_risk_notice() line 750-757",
+      "severity": "low",
+      "reachability": "Internally called from form rendering; visible to any user who can view the taxonomy edit form.",
+      "justification": "get_security_risk_notice() returns an associative array with keys 'title' and 'message', but print_security_risk_notice() passes that array directly to wp_kses() which expects a string. PHP will cast the array to the literal string 'Array', so the notice is never rendered correctly. This is a bug that silently swallows the security warning, not a direct security vulnerability, but demonstrates lack of test coverage and could mask future issues.",
+      "detection_pattern": {
+        "grep_pattern": "wp_kses\\s*\\(\\s*self::|wp_kses\\s*\\(\\s*\\$this->",
+        "anti_pattern": "wp_kses\\s*\\(\\s*['\"]|wp_kses\\s*\\(\\s*esc_|wp_kses\\s*\\(\\s*__\\(",
+        "section_name": "Type confusion: array passed to wp_kses() expecting string",
+        "description": "Catches calls where wp_kses() receives a non-string value (e.g., a method return that is an array). The function silently converts the array to 'Array', defeating any intended security notice or output."
+      }
+    },
+    {
+      "vuln_class": "nonce_key_controlled_by_attacker_input",
+      "location": "Metabox_Taxonomy::save() lines 102, 110-112",
+      "severity": "low",
+      "reachability": "Only reachable after passing the in_array() allowlist check at line 105, so attacker-controlled taxonomy is constrained to plugin-configured values.",
+      "justification": "The nonce field name and action are derived from $_POST['taxonomy'] (line 102) via get_nonce_name() and get_nonce_action(). While in_array() on line 105 constrains $taxonomy to plugin-configured values before the nonce lookup on line 110, the nonce key used to READ from $_POST is built from that already-sanitized $taxonomy. Because in_array() runs before the nonce read, the risk is neutralised in practice, but the ordering means a future refactor that moves the in_array() check could expose nonce-key injection.",
+      "detection_pattern": {
+        "grep_pattern": "get_nonce_name.*_POST|nonce.*_POST\\[.*taxonomy|wp_verify_nonce.*_POST.*taxonomy",
+        "anti_pattern": "in_array.*taxonomy.*true.*get_nonce|sanitize_key.*taxonomy.*verify_nonce",
+        "section_name": "Nonce key derived from unvalidated POST field",
+        "description": "Catches nonce verification flows where the nonce field name or action string is constructed from a POST parameter before that parameter is allowlist-validated. Attacker can choose which nonce field is read, potentially bypassing verification if allowlist check is absent or reordered."
+      }
+    }
+  ]
+}

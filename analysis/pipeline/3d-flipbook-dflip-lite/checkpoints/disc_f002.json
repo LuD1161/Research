@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "stored_xss",
+      "location": "outline_tab(), line 486",
+      "severity": "low",
+      "reachability": "Admin-only: requires edit_post capability and nonce; data must first be saved via the metabox form",
+      "justification": "Saved outline data is written into an inline <script> block via json_encode() without JSON_HEX_TAG, JSON_HEX_APOS, or JSON_HEX_AMP flags; while upstream sanitize_text_field (strips tags) and esc_url_raw remove < > from stored values, making this not currently exploitable, the pattern is fragile and violates the defense-in-depth principle for JS context output.",
+      "detection_pattern": {
+        "grep_pattern": "echo\\s+json_encode\\s*\\(",
+        "anti_pattern": "json_encode\\s*\\([^)]+,\\s*JSON_HEX_TAG",
+        "section_name": "XSS: json_encode in script context without HEX flags",
+        "description": "Finds json_encode() output echoed directly into HTML/script contexts without JSON_HEX_TAG flag; without this flag, angle brackets are not Unicode-escaped, enabling </script> injection or HTML comment injection if upstream sanitization is ever relaxed or bypassed."
+      }
+    },
+    {
+      "vuln_class": "sanitizer_logic_bypass",
+      "location": "array_outline_sanitize(), lines 751-753",
+      "severity": "low",
+      "reachability": "Admin-only: requires edit_post capability and valid nonce on the dflip post edit screen",
+      "justification": "The else branch at line 751 executes `return \"\"` when an unexpected key (anything other than 'title' or 'dest') is encountered in a leaf node; this causes the entire function to return an empty string instead of continuing to sanitize remaining fields or simply skipping the unexpected key, meaning a specially-crafted array with an extra key causes the whole outline record to be discarded rather than sanitized — a sanitizer whose failure mode is silent data loss rather than clean rejection.",
+      "detection_pattern": {
+        "grep_pattern": "return\\s+\"\"\\s*;",
+        "anti_pattern": "continue\\s*;|unset\\s*\\(",
+        "section_name": "Sanitizer: early return from sanitizer discards entire structure",
+        "description": "Finds sanitizer functions that return an empty string on unexpected keys instead of skipping/unsetting the key and continuing; this can cause the entire sanitized structure to silently collapse to empty on unexpected input, making sanitizer behavior unpredictable."
+      }
+    },
+    {
+      "vuln_class": "deprecated_function_usage",
+      "location": "array_outline_sanitize(), line 749",
+      "severity": "low",
+      "reachability": "Admin-only: exercised whenever a non-numeric outline destination is saved",
+      "justification": "sanitize_url() was deprecated in WordPress 6.1 in favor of sanitize_url() -> esc_url_raw(); while functionally equivalent today, use of deprecated functions creates maintenance risk and may behave differently under future WordPress versions.",
+      "detection_pattern": {
+        "grep_pattern": "sanitize_url\\s*\\(",
+        "anti_pattern": "esc_url_raw\\s*\\(",
+        "section_name": "Deprecated: sanitize_url() instead of esc_url_raw()",
+        "description": "Detects use of the deprecated sanitize_url() function (deprecated WP 6.1+); plugins relying on it may break or behave unexpectedly under future WordPress versions."
+      }
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "stored_xss_via_permissive_wp_kses_allowlist",
+      "location": "textarea_field_render(), line 607 and 614",
+      "severity": "low",
+      "reachability": "Administrator only (manage_options); field descriptions are developer-hardcoded strings, not user input. Exploitable only if a future code change introduces attacker-controlled content into a description argument.",
+      "justification": "In textarea_field_render(), $args['description'] is appended to $html at line 607 without escaping, then the entire $html buffer is passed to wp_kses($html, $this->allowed_html) at line 614. The allowed_html allowlist (returned by Common::allowed_html()) explicitly permits <script> tags with src, type, charset, nonce, id, class, dir, and data-* attributes. Any description value containing a <script> tag would therefore survive wp_kses and be emitted to the browser. All current description values are developer-defined hardcoded strings, so there is no live injection path today, but the pattern is architecturally unsound: the wrong allowlist (intended for the stored code field, not UI helper text) is applied to the description HTML block.",
+      "detection_pattern": {
+        "grep_pattern": "wp_kses\\(.*allowed_html",
+        "anti_pattern": "wp_kses_post|esc_html|esc_attr",
+        "section_name": "Stored XSS: description field passed through script-permissive wp_kses allowlist",
+        "description": "Flags wp_kses calls using a custom allowlist variable (allowed_html) rather than the safe defaults like wp_kses_post. When the allowlist permits <script> tags and the content being filtered includes developer- or user-supplied description strings, any <script> in those strings will survive filtering and be emitted to the browser. The anti_pattern checks for proper context-specific escaping functions that would be used instead."
+      }
+    },
+    {
+      "vuln_class": "missing_capability_check_in_sanitize_callback",
+      "location": "sanitize_sitewide(), sanitize_homepage(), sanitize_article(), lines 851-935",
+      "severity": "low",
+      "reachability": "The WordPress Settings API nonce (via settings_fields/options.php) provides CSRF protection and the admin_menu capability ('manage_options') gates the page, but the sanitize_* callbacks themselves do not independently verify current_user_can('manage_options'). In standard WP flow this is safe; the risk is that if the callbacks are ever called directly or the options are registered on a different page group, the capability gate would be absent.",
+      "justification": "sanitize_sitewide(), sanitize_homepage(), and sanitize_article() are registered as sanitize_callback for register_setting() but contain no current_user_can() check. WordPress calls these callbacks when options.php processes the form, which already validates the nonce and the user session, so this is safe in practice. However, defensive coding requires that sanitize callbacks also verify the caller's capability, per WordPress security best practices, to avoid privilege escalation if the callback is invoked from a different code path.",
+      "detection_pattern": {
+        "grep_pattern": "register_setting\\b",
+        "anti_pattern": "current_user_can",
+        "section_name": "Access control: sanitize_callback without capability check",
+        "description": "Finds register_setting() calls whose sanitize_callback does not contain a current_user_can() guard. While the Settings API nonce protects against CSRF, a sanitize callback without a capability check can be triggered from other code paths (e.g. direct option update hooks), potentially allowing lower-privileged users to alter plugin settings if registration is later reused."
+      }
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "ssrf_client_ip_header_injection",
+      "location": "ProxyUtils::get_client_ip() / proxy_requests() line 174",
+      "severity": "medium",
+      "reachability": "Unauthenticated — any visitor whose request matches a proxy mapping or predefined path",
+      "justification": "get_client_ip() iterates HTTP_CLIENT_IP then HTTP_X_FORWARDED_FOR first, so an attacker can supply an arbitrary IP value that is then placed verbatim into X-Forwarded-For sent to the HubSpot CDN, bypassing any IP-based rate-limiting or allow-listing HubSpot applies to the forwarded IP.",
+      "detection_pattern": {
+        "grep_pattern": "HTTP_X_FORWARDED_FOR|HTTP_CLIENT_IP",
+        "anti_pattern": "REMOTE_ADDR.*\\$_SERVER.*!.*HTTP_X_FORWARDED",
+        "section_name": "IP Spoofing: Untrusted X-Forwarded-For trusted over REMOTE_ADDR",
+        "description": "Code that reads HTTP_CLIENT_IP or HTTP_X_FORWARDED_FOR before REMOTE_ADDR for client IP determination allows any attacker to inject a forged IP into forwarded headers or access-control logic."
+      }
+    },
+    {
+      "vuln_class": "ssrf_filter_hook_base_url",
+      "location": "Filters::apply_sites_proxy_cdn_filters() / fetch_and_cache_mappings() / proxy_requests()",
+      "severity": "medium",
+      "reachability": "Any code (plugin or theme) that can register a WordPress filter hook — i.e., any installed plugin with write capability, or admin users via code execution",
+      "justification": "Both the mapping fetch URL (get_plugin_mappings_api_url) and the proxy destination base URL (get_proxy_base_url) are built through apply_filters() calls. A malicious or compromised plugin hooking leadin_sites_proxy_cdn or leadin_plugin_mappings_api_url can redirect all outbound wp_remote_get() calls to an arbitrary internal or external host, achieving SSRF or data exfiltration.",
+      "detection_pattern": {
+        "grep_pattern": "wp_remote_get\\(.*apply_filters",
+        "anti_pattern": "wp_http_validate_url|allowed_redirect_hosts",
+        "section_name": "SSRF: wp_remote_get target controlled by filter hook",
+        "description": "When wp_remote_get (or wp_remote_post) is called with a URL derived from apply_filters(), any hooked plugin can redirect the outbound request to an arbitrary destination including internal services."
+      }
+    },
+    {
+      "vuln_class": "unvalidated_proxy_path_open_ssrf",
+      "location": "proxy_requests() lines 155-164 / get_proxy_path() lines 245-249",
+      "severity": "medium",
+      "reachability": "Unauthenticated — any visitor triggering a predefined path pattern match (/_hcms/, /hs/, /hubfs/, /hs-fs/, /cs/c/, /e3t/)",
+      "justification": "When request_uri matches a PREDEFINED_PATH_PATTERNS regex (line 246-249), the raw request URI is returned directly as proxy_path with no further validation, and is concatenated onto get_proxy_base_url() at line 164; if the base URL base allows path traversal sequences (e.g. /hs/../../internal-service), the constructed target_url could point to unintended paths on the destination host. esc_url_raw() prevents scheme-level injection but does not collapse path traversal.",
+      "detection_pattern": {
+        "grep_pattern": "wp_remote_get\\(.*\\$target_url",
+        "anti_pattern": "wp_parse_url.*path.*preg_match|path_traversal|realpath",
+        "section_name": "SSRF: Proxy path traversal in concatenated target URL",
+        "description": "When a request URI is appended directly to a fixed base URL without normalizing path traversal sequences (../../), attackers may reach unintended paths on the destination server."
+      }
+    },
+    {
+      "vuln_class": "response_header_injection_unescaped_target_url",
+      "location": "proxy_requests() line 227",
+      "severity": "low",
+      "reachability": "Unauthenticated — any visitor whose request reaches the proxy path and matches a mapping",
+      "justification": "Line 227 emits header('X-HS-WP-Plugin-Proxy-URL: ' . $target_url) without stripping \\r\\n; while esc_url_raw() on REQUEST_URI removes most CRLF, the base URL is assembled from filter results and option values that are not CRLF-sanitized, leaving a theoretical header injection window distinct from the request-URI path that is already sanitized.",
+      "detection_pattern": {
+        "grep_pattern": "header\\(.*\\$.*\\)",
+        "anti_pattern": "str_replace.*\\\\r.*\\\\n.*\\$.*header",
+        "section_name": "Response Header Injection: unsanitized value in header()",
+        "description": "Calls to header() that concatenate attacker-influenced or filter-derived strings without stripping CR/LF characters can allow response header injection or HTTP response splitting."
+      }
+    },
+    {
+      "vuln_class": "xss_unescaped_proxy_body_output",
+      "location": "proxy_requests() line 229",
+      "severity": "medium",
+      "reachability": "Unauthenticated — any visitor that triggers a proxy request where the remote response contains script content",
+      "justification": "The raw body of the remote wp_remote_get() response is echoed directly (echo $body; with a phpcs:ignore suppressing the escaping warning). Although this is intended behaviour for a reverse proxy, there is no Content-Type gating or sanitization: if an attacker can influence what HubSpot returns (e.g. via a stored XSS on HubSpot pages) or if the proxy CDN URL is redirected via a filter hook, arbitrary HTML/script executes under the WordPress site's origin.",
+      "detection_pattern": {
+        "grep_pattern": "echo.*wp_remote_retrieve_body|print.*wp_remote_retrieve_body",
+        "anti_pattern": "esc_html|wp_kses|esc_attr",
+        "section_name": "XSS: Unescaped remote response body echoed to browser",
+        "description": "Directly echoing the body of a wp_remote_get() response without sanitization passes through any XSS payload the remote server returns, executing under the WordPress site's origin."
+      }
+    },
+    {
+      "vuln_class": "sensitive_cookie_leakage_to_third_party",
+      "location": "proxy_requests() / filter_wordpress_cookies() lines 431-461",
+      "severity": "medium",
+      "reachability": "Unauthenticated or authenticated — any visitor with non-WordPress cookies set by other plugins whose request triggers the proxy",
+      "justification": "filter_wordpress_cookies() only strips cookies with three specific prefixes (wordpress_, wp-settings-, wp_woocommerce_). Cookies set by other plugins (e.g. wc_session_cookie, PHPSESSID, WooCommerce cart cookies, security plugin cookies) are forwarded to the external HubSpot CDN, potentially leaking session state and user data to a third party.",
+      "detection_pattern": {
+        "grep_pattern": "Cookie.*proxy|wp_remote_get.*cookie|wp_remote_post.*cookie",
+        "anti_pattern": "setcookie.*httponly|filter_cookies.*whitelist|allowlist.*cookie",
+        "section_name": "Cookie Leakage: Incomplete cookie stripping before proxy forward",
+        "description": "Proxy implementations that forward Cookie headers with only a partial denylist may leak sensitive session cookies from other plugins to the external proxy destination."
+      }
+    }
+  ]
+}

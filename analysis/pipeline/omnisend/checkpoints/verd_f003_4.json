@@ -1,0 +1,15 @@
+{
+  "finding_id": "f003_4",
+  "vuln_class": "logic_error_forced_disconnect",
+  "is_real": false,
+  "severity": "false_positive",
+  "reasoning": "The finding claims a subscriber+ can force store disconnection via the REST endpoint POST omnisend/v1/connect, but this is incorrect. While the REST permission_callback only requires is_user_logged_in(), the callback omnisend_post_connection() contains an explicit current_user_can('manage_options') check at line 221 that returns an error response immediately for any non-admin caller. A subscriber never reaches the Options::disconnect() call at line 296. Additionally, the nonce check at line 230 uses action 'connect', which is only generated and served in the admin UI visible to admins — a subscriber cannot obtain a valid nonce for this action. The real code path to Options::disconnect() requires: (1) manage_options capability (admin), (2) a valid 'connect' nonce (admin session), and (3) an API key whose Omnisend account has a platform value other than 'wordpress' or ''. This is an admin-only logic quirk (premature disconnect on unexpected platform value) but not a privilege escalation or low-privilege attack vector. The reachability claim in the finding is factually wrong.",
+  "evidence": {
+    "permission_callback": "is_user_logged_in() — in omnisend_register_connection_routes() at bootstrap lines 109-111",
+    "inner_cap_check": "current_user_can('manage_options') at class-connection.php line 221 — returns error before reaching disconnect",
+    "disconnect_sink": "Options::disconnect() at class-connection.php line 296 — only reachable by manage_options users who pass nonce check",
+    "nonce_action": "'connect' nonce verified at line 230 — nonce only emitted to admin UI",
+    "options_disconnect_effect": "Deletes api_key, brand_id, store_connected, landing_page options — full disconnection"
+  },
+  "_done": true
+}

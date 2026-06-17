@@ -1,0 +1,6 @@
+{
+  "is_real": true,
+  "severity": "medium",
+  "reasoning": "The sink at class-connection.php line 37 emits `esc_url_raw( self::get_signup_url() )` into a JavaScript double-quoted string literal. `get_signup_url()` applies the public WordPress filter `omnisend_signup_wp_link` to the default signup URL and returns the filtered value raw (without any JS or HTML escaping) when the filtered URL's naked domain equals 'omnisend.com'. The domain guard is bypassable: a URL of the form `https://sub.omnisend.com/path?x=1\"};alert(1)//` has naked domain 'omnisend.com' and passes the guard. `esc_url_raw` does not encode double-quote characters (unlike `esc_url`), so the double-quote reaches the rendered JS verbatim, terminating the string and allowing arbitrary script execution. The correct escaper is `esc_js( esc_url( ... ) )`. Reachability: the `display()` method guards with `manage_options`, so the injected JS is only executed in the browser of an authenticated admin who visits the Omnisend settings page. The injection vector requires a co-installed plugin or theme to hook `omnisend_signup_wp_link` and return a crafted URL — this could be a malicious plugin or a trusted plugin with a supply-chain compromise. The finding's claimed reachability and auth requirement are accurate. The bug is a real escaper mismatch, not a false positive.",
+  "_done": true
+}

@@ -1,0 +1,96 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "regex_dos",
+      "location": "bbq_core(), lines 82-100 (block-bad-queries.php)",
+      "severity": "medium",
+      "reachability": "Unauthenticated remote attacker via HTTP request",
+      "justification": "Attacker-controlled superglobals (REQUEST_URI, QUERY_STRING, HTTP_USER_AGENT, HTTP_REFERER) are fed as the subject string into preg_match() patterns that contain nested alternation groups with wildcards (e.g., 'union(.*)select', '((curl_|shell_)?exec|(f|p)open|...)'), creating catastrophic backtracking conditions where a crafted input can cause PHP PCRE to spend excessive CPU time, producing a denial of service.",
+      "detection_pattern": {
+        "grep_pattern": "preg_match\\s*\\(\\s*'.*\\|.*'\\s*,\\s*\\$_(SERVER|GET|POST|REQUEST|COOKIE)",
+        "anti_pattern": "preg_match\\s*\\(.*,\\s*(esc_|sanitize_|intval|absint|wp_strip_all_tags)",
+        "section_name": "ReDoS: user input as preg_match subject against complex alternation patterns",
+        "description": "Catches preg_match calls whose subject string is a raw superglobal value against a concatenated alternation regex; nested quantifiers in alternation arms can produce catastrophic backtracking on crafted inputs."
+      }
+    },
+    {
+      "vuln_class": "security_control_bypass_via_filter",
+      "location": "bbq_core(), lines 46-54 (block-bad-queries.php) - apply_filters on pattern arrays",
+      "severity": "high",
+      "reachability": "Any other installed WordPress plugin (no authentication required if attacker can install a plugin, or if a co-installed plugin is compromised)",
+      "justification": "All five firewall pattern arrays (request_uri_items, query_string_items, user_agent_items, referrer_items, post_items) are exposed via apply_filters(), allowing any co-installed plugin to replace them with empty arrays or remove specific threat signatures, completely disabling the firewall for those request components without any capability check.",
+      "detection_pattern": {
+        "grep_pattern": "apply_filters\\s*\\(\\s*'[^']*'\\s*,\\s*array\\s*\\(",
+        "anti_pattern": "current_user_can|has_filter\\s*\\(.*\\)\\s*&&",
+        "section_name": "Security bypass: filterable security-critical arrays",
+        "description": "Catches apply_filters() calls that wrap security-critical pattern arrays used for WAF/firewall matching; any co-installed plugin can empty or alter these arrays via add_filter(), bypassing the security control entirely."
+      }
+    },
+    {
+      "vuln_class": "security_control_bypass_via_filter",
+      "location": "bbq_core(), lines 63-65 (block-bad-queries.php) - apply_filters on control booleans",
+      "severity": "high",
+      "reachability": "Any co-installed WordPress plugin",
+      "justification": "The bbq_long_requests boolean and bbq_post_scanning boolean that gate entire scanning paths are exposed via apply_filters() with no access control; a co-installed plugin can add a filter returning false to disable long-request blocking and POST body scanning.",
+      "detection_pattern": {
+        "grep_pattern": "apply_filters\\s*\\(\\s*'[^']*'\\s*,\\s*(true|false)\\s*\\)",
+        "anti_pattern": "current_user_can|is_admin\\(\\)",
+        "section_name": "Security bypass: filterable security feature toggle booleans",
+        "description": "Catches apply_filters() calls returning a boolean that controls whether a security feature is active; these are trivially overridden by any co-installed plugin via add_filter()."
+      }
+    },
+    {
+      "vuln_class": "security_control_bypass_via_filter",
+      "location": "bbq_response(), lines 137-143 (block-bad-queries.php) - apply_filters on block response headers",
+      "severity": "high",
+      "reachability": "Any co-installed WordPress plugin",
+      "justification": "The three HTTP response headers sent by the firewall block action (bbq_header_1, bbq_header_2, bbq_header_3) are filterable, allowing a co-installed plugin to change '403 Forbidden' to '200 OK', turning every firewall block into a pass-through without modifying the plugin itself.",
+      "detection_pattern": {
+        "grep_pattern": "header\\s*\\(\\s*apply_filters\\s*\\(",
+        "anti_pattern": "current_user_can|capabilities",
+        "section_name": "Security bypass: filterable HTTP security response headers",
+        "description": "Catches header() calls whose argument is the result of apply_filters(); a co-installed plugin can silently replace a 403 block header with a 200 response, disabling the block action."
+      }
+    },
+    {
+      "vuln_class": "logic_error_incomplete_scan",
+      "location": "bbq_get_string(), lines 149-167 (block-bad-queries.php)",
+      "severity": "medium",
+      "reachability": "Unauthenticated remote attacker via POST body with nested array values",
+      "justification": "When bbq_get_string() encounters a nested array it calls itself recursively at line 157 but discards the return value (no 'return' keyword), then falls through to return null; this means only the first non-array value at any depth is ever returned and all other array keys (including subsequent top-level POST keys) beyond the first nested entry are silently skipped, allowing an attacker to smuggle malicious payloads past the POST scanner by placing them in any array key after a nested value.",
+      "detection_pattern": {
+        "grep_pattern": "function\\s+\\w+\\s*\\(\\s*\\$var\\s*\\)\\s*\\{[^}]*foreach\\s*\\(\\s*\\$var[^}]*if\\s*\\(is_array",
+        "anti_pattern": "return\\s+\\w+\\s*\\(\\s*\\$value\\s*\\)",
+        "section_name": "Logic error: recursive array flattener discards return value",
+        "description": "Catches array-to-string helper functions that recurse into nested arrays without returning the recursive call result, causing the function to silently skip nested content and return null, allowing nested-array POST payloads to bypass WAF scanning."
+      }
+    },
+    {
+      "vuln_class": "xss_stored_via_translation",
+      "location": "bbq_print_js_admin(), lines 334-337 (bbq-settings.php)",
+      "severity": "medium",
+      "reachability": "Attacker who can control a .po/.mo translation file (e.g., via a compromised translation package, WP filesystem write access, or a malicious co-installed language pack)",
+      "justification": "The _e() calls at lines 334-337 output translatable strings directly as JavaScript string literal values delimited by single quotes without esc_js() or json_encode(); a translation string containing a single quote or JavaScript injection payload would break out of the string literal and execute arbitrary JavaScript in the admin context, constituting stored XSS.",
+      "detection_pattern": {
+        "grep_pattern": "_e\\s*\\([^)]*\\)\\s*[^;]*['\"]\\s*;",
+        "anti_pattern": "esc_js\\s*\\(\\s*__\\s*\\(|json_encode\\s*\\(\\s*__\\s*\\(",
+        "section_name": "XSS: unescaped translatable string in JavaScript context",
+        "description": "Catches _e() or __() calls whose output lands inside a JavaScript string literal without esc_js() or json_encode(); a manipulated translation file can inject arbitrary JavaScript into the admin page."
+      }
+    },
+    {
+      "vuln_class": "xss_reflected",
+      "location": "bbq_callback_test(), line 205 (bbq-settings.php)",
+      "severity": "low",
+      "reachability": "Authenticated administrator only (settings page is admin-only)",
+      "justification": "The $href variable built by add_query_arg() is echoed into the href HTML attribute at line 205 without esc_url() wrapping; add_query_arg() does not HTML-encode its output, and the WordPress security guidelines explicitly warn that add_query_arg() output must be escaped with esc_url() before use in HTML attributes to prevent javascript: or data: URI injection.",
+      "detection_pattern": {
+        "grep_pattern": "echo\\s+.*add_query_arg\\s*\\(",
+        "anti_pattern": "esc_url\\s*\\(\\s*add_query_arg",
+        "section_name": "XSS: unescaped add_query_arg() output in HTML attribute",
+        "description": "Catches echo of add_query_arg() return value without esc_url() wrapping; the WordPress coding standards require esc_url() around add_query_arg() output in HTML contexts to prevent attribute injection."
+      }
+    }
+  ]
+}
