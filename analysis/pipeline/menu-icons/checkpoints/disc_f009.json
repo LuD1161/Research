@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "_ajax_menu_icons_update_settings(), line 316-325",
+      "severity": "high",
+      "reachability": "Any authenticated WordPress user (subscriber role or above) can POST directly to admin-ajax.php?action=menu_icons_update_settings",
+      "justification": "The handler calls check_ajax_referer() for CSRF protection but has no current_user_can() check; any logged-in user can overwrite the plugin's global settings stored in the menu-icons WordPress option.",
+      "detection_pattern": {
+        "grep_pattern": "add_action\\s*\\(\\s*['\"]wp_ajax_[^'\"]+['\"]",
+        "anti_pattern": "current_user_can",
+        "section_name": "Broken Access Control: AJAX handler without capability check",
+        "description": "Finds wp_ajax_ handler registrations; files where no current_user_can() appears near the handler are suspicious because a nonce alone prevents CSRF but does not restrict which authenticated users can perform the privileged action."
+      }
+    },
+    {
+      "vuln_class": "broken_access_control",
+      "location": "_maybe_update_settings(), line 233-243",
+      "severity": "medium",
+      "reachability": "Any authenticated user who can craft a POST request to nav-menus.php with a valid nonce (obtainable by visiting nav-menus.php, which itself requires edit_theme_options); ambient page-level protection exists but is not explicitly enforced in the handler",
+      "justification": "check_admin_referer() verifies the nonce but there is no explicit current_user_can('manage_options') or current_user_can('edit_theme_options') check inside _maybe_update_settings(); the function relies entirely on the page's own capability gate rather than defending itself.",
+      "detection_pattern": {
+        "grep_pattern": "check_admin_referer\\s*\\(",
+        "anti_pattern": "current_user_can",
+        "section_name": "Broken Access Control: form handler without explicit capability check",
+        "description": "Finds check_admin_referer() calls; when no current_user_can() appears in the same function, the handler is relying solely on ambient page-level access controls rather than explicitly enforcing authorization."
+      }
+    },
+    {
+      "vuln_class": "xss_stored",
+      "location": "_enqueue_assets(), line 744 (upsell anchor construction), propagated into settingsInfo at line 757-766 via wp_localize_script at line 777",
+      "severity": "low",
+      "reachability": "Admin-only context; the $upsell_notices values are hardcoded in this file but the surrounding $js_data array is passed through apply_filters('menu_icons_settings_js_data', ...) at line 747, and $upsell_notices['url'] / ['btn_text'] are concatenated into $box_data without esc_url()/esc_html() before being embedded in settingsInfo",
+      "justification": "On line 744, $upsell_notices[$rand_key]['url'] and ['btn_text'] are injected directly into an HTML anchor string without esc_url() or esc_html(); this $box_data is then embedded verbatim into the settingsInfo JS string passed to wp_localize_script, meaning any filter that alters the upsell URL or text could introduce XSS rendered in the admin page.",
+      "detection_pattern": {
+        "grep_pattern": "href=['\"]\\s*\\.\\s*\\$[a-zA-Z_]+\\[",
+        "anti_pattern": "esc_url\\s*\\(",
+        "section_name": "XSS: unescaped URL concatenated into anchor href",
+        "description": "Finds href attribute values built by concatenating PHP variables without esc_url(); any variable-derived URL lacking esc_url() is a potential XSS vector if a filter or upstream code can influence the value."
+      }
+    }
+  ]
+}
