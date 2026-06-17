@@ -1,0 +1,6 @@
+{
+  "is_real": true,
+  "severity": "low",
+  "reasoning": "The finding is confirmed. The full attack path is: (1) An HTTP client sends a Content-Type header containing an arbitrarily long boundary value, e.g. 'multipart/form-data; boundary=AAAA...AAAA'. (2) In Form.prototype.parse (line 174), the raw Content-Type header is read from req.headers['content-type'] with no length check. (3) The boundary is extracted via CONTENT_TYPE_BOUNDARY_RE regex (lines 187-190) with no length check. (4) setUpParser is called directly with the raw boundary string (line 198). (5) Inside setUpParser (lines 808-812), Buffer.alloc(boundary.length + 4) and Buffer.alloc(boundary.length + 8) are called. No guard, schema validator, max-length check, or RFC 2046 enforcement (max 70 chars) exists anywhere in the file — confirmed by grep for MAX_BOUNDARY, boundary.length >, maxBoundary, boundaryMax all returning 0 results. The path requires no special options or non-default configuration; it is triggered by the ordinary code path for any multipart/form-data request. The only practical cap is the HTTP server's header size limit (typically 8-16 KB), which means a single request can force ~16 KB of buffer allocations. This is a real but low-severity issue: it is a minor resource amplification with no auth requirement, constrained in practice by server header limits.",
+  "_done": true
+}
