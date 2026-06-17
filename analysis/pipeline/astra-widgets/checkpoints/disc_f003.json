@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "handle_optin_optout(), line 282-308",
+      "severity": "low",
+      "reachability": "Any authenticated user with manage_options capability (administrators) who visits an admin page containing a crafted bsf_analytics_source GET parameter.",
+      "justification": "The $source parameter is read from $_GET['bsf_analytics_source'] and used directly to form both the nonce lookup key ($source . '_analytics_nonce') and the nonce action ($source . '_analytics_optin'), but $source is never validated against the registered $this->entities keys. An admin can provide any arbitrary string as $source, self-generate a valid nonce for that action, and cause update_site_option($source . '_analytics_optin', 'yes'/'no') to write to any site option whose name ends in '_analytics_optin', potentially interfering with other plugins' tracking consent flags.",
+      "detection_pattern": {
+        "grep_pattern": "sanitize_text_field.*\\$_GET.*source",
+        "anti_pattern": "in_array.*\\$source.*\\$(?:this->)?(?:entities|allowed|whitelist)",
+        "section_name": "Unvalidated source parameter used as option key prefix",
+        "description": "Detects code that reads a 'source' identifier from GET input without validating it against a known allowlist before using it to form a storage key. An unvalidated source lets an admin (or attacker who escalates) write to unintended option names."
+      }
+    },
+    {
+      "vuln_class": "logic_bug_sprintf_format_specifier",
+      "location": "option_notice(), line 243",
+      "severity": "low",
+      "reachability": "Affects all admin users who see the opt-in notice banner; no external attacker trigger needed.",
+      "justification": "The inner sprintf on line 243 uses non-positional width specifiers (%2s, %3s, %4s) mixed with positional specifiers from $notice_string (%1$s). PHP treats %2s as 'minimum width 2 of the current sequential argument', not 'argument 2'. As a result: the dir= attribute receives $data['product_name'] (the product name) instead of $language_dir; the href= receives 'rtl' or 'ltr' (a literal direction string) instead of the escaped doc URL, producing a broken/non-functional link; and the link text renders the esc_url() result of the doc link instead of the 'Know More' translation string. While not directly security-exploitable (none of the swapped values come from user input), the dir= attribute receiving the product name is incorrect context and the href= 'rtl'/'ltr' could cause UI confusion.",
+      "detection_pattern": {
+        "grep_pattern": "sprintf\\(.*%[0-9]s.*%[0-9]s",
+        "anti_pattern": "sprintf\\(.*%[0-9]\\$s.*%[0-9]\\$s",
+        "section_name": "sprintf non-positional specifiers mixed with positional",
+        "description": "Catches sprintf calls that mix non-positional width specifiers (%Ns) with positional ones (%N$s), which causes PHP to assign arguments in undefined order leading to wrong values in HTML attributes or content. Files matching the first pattern but not the second (all-positional) are candidates for the argument-mismatch bug."
+      }
+    },
+    {
+      "vuln_class": "missing_nonce_verification",
+      "location": "add_option_to_network(), line 495-506",
+      "severity": "low",
+      "reachability": "Multisite only. Triggered via the update_option_{key}_analytics_optin and add_option_{key}_analytics_optin WordPress hooks when the general settings page is saved. The phpcs:ignore suppresses the nonce-missing warning.",
+      "justification": "add_option_to_network() is hooked to update_option and add_option WordPress action hooks (lines 75-76) and reads $_POST['option_page'] without performing its own nonce verification (explicitly suppressed via phpcs:ignore WordPress.Security.NonceVerification.Missing on line 498). The function relies on upstream WordPress core nonce protection of the general settings form to prevent CSRF, but any code path that fires update_option() for the relevant key outside the settings form (e.g., another plugin, CLI, WP-Cron) would invoke this callback with whatever $_POST is in scope at the time. On multisite, this leads to add_site_option/update_site_option being called with the supplied value propagated across the network without explicit nonce verification in this function.",
+      "detection_pattern": {
+        "grep_pattern": "add_action.*update_option_.*array.*this",
+        "anti_pattern": "wp_verify_nonce|check_admin_referer",
+        "section_name": "update_option hook callback without own nonce verification",
+        "description": "Detects WordPress plugins that register callbacks on update_option_ hooks without performing independent nonce verification inside the callback. These callbacks can be invoked by any code path that triggers the option update, not just protected admin forms, making CSRF or unexpected cross-context writes possible."
+      }
+    }
+  ]
+}
