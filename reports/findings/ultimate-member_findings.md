@@ -15,7 +15,7 @@ Run: `analysis/experiments/um_value/raw/w80qbnmp4_result.json`. Date: 2026-06-16
 
 | # | File | Class | Sev | Auth (verifier) | Status |
 |---|------|-------|-----|-----------------|--------|
-| 1 | `includes/admin/core/class-admin-settings.php` `same_page_update_ajax()` | Broken access control / priv-esc | **HIGH⚠** | **DISPUTED** — 4 verifiers said subscriber+, 3 said only wp-admin roles (editor/shop-mgr) | **needs live validation** |
+| 1 | `includes/admin/core/class-admin-settings.php` `same_page_update_ajax()` | Broken access control / priv-esc | ~~HIGH~~ → **config-cond. LOW/MED** | **LIVE-VALIDATED**: subscriber+editor both blocked from wp-admin at default → cannot get `um-admin-nonce`; attack → `Wrong Nonce`. Real-but-not-default-exploitable | see `validation.md` |
 | 2 | `includes/core/class-files.php` upload (`wp_ajax_nopriv_*`) | Unauth file upload / missing nonce | MED | unauthenticated | needs live validation |
 | 3 | `includes/core/class-member-directory.php` `default_filter_settings` AJAX | Broken access control | MED | any logged-in | candidate |
 | 4 | `includes/admin/core/class-admin-notices.php` `dismiss_notice` | Missing cap on AJAX | MED | any logged-in | candidate |
