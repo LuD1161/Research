@@ -1,0 +1,18 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "null_dereference_dos",
+      "location": "pemToCert (utils.js line 15)",
+      "severity": "low",
+      "reachability": "Reachable by any caller of encryptKeyInfo/encryptKeyInfoWithScheme that passes a non-null options.pem value which does not contain a valid PEM certificate header/footer. The truthiness check at line 46/76 of xmlenc.js prevents null/undefined, but any non-empty non-PEM string bypasses it.",
+      "justification": "RegExp.prototype.exec() returns null when there is no match; the subsequent cert.length access on null throws TypeError: Cannot read properties of null. The enclosing try/catch in xmlenc.js encryptKeyInfoWithScheme (lines 19-38) catches it and delivers it to the callback, preventing a process crash, but it makes the encrypt operation fail on any malformed certificate.",
+      "detection_pattern": {
+        "grep_pattern": "\\.exec\\([^)]+\\)\\s*;\\s*\\n[^}]*\\.length",
+        "anti_pattern": "if\\s*\\(\\w+\\s*&&\\s*\\w+\\.length|\\w+\\s*!==\\s*null",
+        "section_name": "Null Deref: regex exec() result unchecked",
+        "description": "Detects patterns where the return value of RegExp.exec() is used for a property access (e.g. .length, [1]) without a null check. exec() returns null on no match, so any property access will throw TypeError."
+      }
+    }
+  ]
+}
