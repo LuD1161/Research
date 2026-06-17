@@ -1,0 +1,83 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "saml_signature_bypass_ignore_signature",
+      "location": "parse_authn_response / line 589",
+      "severity": "critical",
+      "reachability": "Reachable by any caller of post_assert or redirect_assert that passes options.ignore_signature=true; the entire assertion signature check is unconditionally skipped and the attacker-supplied XML is trusted as-is.",
+      "justification": "Line 589: `if (ignore_signature) { return cb_wf(null, (new xmldom.DOMParser()).parseFromString(result)); }` — when this flag is set, a forged or replayed SAML assertion passes without any cryptographic check.",
+      "detection_pattern": {
+        "grep_pattern": "ignore_signature",
+        "anti_pattern": "ignore_signature.*false|ignore_signature.*=.*false",
+        "section_name": "SAML: signature verification bypass flag",
+        "description": "Detects SAML libraries that expose an ignore_signature flag; when set to true this completely disables signature verification and allows arbitrary assertion forgery."
+      }
+    },
+    {
+      "vuln_class": "saml_signature_wrapping",
+      "location": "parse_authn_response / lines 596-622",
+      "severity": "high",
+      "reachability": "Reachable by any unauthenticated attacker who can craft a SAML response; the signed outer envelope may differ from the unsigned inner assertion accepted by the application.",
+      "justification": "The code calls check_saml_signature on both the extracted assertion string and the full saml_response_str (line 597); get_signed_data returns all signed references and the loop accepts the first signed_dom that contains a saml:Assertion (line 609). An attacker can craft a response where the outer signed envelope contains a benign assertion but the actual assertion parsed from the response is unsigned/modified — classic XML Signature Wrapping.",
+      "detection_pattern": {
+        "grep_pattern": "getSignedReferences|getSignedXml|checkSignature",
+        "anti_pattern": "validateSignedData|assertSignedElement",
+        "section_name": "SAML: XML Signature Wrapping via getSignedReferences",
+        "description": "Detects SAML code that uses getSignedReferences without verifying the signed element IS the assertion consumed downstream; enables signature wrapping attacks where a valid signature on a dummy element co-exists with an unsigned malicious assertion."
+      }
+    },
+    {
+      "vuln_class": "prototype_pollution_via_xml_attribute_key",
+      "location": "parse_assertion_attributes / lines 475-484",
+      "severity": "medium",
+      "reachability": "Reachable if the IdP (or a MITM in allow_unencrypted mode) can supply arbitrary attribute Names in the SAML assertion; `assertion_attributes[attribute_name]` sets a key directly on a plain object without sanitisation.",
+      "justification": "Line 480: `assertion_attributes[attribute_name] = ...` where `attribute_name` is taken verbatim from the XML attribute Name value. An attribute named `__proto__` or `constructor` would pollute the object prototype chain for downstream code.",
+      "detection_pattern": {
+        "grep_pattern": "\\[attribute_name\\]|\\[attrName\\]|\\[key\\]",
+        "anti_pattern": "hasOwnProperty|Object\\.create\\(null\\)|Object\\.defineProperty",
+        "section_name": "Prototype Pollution: unchecked XML attribute key assignment",
+        "description": "Detects direct property assignment using XML-derived keys without hasOwnProperty guard or null-prototype objects; enables prototype pollution when an attacker controls the key."
+      }
+    },
+    {
+      "vuln_class": "xml_external_entity_xxe",
+      "location": "add_namespaces_to_child_assertions / line 523; parse_authn_response / line 807; check_saml_signature / line 353",
+      "severity": "medium",
+      "reachability": "Reachable by any attacker who can supply a crafted SAML response (unauthenticated in IdP-initiated flows); depends on @xmldom/xmldom version's default entity-expansion behaviour.",
+      "justification": "Multiple DOMParser.parseFromString calls (lines 353, 523, 607, 807) operate on attacker-controlled XML. Older versions of @xmldom/xmldom expand external entities by default; if the deployed version does not explicitly disable entity expansion, XXE is possible leading to SSRF or file read.",
+      "detection_pattern": {
+        "grep_pattern": "parseFromString|DOMParser",
+        "anti_pattern": "resolveEntities.*false|entityExpansion.*false|XMLReader",
+        "section_name": "XXE: DOMParser on attacker-controlled XML",
+        "description": "Detects DOMParser usage on external input without explicit entity-expansion hardening; relevant for xmldom-based parsers that historically expanded entities by default."
+      }
+    },
+    {
+      "vuln_class": "audience_restriction_regex_bypass",
+      "location": "parse_authn_response / line 652",
+      "severity": "medium",
+      "reachability": "Reachable when sp_audience is configured as a RegExp (a supported configuration path documented by line 652's _.isRegExp check); an overly-broad pattern allows assertions intended for other SPs to be accepted.",
+      "justification": "Line 652: `_.isRegExp(sp_audience) && sp_audience.test(audienceValue)` — if the application operator passes a broad regex like /.*/ or /example\\.com/ (instead of anchored /^https:\\/\\/example\\.com\\/sp$/), a malicious IdP could include any audience URI and bypass the restriction.",
+      "detection_pattern": {
+        "grep_pattern": "isRegExp.*audience|audience.*test\\(",
+        "anti_pattern": "audience.*===|audience.*strict",
+        "section_name": "SAML: RegExp audience restriction bypass",
+        "description": "Detects SAML audience validation that allows RegExp matching; if the regex is not anchored or is overly broad, a malicious assertion with a crafted audience URI satisfies the check."
+      }
+    },
+    {
+      "vuln_class": "saml_assertion_confusion_allow_unencrypted",
+      "location": "parse_authn_response / lines 576-584",
+      "severity": "high",
+      "reachability": "Reachable when allow_unencrypted_assertion is true (a configurable default exposed via ServiceProvider shared_options); an attacker can strip the EncryptedAssertion wrapper and supply a plaintext assertion that bypasses decryption-based access controls.",
+      "justification": "Lines 577-584: when `allow_unencrypted` is true and the error is 'Expected 1 EncryptedAssertion; found 0', the code falls back to extracting a plain saml:Assertion from the response without any additional check that the assertion was originally intended to be unencrypted by the IdP.",
+      "detection_pattern": {
+        "grep_pattern": "allow_unencrypted|allowUnencrypted",
+        "anti_pattern": "allow_unencrypted.*false|requireEncryptedAssertion",
+        "section_name": "SAML: unencrypted assertion fallback bypass",
+        "description": "Detects SAML implementations that fall back to accepting plaintext assertions when decryption fails; enables downgrade attacks where an attacker strips encryption and replays a forged assertion."
+      }
+    }
+  ]
+}
