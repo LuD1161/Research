@@ -1,0 +1,58 @@
+{
+  "_done": true,
+  "file": "/DATA/openclaw/Repos/Research/packages/node-rsa/node_modules/node-rsa/dist/index.node.js",
+  "findings": [
+    {
+      "vuln_class": "weak_default_cryptographic_algorithm",
+      "location": "PssScheme class, line 3112 (DEFAULT_HASH3 = 'sha1'); NodeNativePssScheme.sign/verify, lines 4173/4185 (hash ?? DEFAULT_PSS_HASH)",
+      "severity": "medium",
+      "reachability": "Reachable by any caller that creates a NodeRSA instance with the 'pss' signing scheme and does not explicitly set a hash — both the pure-JS PssScheme and the NodeNativePssScheme default to SHA-1 for all sign/verify operations.",
+      "justification": "Both pure-JS (line 3112: DEFAULT_HASH3 = 'sha1') and native (line 4087: DEFAULT_PSS_HASH = 'sha1') PSS implementations default to SHA-1 as the hash algorithm. SHA-1 is deprecated by NIST for digital signatures (SP 800-131A Rev 2). Callers who omit the hash option silently use a broken algorithm.",
+      "detection_pattern": {
+        "grep_pattern": "DEFAULT.*=.*['\"]sha1['\"]",
+        "anti_pattern": "DEFAULT.*=.*['\"]sha256['\"]",
+        "section_name": "Weak default hash: SHA-1 for PSS/signing",
+        "description": "Catches module-level DEFAULT_HASH constants set to sha1 in signing scheme implementations. SHA-1 is deprecated for signatures; default should be sha256 or stronger."
+      }
+    },
+    {
+      "vuln_class": "weak_algorithm_accepted_without_error",
+      "location": "applyOptions, lines 3331-3335 (signingSchemeOptions.hash === 'md4' || 'md5' warning only)",
+      "severity": "medium",
+      "reachability": "Any caller that sets setOptions({signingScheme:'pkcs1-md5'}) or similar. The code emits a console.warn but does not throw, so production code using MD5 for RSA signatures silently proceeds.",
+      "justification": "At lines 3331-3335, when the signing hash is 'md4' or 'md5', only console.warn is emitted — not an error. MD5 is cryptographically broken for signatures (chosen-prefix collision attacks). The check at line 3328 validates against NODE_HASHES which includes md4 and md5, so they pass the allowlist and proceed. Callers relying on the library to reject insecure configurations are not protected.",
+      "detection_pattern": {
+        "grep_pattern": "console\\.warn.*md5|console\\.warn.*md4",
+        "anti_pattern": "throw.*md5.*broken|throw.*md4.*broken",
+        "section_name": "Weak hash: MD5/MD4 accepted with warn-only",
+        "description": "Catches packages that warn but do not reject MD4/MD5 for signing operations. Broken hashes should throw, not warn."
+      }
+    },
+    {
+      "vuln_class": "unsafe_deserialization",
+      "location": "$getDecryptedData, line 3883: JSON.parse(toUtf8(bytes))",
+      "severity": "low",
+      "reachability": "Reachable when a caller calls nodeRSA.decrypt(ciphertext, 'json'). If the server decrypts attacker-supplied ciphertext (e.g., encrypted tokens submitted by clients), the decrypted payload is JSON.parsed and returned directly to application code without any sanitization.",
+      "justification": "At line 3883, `$getDecryptedData` calls `JSON.parse(toUtf8(bytes))` when `encoding === 'json'`. Standard `JSON.parse` in Node.js does not cause prototype pollution (the `__proto__` key is not special), but the function returns arbitrary JavaScript values (arrays, nested objects, numbers, null) controlled by whoever encrypted the ciphertext. Application code that then passes the result to downstream functions that do not validate type/shape is exposed to unexpected-type injection. The severity is low because JSON.parse itself is safe; exploitation depends on how the caller uses the returned value.",
+      "detection_pattern": {
+        "grep_pattern": "JSON\\.parse.*decrypt|decrypt.*JSON\\.parse",
+        "anti_pattern": "JSON\\.parse.*schema.*valid|ajv.*JSON\\.parse",
+        "section_name": "Unvalidated JSON.parse of decrypted data",
+        "description": "Catches patterns where decrypted bytes are directly JSON.parsed without schema validation. Callers should validate the shape of decrypted JSON before using it."
+      }
+    },
+    {
+      "vuln_class": "information_exposure_through_error_message_suppression",
+      "location": "$$encryptKey (line 3858-3860), $$decryptKey (line 3867-3869)",
+      "severity": "low",
+      "reachability": "All encrypt/decrypt callers. Any exception from the underlying scheme is swallowed and replaced with a generic 'Error during encryption/decryption'.",
+      "justification": "Both $$encryptKey and $$decryptKey use bare `catch {}` blocks that discard the original error and throw a new generic string. While this prevents oracle leakage (a benefit for PKCS#1 v1.5 timing/error oracles), it also masks programming errors and makes debugging impossible. More importantly, the native NodeNativePssScheme.verify (lines 4153, 4200) also silently swallows errors and returns false, which means failed signature verifications due to wrong key or corrupted data are indistinguishable from deliberate invalid signatures.",
+      "detection_pattern": {
+        "grep_pattern": "catch.*\\{.*return false.*\\}",
+        "anti_pattern": "catch.*err.*\\{.*log.*err",
+        "section_name": "Silent catch in signature verify",
+        "description": "Catches verify() methods that silently return false on all exceptions. This prevents distinguishing crypto errors from deliberate invalid signatures."
+      }
+    }
+  ]
+}
