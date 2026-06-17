@@ -1,0 +1,101 @@
+{
+  "slug": "private-ip",
+  "run": "private-ip",
+  "manifest": "/DATA/openclaw/Repos/Research/analysis/pipeline-js/private-ip/manifest.json",
+  "files_reviewed": 1,
+  "raw_findings": 2,
+  "confirmed_count": 1,
+  "confirmed": [
+    {
+      "id": "f001",
+      "rel": "lib/index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/private-ip/node_modules/private-ip/lib/index.js",
+      "tags": [
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "ssrf_filter_bypass",
+        "location": "ipv6_check (lines 40-54) / exported default function line 61",
+        "severity": "high",
+        "reachability": "Any caller that passes a user-controlled IPv6 string to the exported default function \u2014 including SSRF-protection middleware relying on this library to block private IPs.",
+        "justification": "Line 61 calls ipv6_check(ip) with the raw, un-normalized input string; the regexes on lines 43-50 are case-sensitive (no /i flag), so inputs such as ::FFFF:127.0.0.1, 2001:DB8::1, or 64:FF9B::127.0.0.1 are validated as legitimate IPv6 by ipaddr.js but pass through ipv6_check undetected, causing the function to return false/undefined instead of true.",
+        "detection_pattern": {
+          "grep_pattern": "ipv6_check\\(ip\\)|isPrivate.*ipv6.*\\(ip\\b",
+          "anti_pattern": "ipv6_check\\(.*toNormalizedString|toLowerCase",
+          "section_name": "SSRF filter bypass: un-normalized IPv6 passed to case-sensitive regex",
+          "description": "Detects places where an IPv6 string is routed to a hand-written case-sensitive regex check using the raw (un-normalized) input rather than a normalized lowercase form, enabling private-range bypass via uppercase characters."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "high",
+        "reasoning": "Confirmed real. The exported default function (line 61) passes the raw, un-normalized IPv6 string directly to ipv6_check(ip) rather than passing ip.toNormalizedString() or ip.toLowerCase(). ipaddr.js (is_valid / parse) fully accepts mixed-case IPv6 strings such as ::FFFF:127.0.0.1, 2001:DB8::1, and 64:FF9B::127.0.0.1 as valid IPv6 (confirmed by live testing: is_valid returns true, kind() returns 'ipv6', and toNormalizedString() correctly normalizes them to all-lowercase). However, the regexes on lines 43 (/^::f{4}:.../ -- no /i flag), 45 (/^64:ff9b::.../ -- no /i flag), and 49 (/^2001:db8:.../ -- no /i flag, hardcodes lowercase literal 'db8') are case-sensitive and only match lowercase representations. As a result, inputs like ::FFFF:127.0.0.1 pass is_valid(), enter the parsed.kind()==='ipv6' branch, call ipv6_check with the raw uppercase string, and all 13 regexes return false -- so the function returns false (not private) instead of true. Identical addresses in lowercase are correctly blocked. The bypass is unconditional: no non-default options are required, no schema validation guards the input, and the library is documented and positioned for user-controlled IP filtering/SSRF protection. The regexes on lines 51-53 (fc00::/7, fe80::/10, ff00::/8) do carry /i flags but lines 43-50 do not, introducing an inconsistent and exploitable gap for IPv4-mapped (::ffff:), NAT64 (64:ff9b::), and documentation-prefix (2001:db8::) ranges with any uppercase hex.",
+        "_done": true
+      },
+      "reachability": {
+        "gate_breachable": true,
+        "gate_type": "no gate \u2014 default config",
+        "adjusted_severity": "high",
+        "reasoning": "The vulnerable code path is directly reachable with zero configuration. The exported default function (line 55: export default (ip) => {...}) is the library's primary public API \u2014 any consumer can call it directly. No non-default options are required; the function accepts only a single ip string and the ipv6_check(ip) call at line 61 is reached unconditionally whenever ipaddr.js parses the input as IPv6. ipaddr.js accepts mixed-case IPv6 strings (e.g., ::FFFF:127.0.0.1) as valid and returns kind() === 'ipv6', but the raw un-normalized string is passed to ipv6_check() without any case normalization. By contrast, the IPv4 path (line 59) correctly uses parsed.toNormalizedString() before calling ipv4_check() \u2014 this inconsistency is the root of the bypass. The regexes on lines 43 (::ffff: mapped), 45 (64:ff9b:: NAT64), and 49 (2001:db8:: documentation) have no /i flag and only match lowercase; uppercase variants such as ::FFFF:127.0.0.1, 64:FF9B::192.168.1.1, and 2001:DB8::1 pass through all 13 regexes undetected and the function returns false (not private) instead of true. The parameter is user-controlled in the library's primary real-world use case: SSRF-protection middleware that passes attacker-supplied IP/hostname strings to this function to decide whether to block the request. No schema validation, allowlist, or type-coercion guards the input before the sink. The bypass is unconditional at default configuration."
+      }
+    }
+  ],
+  "all_with_verdicts": [
+    {
+      "id": "f001",
+      "rel": "lib/index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/private-ip/node_modules/private-ip/lib/index.js",
+      "tags": [
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "ssrf_filter_bypass",
+        "location": "ipv6_check (lines 40-54) / exported default function line 61",
+        "severity": "high",
+        "reachability": "Any caller that passes a user-controlled IPv6 string to the exported default function \u2014 including SSRF-protection middleware relying on this library to block private IPs.",
+        "justification": "Line 61 calls ipv6_check(ip) with the raw, un-normalized input string; the regexes on lines 43-50 are case-sensitive (no /i flag), so inputs such as ::FFFF:127.0.0.1, 2001:DB8::1, or 64:FF9B::127.0.0.1 are validated as legitimate IPv6 by ipaddr.js but pass through ipv6_check undetected, causing the function to return false/undefined instead of true.",
+        "detection_pattern": {
+          "grep_pattern": "ipv6_check\\(ip\\)|isPrivate.*ipv6.*\\(ip\\b",
+          "anti_pattern": "ipv6_check\\(.*toNormalizedString|toLowerCase",
+          "section_name": "SSRF filter bypass: un-normalized IPv6 passed to case-sensitive regex",
+          "description": "Detects places where an IPv6 string is routed to a hand-written case-sensitive regex check using the raw (un-normalized) input rather than a normalized lowercase form, enabling private-range bypass via uppercase characters."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "high",
+        "reasoning": "Confirmed real. The exported default function (line 61) passes the raw, un-normalized IPv6 string directly to ipv6_check(ip) rather than passing ip.toNormalizedString() or ip.toLowerCase(). ipaddr.js (is_valid / parse) fully accepts mixed-case IPv6 strings such as ::FFFF:127.0.0.1, 2001:DB8::1, and 64:FF9B::127.0.0.1 as valid IPv6 (confirmed by live testing: is_valid returns true, kind() returns 'ipv6', and toNormalizedString() correctly normalizes them to all-lowercase). However, the regexes on lines 43 (/^::f{4}:.../ -- no /i flag), 45 (/^64:ff9b::.../ -- no /i flag), and 49 (/^2001:db8:.../ -- no /i flag, hardcodes lowercase literal 'db8') are case-sensitive and only match lowercase representations. As a result, inputs like ::FFFF:127.0.0.1 pass is_valid(), enter the parsed.kind()==='ipv6' branch, call ipv6_check with the raw uppercase string, and all 13 regexes return false -- so the function returns false (not private) instead of true. Identical addresses in lowercase are correctly blocked. The bypass is unconditional: no non-default options are required, no schema validation guards the input, and the library is documented and positioned for user-controlled IP filtering/SSRF protection. The regexes on lines 51-53 (fc00::/7, fe80::/10, ff00::/8) do carry /i flags but lines 43-50 do not, introducing an inconsistent and exploitable gap for IPv4-mapped (::ffff:), NAT64 (64:ff9b::), and documentation-prefix (2001:db8::) ranges with any uppercase hex.",
+        "_done": true
+      }
+    },
+    {
+      "id": "f001",
+      "rel": "lib/index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/private-ip/node_modules/private-ip/lib/index.js",
+      "tags": [
+        "redos"
+      ],
+      "finding": {
+        "vuln_class": "insecure_design_undefined_return",
+        "location": "exported default function, lines 55-66",
+        "severity": "medium",
+        "reachability": "Any caller that treats a falsy return (undefined) as 'not private' \u2014 the most common defensive pattern.",
+        "justification": "When ipaddr.js validates the input as IPv6 but none of the handwritten regexes match (e.g. due to the case-bypass above), the function falls through ipv6_check() returning false, and then the outer function itself returns undefined \u2014 callers using if (!privateIp(addr)) allow() silently permit the request.",
+        "detection_pattern": {
+          "grep_pattern": "return undefined|return$",
+          "anti_pattern": "=== false|=== true",
+          "section_name": "Insecure design: undefined as 'not private' sentinel",
+          "description": "Flags IP-classification helpers that return undefined rather than an explicit boolean, which causes callers relying on truthiness/falsiness to silently pass unknown or malformed addresses as non-private."
+        }
+      },
+      "verdict": {
+        "is_real": false,
+        "severity": "N/A",
+        "reasoning": "The finding's causal chain is factually incorrect. It claims: 'the function falls through ipv6_check() returning false, and then the outer function itself returns undefined.' This is wrong. When is_valid(ip) returns true and parsed.kind() === 'ipv6', the outer function executes 'return ipv6_check(ip)' (line 61), which directly returns whatever ipv6_check returns \u2014 boolean false for unmatched IPs, not undefined. The 'return undefined' on line 65 is only reached when is_valid(ip) is false AND the isIP()/ip_regex.v6() fallback also fails, i.e., for entirely invalid/garbage inputs like 'garbage', null, or empty string. The case-bypass bug (uppercase ::FFFF: matching ipv4-mapped private IPs but failing the case-sensitive regex /^::f{4}:.../) is a real separate bug in a different finding class, but it returns boolean false, not undefined. Verified by running the actual module: privateIp('::FFFF:192.168.1.1') returns false (type: boolean); privateIp('garbage') returns undefined (type: undefined). The undefined-return path is not reachable via the claimed vector (valid IPv6 that bypasses the regex).",
+        "_done": true
+      }
+    }
+  ],
+  "reachability_applied": 1,
+  "reachability_downgraded": 0
+}

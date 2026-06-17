@@ -1,0 +1,70 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "php_object_injection_via_unserialize",
+      "location": "CEI_Core::_import(), class-cei-core.php line 294",
+      "severity": "high",
+      "reachability": "Authenticated users with install_plugins capability (or lower if cei_allow_unsafe_imports filter is hooked) who can reach the WordPress Customizer import flow",
+      "justification": "The import handler calls `@unserialize(trim($raw), array('allowed_classes' => false))` on the contents of an attacker-controlled uploaded file; while `allowed_classes => false` mitigates object injection on PHP 7+, servers running PHP < 7 ignore this option entirely and are fully vulnerable to PHP object injection leading to RCE via magic method chains, and even on PHP 7+ the file content is fully attacker-controlled after only an extension check.",
+      "detection_pattern": {
+        "grep_pattern": "unserialize\\s*\\(",
+        "anti_pattern": "json_decode|allowed_classes.*false",
+        "section_name": "PHP Object Injection: unserialize on user-supplied data",
+        "description": "Matches calls to unserialize() which, when fed attacker-controlled data, can trigger PHP object injection via __wakeup/__destruct gadget chains; files lacking json_decode or allowed_classes=>false are especially suspect."
+      }
+    },
+    {
+      "vuln_class": "ssrf_via_image_sideload",
+      "location": "CEI_Core::_sideload_image(), class-cei-core.php line 418 (called from _import_images line 374)",
+      "severity": "high",
+      "reachability": "Authenticated users with install_plugins capability who upload a crafted .dat import file with image URLs pointing to internal/cloud-metadata endpoints and check the 'Download and import image files?' checkbox",
+      "justification": "When the import-images checkbox is set, `_import_images()` iterates over mod values from the attacker-controlled deserialized data and calls `download_url($val)` on any string matching an image extension pattern, allowing the server to make arbitrary HTTP GET requests to attacker-specified URLs including internal network addresses such as cloud metadata endpoints (169.254.169.254).",
+      "detection_pattern": {
+        "grep_pattern": "download_url\\s*\\(",
+        "anti_pattern": "wp_http_validate_url|filter_var.*FILTER_VALIDATE_URL.*allowed_schemes",
+        "section_name": "SSRF: download_url called on user-supplied URL",
+        "description": "Matches download_url() calls that may receive attacker-controlled URLs from deserialized or uploaded data; without URL allow-listing or scheme/host validation, this enables SSRF against internal network resources."
+      }
+    },
+    {
+      "vuln_class": "stored_xss_via_unescaped_error_in_script_tag",
+      "location": "CEI_Core::controls_print_scripts(), class-cei-core.php line 80",
+      "severity": "medium",
+      "reachability": "Authenticated users with edit_theme_options capability who can trigger an import error; the XSS executes in the Customizer admin page for any subsequent visitor with edit_theme_options",
+      "justification": "The global `$cei_error` is printed directly into a `<script>alert(\"...\");</script>` block without any escaping via `esc_js()` or `wp_json_encode()`; if any error path sets $cei_error to a value containing `\");` the script context is broken and arbitrary JavaScript executes in the admin context.",
+      "detection_pattern": {
+        "grep_pattern": "echo.*<script>.*alert\\(",
+        "anti_pattern": "esc_js|wp_json_encode|htmlspecialchars",
+        "section_name": "XSS: unescaped variable in inline script alert",
+        "description": "Matches dynamic values echoed directly into JavaScript alert() calls inside script tags; without esc_js() the injected string can escape the alert and execute arbitrary JS."
+      }
+    },
+    {
+      "vuln_class": "capability_check_bypass_via_filter",
+      "location": "CEI_Core::can_import(), class-cei-core.php line 44",
+      "severity": "medium",
+      "reachability": "Any code or plugin that hooks the 'cei_allow_unsafe_imports' filter can grant import capability to arbitrary or unauthenticated users",
+      "justification": "`can_import()` returns `apply_filters('cei_allow_unsafe_imports', current_user_can('install_plugins'))`, meaning any plugin or theme that returns `true` from this filter unconditionally bypasses the install_plugins capability requirement and allows any user to perform the import, which itself can trigger unserialize and SSRF.",
+      "detection_pattern": {
+        "grep_pattern": "apply_filters.*current_user_can",
+        "anti_pattern": "current_user_can.*&&|&&.*current_user_can",
+        "section_name": "Authorization Bypass: filterable capability check",
+        "description": "Matches capability checks wrapped in apply_filters where the filter result replaces (rather than gates) the current_user_can() result; this pattern lets third-party code silently downgrade the required capability."
+      }
+    },
+    {
+      "vuln_class": "insufficient_file_type_validation",
+      "location": "CEI_Core::_import(), class-cei-core.php lines 271-278",
+      "severity": "low",
+      "reachability": "Authenticated users with install_plugins capability performing a customizer import",
+      "justification": "`wp_check_filetype()` validates only the file extension (must be `.dat`), not actual file content or MIME type; the `wp_handle_upload` override explicitly sets `test_type => false` disabling WordPress's real MIME sniffing, so any file with a `.dat` extension (including PHP scripts) is accepted and processed by unserialize.",
+      "detection_pattern": {
+        "grep_pattern": "test_type.*false",
+        "anti_pattern": "wp_check_filetype_and_ext|finfo_open|mime_content_type",
+        "section_name": "File Upload: MIME type validation disabled",
+        "description": "Matches wp_handle_upload override arrays that set test_type=>false, disabling WordPress's real MIME type sniffing and relying solely on file extension checks that are trivially bypassed."
+      }
+    }
+  ]
+}

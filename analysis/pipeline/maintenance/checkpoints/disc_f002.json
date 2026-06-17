@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "stored_xss",
+      "location": "mtnc_get_color_field(), line 235",
+      "severity": "medium",
+      "reachability": "Any administrator who saves a crafted color value via the plugin settings form; rendered back to any admin who views the settings page",
+      "justification": "The stored color value is placed into an HTML input attribute via wp_kses_post(stripslashes($value)), which strips disallowed HTML tags but does NOT encode double-quote characters. A value such as `\" onmouseover=\"alert(1)` breaks out of the value attribute and injects an event handler; esc_attr() is required here.",
+      "detection_pattern": {
+        "grep_pattern": "value=\"'\\s*\\.\\s*wp_kses_post\\(",
+        "anti_pattern": "value=\"'\\s*\\.\\s*esc_attr\\(",
+        "section_name": "Stored XSS: wp_kses_post in HTML attribute",
+        "description": "Catches cases where wp_kses_post() (a tag-stripping function) is used to populate an HTML attribute value instead of esc_attr(). wp_kses_post does not encode double-quotes so a stored payload can break out of the attribute and inject event handlers."
+      }
+    },
+    {
+      "vuln_class": "css_injection",
+      "location": "mtnc_generate_image_filed(), line 214",
+      "severity": "medium",
+      "reachability": "Administrator who controls an attachment URL (e.g. via a crafted attachment record); rendered to any admin viewing the Design settings page",
+      "justification": "The attachment URL retrieved from wp_get_attachment_image_src() is passed through esc_url() but then injected bare into a CSS style attribute as `style=\"background-image:url(' . $url . ')\"` — without CSS string quotes around the url() argument and without esc_attr() wrapping the entire style value. A URL containing `)` followed by CSS payload can close the url() call and inject arbitrary CSS rules (UI redressing, content injection).",
+      "detection_pattern": {
+        "grep_pattern": "style=.*background-image:url\\(",
+        "anti_pattern": "style=.*background-image:url\\(['\"]",
+        "section_name": "CSS Injection: unquoted url() in style attribute",
+        "description": "Finds background-image:url() constructions in PHP-generated style attributes where the URL argument is not wrapped in CSS string quotes. Without quotes, a ) character in the URL closes the url() call early and allows injecting subsequent CSS. The anti-pattern checks for a leading quote inside url()."
+      }
+    },
+    {
+      "vuln_class": "stored_xss",
+      "location": "mtnc_create_select_options(), lines 628-630",
+      "severity": "low",
+      "reachability": "Latent: no current caller in this file passes attacker-controlled data into val/label; risk materialises if any future or third-party caller passes DB-sourced values",
+      "justification": "Both $tmp['val'] and $tmp['label'] are interpolated raw into <option> HTML (`value=\"{$tmp['val']}\"` and `>{$tmp['label']}&nbsp;`). The downstream mtnc_wp_kses() call strips disallowed tags but does not re-encode attribute values containing double-quotes, so a val containing `\"` breaks the value attribute. esc_attr()/esc_html() should be applied at point of interpolation.",
+      "detection_pattern": {
+        "grep_pattern": "\"<option[^>]*value=\\\\\"\\{\\$",
+        "anti_pattern": "esc_attr\\(\\$tmp\\[.val.\\]\\)",
+        "section_name": "XSS: unescaped option value interpolation",
+        "description": "Finds PHP string-interpolated <option value=...> constructions where the value is inserted raw via {$var} rather than esc_attr($var). The anti-pattern confirms esc_attr is applied to the value before interpolation."
+      }
+    },
+    {
+      "vuln_class": "unprepared_sql_query",
+      "location": "mtnc_insert_attach_sample_files(), line 1248",
+      "severity": "low",
+      "reachability": "Internal only — called during plugin activation/defaults; no user input reaches the query string",
+      "justification": "$wpdb->get_results() is called with an unparameterised string literal containing only the WP core $wpdb->posts table name property and a hardcoded LIKE pattern — no user input is interpolated, so there is no practical SQL injection. The issue is a code hygiene/WPCS violation (phpcs:ignore suppresses the warning) that could become exploitable if the query is later modified to include user input.",
+      "detection_pattern": {
+        "grep_pattern": "\\$wpdb->get_results\\s*\\(\\s*\"SELECT",
+        "anti_pattern": "\\$wpdb->prepare\\(",
+        "section_name": "SQL: get_results without prepare()",
+        "description": "Finds $wpdb->get_results() calls where the query is passed as a bare double-quoted string (not via $wpdb->prepare()). Files matching this but not having prepare() nearby are candidates for SQL injection if user-controlled values are ever concatenated into those strings."
+      }
+    }
+  ]
+}

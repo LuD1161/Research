@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "open_redirect",
+      "location": "force_regenerate_interface(), line 409",
+      "severity": "low",
+      "reachability": "Authenticated users with the plugin capability (default: manage_options). Attacker crafts a URL to tools.php?page=force-regenerate-thumbnails&goback=https://evil.com and tricks a privileged admin into visiting it; after regen completes the 'Go back' link points to the attacker domain.",
+      "justification": "The $_GET['goback'] parameter is output directly as a link href using esc_url() which strips javascript: but allows arbitrary HTTPS URLs, enabling open redirect for any admin-accessible page visit.",
+      "detection_pattern": {
+        "grep_pattern": "esc_url\\s*\\(.*\\$_(?:GET|REQUEST|POST)\\[",
+        "anti_pattern": "wp_validate_redirect|in_array.*allowed_hosts|home_url|admin_url",
+        "section_name": "Open Redirect: user-supplied URL echoed via esc_url",
+        "description": "Catches places where user-supplied URL parameters are passed through esc_url() and echoed as link destinations without validating the destination is a same-site or allowed URL, enabling open redirect."
+      }
+    },
+    {
+      "vuln_class": "privilege_escalation_via_filter",
+      "location": "__construct(), line 78; all capability checks",
+      "severity": "medium",
+      "reachability": "Any plugin or theme that hooks 'regenerate_thumbs_cap' and returns a lower capability (e.g. 'read' or 'edit_posts'). A malicious or vulnerable co-installed plugin could lower the capability, granting subscribers the ability to trigger thumbnail regeneration and bulk deletion of thumbnail files on any attachment.",
+      "justification": "The capability stored in $this->capability is entirely determined by apply_filters('regenerate_thumbs_cap', 'manage_options') and is used as the sole authorization gate for all AJAX handlers, the admin page form, and the bulk action handler; if a third-party filter returns 'read', any logged-in user can invoke ajax_process_image and cause unlink() calls across the uploads directory.",
+      "detection_pattern": {
+        "grep_pattern": "apply_filters\\s*\\(\\s*['\"][^'\"]+cap[^'\"]*['\"]\\s*,\\s*['\"]\\w+['\"]",
+        "anti_pattern": "current_user_can\\s*\\(\\s*'manage_options'\\s*\\)",
+        "section_name": "Privilege Escalation: capability via filter without floor",
+        "description": "Catches plugins that compute the required capability via a filter with no minimum floor, allowing other plugins to lower the required permission below what is safe for the protected action."
+      }
+    },
+    {
+      "vuln_class": "information_exposure",
+      "location": "ajax_process_image(), line 584",
+      "severity": "low",
+      "reachability": "Any HTTP client that can reach admin-ajax.php with action=regeneratethumbnail (requires no prior auth check before this line).",
+      "justification": "error_reporting(0) is called on line 584 BEFORE the capability and nonce checks on lines 589 and 592; while this silences PHP errors to protect the JSON response format, it also masks any runtime errors that might otherwise surface security-relevant conditions, and in isolation represents a pre-auth suppression of error reporting that could hide other bugs.",
+      "detection_pattern": {
+        "grep_pattern": "error_reporting\\s*\\(\\s*0\\s*\\)",
+        "anti_pattern": "current_user_can|check_ajax_referer|wp_verify_nonce",
+        "section_name": "Information Exposure: error_reporting(0) before auth check",
+        "description": "Catches AJAX handlers that disable error reporting before performing authentication/authorization checks, which can mask PHP errors that would otherwise reveal mishandled inputs or logic errors."
+      }
+    },
+    {
+      "vuln_class": "missing_sql_prepare",
+      "location": "get_active_image_sizes(), line 335",
+      "severity": "low",
+      "reachability": "No direct user input flows into this query; it is called from admin_enqueues() (admin-only page load). Severity is low because there is no user-controlled data in the query.",
+      "justification": "The query at line 335 uses $wpdb->get_var() with a raw SQL string referencing $wpdb->posts (a WordPress-managed constant), without $wpdb->prepare(), which is a coding-standard violation that could introduce SQLi risk if the query is refactored to include user input in the future.",
+      "detection_pattern": {
+        "grep_pattern": "->get_var\\s*\\(\\s*\"SELECT",
+        "anti_pattern": "->prepare\\s*\\(",
+        "section_name": "SQL: get_var without prepare()",
+        "description": "Catches $wpdb->get_var() calls that directly interpolate a SQL string instead of using $wpdb->prepare(), flagging potential SQL injection paths even when current inputs are safe."
+      }
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "xss_reflected",
+      "location": "controls_print_scripts(), line 80",
+      "severity": "high",
+      "reachability": "Any authenticated user who can trigger an import error (install_plugins capability required to reach _import, but $cei_error is also set from wp_handle_upload errors). The echo happens in the Customizer admin context for any user who loaded the Customizer after a failed import.",
+      "justification": "At line 80, `$cei_error` is echoed raw into a `<script>alert(\"...\");</script>` block. At line 283, `$cei_error = $file['error']` assigns a wp_handle_upload error string that can embed attacker-influenced content (e.g., the original filename in some WP error messages). No escaping is applied before writing into the JS string literal.",
+      "detection_pattern": {
+        "grep_pattern": "echo\\s*['\"]<script[^'\"]*alert\\(['\"]\\s*\\.\\s*\\$",
+        "anti_pattern": "esc_js\\s*\\(\\s*\\$cei_error|esc_html\\s*\\(\\s*\\$cei_error",
+        "section_name": "XSS: unescaped variable in inline script alert()",
+        "description": "Catches plugins that echo a PHP variable directly into a JS alert() inside a script tag without esc_js/esc_html. Any attacker-influenced value in that variable becomes XSS."
+      }
+    },
+    {
+      "vuln_class": "ssrf",
+      "location": "_sideload_image(), line 418",
+      "severity": "high",
+      "reachability": "Authenticated users with install_plugins capability who upload a crafted .dat export file and check the 'import images' checkbox. The URL stored in `$val` comes directly from the deserialized attacker-supplied file.",
+      "justification": "At line 418, `download_url( $file )` is called where `$file` is a URL extracted from attacker-controlled import data. There is no scheme restriction, host allowlist, or private-IP blocklist, enabling requests to internal services (http://169.254.169.254/, http://localhost/, file:// etc.) to be made from the server.",
+      "detection_pattern": {
+        "grep_pattern": "download_url\\s*\\(\\s*\\$",
+        "anti_pattern": "wp_http_validate_url|filter_var.*FILTER_VALIDATE_URL.*FILTER_FLAG_NO_PRIV_RANGE",
+        "section_name": "SSRF: download_url() on attacker-controlled URL without host validation",
+        "description": "Catches plugins passing user/file-supplied URLs directly to WP's download_url() without validating scheme or blocking private/loopback ranges, enabling SSRF."
+      }
+    },
+    {
+      "vuln_class": "broken_access_control_filter_bypass",
+      "location": "can_import(), line 44",
+      "severity": "medium",
+      "reachability": "Any code path that registers a hook on `cei_allow_unsafe_imports` and returns true — including other plugins, themes, or malicious code. The filter completely overrides the capability check.",
+      "justification": "At line 44, `apply_filters( 'cei_allow_unsafe_imports', current_user_can( 'install_plugins' ) )` allows any hooked callback to return true and bypass the install_plugins capability requirement. Naming the filter 'unsafe_imports' suggests intentional back-door for developers, but it creates an exploitable bypass if another component hooks it carelessly or maliciously.",
+      "detection_pattern": {
+        "grep_pattern": "apply_filters\\s*\\(\\s*['\"][^'\"]*allow[^'\"]*['\"]\\s*,\\s*current_user_can",
+        "anti_pattern": "INTENTIONAL_NO_MITIGATION",
+        "section_name": "Access Control: capability check wrapped in overrideable filter",
+        "description": "Catches plugins that wrap a current_user_can() check inside apply_filters(), allowing any hooked function to override the authorization result and grant access to privileged operations."
+      }
+    },
+    {
+      "vuln_class": "file_upload_type_bypass",
+      "location": "_import(), line 271-279",
+      "severity": "medium",
+      "reachability": "Authenticated users with install_plugins capability uploading a crafted file.",
+      "justification": "Line 271 calls wp_check_filetype() which validates only by file extension (not actual MIME content). Line 278 then passes `'test_type' => false` to wp_handle_upload(), explicitly disabling WP's built-in MIME verification. A file named `evil.dat` containing PHP code or other dangerous content passes both checks and is written to the uploads directory before being read back at line 293.",
+      "detection_pattern": {
+        "grep_pattern": "'test_type'\\s*=>\\s*false",
+        "anti_pattern": "'test_type'\\s*=>\\s*true",
+        "section_name": "File Upload: MIME type checking disabled in wp_handle_upload",
+        "description": "Catches plugins that disable WP's server-side MIME type verification by passing test_type=>false to wp_handle_upload(), allowing files with dangerous content to be uploaded regardless of their declared type."
+      }
+    },
+    {
+      "vuln_class": "arbitrary_action_dispatch",
+      "location": "_import(), line 344-345",
+      "severity": "medium",
+      "reachability": "Authenticated users with install_plugins capability who supply a crafted .dat file with arbitrary key names in the mods array.",
+      "justification": "At line 345, `do_action( 'customize_save_' . $key )` is called where `$key` is an unsanitized key from the attacker-supplied deserialized mods array. An attacker can craft key names to trigger any registered action hook matching the `customize_save_*` pattern, potentially causing unintended side effects in third-party plugins or themes that hook those actions.",
+      "detection_pattern": {
+        "grep_pattern": "do_action\\s*\\(\\s*['\"][^'\"]+['\"]\\s*\\.\\s*\\$",
+        "anti_pattern": "sanitize_key\\s*\\(\\s*\\$key|in_array\\s*\\(\\s*\\$key\\s*,\\s*\\$allowed",
+        "section_name": "Arbitrary Action Dispatch: dynamic action name from user-controlled data",
+        "description": "Catches plugins that construct a do_action() call by concatenating user/file-supplied data without sanitization or allowlisting, enabling dispatch of unintended WordPress action hooks."
+      }
+    },
+    {
+      "vuln_class": "arbitrary_option_write",
+      "location": "_import(), lines 321-329",
+      "severity": "high",
+      "reachability": "Authenticated users with install_plugins capability who upload a crafted .dat file. The install_plugins cap is itself high-privilege, but this enables writing arbitrary WordPress options beyond what customizer settings should control.",
+      "justification": "At lines 321-329, `$option_key` and `$option_value` from the deserialized attacker-supplied file are passed to `CEI_Option::import()` without any allowlist or sanitization. This allows writing to arbitrary database options (e.g., `siteurl`, `active_plugins`, `admin_email`, `users_can_register`) that could facilitate privilege escalation or site takeover, going well beyond customizer scope.",
+      "detection_pattern": {
+        "grep_pattern": "update_option\\s*\\(\\s*\\$option_key|->import\\s*\\(\\s*\\$option_value",
+        "anti_pattern": "in_array\\s*\\(\\s*\\$option_key\\s*,\\s*\\$allowed_options|array_key_exists.*whitelist",
+        "section_name": "Arbitrary Option Write: user-supplied option keys written without allowlist",
+        "description": "Catches plugins that write to arbitrary WordPress options using keys supplied by user/file input without an explicit allowlist, enabling modification of sensitive site configuration options."
+      }
+    },
+    {
+      "vuln_class": "information_disclosure",
+      "location": "_export(), line 227",
+      "severity": "low",
+      "reachability": "Authenticated users with edit_theme_options capability plus a valid nonce.",
+      "justification": "At line 227, `echo serialize( $data )` outputs the full serialized export including all theme mods, plugin option values collected via `cei_export_option_keys` filter, and custom CSS. Depending on what options are registered, this could expose API keys, credentials, or other secrets stored in WordPress options. The export is gated behind nonce + capability, but the risk is that secrets are bundled into a portable file.",
+      "detection_pattern": {
+        "grep_pattern": "echo\\s+serialize\\s*\\(",
+        "anti_pattern": "INTENTIONAL_NO_MITIGATION",
+        "section_name": "Information Disclosure: serialized options echoed to browser as download",
+        "description": "Catches plugins that echo serialized WordPress options/settings directly to the browser as a file download, which may expose secrets stored in those options to anyone with download access."
+      }
+    }
+  ]
+}

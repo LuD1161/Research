@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "path_traversal_via_symlink",
+      "location": "page_optimize_get_path(), lines 701-706",
+      "severity": "high",
+      "reachability": "Unauthenticated — any HTTP client can reach page_optimize_service_request() which is invoked unconditionally at the bottom of service.php (line 722-724). The URI list comes from an unverified query-string parameter.",
+      "justification": "After blocking literal '..' in the raw URI (line 697), the code calls realpath(PAGE_OPTIMIZE_CONCAT_BASE_DIR . \"/$uri\") but never checks that the resolved absolute path is still prefixed by PAGE_OPTIMIZE_CONCAT_BASE_DIR or PAGE_OPTIMIZE_ABSPATH. A symlink planted anywhere inside the web root that points outside it (e.g., /var/www/html/wp-content/uploads/link.css -> /etc/passwd.css) would pass the '..' guard, resolve to an arbitrary on-disk path via realpath(), and the returned path would be read with file_get_contents() and served to the caller. The mime-type guard (lines 161-164) only checks the file extension on the path string, so renaming the target file or the symlink with a .css/.js suffix bypasses it.",
+      "detection_pattern": {
+        "grep_pattern": "realpath\\s*\\(\\s*[A-Z_]+\\s*\\.\\s*[\"'/]",
+        "anti_pattern": "strpos\\s*\\(\\s*\\$path\\s*,\\s*[A-Z_]+",
+        "section_name": "Path traversal: realpath() without prefix check",
+        "description": "Matches calls to realpath() that concatenate a constant base-dir with attacker-controlled input. If the resolved path is never compared against the base dir prefix (anti_pattern), an attacker can place or exploit symlinks to escape the intended directory."
+      }
+    },
+    {
+      "vuln_class": "header_injection",
+      "location": "page_optimize_service_request(), lines 41-46 (cache meta replay)",
+      "severity": "medium",
+      "reachability": "Unauthenticated — requires that the cache is enabled (PAGE_OPTIMIZE_CACHE_DIR defined and writable) and that a cache entry was written first. On a default install with caching on, any visitor who can influence the initial URL set can trigger this path on subsequent requests.",
+      "justification": "HTTP response headers stored in the JSON cache-meta file (line 75) are replayed verbatim via header($header) at lines 44. The Content-Type header in the stored array (line 242) is assembled from $mime_type, which itself is derived from a file extension and is not sanitised for CRLF characters. An attacker who can create a file whose name or extension contains a CRLF byte and whose path survives the concat pipeline would have that header stored in the meta file, then injected on cache replay. Even without CRLF in the mime-type, any header value stored from a crafted request is replayed without escaping.",
+      "detection_pattern": {
+        "grep_pattern": "header\\s*\\(\\s*\\$",
+        "anti_pattern": "sanitize_text_field|str_replace.*\\\\r\\\\n|preg_replace.*\\\\r|\\\\n",
+        "section_name": "Header injection: unsanitised variable passed to header()",
+        "description": "Matches calls to header() where the argument is a PHP variable. Without CRLF stripping (anti_pattern), an attacker who controls the string value can inject arbitrary HTTP response headers."
+      }
+    },
+    {
+      "vuln_class": "information_disclosure_via_gzip_oracle",
+      "location": "page_optimize_build_output(), line 109",
+      "severity": "low",
+      "reachability": "Unauthenticated — any HTTP GET request to the /_static/ endpoint.",
+      "justification": "The compressed argument path (line 108-109) calls @gzuncompress(base64_decode(...)) with the error suppressor on an attacker-supplied blob. Although false is properly checked and exits with 400, feeding malformed gzip blobs to gzuncompress() can leak version or timing information through error handling differences. More importantly, there is no size limit on the decoded blob before it is passed to gzuncompress(), making this a decompression-bomb vector: a tiny base64-encoded payload that expands to hundreds of megabytes of data will be fully decompressed into $args before any length check, consuming server memory and CPU.",
+      "detection_pattern": {
+        "grep_pattern": "gzuncompress\\s*\\(\\s*(base64_decode|@?base64_decode)",
+        "anti_pattern": "strlen.*<|mb_strlen.*<",
+        "section_name": "DoS: decompression bomb via gzuncompress without size limit",
+        "description": "Matches gzuncompress() applied directly to base64-decoded attacker input. Without a pre-decompression size cap (anti_pattern), an attacker can supply a small compressed payload that expands to gigabytes, exhausting PHP memory."
+      }
+    },
+    {
+      "vuln_class": "mime_type_bypass_via_extension",
+      "location": "page_optimize_get_mime_type(), lines 256-267 and page_optimize_build_output() line 161-164",
+      "severity": "medium",
+      "reachability": "Unauthenticated — depends on being able to request a path whose final extension is 'css' or 'js'; the content type is derived solely from the filename extension, not from the file's actual content.",
+      "justification": "page_optimize_get_mime_type() determines the content type exclusively from the last dot-separated extension of the filesystem path (lines 259-266). There is no magic-byte check, no finfo_file() call, and no further restriction on the file's actual content. If path traversal (finding 1) is exploited to reach an arbitrary file renamed with a .css or .js extension, that file's full contents are served verbatim with a trusted content-type header, enabling exfiltration of sensitive files (configuration files, private keys) or serving attacker-controlled JavaScript.",
+      "detection_pattern": {
+        "grep_pattern": "strrpos\\s*\\(\\s*\\$\\w+\\s*,\\s*['\"]\\.['\"]\\s*\\)",
+        "anti_pattern": "finfo_file|mime_content_type|getimagesize",
+        "section_name": "MIME bypass: extension-only type detection",
+        "description": "Matches extension-based MIME detection (strrpos for last dot) without any magic-byte or finfo validation (anti_pattern). A file whose name ends in .css but contains arbitrary content will be served with a CSS content-type, bypassing type restrictions."
+      }
+    }
+  ]
+}

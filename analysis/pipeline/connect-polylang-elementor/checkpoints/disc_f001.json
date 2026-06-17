@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "open_redirect_via_server_variable_injection",
+      "location": "ElementorAssets::editor_domain_redirect(), includes/elementor-assets.php line 181",
+      "severity": "medium",
+      "reachability": "Any logged-in admin visiting the Elementor editor URL on a multidomain Polylang site; attacker can control HTTP_HOST or QUERY_STRING via forged request.",
+      "justification": "The raw `$_SERVER['QUERY_STRING']` is passed to `add_query_arg()` without sanitization, and the resulting URL is host-substituted via `str_replace($server_host, $post_host, $current_url)` then passed to `wp_safe_redirect()`. An attacker who can inject content into the query string (or manipulate HTTP_HOST on an improperly configured server) can influence the redirect target.",
+      "detection_pattern": {
+        "grep_pattern": "add_query_arg\\(\\s*wp_unslash\\(\\s*\\$_SERVER\\[.QUERY_STRING.\\]",
+        "anti_pattern": "esc_url\\(|sanitize_url\\(",
+        "section_name": "Open Redirect: raw QUERY_STRING in add_query_arg before redirect",
+        "description": "Catches plugins that pass unsanitized $_SERVER['QUERY_STRING'] into add_query_arg() before a redirect, which can allow redirect destination manipulation."
+      }
+    },
+    {
+      "vuln_class": "attacker_controlled_header_used_in_logic",
+      "location": "ConnectPlugins::elementor_kit_translation(), includes/connect-plugins.php lines 307-313",
+      "severity": "low",
+      "reachability": "Any unauthenticated or authenticated user making a REST request to /wp-json/elementor/v1/globals with a crafted HTTP_REFERER header.",
+      "justification": "The function reads `$_SERVER['HTTP_REFERER']`, parses its query string, and uses `$query['post']` to determine which language kit to load via `pll_get_post_language()`. HTTP_REFERER is fully attacker-controlled; while `absint()` is applied to the post ID, an attacker can cause the wrong language kit to be served for any arbitrary post ID, potentially leaking the existence of translated content or causing visual inconsistency.",
+      "detection_pattern": {
+        "grep_pattern": "\\$_SERVER\\[.HTTP_REFERER.\\]",
+        "anti_pattern": "wp_get_referer\\(\\)|check_admin_referer\\(",
+        "section_name": "Attacker-Controlled Input: HTTP_REFERER used in business logic",
+        "description": "Catches plugins that directly access $_SERVER['HTTP_REFERER'] for business logic instead of using wp_get_referer() (which validates same-origin) or ignoring it entirely; the Referer header is fully attacker-controlled."
+      }
+    },
+    {
+      "vuln_class": "stored_xss_unescaped_widget_setting_output",
+      "location": "PolylangLanguageSwitcher::render(), includes/widgets/polylang-language-switcher.php lines 753-758",
+      "severity": "low",
+      "reachability": "Admin/editor user who configures the Elementor widget's 'Before' and 'After' language-code text fields; the values are echoed to the front end inside a span tag without escaping.",
+      "justification": "The `before_language_code` and `after_language_code` widget settings (free-text admin inputs) are interpolated directly into the language-code span (`$settings['before_language_code']` and `$settings['after_language_code']`) without any `esc_html()` call, so an administrator could store HTML/JS that renders for all visitors on pages containing this widget.",
+      "detection_pattern": {
+        "grep_pattern": "\\$settings\\[.before_|\\$settings\\[.after_",
+        "anti_pattern": "esc_html\\(\\s*\\$settings\\[|esc_attr\\(\\s*\\$settings\\[",
+        "section_name": "Stored XSS: Elementor widget settings echoed without escaping",
+        "description": "Catches Elementor widget render() methods that echo $settings values directly (especially prefix/suffix text controls) without esc_html() or esc_attr(), enabling stored XSS by anyone who can edit the widget."
+      }
+    },
+    {
+      "vuln_class": "unvalidated_http_host_used_in_url_rewriting",
+      "location": "fix_cross_domain_assets(), connect-polylang-elementor.php line 142; ConnectPlugins::fix_url_domain(), includes/connect-plugins.php line 855; ElementorAssets::editor_domain_redirect(), includes/elementor-assets.php line 182",
+      "severity": "low",
+      "reachability": "Any request where HTTP_HOST can be spoofed (misconfigured web server without a fixed ServerName); affects multidomain Polylang setups only.",
+      "justification": "Multiple functions read `$_SERVER['HTTP_HOST']` and use it to compare against or substitute into URLs. Although the code applies `sanitize_text_field()` and `wp_parse_url()`, a spoofed HTTP_HOST on a misconfigured server could cause URLs to be rewritten to attacker-controlled domains in script/style tags or redirects.",
+      "detection_pattern": {
+        "grep_pattern": "\\$_SERVER\\[.HTTP_HOST.\\]",
+        "anti_pattern": "home_url\\(|site_url\\(",
+        "section_name": "Host Header Injection: HTTP_HOST used in URL construction",
+        "description": "Catches plugins that read $_SERVER['HTTP_HOST'] for URL construction or comparison instead of using WordPress's home_url()/site_url() which read from trusted database options."
+      }
+    }
+  ]
+}

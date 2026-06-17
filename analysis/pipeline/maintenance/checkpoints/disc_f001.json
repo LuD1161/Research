@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "mtnc_plugin_dismiss_dialog, line 18-34 (registered at line 34)",
+      "severity": "medium",
+      "reachability": "Any authenticated (logged-in) WordPress user",
+      "justification": "The wp_ajax_mtnc_dismiss_dialog handler verifies a nonce but performs no current_user_can() capability check; any logged-in user who possesses a valid 'mtnc_dismiss_nonce' nonce can invoke update_option('maintenance_meta', ...) and mutate plugin state.",
+      "detection_pattern": {
+        "grep_pattern": "add_action\\(\"wp_ajax_[^\"]+\",\\s*\"[^\"]+\"\\)",
+        "anti_pattern": "current_user_can\\(",
+        "section_name": "Broken Access Control: AJAX handler without capability check",
+        "description": "Matches wp_ajax_ handler registrations; files that have such a handler but no current_user_can() in the corresponding function are suspicious — nonce verification alone is CSRF protection, not authorization."
+      }
+    },
+    {
+      "vuln_class": "broken_access_control",
+      "location": "mtnc_register_settings, line 79-115",
+      "severity": "medium",
+      "reachability": "Any authenticated user with a valid admin session nonce (admin_init fires for all admin requests)",
+      "justification": "mtnc_register_settings() calls check_admin_referer() for CSRF but has no current_user_can('manage_options') gate before calling update_option('maintenance_options', ...); an authenticated user who can reach admin-ajax.php or admin.php with a valid nonce can overwrite all plugin settings.",
+      "detection_pattern": {
+        "grep_pattern": "check_admin_referer\\(",
+        "anti_pattern": "current_user_can\\(",
+        "section_name": "Broken Access Control: settings handler with nonce but no capability check",
+        "description": "Matches admin_init/form handlers that use check_admin_referer for CSRF but omit a capability check before performing privileged operations such as update_option."
+      }
+    },
+    {
+      "vuln_class": "improper_capability_check",
+      "location": "mtnc_ajax_dismiss_notice, line 41",
+      "severity": "low",
+      "reachability": "Any authenticated user; practically only affects multisite or sites with custom roles",
+      "justification": "current_user_can('administrator') checks a role string rather than a capability (e.g. 'manage_options'); on multisite or sites with custom role plugins this check can be bypassed by users who have administrator-level capabilities but not the 'administrator' role label.",
+      "detection_pattern": {
+        "grep_pattern": "current_user_can\\(['\"]administrator['\"]\\)",
+        "anti_pattern": "current_user_can\\(['\"]manage_options['\"]\\)",
+        "section_name": "Improper capability check: role string instead of capability",
+        "description": "Flags current_user_can('administrator') which checks a role name rather than a primitive capability; role-based checks are unreliable on multisite and with custom role plugins, whereas capability-based checks are the correct WordPress security model."
+      }
+    },
+    {
+      "vuln_class": "css_injection_insufficient_sanitization",
+      "location": "mtnc_register_settings, line 107",
+      "severity": "low",
+      "reachability": "Authenticated users with manage_options (administrators)",
+      "justification": "custom_css is sanitized with wp_kses_post() which strips HTML tags but does not sanitize CSS; an admin can store arbitrary CSS including url() data URIs, CSS-based content exfiltration vectors, or @import directives that load external resources.",
+      "detection_pattern": {
+        "grep_pattern": "wp_kses_post.*custom_css",
+        "anti_pattern": "wp_strip_all_tags\\|sanitize_textarea_field\\|esc_textarea",
+        "section_name": "Insufficient CSS sanitization: wp_kses_post on CSS field",
+        "description": "wp_kses_post is designed for HTML post content, not CSS; using it on CSS fields allows arbitrary CSS to be stored since it only removes HTML tags. CSS fields should use wp_strip_all_tags or a dedicated CSS sanitizer."
+      }
+    }
+  ]
+}

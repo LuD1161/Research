@@ -1,0 +1,150 @@
+{
+  "slug": "method-override",
+  "run": "method-override",
+  "manifest": "/DATA/openclaw/Repos/Research/analysis/pipeline-js/method-override/manifest.json",
+  "files_reviewed": 1,
+  "raw_findings": 3,
+  "confirmed_count": 2,
+  "confirmed": [
+    {
+      "id": "f001",
+      "rel": "index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/method-override/node_modules/method-override/index.js",
+      "tags": [
+        "deserialize"
+      ],
+      "finding": {
+        "vuln_class": "http_method_spoofing_authorization_bypass",
+        "location": "methodOverride (inner middleware), lines 68-79",
+        "severity": "medium",
+        "reachability": "Any unauthenticated or authenticated HTTP client that can send a POST request to an endpoint using this middleware; no special privileges required",
+        "justification": "Line 75 sets `req.method = method.toUpperCase()` to an attacker-supplied value (from query string or header) after only a whitelist check against known HTTP method names; if authorization middleware runs downstream and makes decisions based on `req.method`, an attacker can escalate a POST (allowed) to DELETE/PUT/PATCH to bypass route-level access controls.",
+        "detection_pattern": {
+          "grep_pattern": "req\\.method\\s*=\\s*.*[Uu]pper[Cc]ase",
+          "anti_pattern": "req\\.method\\s*=\\s*.*[Uu]pper[Cc]ase.*//.*validated|authorize.*before.*methodOverride",
+          "section_name": "HTTP Method Spoofing: req.method override",
+          "description": "Catches middleware that overwrites req.method with caller-controlled data; attacker can masquerade as a privileged HTTP verb if auth middleware runs after this assignment."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "medium",
+        "reasoning": "The finding is confirmed. In /DATA/openclaw/Repos/Research/packages/method-override/node_modules/method-override/index.js, lines 68-79, the sink `req.method = method.toUpperCase()` (line 75) is reachable with attacker-controlled input via the HTTP header (default: X-HTTP-Method-Override) or query string (non-default getter, e.g. '_method'). The only guard is `supports(method)` (lines 140-144), which checks that the supplied value is a known HTTP verb name (from Node.js http.METHODS, lowercased). This whitelist prevents arbitrary string injection but does NOT prevent privilege escalation \u2014 an attacker can legitimately supply 'DELETE', 'PUT', or 'PATCH' as the override value, and these pass the whitelist. No schema validator (zod/joi/ajv), no authorization check, and no rate limiting exists within this middleware. The attack path requires only that the consuming application: (1) uses method-override middleware (default configuration works), and (2) places authorization/routing middleware downstream of method-override. This is a well-known misuse pattern for this library, documented in its README, but the code itself enables the bypass. Reachability claim is accurate: any HTTP client can send a POST with X-HTTP-Method-Override: DELETE header and the middleware will set req.method = 'DELETE' before downstream handlers see the request. No non-default options are required for the header-based path. The query string path requires a non-default getter string but is equally exploitable once configured. The 'medium' severity is appropriate: the bypass is real but requires a specific (and unfortunately common) deployment anti-pattern where auth middleware runs after method-override."
+      },
+      "reachability": {
+        "gate_breachable": true,
+        "gate_type": "no gate \u2014 default config",
+        "adjusted_severity": "medium",
+        "reasoning": "The vulnerable sink (req.method = method.toUpperCase(), line 75) is reachable at default configuration with no non-default options required. The default getter reads the X-HTTP-Method-Override request header, which any HTTP client can set freely. The only guard is the supports() allowlist (lines 140-144), which validates that the supplied value is a known HTTP verb name \u2014 but this allowlist explicitly permits DELETE, PUT, PATCH, and other privileged verbs that an attacker would use for method spoofing. There is no authorization check, no rate limiting, and no schema validation within the middleware itself. The header-based attack path is the default configuration: methodOverride() with no arguments already reads X-HTTP-Method-Override from the request headers. An attacker needs only to send a POST request with the header X-HTTP-Method-Override: DELETE (or PUT/PATCH) to cause downstream middleware and route handlers to see req.method === 'DELETE'. If authorization middleware runs downstream of method-override (a common and documented anti-pattern), access controls based on req.method are bypassable. The query string path (_method) requires a non-default getter string, but the header path \u2014 which is the default \u2014 is fully exploitable without any configuration change. Severity remains medium: the bypass is real and default-reachable, but exploitation requires the consuming application to place authorization checks downstream of method-override middleware."
+      }
+    },
+    {
+      "id": "f001",
+      "rel": "index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/method-override/node_modules/method-override/index.js",
+      "tags": [
+        "deserialize"
+      ],
+      "finding": {
+        "vuln_class": "csrf_protection_bypass_via_null_methods_config",
+        "location": "methodOverride (factory), line 53; inner middleware line 64",
+        "severity": "low",
+        "reachability": "Exploitable only when developer sets `opts.methods = null`; a GET or HEAD request with an `_method` override param would then be eligible to trigger method substitution, bypassing CSRF defenses that rely on POST-only semantics",
+        "justification": "Line 53 assigns `opts.methods` directly when it is not `undefined`, so passing `null` sets `methods = null`; line 64's guard `if (methods && methods.indexOf(...) === -1)` short-circuits on `null` (falsy), skipping the allowed-method check entirely and letting ANY HTTP verb (GET, HEAD) trigger an override \u2014 removing the POST-only CSRF barrier.",
+        "detection_pattern": {
+          "grep_pattern": "opts\\.methods\\s*===\\s*undefined\\s*\\?",
+          "anti_pattern": "opts\\.methods\\s*==\\s*null|Array\\.isArray\\(methods\\)",
+          "section_name": "CSRF bypass: null methods config disables verb guard",
+          "description": "Catches method-override configurations that accept null to mean 'all methods allowed', which removes the POST-only guard and lets GET/HEAD requests override HTTP methods, undermining CSRF protections."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The code path is accurately described. Line 53 uses strict `=== undefined` so passing `opts.methods = null` assigns `methods = null`. Line 64's guard `if (methods && methods.indexOf(...) === -1)` short-circuits to false when `methods` is null (falsy), skipping the allowed-method check entirely and permitting any HTTP verb (GET, HEAD, etc.) to trigger method override. This is technically a real CSRF-protection bypass when `methods: null` is configured. However, two important qualifications reduce severity: (1) This behavior is EXPLICITLY DOCUMENTED in the README \u2014 'null can be specified to allow all methods' \u2014 with an accompanying security warning, making it a documented intentional feature rather than a hidden defect. (2) Reachability requires a developer to deliberately pass `{ methods: null }` as server-side configuration; no attacker-controlled input can reach this code path. There is no schema validation (no zod/joi/ajv) on the options object. The CSRF concern is real if a developer deliberately disables the POST-only guard, but labeling it a vulnerability is borderline since the library explicitly documents and warns about this behavior. Severity 'low' is appropriate given the explicit developer opt-in and documented risk warning."
+      }
+    }
+  ],
+  "all_with_verdicts": [
+    {
+      "id": "f001",
+      "rel": "index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/method-override/node_modules/method-override/index.js",
+      "tags": [
+        "deserialize"
+      ],
+      "finding": {
+        "vuln_class": "http_method_spoofing_authorization_bypass",
+        "location": "methodOverride (inner middleware), lines 68-79",
+        "severity": "medium",
+        "reachability": "Any unauthenticated or authenticated HTTP client that can send a POST request to an endpoint using this middleware; no special privileges required",
+        "justification": "Line 75 sets `req.method = method.toUpperCase()` to an attacker-supplied value (from query string or header) after only a whitelist check against known HTTP method names; if authorization middleware runs downstream and makes decisions based on `req.method`, an attacker can escalate a POST (allowed) to DELETE/PUT/PATCH to bypass route-level access controls.",
+        "detection_pattern": {
+          "grep_pattern": "req\\.method\\s*=\\s*.*[Uu]pper[Cc]ase",
+          "anti_pattern": "req\\.method\\s*=\\s*.*[Uu]pper[Cc]ase.*//.*validated|authorize.*before.*methodOverride",
+          "section_name": "HTTP Method Spoofing: req.method override",
+          "description": "Catches middleware that overwrites req.method with caller-controlled data; attacker can masquerade as a privileged HTTP verb if auth middleware runs after this assignment."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "medium",
+        "reasoning": "The finding is confirmed. In /DATA/openclaw/Repos/Research/packages/method-override/node_modules/method-override/index.js, lines 68-79, the sink `req.method = method.toUpperCase()` (line 75) is reachable with attacker-controlled input via the HTTP header (default: X-HTTP-Method-Override) or query string (non-default getter, e.g. '_method'). The only guard is `supports(method)` (lines 140-144), which checks that the supplied value is a known HTTP verb name (from Node.js http.METHODS, lowercased). This whitelist prevents arbitrary string injection but does NOT prevent privilege escalation \u2014 an attacker can legitimately supply 'DELETE', 'PUT', or 'PATCH' as the override value, and these pass the whitelist. No schema validator (zod/joi/ajv), no authorization check, and no rate limiting exists within this middleware. The attack path requires only that the consuming application: (1) uses method-override middleware (default configuration works), and (2) places authorization/routing middleware downstream of method-override. This is a well-known misuse pattern for this library, documented in its README, but the code itself enables the bypass. Reachability claim is accurate: any HTTP client can send a POST with X-HTTP-Method-Override: DELETE header and the middleware will set req.method = 'DELETE' before downstream handlers see the request. No non-default options are required for the header-based path. The query string path requires a non-default getter string but is equally exploitable once configured. The 'medium' severity is appropriate: the bypass is real but requires a specific (and unfortunately common) deployment anti-pattern where auth middleware runs after method-override."
+      }
+    },
+    {
+      "id": "f001",
+      "rel": "index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/method-override/node_modules/method-override/index.js",
+      "tags": [
+        "deserialize"
+      ],
+      "finding": {
+        "vuln_class": "cross_site_tracing_xst_via_method_whitelist",
+        "location": "supports(), line 143; methods npm package whitelist",
+        "severity": "low",
+        "reachability": "Any client that can send a POST request with `_method=TRACE` (or `X-HTTP-Method-Override: TRACE`) to a server that reflects or echoes TRACE requests",
+        "justification": "The `methods` npm package (line 17, used in `supports()` at line 143) includes `trace` and `connect`; a POST to `/?_method=TRACE` sets `req.method='TRACE'`, enabling Cross-Site Tracing (XST) if the server or any upstream proxy reflects TRACE content including cookies or auth headers.",
+        "detection_pattern": {
+          "grep_pattern": "methods\\.indexOf\\(method\\.toLowerCase\\(\\)\\)",
+          "anti_pattern": "blacklist.*TRACE|TRACE.*not.*allowed|method\\.toLowerCase\\(\\).*!==.*trace",
+          "section_name": "XST: TRACE method in whitelist",
+          "description": "Catches method-override patterns that allow TRACE/CONNECT through the whitelist; servers that reflect TRACE are vulnerable to Cross-Site Tracing which can exfiltrate cookies."
+        }
+      },
+      "verdict": {
+        "is_real": false,
+        "severity": "low",
+        "reasoning": "The code path is real but the XST threat is not. Confirmed facts: (1) The `methods` npm package includes 'trace' and 'connect' (both in http.METHODS at runtime). (2) The `supports()` function at line 140-144 uses the module-scoped `var methods = require('methods')` (line 17), NOT the inner `var methods = opts.methods` at line 53 (which is scoped to the factory function closure) \u2014 there is no variable shadowing issue affecting supports(). (3) A POST request with header `X-HTTP-Method-Override: TRACE` (the DEFAULT getter) will set req.method = 'TRACE' with zero non-default configuration required. The attack surface exists factually. However, the finding's claimed threat (Cross-Site Tracing / XST) is not valid: XST requires a browser to send a cross-origin TRACE request to a server that reflects headers. All major browsers have blocked XMLHttpRequest and fetch from sending TRACE since ~2004-2005, making the cross-site credential exfiltration path non-functional in any modern browser. The method-override library itself does not reflect TRACE content \u2014 it only sets req.method on the Node.js request object. An actual XST attack would additionally require: (a) the application has a route handler for TRACE that echoes headers back, AND (b) an attacker can trigger it cross-site from a browser (blocked by browsers). Non-browser clients (curl, etc.) can send TRACE but that is same-origin server-side access, not cross-site tracing. The 'low' severity claim is overstated for the named vuln class. The code does allow TRACE method override (a footgun that application developers should be aware of), but this is a design-level concern about what the consuming application does with TRACE, not an exploitable XST vulnerability in this library."
+      }
+    },
+    {
+      "id": "f001",
+      "rel": "index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/method-override/node_modules/method-override/index.js",
+      "tags": [
+        "deserialize"
+      ],
+      "finding": {
+        "vuln_class": "csrf_protection_bypass_via_null_methods_config",
+        "location": "methodOverride (factory), line 53; inner middleware line 64",
+        "severity": "low",
+        "reachability": "Exploitable only when developer sets `opts.methods = null`; a GET or HEAD request with an `_method` override param would then be eligible to trigger method substitution, bypassing CSRF defenses that rely on POST-only semantics",
+        "justification": "Line 53 assigns `opts.methods` directly when it is not `undefined`, so passing `null` sets `methods = null`; line 64's guard `if (methods && methods.indexOf(...) === -1)` short-circuits on `null` (falsy), skipping the allowed-method check entirely and letting ANY HTTP verb (GET, HEAD) trigger an override \u2014 removing the POST-only CSRF barrier.",
+        "detection_pattern": {
+          "grep_pattern": "opts\\.methods\\s*===\\s*undefined\\s*\\?",
+          "anti_pattern": "opts\\.methods\\s*==\\s*null|Array\\.isArray\\(methods\\)",
+          "section_name": "CSRF bypass: null methods config disables verb guard",
+          "description": "Catches method-override configurations that accept null to mean 'all methods allowed', which removes the POST-only guard and lets GET/HEAD requests override HTTP methods, undermining CSRF protections."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The code path is accurately described. Line 53 uses strict `=== undefined` so passing `opts.methods = null` assigns `methods = null`. Line 64's guard `if (methods && methods.indexOf(...) === -1)` short-circuits to false when `methods` is null (falsy), skipping the allowed-method check entirely and permitting any HTTP verb (GET, HEAD, etc.) to trigger method override. This is technically a real CSRF-protection bypass when `methods: null` is configured. However, two important qualifications reduce severity: (1) This behavior is EXPLICITLY DOCUMENTED in the README \u2014 'null can be specified to allow all methods' \u2014 with an accompanying security warning, making it a documented intentional feature rather than a hidden defect. (2) Reachability requires a developer to deliberately pass `{ methods: null }` as server-side configuration; no attacker-controlled input can reach this code path. There is no schema validation (no zod/joi/ajv) on the options object. The CSRF concern is real if a developer deliberately disables the POST-only guard, but labeling it a vulnerability is borderline since the library explicitly documents and warns about this behavior. Severity 'low' is appropriate given the explicit developer opt-in and documented risk warning."
+      }
+    }
+  ],
+  "reachability_applied": 1,
+  "reachability_downgraded": 0
+}

@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "hardcoded_credential_path",
+      "location": "get_setting(), line 976-978",
+      "severity": "high",
+      "reachability": "Any code path that calls get_setting('json_key'), including the authenticated admin AJAX handlers and automatic post-publish hooks. The file path is exposed in source code visible to anyone with access to the plugin files.",
+      "justification": "get_setting() unconditionally reads and returns the contents of a hardcoded file 'rank-math-835b6feb842b.json' if it exists, bypassing the database-stored key entirely; this is a development artifact left in production code that silently overrides the configured API credential and leaks the sensitive key filename in source.",
+      "detection_pattern": {
+        "grep_pattern": "file_get_contents\\(\\s*plugin_dir_path\\(\\s*__FILE__\\s*\\)\\s*\\.\\s*['\"][a-zA-Z0-9_\\-]+\\.json['\"]",
+        "anti_pattern": "INTENTIONAL_NO_ANTI_PATTERN",
+        "section_name": "Hardcoded credential file fallback",
+        "description": "Matches plugins that hardcode a specific JSON filename within plugin_dir_path as a credential fallback. This pattern indicates a development artifact where a private service-account key file path was left in production source code, silently overriding configured credentials and exposing the key name."
+      }
+    },
+    {
+      "vuln_class": "broken_access_control_via_filterable_capability",
+      "location": "ajax_rm_giapi(), line 361; ajax_get_limits(), line 636; send_to_api_link(), line 318; save_settings(), line 814; admin_menu(), lines 663-675",
+      "severity": "medium",
+      "reachability": "Any authenticated WordPress user if another installed plugin lowers the filtered capability. The AJAX handlers (wp_ajax_rm_giapi, wp_ajax_rm_giapi_limits) are reachable by any logged-in user who passes the capability check.",
+      "justification": "All privileged capability checks use apply_filters('rank_math/indexing_api/capability', 'manage_options'), allowing any other plugin or theme to replace 'manage_options' with a weaker capability like 'read' or 'edit_posts'; an attacker who can install or influence another plugin could thereby grant contributors or subscribers the ability to submit arbitrary URLs to the Google Indexing API and read quota data.",
+      "detection_pattern": {
+        "grep_pattern": "current_user_can\\(\\s*apply_filters\\s*\\(",
+        "anti_pattern": "INTENTIONAL_NO_ANTI_PATTERN",
+        "section_name": "Filterable capability check in privileged handler",
+        "description": "Matches handlers that wrap current_user_can() with apply_filters(), allowing any third-party plugin to lower the required capability. When protecting privileged or state-changing actions, the capability should be a hardcoded constant, not a filterable value."
+      }
+    },
+    {
+      "vuln_class": "missing_file_type_validation_on_upload",
+      "location": "save_google_settings(), lines 842-843",
+      "severity": "low",
+      "reachability": "Authenticated admin users (manage_options) who submit the Google settings form with a file upload. Requires valid nonce and capability.",
+      "justification": "The uploaded file at $_FILES['json_file']['tmp_name'] is read with file_get_contents() and stored as the API credential with no MIME-type, extension, or content validation; while PHP controls tmp_name so path traversal is impossible, an admin could store arbitrary content (malformed or malicious JSON) as the credential, potentially causing downstream errors or confusing the json_decode() call that uses it as a Google API auth config.",
+      "detection_pattern": {
+        "grep_pattern": "file_get_contents\\(\\s*\\$_FILES\\[",
+        "anti_pattern": "wp_check_filetype|getimagesize|finfo_file|mime_content_type",
+        "section_name": "File upload without type validation",
+        "description": "Matches plugins that read uploaded file contents directly via file_get_contents($_FILES[...]['tmp_name']) without validating MIME type or file extension. Even when protected by capability checks, missing content validation allows admins to store malformed or unexpected data types."
+      }
+    },
+    {
+      "vuln_class": "nonce_mangled_by_sanitize_title",
+      "location": "save_settings(), line 810",
+      "severity": "low",
+      "reachability": "Any attacker attempting to analyze nonce verification logic; functionally safe for current WordPress nonces but represents a fragile anti-pattern.",
+      "justification": "The nonce is passed through sanitize_title() before wp_verify_nonce() on line 810 ('wp_verify_nonce( sanitize_title( wp_unslash( $_POST[\"_wpnonce\"] ) ), \"giapi-save\" )'); while current WordPress nonces are hex strings (0-9a-f) and sanitize_title only lowercases them without stripping characters, this is a fragile anti-pattern that would silently break nonce verification if the nonce format ever changes, and it incorrectly applies a slug-sanitizer to a token context.",
+      "detection_pattern": {
+        "grep_pattern": "wp_verify_nonce\\(\\s*sanitize_title\\s*\\(",
+        "anti_pattern": "INTENTIONAL_NO_ANTI_PATTERN",
+        "section_name": "Nonce value mutated by sanitize_title before verification",
+        "description": "Matches wp_verify_nonce() calls where the nonce value is first passed through sanitize_title(). This incorrectly applies a slug-sanitizer to a token, and while currently harmless with hex-encoded WP nonces, it is a fragile anti-pattern that could silently break verification if WP nonce encoding changes."
+      }
+    }
+  ]
+}

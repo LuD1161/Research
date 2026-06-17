@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "nonce_action_reuse",
+      "location": "disable_comments_settings() line 1265, delete_comments_settings() line 1391, get_sub_sites() line 1199",
+      "severity": "low",
+      "reachability": "Authenticated users with manage_options or manage_network_plugins capability who can trigger any of the three wp_ajax_ handlers.",
+      "justification": "All three AJAX handlers — get_sub_sites, disable_comments_save_settings (settings save), and disable_comments_delete_comments (bulk comment deletion) — verify against the identical nonce action string 'disable_comments_save_settings'. A nonce created for the read-only get_sub_sites call is valid for the destructive delete-all-comments call; nonce specificity provides no action-level isolation between handlers.",
+      "detection_pattern": {
+        "grep_pattern": "wp_verify_nonce\\([^,]+,\\s*['\"]([^'\"]+)['\"]",
+        "anti_pattern": "Each action string appears only once across all wp_verify_nonce calls for different destructive vs. read handlers",
+        "section_name": "CSRF/nonce: shared nonce action across handlers of different privilege levels",
+        "description": "Finds wp_verify_nonce calls; when multiple handlers (especially read vs. destructive) share the same action string, a nonce obtained for one operation is silently accepted by the other, defeating per-action CSRF specificity."
+      }
+    },
+    {
+      "vuln_class": "improper_input_validation",
+      "location": "get_sub_sites() lines 1214-1219",
+      "severity": "low",
+      "reachability": "Authenticated users with manage_network_plugins (multisite) or manage_options (single-site) who call the wp_ajax_get_sub_sites handler.",
+      "justification": "The GET parameters pageSize and pageNumber are processed with sanitize_text_field(), which strips HTML but does not coerce to integer or enforce positive bounds. They are then used directly in arithmetic ($offset = ($pageNumber - 1) * $pageSize) and passed as the 'number' and 'offset' arguments to get_sites(). Passing pageSize=0 causes get_sites() to fetch all subsites in a single query (WordPress treats 0 as 'no limit'), enabling resource exhaustion against large networks; non-numeric values are silently cast by PHP, producing undefined pagination behaviour.",
+      "detection_pattern": {
+        "grep_pattern": "sanitize_text_field.*\\$_GET\\[.*(page|limit|offset|number|size)",
+        "anti_pattern": "absint|intval|filter_input.*FILTER_VALIDATE_INT",
+        "section_name": "Input validation: numeric pagination params validated as text",
+        "description": "Catches GET parameters intended to be integers (page, limit, offset, number, size) that are sanitized with sanitize_text_field instead of absint/intval; these are then used in arithmetic or query construction, risking DoS via unbounded queries or type-confusion bugs."
+      }
+    },
+    {
+      "vuln_class": "stored_xss_via_comment_type",
+      "location": "_get_all_comment_types() lines 1106-1128, delete_comments_settings() line 1557, line 1433",
+      "severity": "medium",
+      "reachability": "Any user who can insert a comment record with a crafted comment_type value (e.g. via the WordPress REST API, XML-RPC, or direct database access through another plugin); payload executes when an administrator uses the Delete Comments admin UI and the front-end JavaScript renders the returned 'message' JSON field with innerHTML or equivalent.",
+      "justification": "At line 1111, comment_type values are fetched raw from the database without sanitization. At line 1123 the raw value is embedded directly into the display label: ucwords(str_replace('_', ' ', $value)) . ' (' . $value . ')'. This label is stored in $commenttypes[$value] and later inserted verbatim into the $message string at line 1433, then returned through wp_send_json_success(). If the admin-facing JavaScript renders the 'message' field using innerHTML (common in jQuery-based admin plugins), a comment_type such as '<img src=x onerror=alert(document.cookie)>' stored in the database would execute in the administrator's browser. The file does not escape comment_type values before embedding them in the message.",
+      "detection_pattern": {
+        "grep_pattern": "get_results.*comment_type.*FROM.*comments",
+        "anti_pattern": "esc_html|esc_attr|wp_kses",
+        "section_name": "XSS: raw DB comment_type used in admin response label without escaping",
+        "description": "Finds direct database queries that SELECT comment_type from the comments table; when the retrieved value is used to build a display label or JSON message without esc_html/esc_attr, an attacker who can store a crafted comment_type achieves stored XSS in the admin context when the value is later rendered."
+      }
+    },
+    {
+      "vuln_class": "broken_access_control_via_forgeable_routing_hint",
+      "location": "is_network_admin_ajax_context() lines 133-144, disable_comments_settings() line 1267, delete_comments_settings() line 1393",
+      "severity": "low",
+      "reachability": "Any authenticated user with manage_options capability on a subsite in a multisite installation where the plugin is network-activated and sitewide_settings is disabled.",
+      "justification": "is_network_admin_ajax_context() returns true when the user-supplied GET parameter ?is_network_admin=1 is present on an AJAX request (line 140-143). In disable_comments_settings and delete_comments_settings, $is_network_ctx from this function controls both capability selection (is_network_ctx=true → require manage_network_plugins) and options-table routing (is_network_ctx=true → write to update_site_option). The code docblock at lines 126-132 acknowledges the parameter is 'forgeable'. While the actual capability gate correctly requires manage_network_plugins when is_network_ctx=true — so a plain manage_options user cannot use this to grant themselves super-admin writes — the forgeable routing hint could be abused in a confused-deputy scenario if future code paths do not uniformly re-check capabilities after trusting the routing flag. The more concrete risk today: a subsite admin omitting the ?is_network_admin=1 param when sitewide_settings='1' would fall into the 'manage_options' branch instead of the 'manage_network_plugins' branch, because the sitewide_settings guard only activates when networkactive AND sitewide_settings==='1', meaning a site admin on a network-activated install where sitewide_settings is not strictly '1' can write to their subsite's options with only manage_options.",
+      "detection_pattern": {
+        "grep_pattern": "\\$_GET\\[.is_network_admin.\\]",
+        "anti_pattern": "current_user_can.*manage_network_plugins",
+        "section_name": "Access control: user-controlled routing flag used for context detection without pairing with capability check",
+        "description": "Finds GET parameter 'is_network_admin' being read as a routing hint; when this value influences which code branch executes without an adjacent current_user_can('manage_network_plugins') check, it creates a confused-deputy or privilege-escalation path."
+      }
+    }
+  ]
+}

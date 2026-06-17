@@ -1,0 +1,200 @@
+{
+  "slug": "decompress",
+  "run": "decompress",
+  "manifest": "/DATA/openclaw/Repos/Research/analysis/pipeline-js/decompress/manifest.json",
+  "files_reviewed": 1,
+  "raw_findings": 3,
+  "confirmed_count": 3,
+  "confirmed": [
+    {
+      "id": "f001",
+      "rel": "index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/decompress/node_modules/decompress/index.js",
+      "tags": [
+        "path_traversal",
+        "proto_pollution"
+      ],
+      "finding": {
+        "vuln_class": "path_traversal",
+        "location": "safeMakeDir (line 29) and extractFile (line 106)",
+        "severity": "high",
+        "reachability": "Reachable by any caller that passes a malicious archive (tar/zip/etc.) with crafted entry paths; the archive is the direct input to the exported module function.",
+        "justification": "The output-directory containment checks at lines 29 and 106 use `String.prototype.indexOf(realOutputPath) !== 0` instead of `startsWith(realOutputPath + path.sep)`, so a sibling directory whose name shares the same prefix (e.g. output='/tmp/out' and dest='/tmp/out-evil/...') satisfies the check and permits writes outside the intended output tree.",
+        "detection_pattern": {
+          "grep_pattern": "\\.indexOf\\(real[Oo]utput[Pp]ath\\)\\s*[!=]==\\s*0",
+          "anti_pattern": "startsWith\\(real[Oo]utput[Pp]ath\\s*\\+\\s*['\"][\\\\/]['\"]\\)",
+          "section_name": "Path Traversal: indexOf prefix check",
+          "description": "Catches output-directory containment guards that use indexOf(prefix)===0 rather than startsWith(prefix+sep); the former is bypassable whenever a sibling path shares the same textual prefix."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "high",
+        "reasoning": "The vulnerability is real and confirmed by code analysis. Both guards use `String.prototype.indexOf(realOutputPath) !== 0` (line 29 in safeMakeDir, line 106 in extractFile). When realOutputPath is '/tmp/out' and the destination resolves to '/tmp/out-evil' (a sibling directory whose name shares the prefix), indexOf returns 0, so `0 !== 0` is false and no exception is thrown, allowing the write. The correct check would be `startsWith(realOutputPath + path.sep)`. Attack path: an archive with an entry path like '../out-evil/pwned.php' resolves via path.join to '/tmp/out-evil/pwned.php' (outside the intended output dir). The bypass requires the sibling directory ('/tmp/out-evil') to pre-exist on the filesystem at extraction time; if it does not exist, safeMakeDir recursively checks the parent ('/tmp'), whose indexOf returns -1 (throws correctly). No input schema validation (no zod/joi/ajv), no archive entry path sanitization, no non-default options required \u2014 decompress() is called directly with the archive input as the exported function's first argument. The reachability claim is slightly overstated ('any archive' should be 'archive with traversal path entries AND a pre-existing sibling dir with matching prefix'), but the condition is realistic in shared temp directory environments, CI/CD pipelines where multiple extractions occur, or any system where sibling directories predictably exist.",
+        "_done": true
+      },
+      "reachability": {
+        "gate_breachable": true,
+        "gate_type": "no gate \u2014 default config",
+        "adjusted_severity": "high",
+        "reasoning": "The vulnerable function is the module's default export (module.exports at line 131), making it a fully public API. No non-default options are required to trigger the vulnerability: the default plugin set (tar, tarbz2, targz, unzip) is configured automatically at lines 141-146, so any archive input reaches the vulnerable indexOf checks at lines 29 and 106. Input validation is minimal \u2014 only a type check (string or Buffer) at lines 132-133 with no archive entry path sanitization, no allowlist, no schema validation. The archive content (entry paths) is attacker-controlled in typical real-world usage where users upload archives for extraction. The exploit condition (a sibling directory with a matching prefix pre-existing on the filesystem, e.g. '/tmp/out-evil' when output is '/tmp/out') is realistic in shared temp directories, CI/CD pipelines with multiple extractions, or any multi-tenant environment. Because the vulnerability is reachable at default configuration with no options, the original high severity rating is unchanged."
+      }
+    },
+    {
+      "id": "f001",
+      "rel": "index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/decompress/node_modules/decompress/index.js",
+      "tags": [
+        "path_traversal",
+        "proto_pollution"
+      ],
+      "finding": {
+        "vuln_class": "path_traversal",
+        "location": "extractFile \u2014 symlink branch (lines 120-121)",
+        "severity": "high",
+        "reachability": "Reachable whenever the archive contains a symlink entry; no authentication or privilege is required to supply such an archive.",
+        "justification": "`fsP.symlink(x.linkname, dest)` is called with an archive-controlled `x.linkname` that is never validated; an attacker can create a symlink pointing to any absolute path (e.g. `/etc/passwd`), which persists in the output directory and allows subsequent reads of arbitrary files by the consuming application.",
+        "detection_pattern": {
+          "grep_pattern": "fs(?:P|promises)?\\.(symlink|symlinkSync)\\s*\\([^,)]*linkname",
+          "anti_pattern": "path\\.resolve\\s*\\(.*linkname|isAbsolute|startsWith",
+          "section_name": "Path Traversal: unvalidated symlink linkname",
+          "description": "Catches symlink creation calls that pass an archive-supplied `linkname` field directly without validating that it is relative and does not escape the output directory."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "high",
+        "reasoning": "Confirmed. Lines 120-121 call `fsP.symlink(x.linkname, dest)` with archive-controlled `x.linkname` that is never validated. The guards at lines 89-110 only verify that `dest` (the symlink file location) is within the output directory \u2014 they use `safeMakeDir` and `realpath`-based containment checks on `dest` and its parent directory, but none of these touch `x.linkname` (the symlink target). There is no `path.isAbsolute`, `startsWith`, `path.resolve`-based check, or any schema validation (no zod/joi/ajv) applied to `x.linkname` at any point in the call chain. An attacker can craft an archive (tar, tar.gz, tar.bz2, or zip) containing a symlink entry whose `linkname` field is an absolute path such as `/etc/passwd`, `/etc/shadow`, or any other path outside the output directory. The symlink file itself will be placed at `dest` inside the output directory (passes all containment checks), while pointing externally. Any subsequent file read by the consuming application that dereferences the symlink will access the attacker-chosen target. The symlink branch is reached by default whenever the archive contains a symlink entry and an output directory is specified \u2014 no non-default options or configuration required, no authentication required. The `preventWritingThroughSymlink` guard only prevents writing *through* an already-existing symlink at `dest`; it does not validate the new symlink's target. This is a well-known 'zip symlink' / path traversal via symlink attack. Package version: 4.2.1.",
+        "_done": true
+      },
+      "reachability": {
+        "gate_breachable": true,
+        "gate_type": "no gate \u2014 default config",
+        "adjusted_severity": "high",
+        "reasoning": "The vulnerability is reachable and exploitable at default configuration with no non-default options required. The module's default export at line 131 is a public API function directly callable by any consumer. The symlink branch at lines 120-121 (`fsP.symlink(x.linkname, dest)`) is reached whenever an archive entry has `type === 'symlink'` \u2014 this requires no special options; the default `opts.plugins` array includes all decompressors (tar, tarbz2, targz, unzip). The guards at lines 89-110 use `safeMakeDir` and `realpath`-based containment checks exclusively on `dest` (the symlink's file-system location within the output directory) \u2014 none of these checks touch `x.linkname` (the symlink's target/pointer value). `preventWritingThroughSymlink` only prevents writing *through* a pre-existing symlink at `dest`; it does not validate the new symlink's target. There is no `path.isAbsolute`, `path.resolve`, `startsWith`, schema validation (joi/zod/ajv), or any other guard applied to `x.linkname` anywhere in the call chain. An attacker who can supply the archive (e.g., via file upload, URL fetch, or any input channel) controls `x.linkname` entirely and can set it to an absolute path such as `/etc/passwd` or `/etc/shadow`. The symlink will be created at `dest` (inside the output directory, passing all checks) while pointing externally. Any subsequent dereference by the consuming application reads the attacker-chosen file. No authentication, no privilege, and no non-default option is required to trigger this path."
+      }
+    },
+    {
+      "id": "f001",
+      "rel": "index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/decompress/node_modules/decompress/index.js",
+      "tags": [
+        "path_traversal",
+        "proto_pollution"
+      ],
+      "finding": {
+        "vuln_class": "path_traversal",
+        "location": "extractFile \u2014 hardlink branch (lines 112-113, 116-117)",
+        "severity": "high",
+        "reachability": "Reachable whenever the archive contains a hard-link entry (tar type '1'); no authentication or privilege is required.",
+        "justification": "`fsP.link(x.linkname, dest)` is called with an archive-controlled `x.linkname` that is never validated; on systems where the output directory shares a filesystem with sensitive files (common for `/tmp` vs `/etc` on many Linux distros), an attacker can create a hardlink from within the output directory to any accessible file (e.g. `/etc/shadow`), exposing its contents.",
+        "detection_pattern": {
+          "grep_pattern": "fs(?:P|promises)?\\.(link|linkSync)\\s*\\([^,)]*linkname",
+          "anti_pattern": "path\\.resolve\\s*\\(.*linkname|isAbsolute|startsWith",
+          "section_name": "Path Traversal: unvalidated hardlink linkname",
+          "description": "Catches hard-link creation calls that pass an archive-supplied `linkname` field directly without verifying the source path is within the allowed output tree."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "high",
+        "reasoning": "The vulnerability is confirmed real. In /DATA/openclaw/Repos/Research/packages/decompress/node_modules/decompress/index.js at lines 112-113 and 116-117, `fsP.link(x.linkname, dest)` is called with `x.linkname` sourced directly from the archive's tar header (set in decompress-tar/index.js line 32: `file.linkname = header.linkname`) with no sanitization. The tar header's linkname field is parsed raw from archive bytes by tar-stream (headers.js line 250) \u2014 no path normalization or containment check is applied anywhere in the chain. The guards that do exist (lines 96-110) call `safeMakeDir` and `fsP.realpath(path.dirname(dest))` to validate that the DESTINATION (new link location) stays within the output directory, but there is no corresponding check on `x.linkname` (the source path passed as the first argument to `fs.link()`). This means an attacker who crafts a tar archive with a type-'1' hardlink entry where `linkname` is an absolute path (e.g., `/etc/passwd`) can cause the library to create a hardlink inside the output directory pointing to that external file. No special options or configuration are required \u2014 the default plugin set includes `decompressTar()` and the hardlink branch executes whenever an archive entry has `type === 'link'`. No schema validation (zod/joi/ajv) is present. The readme contains no security disclaimers about untrusted archives. Reachability is direct: any caller passing an attacker-supplied archive buffer to `decompress(buf, outputDir)` is affected. OS-level mitigation: `protected_hardlinks=1` (confirmed active on this system) prevents unprivileged users from hardlinking files they do not own, which reduces practical impact for non-root processes. However, (a) processes running as root (common in Docker/CI) bypass this protection entirely, (b) the vulnerability is present in the code regardless of OS configuration, and (c) processes can hardlink their own files. Severity remains HIGH because the no-authentication reachability claim is correct with respect to the decompress API itself, and root execution is a common deployment pattern.",
+        "_done": true
+      },
+      "reachability": {
+        "gate_breachable": true,
+        "gate_type": "no gate \u2014 default config",
+        "adjusted_severity": "high",
+        "reasoning": "The vulnerability is reachable at default configuration with no special options required. The top-level export `module.exports = (input, output, opts)` in index.js is a public API. The default plugin set (lines 141-146) includes `decompressTar()` with no opt-in needed, so any tar archive containing a type-'1' hardlink entry triggers the vulnerable branch at lines 112-113. The destination path (`dest`) is validated via `fsP.realpath(path.dirname(dest))` at lines 104-109, but `x.linkname` \u2014 the source path passed as the first argument to `fsP.link(x.linkname, dest)` \u2014 is never checked, sanitized, or constrained to the output directory. An attacker who supplies a crafted archive (the primary use-case of this library) can set `linkname` to an absolute path such as `/etc/shadow` and cause the library to create a hardlink inside the output directory pointing to that file, exposing its contents. No schema validation, type allowlist, or path-containment check exists for the linkname field anywhere in the call chain. The parameter is user-controlled in the most common real-world pattern (extracting untrusted/downloaded archives). OS-level mitigation (`protected_hardlinks=1`) reduces practical impact for non-root processes but is bypassed entirely when the process runs as root (common in CI/Docker), so severity remains HIGH."
+      }
+    }
+  ],
+  "all_with_verdicts": [
+    {
+      "id": "f001",
+      "rel": "index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/decompress/node_modules/decompress/index.js",
+      "tags": [
+        "path_traversal",
+        "proto_pollution"
+      ],
+      "finding": {
+        "vuln_class": "path_traversal",
+        "location": "safeMakeDir (line 29) and extractFile (line 106)",
+        "severity": "high",
+        "reachability": "Reachable by any caller that passes a malicious archive (tar/zip/etc.) with crafted entry paths; the archive is the direct input to the exported module function.",
+        "justification": "The output-directory containment checks at lines 29 and 106 use `String.prototype.indexOf(realOutputPath) !== 0` instead of `startsWith(realOutputPath + path.sep)`, so a sibling directory whose name shares the same prefix (e.g. output='/tmp/out' and dest='/tmp/out-evil/...') satisfies the check and permits writes outside the intended output tree.",
+        "detection_pattern": {
+          "grep_pattern": "\\.indexOf\\(real[Oo]utput[Pp]ath\\)\\s*[!=]==\\s*0",
+          "anti_pattern": "startsWith\\(real[Oo]utput[Pp]ath\\s*\\+\\s*['\"][\\\\/]['\"]\\)",
+          "section_name": "Path Traversal: indexOf prefix check",
+          "description": "Catches output-directory containment guards that use indexOf(prefix)===0 rather than startsWith(prefix+sep); the former is bypassable whenever a sibling path shares the same textual prefix."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "high",
+        "reasoning": "The vulnerability is real and confirmed by code analysis. Both guards use `String.prototype.indexOf(realOutputPath) !== 0` (line 29 in safeMakeDir, line 106 in extractFile). When realOutputPath is '/tmp/out' and the destination resolves to '/tmp/out-evil' (a sibling directory whose name shares the prefix), indexOf returns 0, so `0 !== 0` is false and no exception is thrown, allowing the write. The correct check would be `startsWith(realOutputPath + path.sep)`. Attack path: an archive with an entry path like '../out-evil/pwned.php' resolves via path.join to '/tmp/out-evil/pwned.php' (outside the intended output dir). The bypass requires the sibling directory ('/tmp/out-evil') to pre-exist on the filesystem at extraction time; if it does not exist, safeMakeDir recursively checks the parent ('/tmp'), whose indexOf returns -1 (throws correctly). No input schema validation (no zod/joi/ajv), no archive entry path sanitization, no non-default options required \u2014 decompress() is called directly with the archive input as the exported function's first argument. The reachability claim is slightly overstated ('any archive' should be 'archive with traversal path entries AND a pre-existing sibling dir with matching prefix'), but the condition is realistic in shared temp directory environments, CI/CD pipelines where multiple extractions occur, or any system where sibling directories predictably exist.",
+        "_done": true
+      }
+    },
+    {
+      "id": "f001",
+      "rel": "index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/decompress/node_modules/decompress/index.js",
+      "tags": [
+        "path_traversal",
+        "proto_pollution"
+      ],
+      "finding": {
+        "vuln_class": "path_traversal",
+        "location": "extractFile \u2014 symlink branch (lines 120-121)",
+        "severity": "high",
+        "reachability": "Reachable whenever the archive contains a symlink entry; no authentication or privilege is required to supply such an archive.",
+        "justification": "`fsP.symlink(x.linkname, dest)` is called with an archive-controlled `x.linkname` that is never validated; an attacker can create a symlink pointing to any absolute path (e.g. `/etc/passwd`), which persists in the output directory and allows subsequent reads of arbitrary files by the consuming application.",
+        "detection_pattern": {
+          "grep_pattern": "fs(?:P|promises)?\\.(symlink|symlinkSync)\\s*\\([^,)]*linkname",
+          "anti_pattern": "path\\.resolve\\s*\\(.*linkname|isAbsolute|startsWith",
+          "section_name": "Path Traversal: unvalidated symlink linkname",
+          "description": "Catches symlink creation calls that pass an archive-supplied `linkname` field directly without validating that it is relative and does not escape the output directory."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "high",
+        "reasoning": "Confirmed. Lines 120-121 call `fsP.symlink(x.linkname, dest)` with archive-controlled `x.linkname` that is never validated. The guards at lines 89-110 only verify that `dest` (the symlink file location) is within the output directory \u2014 they use `safeMakeDir` and `realpath`-based containment checks on `dest` and its parent directory, but none of these touch `x.linkname` (the symlink target). There is no `path.isAbsolute`, `startsWith`, `path.resolve`-based check, or any schema validation (no zod/joi/ajv) applied to `x.linkname` at any point in the call chain. An attacker can craft an archive (tar, tar.gz, tar.bz2, or zip) containing a symlink entry whose `linkname` field is an absolute path such as `/etc/passwd`, `/etc/shadow`, or any other path outside the output directory. The symlink file itself will be placed at `dest` inside the output directory (passes all containment checks), while pointing externally. Any subsequent file read by the consuming application that dereferences the symlink will access the attacker-chosen target. The symlink branch is reached by default whenever the archive contains a symlink entry and an output directory is specified \u2014 no non-default options or configuration required, no authentication required. The `preventWritingThroughSymlink` guard only prevents writing *through* an already-existing symlink at `dest`; it does not validate the new symlink's target. This is a well-known 'zip symlink' / path traversal via symlink attack. Package version: 4.2.1.",
+        "_done": true
+      }
+    },
+    {
+      "id": "f001",
+      "rel": "index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/decompress/node_modules/decompress/index.js",
+      "tags": [
+        "path_traversal",
+        "proto_pollution"
+      ],
+      "finding": {
+        "vuln_class": "path_traversal",
+        "location": "extractFile \u2014 hardlink branch (lines 112-113, 116-117)",
+        "severity": "high",
+        "reachability": "Reachable whenever the archive contains a hard-link entry (tar type '1'); no authentication or privilege is required.",
+        "justification": "`fsP.link(x.linkname, dest)` is called with an archive-controlled `x.linkname` that is never validated; on systems where the output directory shares a filesystem with sensitive files (common for `/tmp` vs `/etc` on many Linux distros), an attacker can create a hardlink from within the output directory to any accessible file (e.g. `/etc/shadow`), exposing its contents.",
+        "detection_pattern": {
+          "grep_pattern": "fs(?:P|promises)?\\.(link|linkSync)\\s*\\([^,)]*linkname",
+          "anti_pattern": "path\\.resolve\\s*\\(.*linkname|isAbsolute|startsWith",
+          "section_name": "Path Traversal: unvalidated hardlink linkname",
+          "description": "Catches hard-link creation calls that pass an archive-supplied `linkname` field directly without verifying the source path is within the allowed output tree."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "high",
+        "reasoning": "The vulnerability is confirmed real. In /DATA/openclaw/Repos/Research/packages/decompress/node_modules/decompress/index.js at lines 112-113 and 116-117, `fsP.link(x.linkname, dest)` is called with `x.linkname` sourced directly from the archive's tar header (set in decompress-tar/index.js line 32: `file.linkname = header.linkname`) with no sanitization. The tar header's linkname field is parsed raw from archive bytes by tar-stream (headers.js line 250) \u2014 no path normalization or containment check is applied anywhere in the chain. The guards that do exist (lines 96-110) call `safeMakeDir` and `fsP.realpath(path.dirname(dest))` to validate that the DESTINATION (new link location) stays within the output directory, but there is no corresponding check on `x.linkname` (the source path passed as the first argument to `fs.link()`). This means an attacker who crafts a tar archive with a type-'1' hardlink entry where `linkname` is an absolute path (e.g., `/etc/passwd`) can cause the library to create a hardlink inside the output directory pointing to that external file. No special options or configuration are required \u2014 the default plugin set includes `decompressTar()` and the hardlink branch executes whenever an archive entry has `type === 'link'`. No schema validation (zod/joi/ajv) is present. The readme contains no security disclaimers about untrusted archives. Reachability is direct: any caller passing an attacker-supplied archive buffer to `decompress(buf, outputDir)` is affected. OS-level mitigation: `protected_hardlinks=1` (confirmed active on this system) prevents unprivileged users from hardlinking files they do not own, which reduces practical impact for non-root processes. However, (a) processes running as root (common in Docker/CI) bypass this protection entirely, (b) the vulnerability is present in the code regardless of OS configuration, and (c) processes can hardlink their own files. Severity remains HIGH because the no-authentication reachability claim is correct with respect to the decompress API itself, and root execution is a common deployment pattern.",
+        "_done": true
+      }
+    }
+  ],
+  "reachability_applied": 3,
+  "reachability_downgraded": 0
+}

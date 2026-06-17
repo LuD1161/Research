@@ -1,0 +1,160 @@
+{
+  "slug": "ssrf-req-filter",
+  "run": "ssrf-req-filter",
+  "manifest": "/DATA/openclaw/Repos/Research/analysis/pipeline-js/ssrf-req-filter/manifest.json",
+  "files_reviewed": 1,
+  "raw_findings": 3,
+  "confirmed_count": 2,
+  "confirmed": [
+    {
+      "id": "f001",
+      "rel": "lib/index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/ssrf-req-filter/node_modules/ssrf-req-filter/lib/index.js",
+      "tags": [
+        "deserialize"
+      ],
+      "finding": {
+        "vuln_class": "ssrf_filter_bypass_hostname_pre_check_reliance_on_lookup_event",
+        "location": "requestFilterHandler > agent.createConnection override, lines 28-41",
+        "severity": "low",
+        "reachability": "Reachable by any caller who provides a hostname (non-IP) as the request host. The entire SSRF protection for hostname-based requests depends exclusively on the 'lookup' event being emitted.",
+        "justification": "The pre-connection check at line 30 calls `checkIp(options.host)`. For any non-IP string (hostnames like 'internal.corp'), `ipaddr.isValid()` returns false, so `checkIp` returns `true` (ALLOW) and the pre-check is silently bypassed. Protection relies entirely on the 'lookup' event firing after DNS resolution. In environments using custom net.Socket implementations, mocked sockets, or certain Unix-domain-socket usages where `options.host` is undefined/absent, the lookup event may not fire, leaving the filter ineffective with no fallback.",
+        "detection_pattern": {
+          "grep_pattern": "createConnection.*options.*host.*checkIp|isValid.*host.*return true",
+          "anti_pattern": "if\\s*\\(!options\\.host\\).*socket\\.destroy|throw.*blocked.*unix",
+          "section_name": "SSRF: pre-check allows non-IP host strings through",
+          "description": "Catches SSRF filter implementations where the pre-connection check unconditionally allows non-IP host values (because IP validation returns false for hostnames), making the filter entirely dependent on a post-DNS 'lookup' event. If the lookup event is not emitted, there is no SSRF protection."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The code behavior is confirmed exactly as described. At line 30, `checkIp(options.host)` calls `ipaddr.isValid()` on the host value. For any non-IP string (hostname like 'internal.corp', 'localhost', or `undefined`), `ipaddr.isValid()` returns `false`, so `checkIp` returns `true` (ALLOW), and the pre-connection check is silently bypassed without any block. This is verified by running ipaddr.js directly: `ipaddr.isValid('internal.corp')` returns `false`, `ipaddr.isValid('localhost')` returns `false`, `ipaddr.isValid(undefined)` returns `false`. For these cases, the ENTIRE SSRF protection depends on the `lookup` event firing after DNS resolution (lines 34-39). In the standard/documented use case (axios or node-fetch making TCP connections), the `lookup` event IS emitted by Node.js net.Socket for hostname-based connections, so in practice the protection works: e.g. 'localhost' passes the pre-check but the lookup event fires with '127.0.0.1', which `checkIp` correctly blocks. The finding is real as an architectural weakness: (1) the pre-check design is incomplete for hostnames \u2014 it provides zero protection at that layer; (2) if the lookup event is not emitted (Unix domain sockets where `options.host` is `undefined`/absent and `options.path` is used instead, or custom/mocked socket implementations), there is no fallback and the filter provides no protection. The severity is appropriately rated 'low' because: the documented usage (HTTP over TCP with axios/node-fetch) is protected via the lookup event; the gap only opens in non-standard socket usage that is outside the library's intended scope; there is no schema validation (zod/joi/ajv) involved, and no non-default config is required \u2014 but the attack requires the caller to use a custom socket implementation or Unix domain socket context that the library does not defend against. The reachability claim is confirmed: any hostname-based request bypasses the pre-check, and if lookup does not fire, the filter is entirely ineffective. The finding is valid but edge-case in practice.",
+        "_done": true,
+        "severity_pre_reach": "low"
+      },
+      "reachability": {
+        "gate_breachable": false,
+        "gate_type": "non-standard socket usage required for full bypass \u2014 lookup event covers normal TCP/hostname cases",
+        "adjusted_severity": "low",
+        "reasoning": "The vulnerable code is in a publicly exported function (module.exports default export and module.exports.requestFilterHandler). No non-default options are required to reach the code path \u2014 any hostname-based URL triggers the pre-check bypass at line 30. However, gate_breachable is false because complete exploitation (SSRF filter providing zero protection) requires a non-standard socket scenario where the 'lookup' event is not emitted (Unix domain sockets with options.path instead of options.host, or custom/mocked socket implementations). In the standard/documented usage pattern (HTTP/HTTPS over TCP with axios or node-fetch), the lookup event IS emitted by Node.js net.Socket for all hostname-based connections, so the filter works correctly via the secondary protection layer. The pre-check architectural weakness is real but only becomes an exploitable full bypass in non-standard contexts outside the library's intended scope. The user-controlled parameter (url) is the primary input, and the host is derived from it, so the parameter is user-controlled in typical deployments. Severity stays 'low' as originally assessed."
+      }
+    },
+    {
+      "id": "f001",
+      "rel": "lib/index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/ssrf-req-filter/node_modules/ssrf-req-filter/lib/index.js",
+      "tags": [
+        "deserialize"
+      ],
+      "finding": {
+        "vuln_class": "ssrf_filter_bypass_unix_socket_no_host",
+        "location": "requestFilterHandler > agent.createConnection override, line 29-31",
+        "severity": "low",
+        "reachability": "Reachable only if the caller uses the patched agent with a Unix-domain socket request (options.path set, options.host absent). Unix socket access already implies local system access, but the filter provides a false sense of protection.",
+        "justification": "At line 29, `const {host: address} = options` destructures `host` from the connection options. For Unix socket connections (where `options.path` is set but `options.host` is undefined), `address` is `undefined`. `ipaddr.isValid(undefined)` returns `false`, so `checkIp(undefined)` returns `true` (ALLOW). No lookup event fires for Unix sockets. The request proceeds to a local Unix socket (e.g., `/var/run/docker.sock`) without any SSRF check, silently bypassing the filter.",
+        "detection_pattern": {
+          "grep_pattern": "options\\.host.*checkIp|const.*host.*=.*options",
+          "anti_pattern": "options\\.path.*destroy|socketPath.*blocked|!options\\.host.*throw",
+          "section_name": "SSRF: Unix socket bypass via undefined host",
+          "description": "Catches SSRF filter implementations that only check `options.host` in the createConnection override and do not handle the case where `options.host` is undefined (Unix domain socket connections via `options.path`). An undefined host causes IP validation to return false, which most filters interpret as 'not an IP, allow through', bypassing protection entirely for Unix socket connections."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "informational",
+        "reasoning": "The vulnerability is real but the finding's claimed mechanism is slightly inaccurate. The finding claims options.host is undefined for Unix socket connections, but Node.js http.Agent always populates options.host with 'localhost' (the default) when socketPath is used in request options. However, the bypass still works because checkIp('localhost') also returns true (ALLOW): ipaddr.isValid('localhost') returns false, so checkIp short-circuits and returns true (line 6-8 of index.js). Additionally, Unix socket connections bypass DNS entirely, so the 'lookup' event handler (lines 34-39) never fires. Net result: a request with socketPath set (e.g., '/var/run/docker.sock') passes through the patched agent.createConnection unchecked. Verified end-to-end with Node.js v22: net.createConnection is called with socketPath='/var/run/docker.sock' and host='localhost', and the filter does not block it. The bypass requires the caller to (a) use the patched agent and (b) make an HTTP request with socketPath in the request options \u2014 an unusual but possible configuration. The finding's severity=low is appropriate: socketPath in request options is not a typical user-controlled input surface, and accessing Unix sockets already implies local system access. The core vulnerability class (Unix socket bypass) is confirmed despite the minor mechanism inaccuracy (undefined vs 'localhost').",
+        "severity_pre_reach": "low"
+      },
+      "reachability": {
+        "gate_breachable": false,
+        "gate_type": "non-default usage pattern required (socketPath must be set in HTTP request options)",
+        "adjusted_severity": "informational",
+        "reasoning": "The vulnerability is real (confirmed by adversarial verdict) but is not breachable under default or typical usage. The library exports two functions: the default export creates and patches a fresh agent for a given URL, and requestFilterHandler patches any caller-supplied agent. The bypass triggers only when the caller (1) uses the patched agent AND (2) makes an HTTP request with socketPath set in the request options (Unix domain socket). In that configuration, Node.js sets options.host to 'localhost' by default; ipaddr.isValid('localhost') returns false, so checkIp short-circuits to true (ALLOW) and the lookup event never fires because Unix socket connections skip DNS entirely. However, socketPath in request options is not a default or typical usage pattern for applications using ssrf-req-filter. The library is designed to protect URL-based SSRF (e.g., user-supplied URLs like http://169.254.169.254/). Unix socket usage requires an explicit, attacker-influenced socketPath string embedded in the application's request options \u2014 a much harder-to-reach attacker surface. In real-world deployments, socketPath values are typically hardcoded by developers, not derived from user input. The gate is non-default option required: an attacker must control or influence the socketPath value in HTTP request options, which is rarely a user-controlled input. Since the prerequisite usage pattern is not the default or typical use of this library, gate_breachable=false and severity is downgraded to informational."
+      }
+    }
+  ],
+  "all_with_verdicts": [
+    {
+      "id": "f001",
+      "rel": "lib/index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/ssrf-req-filter/node_modules/ssrf-req-filter/lib/index.js",
+      "tags": [
+        "deserialize"
+      ],
+      "finding": {
+        "vuln_class": "ssrf_filter_bypass_via_lookup_error_path",
+        "location": "requestFilterHandler > socket.on('lookup') callback, line 35",
+        "severity": "medium",
+        "reachability": "Reachable by any caller using the patched agent for hostname-based HTTP/HTTPS requests where DNS resolution fails or returns an error alongside an address (edge-case Node.js behavior).",
+        "justification": "The lookup event handler uses `if (error || checkIp(address)) { return false; }` \u2014 when `error` is truthy, the short-circuit OR skips the IP check and returns `false` WITHOUT calling `socket.destroy()`. If a non-standard runtime or future Node.js version emits the lookup event with both `error` and a resolved `address` (e.g., partial DNS failure with a result), the private address is never checked and the socket is not destroyed, allowing an SSRF to private infrastructure. Node.js currently aborts the TCP connect on DNS error regardless, but this relies on undocumented runtime behavior rather than explicit code-level enforcement.",
+        "detection_pattern": {
+          "grep_pattern": "socket\\.on\\(['\"]lookup['\"].*error.*\\|\\|",
+          "anti_pattern": "if\\s*\\(error\\)\\s*\\{[^}]*socket\\.destroy",
+          "section_name": "SSRF: lookup event error path missing socket.destroy",
+          "description": "Catches socket 'lookup' event handlers that use short-circuit OR (`error || condition`) instead of explicitly destroying the socket on DNS error. The correct pattern is to always call socket.destroy(error) when error is truthy, rather than relying on the runtime to abort the connection."
+        }
+      },
+      "verdict": {
+        "is_real": false,
+        "severity": "n/a",
+        "reasoning": "The finding is NOT a real vulnerability under any standard Node.js runtime. The claimed scenario requires the 'lookup' event to fire with both a truthy error AND a private IP address simultaneously \u2014 this is impossible per the Node.js dns.lookup API contract and empirically confirmed.\n\nKey facts established:\n1. CODE READS CORRECTLY: The handler at line 34-39 is `if (error || checkIp(address)) { return false; }`. When error is truthy, it short-circuits and does NOT call socket.destroy(). This is the code path the finding targets.\n2. EMPIRICAL TEST (Node.js v22.22.2): When DNS resolution fails (ENOTFOUND), the 'lookup' event fires with `err=<Error>` and `addr=undefined`. The address argument is NEVER a private IP when error is truthy. Confirmed by running `net.Socket` against a nonexistent host.\n3. NODE.JS DNS CONTRACT: dns.lookup uses an exclusive error-or-address pattern: if err is set, address is undefined/null; if address is set, err is null. This is documented and enforced in the built-in net.js source.\n4. FALLBACK SAFETY: Even if somehow addr were truthy on error (hypothetically), `checkIp(undefined)` returns `true` (allow/unicast), meaning the short-circuit `error || checkIp(address)` would still be true \u2014 so the return-false path is taken regardless. There is no path where a private address reaches the TCP connect phase via the error branch.\n5. TCP ABORT: On DNS error, Node.js calls `connectErrorNT` which emits an 'error' event and aborts \u2014 no TCP connection is ever initiated. Even if socket.destroy() were not called, no connection would be established.\n6. ATTACKER CONTROL: The attacker controls the URL/hostname passed to manageConnection(). The initial `checkIp(options.host)` at line 30 blocks direct private IP input. The lookup handler is the hostname-based SSRF guard. There is no schema validation (zod/joi) but the protection does not require it \u2014 it is network-layer enforcement.\n\nThe finding describes a theoretically correct defensive coding concern (not calling socket.destroy on error), but frames it as a real SSRF bypass. The attack path is non-existent in any shipping Node.js version because the precondition (error + private address simultaneously) violates the dns.lookup API contract. The finding is a false positive."
+      }
+    },
+    {
+      "id": "f001",
+      "rel": "lib/index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/ssrf-req-filter/node_modules/ssrf-req-filter/lib/index.js",
+      "tags": [
+        "deserialize"
+      ],
+      "finding": {
+        "vuln_class": "ssrf_filter_bypass_hostname_pre_check_reliance_on_lookup_event",
+        "location": "requestFilterHandler > agent.createConnection override, lines 28-41",
+        "severity": "low",
+        "reachability": "Reachable by any caller who provides a hostname (non-IP) as the request host. The entire SSRF protection for hostname-based requests depends exclusively on the 'lookup' event being emitted.",
+        "justification": "The pre-connection check at line 30 calls `checkIp(options.host)`. For any non-IP string (hostnames like 'internal.corp'), `ipaddr.isValid()` returns false, so `checkIp` returns `true` (ALLOW) and the pre-check is silently bypassed. Protection relies entirely on the 'lookup' event firing after DNS resolution. In environments using custom net.Socket implementations, mocked sockets, or certain Unix-domain-socket usages where `options.host` is undefined/absent, the lookup event may not fire, leaving the filter ineffective with no fallback.",
+        "detection_pattern": {
+          "grep_pattern": "createConnection.*options.*host.*checkIp|isValid.*host.*return true",
+          "anti_pattern": "if\\s*\\(!options\\.host\\).*socket\\.destroy|throw.*blocked.*unix",
+          "section_name": "SSRF: pre-check allows non-IP host strings through",
+          "description": "Catches SSRF filter implementations where the pre-connection check unconditionally allows non-IP host values (because IP validation returns false for hostnames), making the filter entirely dependent on a post-DNS 'lookup' event. If the lookup event is not emitted, there is no SSRF protection."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The code behavior is confirmed exactly as described. At line 30, `checkIp(options.host)` calls `ipaddr.isValid()` on the host value. For any non-IP string (hostname like 'internal.corp', 'localhost', or `undefined`), `ipaddr.isValid()` returns `false`, so `checkIp` returns `true` (ALLOW), and the pre-connection check is silently bypassed without any block. This is verified by running ipaddr.js directly: `ipaddr.isValid('internal.corp')` returns `false`, `ipaddr.isValid('localhost')` returns `false`, `ipaddr.isValid(undefined)` returns `false`. For these cases, the ENTIRE SSRF protection depends on the `lookup` event firing after DNS resolution (lines 34-39). In the standard/documented use case (axios or node-fetch making TCP connections), the `lookup` event IS emitted by Node.js net.Socket for hostname-based connections, so in practice the protection works: e.g. 'localhost' passes the pre-check but the lookup event fires with '127.0.0.1', which `checkIp` correctly blocks. The finding is real as an architectural weakness: (1) the pre-check design is incomplete for hostnames \u2014 it provides zero protection at that layer; (2) if the lookup event is not emitted (Unix domain sockets where `options.host` is `undefined`/absent and `options.path` is used instead, or custom/mocked socket implementations), there is no fallback and the filter provides no protection. The severity is appropriately rated 'low' because: the documented usage (HTTP over TCP with axios/node-fetch) is protected via the lookup event; the gap only opens in non-standard socket usage that is outside the library's intended scope; there is no schema validation (zod/joi/ajv) involved, and no non-default config is required \u2014 but the attack requires the caller to use a custom socket implementation or Unix domain socket context that the library does not defend against. The reachability claim is confirmed: any hostname-based request bypasses the pre-check, and if lookup does not fire, the filter is entirely ineffective. The finding is valid but edge-case in practice.",
+        "_done": true
+      }
+    },
+    {
+      "id": "f001",
+      "rel": "lib/index.js",
+      "file": "/DATA/openclaw/Repos/Research/packages/ssrf-req-filter/node_modules/ssrf-req-filter/lib/index.js",
+      "tags": [
+        "deserialize"
+      ],
+      "finding": {
+        "vuln_class": "ssrf_filter_bypass_unix_socket_no_host",
+        "location": "requestFilterHandler > agent.createConnection override, line 29-31",
+        "severity": "low",
+        "reachability": "Reachable only if the caller uses the patched agent with a Unix-domain socket request (options.path set, options.host absent). Unix socket access already implies local system access, but the filter provides a false sense of protection.",
+        "justification": "At line 29, `const {host: address} = options` destructures `host` from the connection options. For Unix socket connections (where `options.path` is set but `options.host` is undefined), `address` is `undefined`. `ipaddr.isValid(undefined)` returns `false`, so `checkIp(undefined)` returns `true` (ALLOW). No lookup event fires for Unix sockets. The request proceeds to a local Unix socket (e.g., `/var/run/docker.sock`) without any SSRF check, silently bypassing the filter.",
+        "detection_pattern": {
+          "grep_pattern": "options\\.host.*checkIp|const.*host.*=.*options",
+          "anti_pattern": "options\\.path.*destroy|socketPath.*blocked|!options\\.host.*throw",
+          "section_name": "SSRF: Unix socket bypass via undefined host",
+          "description": "Catches SSRF filter implementations that only check `options.host` in the createConnection override and do not handle the case where `options.host` is undefined (Unix domain socket connections via `options.path`). An undefined host causes IP validation to return false, which most filters interpret as 'not an IP, allow through', bypassing protection entirely for Unix socket connections."
+        }
+      },
+      "verdict": {
+        "is_real": true,
+        "severity": "low",
+        "reasoning": "The vulnerability is real but the finding's claimed mechanism is slightly inaccurate. The finding claims options.host is undefined for Unix socket connections, but Node.js http.Agent always populates options.host with 'localhost' (the default) when socketPath is used in request options. However, the bypass still works because checkIp('localhost') also returns true (ALLOW): ipaddr.isValid('localhost') returns false, so checkIp short-circuits and returns true (line 6-8 of index.js). Additionally, Unix socket connections bypass DNS entirely, so the 'lookup' event handler (lines 34-39) never fires. Net result: a request with socketPath set (e.g., '/var/run/docker.sock') passes through the patched agent.createConnection unchecked. Verified end-to-end with Node.js v22: net.createConnection is called with socketPath='/var/run/docker.sock' and host='localhost', and the filter does not block it. The bypass requires the caller to (a) use the patched agent and (b) make an HTTP request with socketPath in the request options \u2014 an unusual but possible configuration. The finding's severity=low is appropriate: socketPath in request options is not a typical user-controlled input surface, and accessing Unix sockets already implies local system access. The core vulnerability class (Unix socket bypass) is confirmed despite the minor mechanism inaccuracy (undefined vs 'localhost')."
+      }
+    }
+  ],
+  "reachability_applied": 2,
+  "reachability_downgraded": 2
+}
