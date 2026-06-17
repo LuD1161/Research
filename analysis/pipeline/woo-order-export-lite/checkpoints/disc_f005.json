@@ -1,0 +1,19 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "csrf",
+      "location": "ajax_export_download_bulk_file(), line 35-63",
+      "severity": "medium",
+      "reachability": "Any authenticated user with view_woocommerce_reports or cap_export_orders capability (shop manager, administrator by default) who can be lured to a malicious page",
+      "justification": "ajax_gate() dispatches to WC_Order_Export_Ajax::ajax_export_download_bulk_file() via the no-tab path (lines 530-538) without ever calling check_admin_referer/check_ajax_referer — the nonce check at lines 546-548 only executes for the tab-dispatch path — and ajax_export_download_bulk_file() contains no nonce verification of its own, unlike ajax_run_one_job() which calls check_ajax_referer() at line 17; a cross-origin request can therefore trigger a full order export on behalf of the victim."
+    },
+    {
+      "vuln_class": "xss_reflected",
+      "location": "ajax_export_download_bulk_file(), line 44 / line 61",
+      "severity": "medium",
+      "reachability": "Any authenticated user with the same capability who can control a result text value returned by build_and_send_file() or a profile title stored in settings",
+      "justification": "The $output string is assembled at line 43-44 by interpolating $settings['title'] and the unescaped $v['text'] values from the $result array directly into an HTML string via sprintf/implode with no esc_html/esc_attr applied to those slots, then echoed via die($output) at line 61 (with a phpcs:ignore suppressing the warning) when $browser_output is false and HTTP_REFERER is absent, making any HTML in those values render in the browser."
+    }
+  ]
+}
