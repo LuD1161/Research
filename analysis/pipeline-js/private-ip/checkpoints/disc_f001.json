@@ -1,0 +1,31 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "ssrf_filter_bypass",
+      "location": "ipv6_check (lines 40-54) / exported default function line 61",
+      "severity": "high",
+      "reachability": "Any caller that passes a user-controlled IPv6 string to the exported default function — including SSRF-protection middleware relying on this library to block private IPs.",
+      "justification": "Line 61 calls ipv6_check(ip) with the raw, un-normalized input string; the regexes on lines 43-50 are case-sensitive (no /i flag), so inputs such as ::FFFF:127.0.0.1, 2001:DB8::1, or 64:FF9B::127.0.0.1 are validated as legitimate IPv6 by ipaddr.js but pass through ipv6_check undetected, causing the function to return false/undefined instead of true.",
+      "detection_pattern": {
+        "grep_pattern": "ipv6_check\\(ip\\)|isPrivate.*ipv6.*\\(ip\\b",
+        "anti_pattern": "ipv6_check\\(.*toNormalizedString|toLowerCase",
+        "section_name": "SSRF filter bypass: un-normalized IPv6 passed to case-sensitive regex",
+        "description": "Detects places where an IPv6 string is routed to a hand-written case-sensitive regex check using the raw (un-normalized) input rather than a normalized lowercase form, enabling private-range bypass via uppercase characters."
+      }
+    },
+    {
+      "vuln_class": "insecure_design_undefined_return",
+      "location": "exported default function, lines 55-66",
+      "severity": "medium",
+      "reachability": "Any caller that treats a falsy return (undefined) as 'not private' — the most common defensive pattern.",
+      "justification": "When ipaddr.js validates the input as IPv6 but none of the handwritten regexes match (e.g. due to the case-bypass above), the function falls through ipv6_check() returning false, and then the outer function itself returns undefined — callers using if (!privateIp(addr)) allow() silently permit the request.",
+      "detection_pattern": {
+        "grep_pattern": "return undefined|return$",
+        "anti_pattern": "=== false|=== true",
+        "section_name": "Insecure design: undefined as 'not private' sentinel",
+        "description": "Flags IP-classification helpers that return undefined rather than an explicit boolean, which causes callers relying on truthiness/falsiness to silently pass unknown or malformed addresses as non-private."
+      }
+    }
+  ]
+}
