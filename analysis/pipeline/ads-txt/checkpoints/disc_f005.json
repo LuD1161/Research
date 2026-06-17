@@ -1,0 +1,18 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "save() / line 24, 72, 89",
+      "severity": "medium",
+      "reachability": "Authenticated users with the 'edit_ads_txt' capability (administrators by default; could be granted to lower roles by other plugins/code). Reachable via admin-post and wp_ajax_ hooks registered at lines 110-113.",
+      "justification": "The POST-supplied 'post_id' is cast to int but never verified to belong to an 'adstxt' or 'app-adstxt' post type before being passed to wp_insert_post(); an attacker with 'edit_ads_txt' can supply the ID of any existing post (e.g. a page or product), causing wp_insert_post() to overwrite its post_content with sanitized ads.txt data and change its post_type to 'adstxt', effectively destroying arbitrary site content.",
+      "detection_pattern": {
+        "grep_pattern": "wp_insert_post\\s*\\(\\s*\\$postarr",
+        "anti_pattern": "get_post_type\\s*\\(\\s*\\$post_id\\s*\\)|get_post\\s*\\(.*post_type",
+        "section_name": "Missing post-type ownership check before wp_insert_post",
+        "description": "Flags handlers that build a $postarr with a user-supplied ID and call wp_insert_post() without first verifying that the existing post with that ID belongs to the expected custom post type. When the check is absent, an authenticated user can overwrite any post's content and type."
+      }
+    }
+  ]
+}
