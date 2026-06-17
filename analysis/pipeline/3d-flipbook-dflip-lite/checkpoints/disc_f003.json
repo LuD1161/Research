@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "hidedflipRating() / line 130-134, registered at line 91",
+      "severity": "medium",
+      "reachability": "Any authenticated WordPress user (any role: subscriber, customer, etc.). The handler is registered under wp_ajax_hidedflipRating (logged-in hook only) but has no capability check and no nonce verification. Because is_admin() returns true during AJAX requests, the registration is reached for every authenticated AJAX call to admin-ajax.php with action=hidedflipRating.",
+      "justification": "hidedflipRating() calls update_option('dflip_showratingdiv','no') with no current_user_can() check and no nonce, so any logged-in user can permanently suppress the admin review-rating notice, a privileged site-wide option write.",
+      "detection_pattern": {
+        "grep_pattern": "add_action\\(\\s*['\"]wp_ajax_[^'\"]+['\"]",
+        "anti_pattern": "check_ajax_referer|wp_verify_nonce|current_user_can",
+        "section_name": "Broken Access Control: AJAX handler without capability check or nonce",
+        "description": "Finds wp_ajax_ handler registrations. When neither check_ajax_referer/wp_verify_nonce (CSRF) nor current_user_can (authz) appears in the same handler function, any authenticated user can invoke the handler. Particularly dangerous when the handler performs privileged state-changing operations such as update_option or database writes."
+      }
+    },
+    {
+      "vuln_class": "csrf",
+      "location": "hidedflipRating() / line 130-134",
+      "severity": "low",
+      "reachability": "Any authenticated WordPress user who can be tricked into visiting an attacker-controlled page. The action is wp_ajax_ (logged-in only) so unauthenticated CSRF is not possible, but authenticated CSRF is because there is no nonce.",
+      "justification": "The hidedflipRating AJAX handler writes a site option without a nonce, so a forged cross-site request from any authenticated session (including admins visiting a malicious page) will successfully set dflip_showratingdiv to 'no'. The impact is low (only hides a dismissal notice) but the pattern is a CSRF.",
+      "detection_pattern": {
+        "grep_pattern": "add_action\\(\\s*['\"]wp_ajax_[^'\"]+['\"]",
+        "anti_pattern": "check_ajax_referer|wp_verify_nonce",
+        "section_name": "CSRF: AJAX handler without nonce verification",
+        "description": "Matches any wp_ajax_ handler registration. If neither check_ajax_referer nor wp_verify_nonce appears in the associated callback, the handler is vulnerable to CSRF for authenticated users. Flag files where the AJAX action name maps to a callback that contains update_option, wpdb->update/insert/delete, or wp_update_post without a nonce check."
+      }
+    },
+    {
+      "vuln_class": "stored_xss",
+      "location": "filter_the_pdf_attachment_content() / line 288",
+      "severity": "medium",
+      "reachability": "Any user or role that can edit PDF attachment post titles (typically Editor or Administrator). The post title is read from the database via get_the_title() and inserted unescaped as shortcode text content. An attacker who can control the PDF attachment title can inject arbitrary JavaScript that executes when a visitor views the attachment page.",
+      "justification": "Line 288 concatenates get_the_title($post) into the shortcode string passed to do_shortcode() without any escaping; if the [dflip] shortcode handler echoes the inner text as raw HTML (the link text), a stored XSS payload in the title will be rendered in visitors' browsers.",
+      "detection_pattern": {
+        "grep_pattern": "get_the_title|get_post_meta|get_post_field",
+        "anti_pattern": "esc_html|esc_attr|wp_kses",
+        "section_name": "Stored XSS: unescaped post title/meta in output",
+        "description": "Finds calls to get_the_title, get_post_meta, or get_post_field whose return values are used in echo or string concatenation context without an escaping wrapper. These database-sourced values can contain stored payloads set by users with edit permissions, causing stored XSS when rendered."
+      }
+    },
+    {
+      "vuln_class": "reflected_xss",
+      "location": "dflip_category_filter() / line 304-319",
+      "severity": "low",
+      "reachability": "Administrators only (admin-area filter form, requires manage_categories or similar). The $_GET value of the taxonomy slug is read via filter_input(INPUT_GET, $taxonomy) and passed as the 'selected' argument to wp_dropdown_categories(). WordPress's wp_dropdown_categories sanitises the 'selected' value internally before printing the option tag, so exploitation depends on its internal behavior; most WordPress versions safely cast it. Rated low because attack surface is already admin-only.",
+      "justification": "filter_input(INPUT_GET, $taxonomy) at line 304 returns a raw GET value with no sanitization before being fed to wp_dropdown_categories as 'selected'. While wp_dropdown_categories generally escapes option values, the unsanitized user input as a function argument still represents a trust boundary violation and could be exploitable if the WordPress version has a regression in wp_dropdown_categories.",
+      "detection_pattern": {
+        "grep_pattern": "filter_input\\(INPUT_GET",
+        "anti_pattern": "sanitize_text_field|absint|intval|esc_attr|sanitize_key",
+        "section_name": "Reflected XSS / Input not sanitized: raw GET parameter used without sanitization",
+        "description": "Finds filter_input(INPUT_GET, ...) calls where the result is not passed through a WordPress sanitization function before use in output or as an argument to WordPress functions. Raw GET values are attacker-controlled and must be sanitized before use in any output or database query context."
+      }
+    }
+  ]
+}
