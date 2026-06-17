@@ -1,0 +1,31 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "missing_capability_check",
+      "location": "render_chat(), line 22",
+      "severity": "low",
+      "reachability": "Any authenticated WordPress user who reaches an admin-accessible URL satisfying the show_strategy GET conditions (e.g., a subscriber who navigates to a crafted admin URL). The admin_footer hook fires for all admin pages with no role guard.",
+      "justification": "render_chat() gates only on show_strategy->shouldDisplay() which evaluates $_GET parameters (GetStrategy), never calls current_user_can(); any authenticated user reaching a qualifying admin URL receives the chat widget HTML including a valid nonce, leaking plugin internals to low-privilege roles.",
+      "detection_pattern": {
+        "grep_pattern": "add_action\\s*\\(\\s*['\"]admin_footer['\"]",
+        "anti_pattern": "current_user_can|user_can|is_admin\\s*\\(\\s*\\)",
+        "section_name": "Missing capability check: admin_footer hook",
+        "description": "Finds admin_footer hook registrations that lack a current_user_can() guard in the same file; admin_footer fires for any authenticated user reaching an admin page, so handlers rendering privileged UI without a capability check expose that UI to low-privilege roles."
+      }
+    },
+    {
+      "vuln_class": "user_controlled_value_in_filter",
+      "location": "render_chat() line 26 / AjaxChatSettings::get_settings_ajax() line 22-23",
+      "severity": "low",
+      "reachability": "Any user who can trigger the AJAX action (authenticated admin-level, guarded by check_ajax_referer) can supply an arbitrary instance_id value that, after sanitize_key(), is passed as a parameter to apply_filters(). Impact depends entirely on what plugins or themes hook octolize_docs_chat_settings_<slug>.",
+      "justification": "instance_id is read from $_GET in render_chat() and from $_POST in get_settings_ajax(), sanitized with sanitize_key() (reducing to [a-z0-9_-]), then passed to apply_filters() as part of the $data array; any registered filter receiving $data['instance_id'] without additional validation becomes an extension point for attacker-controlled input, violating the principle that filter arguments should be treated as untrusted.",
+      "detection_pattern": {
+        "grep_pattern": "apply_filters\\s*\\([^,]+,\\s*\\[?\\$_(GET|POST|REQUEST)",
+        "anti_pattern": "sanitize_text_field|absint|intval|sanitize_key|esc_",
+        "section_name": "User input passed directly to apply_filters",
+        "description": "Detects apply_filters() calls where a superglobal ($_GET/$_POST/$_REQUEST) value is passed as a filter argument without apparent sanitization immediately before the call; downstream filter callbacks receiving unsanitized user input may perform unsafe operations."
+      }
+    }
+  ]
+}
