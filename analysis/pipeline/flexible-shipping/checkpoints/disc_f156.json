@@ -1,0 +1,31 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "handle_ajax_action_click (line 83), handle_ajax_action_event (line 64), handle_ajax_action_auto_show_popup (line 97), handle_ajax_action_save_fields (line 108)",
+      "severity": "medium",
+      "reachability": "Any authenticated WordPress user (subscriber, customer, contributor, etc.) can invoke all four AJAX handlers. The handlers are registered only under wp_ajax_ (not nopriv), so unauthenticated users are excluded, but there is no current_user_can() check to restrict to administrators or users with a specific capability.",
+      "justification": "All four handlers call check_ajax_referer() for CSRF protection but never call current_user_can(), allowing any logged-in user to mutate plugin-level onboarding options (click counters, event state, popup state, and saved field data) that are administrative plugin settings.",
+      "detection_pattern": {
+        "grep_pattern": "wp_ajax_.*function handle_ajax|add_action\\(\\s*'wp_ajax_",
+        "anti_pattern": "current_user_can\\(",
+        "section_name": "Broken Access Control: AJAX handler without capability check",
+        "description": "Finds wp_ajax_ handler registrations in PHP files. When a file registers wp_ajax_ hooks but contains no current_user_can() call, any authenticated user can reach state-changing endpoints intended for administrators."
+      }
+    },
+    {
+      "vuln_class": "unsanitized_data_passed_to_action_hook",
+      "location": "handle_ajax_action_save_fields (line 113)",
+      "severity": "medium",
+      "reachability": "Any authenticated WordPress user (due to missing capability check above). The full unsanitized $_POST array (after wp_unslash only) is forwarded to do_action() and received by all callbacks hooked to octolize/onboarding/save_fields/<suffix>.",
+      "justification": "At line 113, $data = wp_unslash($_POST) (line 111) is passed verbatim to do_action(); the only sanitization applied is sanitize_text_field on a single popup_id key (line 112), while all other POST keys arrive at downstream hook callbacks unsanitized, potentially leading to SQL injection, stored XSS, or other issues in those callbacks depending on how they consume $data.",
+      "detection_pattern": {
+        "grep_pattern": "do_action\\([^)]*\\$_POST|do_action\\([^)]*\\$data",
+        "anti_pattern": "sanitize_text_field|array_map.*sanitize|array_walk.*sanitize",
+        "section_name": "Unsanitized POST data forwarded to action hook",
+        "description": "Catches do_action() calls that forward raw or minimally-processed POST data. Hook callbacks that receive this data may not expect it to be unsanitized, leading to second-order injection vulnerabilities depending on what each callback does with the payload."
+      }
+    }
+  ]
+}
