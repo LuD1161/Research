@@ -1,0 +1,18 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "reflected_xss",
+      "location": "line 17 / template body",
+      "severity": "low",
+      "reachability": "Any unauthenticated or authenticated user who can load the admin page URL with a crafted ?tab= parameter. In practice this page is restricted to admins, so reachability is admin-only. The value is never echoed directly in THIS file, making it a hygiene/regression risk rather than an immediately exploitable XSS.",
+      "justification": "Line 17 assigns raw $_GET['tab'] to $active_tab without any sanitization (no sanitize_key, no esc_attr). In this template the variable is only consumed via ternary comparisons whose outputs are hard-coded string literals ('nav-tab-active' or ''), so no unsanitized value reaches the browser in this file. However the unescaped variable is passed to BSR_Templates_Helper::get_tab_template() (line 75) and included sub-templates, creating a regression surface if any sub-template ever echoes $active_tab directly.",
+      "detection_pattern": {
+        "grep_pattern": "\\$_GET\\[\\s*['\"]tab['\"]\\s*\\]",
+        "anti_pattern": "sanitize_(?:key|text_field|title)\\s*\\(\\s*\\$_GET\\[",
+        "section_name": "Unsanitized tab parameter from $_GET",
+        "description": "Catches WordPress admin pages that read a tab/page discriminator from $_GET without sanitizing it. Files matching the grep but not the anti_pattern pass a raw string into downstream template logic, creating an XSS regression surface whenever the value is echoed."
+      }
+    }
+  ]
+}
