@@ -1,0 +1,15 @@
+{
+  "finding_id": "f007_0",
+  "plugin": "ajax-search-for-woocommerce",
+  "file": "includes/Admin/Promo/FeedbackNotice.php",
+  "location": "displayNotice() / line 64",
+  "vuln_class": "stored_xss",
+  "is_real": false,
+  "severity": "informational",
+  "reasoning": "Three independent reasons make this finding false: (1) WRONG REACHABILITY — the notice is only rendered when shouldShowFeedbackNotice() returns true, which requires current_user_can('install_plugins') on line 42 of NoticePolicy.php. That capability is restricted to administrators, not subscribers or any lower role. The finding's claim of 'subscriber and above' is incorrect. (2) SELF-XSS ONLY — $current_user->display_name is the display name of the *same* administrator who is viewing the notice. There is no mechanism by which a low-privileged user's display_name appears in this notice. No cross-user attack vector exists. (3) WORDPRESS CORE SANITIZES display_name ON SAVE — WordPress core's wp_insert_user()/wp_update_user() in wp-includes/user.php passes display_name through sanitize_text_field(), which calls strip_tags() internally. This strips any HTML or script tags before they are persisted to the database. An attacker cannot store '<script>alert(1)</script>' in display_name through any normal WordPress API. The unescaped output at line 64 ('<strong>' . $current_user->display_name . '</strong>') is a coding style issue (missing esc_html()) but is not exploitable in practice given the combination of admin-only gate, self-display, and WordPress-level sanitization on save.",
+  "sink_reachable": false,
+  "sanitizer_present": true,
+  "sanitizer_notes": "WordPress core sanitizes display_name with sanitize_text_field() (which calls strip_tags()) in wp_insert_user()/wp_update_user(). Additionally, the display gate requires install_plugins capability (admin-only). Additionally, the displayed display_name belongs to the current user viewing the page, not any attacker-controlled user.",
+  "reachability_correction": "The notice only appears when current_user_can('install_plugins') is true (NoticePolicy.php line 42). This is an admin-only capability. Subscribers cannot trigger this notice or influence whose display_name is shown there.",
+  "_done": true
+}
