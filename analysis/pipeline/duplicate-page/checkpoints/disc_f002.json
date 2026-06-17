@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "line 1, file-level guard",
+      "severity": "medium",
+      "reachability": "Any WordPress request that includes this file. In normal WP execution ABSPATH is always defined, so the AND condition on line 1 is never true, making the capability check in the guard dead code. The file is rendered by a controller that should gate access, but the file-level defense-in-depth guard is logically inverted.",
+      "justification": "The guard uses `&&` instead of `||`: `if (!defined('ABSPATH') && !current_user_can('manage_options'))` — this exits only when BOTH conditions are true simultaneously, but since ABSPATH is always defined in a real WP request, the guard never triggers, allowing any authenticated (or unauthenticated) user who can reach this include path to execute the file-level code without capability enforcement.",
+      "detection_pattern": {
+        "grep_pattern": "if\\s*\\(\\s*!defined\\s*\\(\\s*['\"]ABSPATH['\"]\\s*\\)\\s*&&\\s*!current_user_can",
+        "anti_pattern": "if\\s*\\(\\s*!defined\\s*\\(\\s*['\"]ABSPATH['\"]\\s*\\)\\s*\\|\\|\\s*!current_user_can",
+        "section_name": "Broken Access Control: inverted file guard (AND vs OR)",
+        "description": "Detects PHP files that use && instead of || in the standard WordPress file-level guard. The correct pattern is `if (!defined('ABSPATH') || !current_user_can(...))` — using && means the guard only fires when ABSPATH is undefined AND the user lacks capability, but since ABSPATH is always defined in a real WP request, the capability check is bypassed entirely."
+      }
+    },
+    {
+      "vuln_class": "stored_xss",
+      "location": "lines 49-51, 60-63, 71-72 — select option comparison echoes",
+      "severity": "low",
+      "reachability": "Administrator who saves settings, or any party who can write directly to the `duplicate_page_options` DB option. Values are retrieved via get_option() and echoed unescaped into HTML attribute context in the comparison ternaries.",
+      "justification": "Options retrieved from `get_option('duplicate_page_options')` at line 29 are echoed directly in attribute context without esc_attr() on lines 49-51, 60-63, and 71-72 (e.g., `echo($opt['duplicate_post_status'] == 'draft') ? \"selected = 'selected'\" : '';`). Although the ternary only emits a static string, the comparison itself evaluates the raw DB value. If the stored value somehow contains injection (second-order from DB corruption or another write path), nothing prevents it. The text input field `duplicate_post_suffix` is correctly escaped with esc_attr() on line 80, making this inconsistency notable. Severity is low because the ternary output is static and exploit requires DB write access.",
+      "detection_pattern": {
+        "grep_pattern": "echo\\s*\\(\\s*\\$opt\\[",
+        "anti_pattern": "echo\\s+esc_attr\\s*\\(",
+        "section_name": "Stored XSS: unescaped option value echo in attribute context",
+        "description": "Detects direct echo of option array values ($opt[...]) without esc_attr/esc_html wrapping. When retrieved option values are echoed into HTML attribute or body context without escaping, a second-order XSS is possible if the option store is ever written with unvalidated data from another code path."
+      }
+    },
+    {
+      "vuln_class": "data_integrity_double_encoding",
+      "location": "lines 15-18, POST handler sanitization",
+      "severity": "low",
+      "reachability": "Any administrator submitting the settings form. The double-encoding happens on every save.",
+      "justification": "Settings are sanitized with `sanitize_text_field(htmlentities($_POST['...']))` — htmlentities() converts special characters to HTML entities first, then sanitize_text_field() processes the result. The entity-encoded string is stored in the DB. On retrieval and display (e.g., line 80 with esc_attr()), the entities get double-encoded, corrupting stored values containing characters like `<`, `>`, `&`, or `\"`. This is most impactful for the free-text `duplicate_post_suffix` field. While not a direct security exploit, double-encoding can break sanitization logic and mask injection characters in unexpected contexts.",
+      "detection_pattern": {
+        "grep_pattern": "sanitize_text_field\\s*\\(\\s*htmlentities\\s*\\(",
+        "anti_pattern": "sanitize_text_field\\s*\\(\\s*wp_unslash\\s*\\(",
+        "section_name": "Data Integrity: double-encoding via htmlentities before sanitize_text_field",
+        "description": "Detects the anti-pattern of wrapping input in htmlentities() before sanitize_text_field(). The correct WP pattern is sanitize_text_field(wp_unslash($_POST['...'])). Double-encoding corrupts stored values and can interfere with downstream sanitization logic."
+      }
+    },
+    {
+      "vuln_class": "xss_via_translation",
+      "location": "line 13, _e() with raw HTML string",
+      "severity": "low",
+      "reachability": "Requires a malicious translation file (e.g., a compromised language pack or a translator with file-system access). Triggered for any admin who saves settings with a tampered translation active.",
+      "justification": "`_e('<div class=\"saving-txt\"><strong>Saving Please wait...</strong></div>','duplicate-page')` passes raw HTML to the translation function. A malicious or compromised translation file could replace this string with arbitrary HTML/JS that executes in the admin context. The correct approach is to use plain translatable strings and wrap them in HTML outside the translation call.",
+      "detection_pattern": {
+        "grep_pattern": "_e\\s*\\(\\s*'<|_e\\s*\\(\\s*\"<",
+        "anti_pattern": "_e\\s*\\(\\s*'[^<>]*'",
+        "section_name": "XSS via translation: raw HTML passed to _e()/__()",
+        "description": "Detects _e() or __() calls where the first argument starts with an HTML tag. Passing raw HTML to translation functions allows a malicious translation to inject arbitrary markup or script into the page. Translatable strings should be plain text; HTML structure should wrap them."
+      }
+    }
+  ]
+}
