@@ -1,17 +1,19 @@
-// review_pipeline.js — router-driven, durable, resumable discovery + adversarial verify.
+// review_pipeline.js — router-driven, durable, resumable discovery + adversarial verify
+// + reachability verify.
 //
 // Inputs (set MANIFEST below): a manifest produced by tools/lens_router.py:
 //   { plugin_dir, files: [{id, file, rel, tags, tier, lines, brief}] }
 // Each file already has a COMPOSED BRIEF on disk (general pass + ONLY its routed lenses).
 //
-// Flow per file:  DISCOVER (cheap model reads brief + target, 1 file) -> for each finding,
-//   ADVERSARIAL VERIFY (refute-by-default). Everything checkpoints to git per agent and
-//   syncs per wave, so a rate-limit/SSH/host death resumes by re-running (done units skip).
+// Flow per file:  DISCOVER -> ADVERSARIAL VERIFY -> REACHABILITY VERIFY (for gated findings).
+// The reachability stage catches the pipeline's recurring blind spot: the adversarial verifier
+// confirms access-control findings without establishing whether attackers can obtain the gating
+// secret/nonce/token. This stage traces the gate and downgrades when it's unbreachable.
 
 export const meta = {
   name: 'review-pipeline',
-  description: 'Router-driven durable discovery + adversarial verify over a lens-routed manifest',
-  phases: [{ title: 'Load' }, { title: 'Discover' }, { title: 'Verify' }, { title: 'Sync' }],
+  description: 'Router-driven durable discovery + adversarial verify + reachability verify',
+  phases: [{ title: 'Load' }, { title: 'Discover' }, { title: 'Verify' }, { title: 'Reachability' }, { title: 'Sync' }],
 }
 
 const ROOT = '/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review'
@@ -36,6 +38,18 @@ const VERD_SCHEMA = {
   type: 'object', additionalProperties: true, required: ['is_real', 'severity', 'reasoning'],
   properties: { is_real: { type: 'boolean' }, severity: { type: 'string' }, reasoning: { type: 'string' } },
 }
+const REACH_SCHEMA = {
+  type: 'object', additionalProperties: true,
+  required: ['gate_breachable', 'gate_type', 'adjusted_severity', 'reasoning'],
+  properties: {
+    gate_breachable: { type: 'boolean' },
+    gate_type: { type: 'string' },
+    adjusted_severity: { type: 'string' },
+    reasoning: { type: 'string' },
+  },
+}
+const REACH_VULN_CLASSES = /broken_access|access.control|auth|priv.esc|idor|insecure.direct/i
+const REACH_SEVERITIES = /^(HIGH|CRITICAL|MED)/i
 
 function durable(ckptAbs, label) {
   return `\n\n## DURABILITY PROTOCOL — follow EXACTLY (resumable, git-checkpointed)
@@ -124,8 +138,86 @@ for (let attempt = 0; attempt < 3 && vpending.length; attempt++) {
 }
 
 const confirmed = verified.filter((v) => v.verdict && v.verdict.is_real)
+
+// ---- REACHABILITY VERIFY (gated findings only) ------------------------------------
+// Catches the pipeline's recurring blind spot: adversarial verify confirms access-control
+// findings without checking whether the gating secret/nonce/token is obtainable by an
+// attacker. Only runs on confirmed findings that match access-control vuln classes or
+// have severity >= MED — cheap no-op when nothing qualifies.
+const needsReach = confirmed.filter((v) => {
+  const vc = v.finding.vuln_class || ''
+  const sev = (v.verdict && v.verdict.severity) || v.finding.severity || ''
+  return REACH_VULN_CLASSES.test(vc) || REACH_SEVERITIES.test(sev)
+})
+log(`reachability check: ${needsReach.length} of ${confirmed.length} confirmed findings qualify`)
+
+async function reachVerify(v) {
+  const ckpt = `${CK}/reach_${v.id}_${v.finding.vuln_class || 'unk'}.json`
+  const prompt =
+    `REACHABILITY GATE ANALYSIS. You must determine whether an attacker can actually ` +
+    `REACH and EXPLOIT this confirmed vulnerability, or whether it is gated behind a ` +
+    `secret/nonce/token that an unauthenticated or low-privilege attacker cannot obtain.\n\n` +
+    `Read the file: ${v.file}\n` +
+    `Finding: ${JSON.stringify(v.finding)}\n` +
+    `Adversarial verdict: ${JSON.stringify(v.verdict)}\n\n` +
+    `Trace the COMPLETE exploitation prerequisite chain:\n` +
+    `1. What gate protects the vulnerable code path? (nonce, secret key, capability check, ` +
+    `   authentication cookie, random token, etc.)\n` +
+    `2. WHERE is that gate value generated? (wp_create_nonce in admin page = admin-only; ` +
+    `   random secret in DB = unguessable; predictable value = breachable)\n` +
+    `3. Can an unauthenticated attacker obtain or guess the gate value? Search the ENTIRE ` +
+    `   plugin for places the value is exposed (rendered in HTML, leaked in API responses, ` +
+    `   logged, emailed, predictable pattern).\n` +
+    `4. If the gate requires admin/elevated privileges to obtain, the finding is NOT ` +
+    `   default-exploitable — set gate_breachable=false and downgrade severity.\n\n` +
+    `gate_type: name the mechanism (e.g. "wp_nonce admin-only", "35-char random secret", ` +
+    `"capability check manage_options", "no gate — open handler").\n` +
+    `gate_breachable: true ONLY if an unauth/low-priv attacker can obtain the gate value ` +
+    `in a default WordPress install. Default to false when uncertain.\n` +
+    `adjusted_severity: keep original if breachable, downgrade to LOW or INFORMATIONAL if not.`
+  try {
+    const r = await agent(prompt + durable(ckpt, `reach-${v.id}`), { label: `reach:${v.id}`, phase: 'Reachability', schema: REACH_SCHEMA, model: 'sonnet', effort: 'high' })
+    return { ...v, reachability: r }
+  } catch (e) { return { ...v, reachability: null } }
+}
+
+const reachResults = []
+if (needsReach.length) {
+  phase('Reachability')
+  let rpending = needsReach.map((_, i) => i)
+  for (let attempt = 0; attempt < 3 && rpending.length; attempt++) {
+    const failed = []
+    for (let s = 0; s < rpending.length; s += WAVE) {
+      const chunk = rpending.slice(s, s + WAVE)
+      const wr = await parallel(chunk.map((i) => () => reachVerify(needsReach[i])))
+      for (let k = 0; k < wr.length; k++) {
+        if (wr[k] && wr[k].reachability) reachResults.push(wr[k])
+        else failed.push(chunk[k])
+      }
+      await syncWave(`reach-a${attempt}w${Math.floor(s / WAVE)}`)
+      log(`reach a${attempt} w${Math.floor(s / WAVE)}: done=${reachResults.length} failed=${failed.length}`)
+    }
+    rpending = failed
+  }
+}
+
+// Merge reachability results back: downgrade confirmed findings where gate is unbreachable
+const reachMap = new Map(reachResults.map((r) => [`${r.id}:${r.finding.vuln_class || ''}`, r.reachability]))
+const finalConfirmed = confirmed.map((v) => {
+  const key = `${v.id}:${v.finding.vuln_class || ''}`
+  const reach = reachMap.get(key)
+  if (!reach) return v
+  if (!reach.gate_breachable && reach.adjusted_severity) {
+    return { ...v, reachability: reach, verdict: { ...v.verdict, severity: reach.adjusted_severity, severity_pre_reach: v.verdict.severity } }
+  }
+  return { ...v, reachability: reach }
+})
+const downgraded = finalConfirmed.filter((v) => v.reachability && !v.reachability.gate_breachable)
+log(`reachability: ${downgraded.length} findings downgraded, ${finalConfirmed.length - downgraded.length} unchanged`)
+
 return {
   run: RUN, plugin: MANIFEST, files_reviewed: discResults.length,
-  raw_findings: toVerify.length, confirmed_count: confirmed.length,
-  confirmed, all_with_verdicts: verified,
+  raw_findings: toVerify.length, confirmed_count: finalConfirmed.length,
+  confirmed: finalConfirmed, all_with_verdicts: verified,
+  reachability_applied: needsReach.length, reachability_downgraded: downgraded.length,
 }
