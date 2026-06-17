@@ -1,0 +1,6 @@
+{
+  "is_real": false,
+  "severity": "false_positive",
+  "reasoning": "FALSE POSITIVE. The finding correctly observes that $_POST['s'] is read without sanitization at Bacola.php line 29, and is passed unsanitized to Helpers::searchProducts($search_term) (Helpers.php line 1655). However, the downstream call chain applies sanitize_text_field() unconditionally before any dangerous use. Helpers::searchProducts() calls DGWT_WCAS()->nativeSearch->getSearchResults($phrase, true, 'product-ids') (Search.php line 1660). In getSearchResults() (Search.php lines 174-175), the branch when $return === true executes $keyword = sanitize_text_field($phrase) — this is always true in the call from searchProducts(). The sanitized $keyword is what proceeds to all query logic. The raw $search_term string never reaches any dangerous sink (no SQL concatenation, no output escaping bypass, no eval). The reachability claim is accurate — the wp_ajax_nopriv_load_more hook is accessible to unauthenticated visitors and the is_relevant_product_ajax_query() guard only checks $_POST['action'] === 'load_more', not capability or nonce — but there is no exploitable impact because sanitization is guaranteed inside getSearchResults() when called via this path. This is a coding-standards violation at the call site (sanitize before passing), not a security vulnerability.",
+  "_done": true
+}
