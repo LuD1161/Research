@@ -1,0 +1,70 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "xpath_injection",
+      "location": "decryptKeyInfo, lines 246 and 273",
+      "severity": "high",
+      "reachability": "Any caller of decrypt() or decryptKeyInfo() with attacker-supplied XML — the URI attribute of a RetrievalMethod element in the XML is read from the document and spliced into XPath expressions without any sanitization.",
+      "justification": "keyRetrievalMethodUri.substring(1) is derived from keyRetrievalMethod.getAttribute('URI') (attacker-controlled XML attribute) and concatenated directly into XPath strings on lines 246 and 273, allowing an attacker to break out of the single-quoted string and inject arbitrary XPath predicates or functions to alter which nodes are selected during decryption.",
+      "detection_pattern": {
+        "grep_pattern": "xpath\\.select\\([^)]*\\+[^)]*getAttribute",
+        "anti_pattern": "xpath\\.select.*\\$[a-zA-Z]",
+        "section_name": "XPath injection: dynamic string concatenation in xpath.select",
+        "description": "Matches XPath queries built by string concatenation with getAttribute() results; the safe alternative is parameterized XPath using variable bindings (the `$var` syntax in the xpath library) rather than string interpolation."
+      }
+    },
+    {
+      "vuln_class": "out_of_scope_callback_causing_crash",
+      "location": "decryptWithAlgorithm, line 325",
+      "severity": "high",
+      "reachability": "Any attacker who can supply a CBC-encrypted blob whose last byte encodes a padding value outside the range [1, ivLength] will trigger this code path — reachable from decrypt() and decryptKeyInfo() with attacker-supplied ciphertext.",
+      "justification": "decryptWithAlgorithm() is a synchronous function that has no 'callback' parameter; line 325 calls callback(new Error('padding length invalid')) on invalid padding, which is a ReferenceError in the synchronous context. The ReferenceError propagates up uncaught and crashes the process instead of being returned to the caller, creating a denial-of-service vector. This also leaks a timing/error oracle for CBC-mode padding.",
+      "detection_pattern": {
+        "grep_pattern": "function decrypt[A-Za-z]*\\([^)]*\\)[^{]*\\{[\\s\\S]*?callback\\(new Error",
+        "anti_pattern": "function decrypt[A-Za-z]*\\([^)]*callback[^)]*\\)",
+        "section_name": "Callback used out of scope in sync decryption function",
+        "description": "Catches synchronous decryption helper functions that call a 'callback' identifier not present in their parameter list, which will throw a ReferenceError on error paths and crash the Node.js process."
+      }
+    },
+    {
+      "vuln_class": "xml_injection_via_unescaped_template_interpolation",
+      "location": "encryptKeyInfoWithScheme, line 29 / keyinfo.tpl.xml.js line 10",
+      "severity": "medium",
+      "reachability": "Callers of encrypt() or encryptKeyInfo() who pass an options.pem value that is not a well-formed certificate — e.g., a PEM containing XML special characters or crafted content between the certificate headers — can inject arbitrary XML into the KeyInfo block.",
+      "justification": "In xmlenc.js line 29 encryptionPublicCert is built by concatenating pemToCert(options.pem.toString()) with literal XML tags, then in keyinfo.tpl.xml.js line 10 it is interpolated as ${encryptionPublicCert} without calling escapehtml(), while every other field in that template is escaped; a PEM body containing characters like < > & or an extra </X509Certificate> sequence breaks the XML document structure.",
+      "detection_pattern": {
+        "grep_pattern": "\\$\\{(?!escapehtml)[a-zA-Z_][a-zA-Z0-9_]*(?:Cert|Xml|Html|Content|Body|Data)\\}",
+        "anti_pattern": "\\$\\{escapehtml\\(",
+        "section_name": "XML injection: unescaped template variable containing certificate/XML data",
+        "description": "Finds template literal interpolations of variables with names suggesting HTML/XML/certificate content that are not wrapped in escapehtml(), indicating missing output encoding in XML generation."
+      }
+    },
+    {
+      "vuln_class": "xml_injection_via_unescaped_template_interpolation",
+      "location": "encrypt_key / encrypt, encrypted-key.tpl.xml.js line 6",
+      "severity": "medium",
+      "reachability": "Any caller of encrypt() where encryptKeyInfo returns a keyInfo string that was constructed from attacker-influenced certificate data; the keyInfo string is spliced raw into the outer EncryptedData XML document.",
+      "justification": "In encrypted-key.tpl.xml.js line 6, ${keyInfo} is inserted without escapehtml() — unlike contentEncryptionMethod and encryptedContent on lines 5 and 8 which are escaped — so if the keyInfo string (itself output of keyinfo template) contains extra XML, it could inject elements into the EncryptedData document.",
+      "detection_pattern": {
+        "grep_pattern": "\\$\\{(?!escapehtml)[a-zA-Z_][a-zA-Z0-9_]*(?:[Kk]ey[Ii]nfo|[Xx]ml|[Hh]tml)\\}",
+        "anti_pattern": "\\$\\{escapehtml\\(",
+        "section_name": "XML injection: unescaped keyInfo in template",
+        "description": "Catches template literal interpolations of variables named keyInfo or similar XML/HTML identifiers that bypass escapehtml(), allowing injected XML if the variable content is not sanitized upstream."
+      }
+    },
+    {
+      "vuln_class": "padding_oracle_cbc_mode",
+      "location": "decryptWithAlgorithm, lines 308-331",
+      "severity": "medium",
+      "reachability": "Any attacker who can submit ciphertext to a service that calls decrypt() and observe whether an error is returned versus success — the padding check on line 321-327 produces a distinguishable error for invalid padding versus valid padding.",
+      "justification": "For CBC-mode algorithms (aes-128-cbc, aes-256-cbc, des-ede3-cbc) the custom padding removal on lines 321-327 returns an error when the last byte value is outside [1, ivLength], creating a padding oracle that an attacker can exploit to decrypt arbitrary ciphertext by submitting chosen ciphertexts and observing the error/success distinction.",
+      "detection_pattern": {
+        "grep_pattern": "charCodeAt.*length.*-.*1.*padding.*Error",
+        "anti_pattern": "crypto\\.timingSafeEqual|setAutoPadding\\(true\\)",
+        "section_name": "Padding oracle: custom CBC padding validation with error leak",
+        "description": "Detects manual CBC padding removal code that throws or returns distinguishable errors for invalid padding bytes, which enables a padding oracle attack against decrypted ciphertext."
+      }
+    }
+  ]
+}
