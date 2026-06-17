@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "mk_dp_close_dp_help(), line 408-425",
+      "severity": "low",
+      "reachability": "Any authenticated WordPress user (subscriber and above) can reach wp_ajax_mk_dp_close_dp_help via admin-ajax.php. No wp_ajax_nopriv_ hook, so unauthenticated users are excluded.",
+      "justification": "The handler verifies a nonce (nc_help_desk) but performs no current_user_can() check before calling update_option('mk_fm_close_fm_help_c', 'done'), allowing any logged-in user to permanently dismiss the admin help-desk notice for all administrators.",
+      "detection_pattern": {
+        "grep_pattern": "add_action\\('wp_ajax_[^']+',",
+        "anti_pattern": "current_user_can",
+        "section_name": "Broken Access Control: AJAX handler without capability check",
+        "description": "Finds wp_ajax_ handler registrations. Any such handler that lacks a current_user_can() call allows any logged-in user to perform the action regardless of role. Nonce checks only prevent CSRF; they do not restrict which users can call the handler."
+      }
+    },
+    {
+      "vuln_class": "broken_guard_logic",
+      "location": "inc/admin-settings.php, line 1",
+      "severity": "low",
+      "reachability": "The file is included only from duplicate_page_settings() which already enforces current_user_can('manage_options'), so the broken guard has no exploitable impact in the current code path. It becomes dangerous if the file is ever included from an unguarded context.",
+      "justification": "The guard uses && (AND) instead of || (OR): `!defined('ABSPATH') && !current_user_can('manage_options')`. Because ABSPATH is always defined in WordPress, the first operand is always false, making the entire condition false and the exit() dead code. The intended pattern is `!defined('ABSPATH') || !current_user_can(...)` (two separate guards). A future direct inclusion without the caller's gate would expose the settings page to any logged-in user.",
+      "detection_pattern": {
+        "grep_pattern": "!defined\\('ABSPATH'\\)\\s*&&\\s*!current_user_can",
+        "anti_pattern": "!defined\\('ABSPATH'\\)\\s*\\|\\|",
+        "section_name": "Broken Guard: ABSPATH check joined with AND instead of OR",
+        "description": "Finds PHP files that use AND (&&) to join the ABSPATH sentinel with a capability check, making the exit dead code whenever ABSPATH is defined (i.e., always in WordPress). The correct pattern is OR (||): exit if ABSPATH is not defined OR user lacks the capability."
+      }
+    },
+    {
+      "vuln_class": "js_injection_via_inline_script",
+      "location": "dp_redirect(), lines 379-388 (duplicatepage.php)",
+      "severity": "medium",
+      "reachability": "dp_redirect() is only called in admin-settings.php with hardcoded relative URL strings, so attacker-controlled input does not currently reach it. If any future caller passes user-supplied input (e.g., a redirect_to parameter) the vulnerability becomes exploitable by any user who can reach that caller.",
+      "justification": "The function applies esc_url_raw() to the URL and then embeds it into a JavaScript string literal via wp_add_inline_script: `window.location.href=\"$web_url\";`. esc_url_raw does not encode double-quotes, so a URL containing a literal double-quote (e.g., foo\"bar) would break out of the JS string and execute arbitrary JavaScript. The correct fix is to use json_encode() or esc_js() when injecting values into JS string contexts.",
+      "detection_pattern": {
+        "grep_pattern": "wp_add_inline_script[^;]+esc_url",
+        "anti_pattern": "json_encode|esc_js",
+        "section_name": "XSS: URL value injected into JS string without JS-safe escaping",
+        "description": "Finds wp_add_inline_script calls where a URL sanitized only with esc_url or esc_url_raw is embedded into a JavaScript string. esc_url* strips dangerous protocols but does not encode double-quotes, so injecting such a value into window.location.href=\"...\"-style JS is a latent XSS. Values in JS contexts must be escaped with json_encode() or esc_js()."
+      }
+    },
+    {
+      "vuln_class": "missing_post_type_sanitization_in_redirect",
+      "location": "duplicate_edit_post(), lines 268-276 (duplicatepage.php)",
+      "severity": "low",
+      "reachability": "Reachable by any user who can trigger dt_duplicate_post_as_draft (requires edit_post capability on the target post). The post_type value comes from the database via get_post(), so direct injection requires a prior write to the posts table.",
+      "justification": "$post->post_type is concatenated directly into the redirect URL without sanitization: `admin_url('edit.php'.$returnpage)` where $returnpage = '?post_type='.$post->post_type. esc_url_raw() is applied to the full assembled URL, but post_type could contain characters that construct an unexpected URL if the DB value were attacker-influenced (e.g., via a malicious post type registered by another plugin). The value should be sanitized with sanitize_key() before concatenation.",
+      "detection_pattern": {
+        "grep_pattern": "post_type.*wp_redirect|wp_redirect.*post_type",
+        "anti_pattern": "sanitize_key.*post_type|post_type.*sanitize_key",
+        "section_name": "Open Redirect / URL Manipulation: unsanitized post_type in redirect",
+        "description": "Finds wp_redirect calls where post_type is concatenated into the URL without sanitize_key(). Although the value comes from the DB, it is still best practice to sanitize it to prevent URL manipulation if the value is ever indirectly attacker-controlled."
+      }
+    }
+  ]
+}
