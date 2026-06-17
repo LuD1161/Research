@@ -2,7 +2,7 @@
 
 Automated security review of WordPress plugins using LLM agents with static pre-filtering and self-improving pattern detection.
 
-> **For agents**: Read [`AGENT_INSTRUCTIONS.md`](AGENT_INSTRUCTIONS.md) for step-by-step instructions to run the pipeline on any plugin. It includes what to ask the user, exact commands, and troubleshooting.
+> **For agents**: Read [`AGENT_INSTRUCTIONS.md`](agent-instructions.md) for step-by-step instructions to run the pipeline on any plugin. It includes what to ask the user, exact commands, and troubleshooting.
 
 ## Quick Start — Run a Plugin Review
 
