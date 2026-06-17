@@ -1,0 +1,31 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "filterable_capability_downgrade",
+      "location": "verify_permissions() line 57, verify_admin_permissions() line 67",
+      "severity": "medium",
+      "reachability": "Requires a third-party plugin or theme to hook 'leadin_view_plugin_menu_capability' or 'leadin_connect_plugin_capability' and return a weaker capability (e.g., 'read'). If that happens, all leadin/v1 REST endpoints become accessible to any authenticated subscriber.",
+      "justification": "Both permission callbacks delegate the capability string to apply_filters(), returning defaults 'edit_posts' and 'manage_options' respectively; any WordPress code that hooks 'leadin_view_plugin_menu_capability' or 'leadin_connect_plugin_capability' can lower the required role to 'read', granting arbitrary authenticated users access to all plugin REST routes.",
+      "detection_pattern": {
+        "grep_pattern": "current_user_can\\(\\s*apply_filters\\s*\\(",
+        "anti_pattern": "current_user_can\\(\\s*'(manage_options|edit_posts|publish_posts)'\\s*\\)",
+        "section_name": "Capability Downgrade via Filterable Permission Callback",
+        "description": "Catches REST permission_callback implementations that pass an apply_filters() return value directly into current_user_can(). If a third party hooks the filter and supplies a weaker capability string, all routes guarded by this callback become accessible to lower-privileged users."
+      }
+    },
+    {
+      "vuln_class": "misleading_security_comment",
+      "location": "verify_permissions() docblock line 52-56, verify_admin_permissions() docblock line 62-66",
+      "severity": "low",
+      "reachability": "Not directly exploitable, but can mislead developers into removing or bypassing capability checks in subclasses, believing the nonce is sufficient authorization.",
+      "justification": "The docblock states 'User permissions are already verified by nonce wp_rest automatically,' which is factually incorrect: the wp_rest nonce authenticates the request as originating from a logged-in WordPress session but does NOT perform capability/role authorization; this false claim could lead developers to omit proper capability checks in derived controllers.",
+      "detection_pattern": {
+        "grep_pattern": "nonce.*already.*verif|verif.*nonce.*automat",
+        "anti_pattern": "current_user_can",
+        "section_name": "Misleading Nonce-as-Authorization Comment",
+        "description": "Detects code comments claiming a nonce check substitutes for authorization. WordPress nonces authenticate session origin, not user capabilities; treating them as authorization is a known anti-pattern that leads to privilege escalation when capability checks are later removed."
+      }
+    }
+  ]
+}
