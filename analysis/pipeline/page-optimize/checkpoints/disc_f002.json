@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "xss_reflected_attribute",
+      "location": "do_items(), lines 292, 312-314",
+      "severity": "medium",
+      "reachability": "Requires a registered script (wp_enqueue_script) with a specially-crafted src path containing HTML special characters. Any plugin or theme author, or a lower-trust actor who can register scripts, can reach this. The path must pass is_internal_uri() check which only verifies URL prefix, not character safety.",
+      "justification": "$href is built by concatenating $siteurl with $path_str (from $js_array['paths'] which originates from js_url_parsed['path']) and is then directly interpolated into a <script src='$href'> string without esc_url() or esc_attr(), so a crafted path with a single-quote or >< can break out of the attribute and inject arbitrary HTML.",
+      "detection_pattern": {
+        "grep_pattern": "src='\\$href'|src=\"\\$href\"|src=.\\$href",
+        "anti_pattern": "esc_url\\s*\\(\\s*\\$href",
+        "section_name": "XSS: unescaped URL in script src attribute",
+        "description": "Detects PHP files that interpolate a $href variable directly into an HTML script src attribute without esc_url(). Any registered script with special characters in its path (single-quote, angle brackets) can break out of the attribute context and inject HTML/JS."
+      }
+    },
+    {
+      "vuln_class": "xss_stored_inline_script",
+      "location": "do_items(), lines 300-303 and 328-331",
+      "severity": "low",
+      "reachability": "Requires the ability to call wp_add_inline_script() (or equivalent that populates $js_array['extras']['before'/'after']). In practice, this is a plugin/theme author capability — i.e., same-privilege code injection only. The code intentionally echoes raw script content.",
+      "justification": "$inline_before and $inline_after from $js_array['extras'] are echoed directly without any sanitization (echo $inline_before; / echo $inline_after;). While this is by design (inline scripts need to be raw JS), there is no integrity check: any actor who can write to these values via a filter or direct manipulation can inject arbitrary HTML/JS into the page output.",
+      "detection_pattern": {
+        "grep_pattern": "echo\\s+\\$inline_before|echo\\s+\\$inline_after|echo\\s+\\$inline_script",
+        "anti_pattern": "wp_kses|esc_html|esc_js",
+        "section_name": "XSS: unescaped inline script echo",
+        "description": "Detects PHP files that echo inline script variables without sanitization. While often intentional for inline JS, these sinks can be exploited if upstream data can be influenced by lower-trust actors."
+      }
+    },
+    {
+      "vuln_class": "arbitrary_file_read",
+      "location": "do_items(), line 199",
+      "severity": "low",
+      "reachability": "The $js_realpath used in file_get_contents() comes from dependency_src_to_fs_path() which resolves only internal URLs verified by is_internal_uri(). The path is further constrained by uri_path_to_fs_path() which rejects ../ sequences. Risk is limited but the function lacks realpath() canonicalization before the filesystem read.",
+      "justification": "file_get_contents($js_realpath) at line 199 reads an arbitrary filesystem path resolved from a registered script URL. While the path resolution guards against plain ../ traversal via regex, it does not call realpath() to canonicalize symbolic links or other OS-level indirections; a symlinked path inside the web root pointing outside it could bypass the prefix check.",
+      "detection_pattern": {
+        "grep_pattern": "file_get_contents\\s*\\(\\s*\\$[a-z_]*path|file_get_contents\\s*\\(\\s*\\$[a-z_]*realpath",
+        "anti_pattern": "realpath\\s*\\(|strpos.*ABSPATH|strpos.*WP_CONTENT_DIR",
+        "section_name": "File Read: file_get_contents on resolved path without realpath()",
+        "description": "Detects PHP files that call file_get_contents() on a dynamically-resolved path variable without calling realpath() for canonicalization. Symlink attacks or OS-level tricks may bypass string-based prefix checks used to restrict the allowed path space."
+      }
+    }
+  ]
+}
