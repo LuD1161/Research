@@ -1,0 +1,18 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "path_traversal_via_symlink",
+      "location": "getPath (st.js line 230), called from serve (st.js line 275), invoked via mount(q, s) at server.js line 181",
+      "severity": "low",
+      "reachability": "Any HTTP client can reach this via GET requests to the server started by server.js. Exploitation requires an attacker-placed or operator-misconfigured symlink inside the served directory that points outside it.",
+      "justification": "getPath calls path.join(this.path, u) with no subsequent fs.realpath call or prefix assertion, so symlinks inside the served root that resolve to paths outside it are silently followed, allowing reads of out-of-root files.",
+      "detection_pattern": {
+        "grep_pattern": "path\\.join\\s*\\([^)]+\\)(?!.*realpath)(?!.*startsWith)",
+        "anti_pattern": "realpath|resolve.*indexOf|resolve.*startsWith",
+        "section_name": "Path traversal: path.join without realpath prefix check",
+        "description": "Flags path.join calls where the result is used in fs operations without a subsequent realpath resolution and prefix assertion. Without realpath, symlinks inside the served root can escape the root, and double-encoded traversal sequences that survive only partial decoding may reach unexpected paths."
+      }
+    }
+  ]
+}
