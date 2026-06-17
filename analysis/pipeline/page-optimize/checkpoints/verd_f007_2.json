@@ -1,0 +1,6 @@
+{
+  "is_real": true,
+  "severity": "low",
+  "reasoning": "The finding is confirmed. In page-optimize/service.php line 109, `@gzuncompress(base64_decode(substr($args, 1)))` is called on attacker-supplied query string data with no pre-decompression size limit. The endpoint is triggered unauthenticated: page-optimize.php line 29 checks only if REQUEST_URI starts with '/_static/' and immediately requires service.php — no WordPress authentication, nonce, or capability check exists. The `@` error suppressor does not prevent memory exhaustion; it only suppresses error output. PHP's gzuncompress() defaults to unlimited decompression (max_length=-1). The only guard after decompression is `if (false === $args)` which exits only on decompression failure — a successful but massive decompression proceeds normally. No strlen or mb_strlen size cap appears anywhere before the gzuncompress call. A crafted zlib payload (e.g. a few hundred bytes compressing to hundreds of MB) sent as a GET to /_static/??-<base64payload> will be fully expanded into $args, exhausting PHP memory and enabling denial-of-service. Severity is low (not RCE, impact limited to DoS, and PHP memory_limit provides a ceiling — the process dies rather than taking down the whole server), but the vulnerability is real and unauthenticated.",
+  "_done": true
+}
