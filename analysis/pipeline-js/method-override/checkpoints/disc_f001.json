@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "http_method_spoofing_authorization_bypass",
+      "location": "methodOverride (inner middleware), lines 68-79",
+      "severity": "medium",
+      "reachability": "Any unauthenticated or authenticated HTTP client that can send a POST request to an endpoint using this middleware; no special privileges required",
+      "justification": "Line 75 sets `req.method = method.toUpperCase()` to an attacker-supplied value (from query string or header) after only a whitelist check against known HTTP method names; if authorization middleware runs downstream and makes decisions based on `req.method`, an attacker can escalate a POST (allowed) to DELETE/PUT/PATCH to bypass route-level access controls.",
+      "detection_pattern": {
+        "grep_pattern": "req\\.method\\s*=\\s*.*[Uu]pper[Cc]ase",
+        "anti_pattern": "req\\.method\\s*=\\s*.*[Uu]pper[Cc]ase.*//.*validated|authorize.*before.*methodOverride",
+        "section_name": "HTTP Method Spoofing: req.method override",
+        "description": "Catches middleware that overwrites req.method with caller-controlled data; attacker can masquerade as a privileged HTTP verb if auth middleware runs after this assignment."
+      }
+    },
+    {
+      "vuln_class": "cross_site_tracing_xst_via_method_whitelist",
+      "location": "supports(), line 143; methods npm package whitelist",
+      "severity": "low",
+      "reachability": "Any client that can send a POST request with `_method=TRACE` (or `X-HTTP-Method-Override: TRACE`) to a server that reflects or echoes TRACE requests",
+      "justification": "The `methods` npm package (line 17, used in `supports()` at line 143) includes `trace` and `connect`; a POST to `/?_method=TRACE` sets `req.method='TRACE'`, enabling Cross-Site Tracing (XST) if the server or any upstream proxy reflects TRACE content including cookies or auth headers.",
+      "detection_pattern": {
+        "grep_pattern": "methods\\.indexOf\\(method\\.toLowerCase\\(\\)\\)",
+        "anti_pattern": "blacklist.*TRACE|TRACE.*not.*allowed|method\\.toLowerCase\\(\\).*!==.*trace",
+        "section_name": "XST: TRACE method in whitelist",
+        "description": "Catches method-override patterns that allow TRACE/CONNECT through the whitelist; servers that reflect TRACE are vulnerable to Cross-Site Tracing which can exfiltrate cookies."
+      }
+    },
+    {
+      "vuln_class": "csrf_protection_bypass_via_null_methods_config",
+      "location": "methodOverride (factory), line 53; inner middleware line 64",
+      "severity": "low",
+      "reachability": "Exploitable only when developer sets `opts.methods = null`; a GET or HEAD request with an `_method` override param would then be eligible to trigger method substitution, bypassing CSRF defenses that rely on POST-only semantics",
+      "justification": "Line 53 assigns `opts.methods` directly when it is not `undefined`, so passing `null` sets `methods = null`; line 64's guard `if (methods && methods.indexOf(...) === -1)` short-circuits on `null` (falsy), skipping the allowed-method check entirely and letting ANY HTTP verb (GET, HEAD) trigger an override — removing the POST-only CSRF barrier.",
+      "detection_pattern": {
+        "grep_pattern": "opts\\.methods\\s*===\\s*undefined\\s*\\?",
+        "anti_pattern": "opts\\.methods\\s*==\\s*null|Array\\.isArray\\(methods\\)",
+        "section_name": "CSRF bypass: null methods config disables verb guard",
+        "description": "Catches method-override configurations that accept null to mean 'all methods allowed', which removes the POST-only guard and lets GET/HEAD requests override HTTP methods, undermining CSRF protections."
+      }
+    }
+  ]
+}
