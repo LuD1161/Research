@@ -1,0 +1,378 @@
+{
+  "summary": "Router-driven durable discovery + adversarial verify + reachability verify",
+  "agentCount": 24,
+  "logs": [
+    "manifest: 4 files at tier>=1 (MANIFEST=/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review/analysis/pipeline/woo-order-export-lite/manifest.json)",
+    "discover a0 w0: files=4 failed=0",
+    "verifying 11 raw findings",
+    "verify a0 w0: done=4 failed=0",
+    "verify a0 w1: done=8 failed=0",
+    "verify a0 w2: done=11 failed=0",
+    "reachability check: 4 of 4 confirmed findings qualify",
+    "reach a0 w0: done=4 failed=0",
+    "reachability: 2 findings downgraded, 2 unchanged"
+  ],
+  "result": {
+    "run": "woo-order-export-lite",
+    "plugin": "/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review/analysis/pipeline/woo-order-export-lite/manifest.json",
+    "files_reviewed": 4,
+    "raw_findings": 11,
+    "confirmed_count": 4,
+    "confirmed": [
+      {
+        "id": "f003",
+        "rel": "classes/FPDF/class-woe-pdf-mc-table.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/woo-order-export-lite/classes/FPDF/class-woe-pdf-mc-table.php",
+        "tags": [
+          "xss",
+          "fileio"
+        ],
+        "finding": {
+          "vuln_class": "path_traversal_file_read",
+          "location": "drawLogo() lines 135-162",
+          "severity": "medium",
+          "reachability": "Any user who can control PDF export settings (typically admin or shop manager) can supply the logo source path; the value flows into getimagesize($source) at line 146 and $this->Image($source, ...) at line 162 with no realpath() check or path-prefix restriction, allowing traversal to arbitrary local files that get embedded into the generated PDF.",
+          "justification": "The logo source from header_props['logo']['source'] is passed directly to getimagesize() and FPDF's Image() without any canonicalization or prefix validation, enabling a path like ../wp-config.php to be embedded into the PDF output."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "LOW",
+          "reasoning": "Confirmed end-to-end by tracing the full data flow.\n\nCOMPLETE ATTACK CHAIN:\n1. Storage: format_pdf_logo_source is stored via ajax_save_settings() -> make_new_settings() (class-wc-order-export-manage.php:78-149). make_new_settings() copies every $_POST['settings'] key-value directly into stored settings with zero sanitization (line 130-132: `$settings[$key] = $val`). The format_pdf_logo_source key accepts any string.\n\n2. Prefix stripping: class-wc-order-export-engine.php lines 203-206 regex `preg_match('#^format_pdf_(.+)$#', $key, $m)` strips the format_pdf_ prefix, producing $format_settings['logo_source'] = <attacker value>.\n\n3. Formatter reads it: class-woe-formatter-pdf.php line 293: `'source' => $this->settings['logo_source_id'] ? get_attached_file(...) : $this->settings['logo_source']`. When logo_source_id is 0/falsy, logo_source is used directly without any transformation.\n\n4. Sink 1 — getimagesize(): class-woe-pdf-mc-table.php line 146: `getimagesize($source)` called when width is 0. No realpath(), no prefix check.\n\n5. Sink 2 — FPDF Image(): class-woe-pdf-mc-table.php line 162: `$this->Image($source, ...)` dispatches to _parsejpg/_parsepng etc. in class-woe-fpdf.php via `file_get_contents($str_file)` (line 2130) or `fopen($str_file, 'rb')` (line 2196). Extension is extracted from the supplied path at line 159 via pathinfo(), so an attacker controls both the path and the extension used for dispatch.\n\nNO GUARDS FOUND:\n- No realpath() on the logo source path in the image pipeline (realpath() is only used for font paths in class-woe-fpdf.php:1920/3189).\n- No path-prefix restriction against ABSPATH or wp_upload_dir().\n- The esc_attr walk over all settings in ajax_save_settings() is commented out (trait lines 16-21).\n- make_new_settings() has no per-field sanitization for logo_source.\n\nAUTH CONTEXT — CORRECT AS STATED:\n- ajax_save_settings() calls check_nonce() which verifies wp_verify_nonce($nonce, 'woe_nonce') only. No current_user_can() check inside the handler.\n- The nonce is issued only to users who can load the plugin admin page, meaning admin or shop_manager in practice.\n- The reachability claim is accurate: shop_manager is a non-admin role that normally cannot read wp-config.php via the filesystem; this bypasses that restriction.\n\nIMPACT: The attacker (as shop_manager) saves a logo source of e.g. /var/www/html/wp-config.php.png or a real binary file at an arbitrary path, triggers a PDF export, and the file bytes are embedded in the returned PDF via file_get_contents/fopen. This is a local file read leading to credential exfiltration (DB password, WordPress secret keys in wp-config.php). Not RCE. Medium severity is correct.",
+          "severity_pre_reach": "medium"
+        },
+        "reachability": {
+          "gate_breachable": false,
+          "gate_type": "capability check (view_woocommerce_reports OR export_woocommerce_orders) + wp_nonce admin-only",
+          "adjusted_severity": "LOW",
+          "reasoning": "Two gates protect the vulnerable path, both requiring elevated privilege. First, ajax_gate() at class-wc-order-export-admin.php:514 enforces current_user_can('view_woocommerce_reports') OR current_user_can('export_woocommerce_orders') before any method dispatch — unauthenticated users and subscriber-level roles die immediately. Second, the wp_nonce ('woe_nonce') used by check_admin_referer at line 546 is generated via wp_create_nonce('woe_nonce') and rendered into the plugin admin page HTML (view/main.php:24) which itself is only accessible to users who already pass the capability gate. There is no route by which an unauthenticated attacker or a standard subscriber can obtain the nonce value. The minimum role required is shop_manager (which holds view_woocommerce_reports) or a user explicitly granted export_woocommerce_orders. The path traversal is real but requires a shop_manager or administrator credential to exercise — it is not default-exploitable from the outside. Severity is downgraded to LOW because exploitation requires an already-elevated, already-trusted role that normally has broader system access. The original adversarial verdict confirmed this in its AUTH CONTEXT section: 'admin or shop_manager in practice'."
+        }
+      },
+      {
+        "id": "f005",
+        "rel": "classes/admin/tabs/ajax/class-wc-order-export-ajax.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/woo-order-export-lite/classes/admin/tabs/ajax/class-wc-order-export-ajax.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "csrf",
+          "location": "ajax_export_download_bulk_file(), line 35-63",
+          "severity": "medium",
+          "reachability": "Any authenticated user with view_woocommerce_reports or cap_export_orders capability (shop manager, administrator by default) who can be lured to a malicious page",
+          "justification": "ajax_gate() dispatches to WC_Order_Export_Ajax::ajax_export_download_bulk_file() via the no-tab path (lines 530-538 of class-wc-order-export-admin.php) without ever calling check_admin_referer/check_ajax_referer — the nonce check at lines 546-548 only executes for the tab-dispatch path — and ajax_export_download_bulk_file() contains no nonce verification of its own, unlike ajax_run_one_job() which calls check_ajax_referer() at line 17; a cross-origin request can therefore trigger a full order export on behalf of the victim."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "The vulnerability is confirmed by tracing the full dispatch path. (1) Hook registration: add_action('wp_ajax_order_exporter', [$this, 'ajax_gate']) at class-wc-order-export-admin.php:43 — authenticated users only, no nopriv variant. (2) ajax_gate() at line 512 performs a capability check (view_woocommerce_reports OR cap_export_orders) then branches: if $_REQUEST['tab'] is absent or not a registered tab key (lines 530-538), it instantiates WC_Order_Export_Ajax and calls $method() directly then die()s — the nonce check at lines 546-548 (check_admin_referer) is inside the ELSE branch for tab-dispatch only and is never reached on this path. (3) ajax_export_download_bulk_file() (lines 35-64) contains zero nonce verification; the phpcs:ignore comment at line 68 in get_settings_from_bulk_request() confirms deliberate omission. (4) The legitimate bulk-action redirect at line 597 builds the URL as admin-ajax.php?action=order_exporter&method=export_download_bulk_file&export_bulk_profile=now&ids=... with no nonce parameter, proving the endpoint is designed to work without one. (5) build_and_send_file() is called unconditionally at line 40 — the export executes and the file is sent to the browser. An attacker can lure a victim with shop_manager or administrator role to load this URL cross-origin (e.g. via img tag or fetch from a malicious page) and trigger a full order data export on their behalf. The missing guard is the nonce check in the no-tab branch of ajax_gate() and the absence of any nonce check inside ajax_export_download_bulk_file() itself, unlike ajax_run_one_job() which correctly calls check_ajax_referer() at line 17.",
+          "_done": true
+        },
+        "reachability": {
+          "gate_breachable": true,
+          "gate_type": "capability check only (view_woocommerce_reports or cap_export_orders) — no nonce on no-tab dispatch path",
+          "adjusted_severity": "medium",
+          "reasoning": "The only gate protecting ajax_export_download_bulk_file() is WordPress authentication plus the view_woocommerce_reports or cap_export_orders capability, held by shop_manager and administrator roles by default. No nonce, secret, or unguessable token is required. The gate value is the victim's own session cookie, which is automatically attached by the browser in any cross-origin request — the attacker needs no separate value. Confirmed by: (1) ajax_gate() performs capability check then routes to the method directly on the no-tab path (class-wc-order-export-admin.php:530-538) with no nonce check; (2) the nonce check at lines 546-548 is in the ELSE branch only, unreachable on this path; (3) ajax_export_download_bulk_file() contains zero nonce verification; (4) the legitimate bulk-action redirect at line 597 constructs the URL as admin-ajax.php?action=order_exporter&method=export_download_bulk_file&export_bulk_profile=now&ids=... with no nonce parameter, proving design intent to work without one; (5) phpcs:ignore WordPress.Security.NonceVerification.Recommended at line 68 of the ajax class confirms deliberate omission. An attacker lures a shop_manager or administrator to a malicious page; the victim's browser sends a request to that URL; the capability check passes via the session cookie; build_and_send_file() executes unconditionally; order data is exported. No secret value needs to be obtained or guessed. Severity remains MEDIUM (requires luring a privileged user, not freely exploitable by any unauthenticated visitor)."
+        }
+      },
+      {
+        "id": "f012",
+        "rel": "classes/class-wc-order-export-admin.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/woo-order-export-lite/classes/class-wc-order-export-admin.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "csrf_missing_nonce",
+          "location": "ajax_gate(), lines 530-538 (global handler branch)",
+          "severity": "medium",
+          "reachability": "Any logged-in user with view_woocommerce_reports or export_woocommerce_orders capability",
+          "justification": "When $_REQUEST['tab'] is absent or not in $this->tabs, the code dispatches $ajax_handler->$method() (line 537) without ever calling check_admin_referer(); the nonce check at line 546 only runs in the tab-routed branch, so all globally-handled AJAX methods (WC_Order_Export_Ajax) execute with no CSRF protection."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "Confirmed by code. ajax_gate() (class-wc-order-export-admin.php lines 530-538) dispatches to WC_Order_Export_Ajax::$method() when $_REQUEST['tab'] is absent or not in $this->tabs, and calls die() immediately after — the check_admin_referer() at line 546 is unreachable from this branch. The global handler class (class-wc-order-export-ajax.php) exposes two public ajax_* methods: ajax_run_one_job() has its own check_ajax_referer() guard and is protected; ajax_export_download_bulk_file() has NO nonce check at all (confirmed by phpcs:ignore NonceVerification comment at line 68-69), reads $_REQUEST['export_bulk_profile'] attacker-controlled, and triggers a full WooCommerce order export and download. The wp_ajax_order_exporter hook is logged-in-only, so reachability is correctly scoped to users with view_woocommerce_reports or export_woocommerce_orders capability. A cross-site request to wp-admin/admin-ajax.php?action=order_exporter&method=export_download_bulk_file with no tab parameter executes the export with no CSRF token required. WC_Order_Export_Ajax only uses WC_Order_Export_Ajax_Helpers trait, not WC_Order_Export_Admin_Tab_Abstract_Ajax_Export, so the check_nonce()-guarded tab methods are not reachable through this branch. No missed sanitizer or guard was found. The finding is structurally confirmed."
+        },
+        "reachability": {
+          "gate_breachable": true,
+          "gate_type": "wp_ajax authentication cookie + capability check (view_woocommerce_reports or export_woocommerce_orders)",
+          "adjusted_severity": "MEDIUM",
+          "reasoning": "The wp_ajax_order_exporter hook is registered as logged-in-only (wp_ajax_, not wp_ajax_nopriv_), so unauthenticated attackers cannot reach ajax_gate() at all. Inside ajax_gate(), the global handler branch (lines 530-538) dispatches to WC_Order_Export_Ajax::ajax_export_download_bulk_file() with no nonce check when $_REQUEST['tab'] is absent — the check_admin_referer() at line 546 is only reachable via the tab-routed branch. The gate (authentication cookie + view_woocommerce_reports or export_woocommerce_orders capability) cannot be bypassed by the attacker; however, in a CSRF attack the gate is satisfied by the victim's own browser session, not something the attacker must guess or steal. CSRF does not require the attacker to obtain the gate value — it requires the victim to already hold it. WooCommerce shop managers routinely hold these capabilities. Therefore: gate_breachable=true (victim's session satisfies the gate), severity stays MEDIUM. The nonce value (woe_nonce) is generated via wp_create_nonce() and embedded only in authenticated admin pages, making it unguessable by the attacker — but because the vulnerable branch (ajax_export_download_bulk_file) has NO nonce check at all (confirmed by phpcs:ignore NonceVerification comment at line 68-69), the absence of a nonce to guess is exactly the vulnerability. An attacker crafts a cross-origin POST to wp-admin/admin-ajax.php?action=order_exporter&method=export_download_bulk_file (no tab parameter) and the victim's browser sends the session cookie, triggering a full WooCommerce order export with attacker-controlled export_bulk_profile parameter."
+        }
+      },
+      {
+        "id": "f012",
+        "rel": "classes/class-wc-order-export-admin.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/woo-order-export-lite/classes/class-wc-order-export-admin.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "broken_access_control",
+          "location": "export_orders_bulk_action_process(), lines 593-634",
+          "severity": "medium",
+          "reachability": "Any user who can access the WooCommerce orders list page (shop_manager or above by default, but filterable)",
+          "justification": "The bulk action handler that marks and unmarks orders as exported (lines 599-625) performs no current_user_can() check; WordPress's handle_bulk_actions filter does not enforce capability, so a lower-privileged user who can reach the orders list can toggle the export status of any order."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "low",
+          "reasoning": "Confirmed real. export_orders_bulk_action_process() at lines 593-634 contains zero current_user_can() calls — verified by exhaustive grep of the entire plugin source. The function is registered on handle_bulk_actions-edit-shop_order and handle_bulk_actions-woocommerce_page_wc-orders (constructor lines 47-58). WordPress core fires the handle_bulk_actions-{screen} filter after verifying the WP nonce (_wpnonce) but does not enforce any role/capability itself before calling the filter. The only capability checks in the plugin are: add_menu() line 238-239 (manage_woocommerce), ajax_gate() line 514 (view_woocommerce_reports OR export_woocommerce_orders custom cap), and user_can_add_custom_php() line 688. None guard the bulk handler. The plugin defines a custom capability self::$cap_export_orders = 'export_woocommerce_orders' and ajax_gate() enforces it, but the bulk action path bypasses it entirely. A user who has WooCommerce orders-list access (e.g. granted view_woocommerce_reports but not export_woocommerce_orders) can submit a crafted bulk action POST to mark or unmark any order's export metadata. Reachability is accurate: the gate is page-level access to edit-shop_order/wc-orders, which is shop_manager+ by default but can be widened via the filterable woe_current_user_can_export hook (line 238). The claimed severity of medium is appropriate — the impact is tampering with order export metadata (woe_order_exported), not order data itself, and requires authentication with at least WooCommerce orders-list access.",
+          "severity_pre_reach": "medium"
+        },
+        "reachability": {
+          "gate_breachable": false,
+          "gate_type": "wp_nonce admin-only (bulk-posts / bulk-orders, shop_manager+)",
+          "adjusted_severity": "low",
+          "reasoning": "The exploitation prerequisite chain has two mandatory gates an attacker must clear before reaching the unguarded export_orders_bulk_action_process() function. Gate 1: WordPress core verifies a _wpnonce (action 'bulk-posts' for legacy orders list, 'bulk-orders' for HPOS) before firing the handle_bulk_actions-{screen} filter. This nonce is embedded in the orders list page HTML via wp_nonce_field() and is only issued to users who can successfully load that admin page. Gate 2: The WooCommerce orders list page (edit.php?post_type=shop_order or wc-orders) requires the edit_shop_orders capability, which defaults to shop_manager and administrator roles. An unauthenticated or low-privilege attacker (subscriber, contributor, customer) cannot load the orders list page, therefore cannot receive a valid _wpnonce, and therefore cannot trigger the bulk action handler at all. The real vulnerability is a privilege mismatch within the authenticated shop_manager+ tier: the plugin defines a custom capability export_woocommerce_orders enforced only in ajax_gate() (line 514), but the bulk action path bypasses it entirely, allowing a user with orders-list access but without the export_woocommerce_orders cap to mark/unmark export metadata. This scenario requires a non-default site configuration where a role has been granted WooCommerce orders-list access but explicitly denied the export capability. In a default WordPress+WooCommerce install, any user who can reach the orders list already has shop_manager or administrator role, making the missing cap check redundant in practice. The impact is limited to toggling woe_order_exported metadata on orders, not reading or leaking order data. Severity is downgraded from medium to low because the gate (wp nonce tied to admin-only page access) is not breachable by unauthenticated or standard low-privilege users."
+        }
+      }
+    ],
+    "all_with_verdicts": [
+      {
+        "id": "f003",
+        "rel": "classes/FPDF/class-woe-pdf-mc-table.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/woo-order-export-lite/classes/FPDF/class-woe-pdf-mc-table.php",
+        "tags": [
+          "xss",
+          "fileio"
+        ],
+        "finding": {
+          "vuln_class": "path_traversal_file_read",
+          "location": "drawLogo() lines 135-162",
+          "severity": "medium",
+          "reachability": "Any user who can control PDF export settings (typically admin or shop manager) can supply the logo source path; the value flows into getimagesize($source) at line 146 and $this->Image($source, ...) at line 162 with no realpath() check or path-prefix restriction, allowing traversal to arbitrary local files that get embedded into the generated PDF.",
+          "justification": "The logo source from header_props['logo']['source'] is passed directly to getimagesize() and FPDF's Image() without any canonicalization or prefix validation, enabling a path like ../wp-config.php to be embedded into the PDF output."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "Confirmed end-to-end by tracing the full data flow.\n\nCOMPLETE ATTACK CHAIN:\n1. Storage: format_pdf_logo_source is stored via ajax_save_settings() -> make_new_settings() (class-wc-order-export-manage.php:78-149). make_new_settings() copies every $_POST['settings'] key-value directly into stored settings with zero sanitization (line 130-132: `$settings[$key] = $val`). The format_pdf_logo_source key accepts any string.\n\n2. Prefix stripping: class-wc-order-export-engine.php lines 203-206 regex `preg_match('#^format_pdf_(.+)$#', $key, $m)` strips the format_pdf_ prefix, producing $format_settings['logo_source'] = <attacker value>.\n\n3. Formatter reads it: class-woe-formatter-pdf.php line 293: `'source' => $this->settings['logo_source_id'] ? get_attached_file(...) : $this->settings['logo_source']`. When logo_source_id is 0/falsy, logo_source is used directly without any transformation.\n\n4. Sink 1 — getimagesize(): class-woe-pdf-mc-table.php line 146: `getimagesize($source)` called when width is 0. No realpath(), no prefix check.\n\n5. Sink 2 — FPDF Image(): class-woe-pdf-mc-table.php line 162: `$this->Image($source, ...)` dispatches to _parsejpg/_parsepng etc. in class-woe-fpdf.php via `file_get_contents($str_file)` (line 2130) or `fopen($str_file, 'rb')` (line 2196). Extension is extracted from the supplied path at line 159 via pathinfo(), so an attacker controls both the path and the extension used for dispatch.\n\nNO GUARDS FOUND:\n- No realpath() on the logo source path in the image pipeline (realpath() is only used for font paths in class-woe-fpdf.php:1920/3189).\n- No path-prefix restriction against ABSPATH or wp_upload_dir().\n- The esc_attr walk over all settings in ajax_save_settings() is commented out (trait lines 16-21).\n- make_new_settings() has no per-field sanitization for logo_source.\n\nAUTH CONTEXT — CORRECT AS STATED:\n- ajax_save_settings() calls check_nonce() which verifies wp_verify_nonce($nonce, 'woe_nonce') only. No current_user_can() check inside the handler.\n- The nonce is issued only to users who can load the plugin admin page, meaning admin or shop_manager in practice.\n- The reachability claim is accurate: shop_manager is a non-admin role that normally cannot read wp-config.php via the filesystem; this bypasses that restriction.\n\nIMPACT: The attacker (as shop_manager) saves a logo source of e.g. /var/www/html/wp-config.php.png or a real binary file at an arbitrary path, triggers a PDF export, and the file bytes are embedded in the returned PDF via file_get_contents/fopen. This is a local file read leading to credential exfiltration (DB password, WordPress secret keys in wp-config.php). Not RCE. Medium severity is correct."
+        }
+      },
+      {
+        "id": "f003",
+        "rel": "classes/FPDF/class-woe-pdf-mc-table.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/woo-order-export-lite/classes/FPDF/class-woe-pdf-mc-table.php",
+        "tags": [
+          "xss",
+          "fileio"
+        ],
+        "finding": {
+          "vuln_class": "path_traversal_file_read",
+          "location": "isImageCell() line 381, getMaxImageHeight() line 367, Row() lines 300 and 314",
+          "severity": "medium",
+          "reachability": "The image cell value comes from order row data assembled during export; a user who can influence exported order data (e.g. a product image field) and trigger a PDF export can supply a path that passes the file_exists() check but traverses outside the intended directory.",
+          "justification": "isImageCell() validates only that file_exists($value['value']) is true and type === 'image', but there is no realpath() canonicalization or directory-prefix check before the value is passed to getimagesize() and $this->Image(), so a path like ../../wp-config.php that exists on disk would be accepted and embedded."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "The finding is a false positive. The full taint path requires admin-level access at every step, making this a non-exploitable self-attack.\n\n**Sink analysis (confirmed accurate):** `isImageCell()` at line 381 performs only `file_exists($value['value'])` with no `realpath()` or directory prefix guard before the value is passed to `getimagesize()` (line 367) and `$this->Image()` (line 314). That code pattern is accurate.\n\n**Source analysis (where the finding fails):** The image column value cannot be attacker-controlled:\n\n1. The only field statically tagged `format=image` is `embedded_product_image` (trait-woe-core-extractor-ui.php line 452). Its value is assembled in `class-wc-order-export-order-product-fields.php` lines 151-154: `$thumbfile = str_replace(wp_get_upload_dir()['baseurl'], wp_get_upload_dir()['basedir'], $image[0])` where `$image[0]` comes from `wp_get_attachment_image_src()` — entirely WordPress-controlled, no customer input.\n\n2. An admin CAN assign `format=image` to a custom order meta field through the UI (`get_format_fields()` at trait line 1418 exposes `image` as a selectable format for any meta/custom field). If a customer-submitted meta key were tagged with image format, the raw meta string from `order_meta[$field]` or `item_meta[$field]` would flow to the sink. However: (a) setting format=image on a field requires admin access to the export profile settings UI; (b) triggering the PDF export requires `manage_woocommerce` or `export_woocommerce_orders` capability (class-wc-order-export-admin.php lines 238-245); (c) for `file_exists()` to pass, the meta value must be an absolute filesystem path — a customer submitting a relative path like `../../wp-config.php` would fail the check.\n\n3. Even if a traversal string passed `file_exists()` and `isImageCell()`, `FPDF::Image()` dispatches on file extension (class-woe-fpdf.php lines 1794-1797): it calls `_parse{ext}()` and throws `WOE_FPDF_Exception` for unsupported types. For `wp-config.php`, extension `php` has no parser method, the exception is thrown and caught silently in `Row()` at line 315. Only files with image extensions (jpg, png, gif, etc.) would actually be read via `file_get_contents`.\n\n**Reachability verdict:** The finding's stated threat model (\"a user who can influence exported order data\") does not hold. The only hardcoded image field (`embedded_product_image`) uses the WordPress attachment system exclusively. Any alternative path via custom meta format=image assignment requires: admin configures the field as image format AND admin triggers the export. Both setup and execution are gated behind administrator/shop-manager capabilities. There is no privilege escalation vector from customer to the sink."
+        }
+      },
+      {
+        "id": "f003",
+        "rel": "classes/FPDF/class-woe-pdf-mc-table.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/woo-order-export-lite/classes/FPDF/class-woe-pdf-mc-table.php",
+        "tags": [
+          "xss",
+          "fileio"
+        ],
+        "finding": {
+          "vuln_class": "http_header_injection",
+          "location": "_httpencode() lines 584-586, output_to_destination() lines 550 and 560",
+          "severity": "medium",
+          "reachability": "Reached whenever output_to_destination() is called with dest='I' or dest='D' and a caller-controlled $name; if the caller can embed CRLF sequences or double-quote characters in $name, they flow unfiltered into the Content-Disposition header.",
+          "justification": "When _isascii($value) returns true, _httpencode() returns param . '=\"' . $value . '\"' with no stripping of \\r, \\n, or '\"', so a filename containing CRLF allows injecting arbitrary HTTP response headers (e.g. Set-Cookie or Location) from the inline/download PDF endpoints."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "N/A",
+          "reasoning": "The vulnerable code path (_httpencode returning an unescaped value into Content-Disposition) exists in output_to_destination() for dest='I' and dest='D', but there is exactly one call site in the entire plugin: class-woe-formatter-pdf.php line 489 calls `$this->pdf->output_to_destination('f', $this->filename)` — dest='f' (case 'F': file save). The 'I' (inline browser) and 'D' (download) branches that emit HTTP headers are dead code in this plugin. No AJAX handler, REST endpoint, or any other code invokes output_to_destination with a browser-output destination. The theoretical sink (_httpencode with no CRLF stripping) is real, but the reachability claim is false: no attacker-controlled request can reach the header-emitting branches.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f003",
+        "rel": "classes/FPDF/class-woe-pdf-mc-table.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/woo-order-export-lite/classes/FPDF/class-woe-pdf-mc-table.php",
+        "tags": [
+          "xss",
+          "fileio"
+        ],
+        "finding": {
+          "vuln_class": "incomplete_input_validation",
+          "location": "convert_color() lines 782-786",
+          "severity": "low",
+          "reachability": "Any code path that passes a color array through setProperties/setHeaderProperty/setTableRowProperty and ultimately calls convert_color(); the third element (blue channel, index 2) of the array is not validated.",
+          "justification": "The loop in convert_color() runs for $i = 0 and $i = 1 only (condition $i < 2), so index 2 is sliced into the result without the numeric/range check applied to indices 0 and 1, potentially allowing a non-integer value to reach SetTextColor() or SetFillColor() and trigger unexpected FPDF behavior."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "n/a",
+          "reasoning": "The loop off-by-one in convert_color() (condition $i < 2 skips index 2 validation) is a real code defect but not a security vulnerability. The sole input path into convert_color() for background_color and text_color values goes through hex2RGB(), which either (a) returns false for invalid/non-hex input — caught by !empty() before convert_color() is ever called — or (b) returns a 3-element array where all values are guaranteed integers 0-255 via bitwise (0xFF & value) and hexdec operations. There is no attacker-controlled code path that delivers an unvalidated or non-integer index-2 value to SetFillColor() or SetTextColor(). Even if such a path existed, settings modification requires a valid woe_nonce (admin session), restricting reach to authenticated administrators. The missing validation on $array[2] is inconsequential in practice."
+        }
+      },
+      {
+        "id": "f005",
+        "rel": "classes/admin/tabs/ajax/class-wc-order-export-ajax.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/woo-order-export-lite/classes/admin/tabs/ajax/class-wc-order-export-ajax.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "csrf",
+          "location": "ajax_export_download_bulk_file(), line 35-63",
+          "severity": "medium",
+          "reachability": "Any authenticated user with view_woocommerce_reports or cap_export_orders capability (shop manager, administrator by default) who can be lured to a malicious page",
+          "justification": "ajax_gate() dispatches to WC_Order_Export_Ajax::ajax_export_download_bulk_file() via the no-tab path (lines 530-538 of class-wc-order-export-admin.php) without ever calling check_admin_referer/check_ajax_referer — the nonce check at lines 546-548 only executes for the tab-dispatch path — and ajax_export_download_bulk_file() contains no nonce verification of its own, unlike ajax_run_one_job() which calls check_ajax_referer() at line 17; a cross-origin request can therefore trigger a full order export on behalf of the victim."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "The vulnerability is confirmed by tracing the full dispatch path. (1) Hook registration: add_action('wp_ajax_order_exporter', [$this, 'ajax_gate']) at class-wc-order-export-admin.php:43 — authenticated users only, no nopriv variant. (2) ajax_gate() at line 512 performs a capability check (view_woocommerce_reports OR cap_export_orders) then branches: if $_REQUEST['tab'] is absent or not a registered tab key (lines 530-538), it instantiates WC_Order_Export_Ajax and calls $method() directly then die()s — the nonce check at lines 546-548 (check_admin_referer) is inside the ELSE branch for tab-dispatch only and is never reached on this path. (3) ajax_export_download_bulk_file() (lines 35-64) contains zero nonce verification; the phpcs:ignore comment at line 68 in get_settings_from_bulk_request() confirms deliberate omission. (4) The legitimate bulk-action redirect at line 597 builds the URL as admin-ajax.php?action=order_exporter&method=export_download_bulk_file&export_bulk_profile=now&ids=... with no nonce parameter, proving the endpoint is designed to work without one. (5) build_and_send_file() is called unconditionally at line 40 — the export executes and the file is sent to the browser. An attacker can lure a victim with shop_manager or administrator role to load this URL cross-origin (e.g. via img tag or fetch from a malicious page) and trigger a full order data export on their behalf. The missing guard is the nonce check in the no-tab branch of ajax_gate() and the absence of any nonce check inside ajax_export_download_bulk_file() itself, unlike ajax_run_one_job() which correctly calls check_ajax_referer() at line 17.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f005",
+        "rel": "classes/admin/tabs/ajax/class-wc-order-export-ajax.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/woo-order-export-lite/classes/admin/tabs/ajax/class-wc-order-export-ajax.php",
+        "tags": [
+          "access_control",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "xss_reflected",
+          "location": "ajax_export_download_bulk_file(), lines 43-44 and line 61",
+          "severity": "medium",
+          "reachability": "Any authenticated user with the same capability who can control a result text value returned by build_and_send_file() or a profile title stored in settings",
+          "justification": "$settings['title'] and the $v['text'] values from the $result array are interpolated into $output via sprintf/implode with no esc_html applied to those slots, then emitted via die($output) at line 61 (with a phpcs:ignore suppressing the escape warning) when $browser_output is false and HTTP_REFERER is absent, so any HTML in those values renders directly in the browser."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "false_positive",
+          "reasoning": "The finding is incorrectly classified as reflected XSS and the sink is not reachable in the Lite plugin under normal conditions. Detailed analysis:\n\n1. WRONG VULN CLASS: $settings['title'] is read from a WordPress option (get_option via WC_Order_Export_Manage::get()), not from the current HTTP request. The bulk request only supplies export_bulk_profile and ids. This would be stored XSS at best, not reflected XSS.\n\n2. SINK UNREACHABLE IN LITE: The die($output) branch at line 61 fires only when $browser_output is false. $browser_output = empty($settings['destination']['not_download_browser']). In the Lite plugin: (a) show_destination_in_profile defaults to false so $destination_flag is false; (b) $settings is built from array_merge(get_defaults_filters(), get_settings_from_bulk_request()) — neither source sets destination.not_download_browser; (c) the default destination array only contains zapier_export_type. Therefore $browser_output is always true in Lite, meaning send_headers() and send_contents_delete_file() are called (streaming the file to browser), and the die($output) path is never reached.\n\n3. SECOND CONDITION ALSO BLOCKS: Even if $browser_output were false, the code does wp_safe_redirect(HTTP_REFERER) first when HTTP_REFERER is present. Any browser-initiated request will have HTTP_REFERER, so die($output) is only reached in non-browser/direct AJAX calls with no referer.\n\n4. $result['text'] NON-ISSUE: build_and_send_file() only populates $result via WC_Order_Export_Pro_Engine::export() when $export (the $destination_flag) is truthy. In Lite, $destination_flag is always false, so $result is always [] and implode produces an empty string.\n\n5. AUTH IS CORRECT: ajax_gate() does require view_woocommerce_reports or cap_export_orders — so the endpoint is admin/shop-manager only. The nonce check in ajax_gate() applies to the tab branch; the global handler branch (used here) lacks check_admin_referer, but the capability check remains.\n\nConclusion: The die($output) sink with unescaped $settings['title'] is real code, but the path to it is blocked in Lite by $browser_output always being true. The vuln class label is wrong (stored not reflected). The finding as stated does not represent an exploitable vulnerability in the Lite plugin."
+        }
+      },
+      {
+        "id": "f006",
+        "rel": "classes/admin/tabs/ajax/trait-wc-order-export-admin-tab-abstract-ajax-export.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/woo-order-export-lite/classes/admin/tabs/ajax/trait-wc-order-export-admin-tab-abstract-ajax-export.php",
+        "tags": [
+          "xss",
+          "fileio"
+        ],
+        "finding": {
+          "vuln_class": "http_header_injection",
+          "location": "ajax_export_finish() line 161 / ajax_plain_export() line 127 → send_headers() in trait-wc-order-export-ajax-helpers.php line 74",
+          "severity": "medium",
+          "reachability": "Authenticated users with view_woocommerce_reports or export capability; nonce-protected",
+          "justification": "The user-supplied POST settings field 'export_filename' flows through use_ready_or_prepare_settings() and make_filename() without stripping CR/LF characters, then is stored in a transient and later concatenated directly into the Content-Disposition header as filename=\"$download_name\" (helpers trait line 74), enabling HTTP response header injection via newline injection in the filename mask."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "N/A",
+          "reasoning": "The taint path from POST to Content-Disposition header is real in code structure, but the vulnerability is not exploitable on the plugin's minimum supported PHP version (7.4+). Here is the concrete trace: (1) $_POST['settings'] is passed unsanitized as $in['settings'] through use_ready_or_prepare_settings() -> make_new_settings(), and export_filename is merged into $settings without any CR/LF stripping (class-wc-order-export-manage.php line 130-132). (2) make_filename() in class-wc-order-export-engine.php performs only date/token substitution on the mask — no sanitization of CR/LF characters (line 52: return apply_filters('woe_make_filename', strtr($mask, $subst))). (3) The resulting filename is stored in a transient and then passed directly to header('Content-Disposition: attachment; filename=\"' . $download_name . '\"') in trait-wc-order-export-ajax-helpers.php line 74, with no sanitization at the sink. (4) HOWEVER: PHP itself has blocked newline injection in header() since PHP 5.1.2/5.4.0. Since PHP 5.4, calling header() with a value containing \\n or \\r\\n emits an E_WARNING and the offending header is silently discarded — it is NOT sent to the client. The plugin requires PHP >= 7.4.0 (readme.txt line 5), meaning all supported environments have this PHP-level guard. Confirmed by live test: php -r 'header(\"Content-Disposition: attachment; filename=\\\"test\\ninjected: evil\\\"\");' emits 'Header may not contain more than a single header, new line detected' and does not inject. The auth claim (nonce-protected, view_woocommerce_reports or export capability) is accurate: check_nonce() in trait-wc-order-export-admin-tab-abstract-ajax-filters.php line 8-16 calls wp_verify_nonce(), and class-wc-order-export-admin.php line 514 gates the AJAX handler registration on current_user_can('view_woocommerce_reports') || current_user_can(cap_export_orders). The sink is reachable by authenticated privileged users, there is no application-level sanitizer, but PHP's own runtime protection makes this a non-exploitable false positive for all supported PHP versions.",
+          "_done": true
+        }
+      },
+      {
+        "id": "f006",
+        "rel": "classes/admin/tabs/ajax/trait-wc-order-export-admin-tab-abstract-ajax-export.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/woo-order-export-lite/classes/admin/tabs/ajax/trait-wc-order-export-admin-tab-abstract-ajax-export.php",
+        "tags": [
+          "xss",
+          "fileio"
+        ],
+        "finding": {
+          "vuln_class": "stored_xss",
+          "location": "ajax_preview() lines 21-31",
+          "severity": "medium",
+          "reachability": "Authenticated admin users viewing order preview; triggered when order data (billing name, address, notes, etc.) contains HTML/JS payloads",
+          "justification": "ob_get_contents() captures the raw rendered HTML output of build_file() in 'preview' mode (which includes unsanitized order field values for non-plain formats), wraps it in json_encode(), and echoes it; the client-side buttons.js then injects this value via jQuery('#output_preview').html(html) at line 20, executing any script tags present in order data as stored XSS."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "none",
+          "reasoning": "The finding claims stored XSS via jQuery('#output_preview').html(html) in buttons.js line 20. The sink exists in code, but is unreachable with any supported format. The JS logic in woe_show_preview() routes to .html() only in the else branch — i.e., only when the format is neither flat nor object. flat_formats = ['XLS','CSV','TSV','PDF','HTML'] and object_formats = ['XML','JSON'] (set in class-wc-order-export-admin.php lines 382-383). The plugin ships exactly seven formatters: csv, html, json, pdf, tsv, xls, xml. These two sets jointly cover all seven, leaving no format that falls through to the .html() sink. For HTML and PDF formats (which do emit raw HTML from order data without escaping in the formatter), the flat-format branch fires first and routes to .text(), which renders the content as plain text. The server side does send unescaped HTML order data in the json response (build_file in preview mode with HTML formatter calls fwrite with raw row values — no esc_html), so the PHP side produces dangerous payload, but the JS consumer always reaches .text() rather than .html() for every reachable format. Auth is real: ajax_gate() enforces current_user_can('view_woocommerce_reports') plus nonce. The .html() sink is dead code."
+        }
+      },
+      {
+        "id": "f012",
+        "rel": "classes/class-wc-order-export-admin.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/woo-order-export-lite/classes/class-wc-order-export-admin.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "csrf_missing_nonce",
+          "location": "ajax_gate(), lines 530-538 (global handler branch)",
+          "severity": "medium",
+          "reachability": "Any logged-in user with view_woocommerce_reports or export_woocommerce_orders capability",
+          "justification": "When $_REQUEST['tab'] is absent or not in $this->tabs, the code dispatches $ajax_handler->$method() (line 537) without ever calling check_admin_referer(); the nonce check at line 546 only runs in the tab-routed branch, so all globally-handled AJAX methods (WC_Order_Export_Ajax) execute with no CSRF protection."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "Confirmed by code. ajax_gate() (class-wc-order-export-admin.php lines 530-538) dispatches to WC_Order_Export_Ajax::$method() when $_REQUEST['tab'] is absent or not in $this->tabs, and calls die() immediately after — the check_admin_referer() at line 546 is unreachable from this branch. The global handler class (class-wc-order-export-ajax.php) exposes two public ajax_* methods: ajax_run_one_job() has its own check_ajax_referer() guard and is protected; ajax_export_download_bulk_file() has NO nonce check at all (confirmed by phpcs:ignore NonceVerification comment at line 68-69), reads $_REQUEST['export_bulk_profile'] attacker-controlled, and triggers a full WooCommerce order export and download. The wp_ajax_order_exporter hook is logged-in-only, so reachability is correctly scoped to users with view_woocommerce_reports or export_woocommerce_orders capability. A cross-site request to wp-admin/admin-ajax.php?action=order_exporter&method=export_download_bulk_file with no tab parameter executes the export with no CSRF token required. WC_Order_Export_Ajax only uses WC_Order_Export_Ajax_Helpers trait, not WC_Order_Export_Admin_Tab_Abstract_Ajax_Export, so the check_nonce()-guarded tab methods are not reachable through this branch. No missed sanitizer or guard was found. The finding is structurally confirmed."
+        }
+      },
+      {
+        "id": "f012",
+        "rel": "classes/class-wc-order-export-admin.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/woo-order-export-lite/classes/class-wc-order-export-admin.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "broken_access_control",
+          "location": "export_orders_bulk_action_process(), lines 593-634",
+          "severity": "medium",
+          "reachability": "Any user who can access the WooCommerce orders list page (shop_manager or above by default, but filterable)",
+          "justification": "The bulk action handler that marks and unmarks orders as exported (lines 599-625) performs no current_user_can() check; WordPress's handle_bulk_actions filter does not enforce capability, so a lower-privileged user who can reach the orders list can toggle the export status of any order."
+        },
+        "verdict": {
+          "is_real": true,
+          "severity": "medium",
+          "reasoning": "Confirmed real. export_orders_bulk_action_process() at lines 593-634 contains zero current_user_can() calls — verified by exhaustive grep of the entire plugin source. The function is registered on handle_bulk_actions-edit-shop_order and handle_bulk_actions-woocommerce_page_wc-orders (constructor lines 47-58). WordPress core fires the handle_bulk_actions-{screen} filter after verifying the WP nonce (_wpnonce) but does not enforce any role/capability itself before calling the filter. The only capability checks in the plugin are: add_menu() line 238-239 (manage_woocommerce), ajax_gate() line 514 (view_woocommerce_reports OR export_woocommerce_orders custom cap), and user_can_add_custom_php() line 688. None guard the bulk handler. The plugin defines a custom capability self::$cap_export_orders = 'export_woocommerce_orders' and ajax_gate() enforces it, but the bulk action path bypasses it entirely. A user who has WooCommerce orders-list access (e.g. granted view_woocommerce_reports but not export_woocommerce_orders) can submit a crafted bulk action POST to mark or unmark any order's export metadata. Reachability is accurate: the gate is page-level access to edit-shop_order/wc-orders, which is shop_manager+ by default but can be widened via the filterable woe_current_user_can_export hook (line 238). The claimed severity of medium is appropriate — the impact is tampering with order export metadata (woe_order_exported), not order data itself, and requires authentication with at least WooCommerce orders-list access."
+        }
+      },
+      {
+        "id": "f012",
+        "rel": "classes/class-wc-order-export-admin.php",
+        "file": "/home/openclaw/Repos/Research/2026/wp-plugins-research/plugins/src/woo-order-export-lite/classes/class-wc-order-export-admin.php",
+        "tags": [
+          "access_control",
+          "sqli",
+          "xss"
+        ],
+        "finding": {
+          "vuln_class": "sensitive_data_exposure_unauthenticated",
+          "location": "export_orders_bulk_action_process(), line 597",
+          "severity": "medium",
+          "reachability": "Any authenticated user who triggers the bulk export action, but the resulting redirect URL is nonce-free and can be replayed by an unauthenticated party if the URL leaks",
+          "justification": "The redirect URL constructed at line 597 (admin-ajax.php?action=order_exporter&method=export_download_bulk_file&...&ids=...) contains no nonce parameter; if this URL is shared or logged, a third party can download the bulk export file without authentication because the generated link carries no CSRF/auth token."
+        },
+        "verdict": {
+          "is_real": false,
+          "severity": "false_positive",
+          "reasoning": "The finding claims unauthenticated parties can replay the nonce-free redirect URL to download bulk export files. This is false. The sole dispatcher ajax_gate() (class-wc-order-export-admin.php line 512-566) checks current_user_can('view_woocommerce_reports') OR current_user_can(cap_export_orders) at line 514 before any routing occurs. Unauthenticated users have no capabilities; the request dies at line 514-516 with 'You can not do it'. WordPress admin-ajax.php does execute for unauthenticated users generically, but ajax_gate() kills the request immediately. The real vulnerability is CSRF (missing nonce for the no-tab branch through ajax_gate): ajax_export_download_bulk_file has no internal nonce check (confirmed by phpcs:ignore comment at line 68 and absence of check_ajax_referer, contrast with ajax_run_one_job which does call check_ajax_referer). However the specific claim of 'unauthenticated' access is wrong — a capability-authenticated session is required. The redirect URL at line 597 is indeed nonce-free, making it CSRF-vulnerable for logged-in users, but not exploitable by unauthenticated parties. The finding's vuln_class of sensitive_data_exposure_unauthenticated does not match the actual exposure model."
+        }
+      }
+    ],
+    "reachability_applied": 4,
+    "reachability_downgraded": 2
+  }
+}

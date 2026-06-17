@@ -17,11 +17,11 @@ export const meta = {
 }
 
 const ROOT = '/home/openclaw/Repos/Research/.claude/worktrees/woo-security-review'
-// ---- set per run -----------------------------------------------------------------
-const RUN = 'recaptcha'
+// ---- set per run (via args or fallback) ------------------------------------------
+const RUN = (typeof args !== 'undefined' && args && args.run) || 'recaptcha'
 const MANIFEST = `${ROOT}/analysis/pipeline/${RUN}/manifest.json`
 const CK = `${ROOT}/analysis/pipeline/${RUN}/checkpoints`
-const WAVE = 4 // keep modest: Sonnet server-side burst throttle trips ~14-wide
+const WAVE = 14 // 16 cores → cap min(16, cores-2) = 14
 const TIER_MIN = 1 // small plugin -> exhaustive sweep of all tier>=1 files
 
 const DISC_SCHEMA = {
@@ -32,6 +32,10 @@ const DISC_SCHEMA = {
     properties: {
       vuln_class: { type: 'string' }, location: { type: 'string' }, severity: { type: 'string' },
       reachability: { type: 'string' }, justification: { type: 'string' },
+      detection_pattern: { type: 'object', properties: {
+        grep_pattern: { type: 'string' }, anti_pattern: { type: 'string' },
+        section_name: { type: 'string' }, description: { type: 'string' },
+      } },
     } } } },
 }
 const VERD_SCHEMA = {
@@ -83,7 +87,15 @@ async function discover(i) {
     `You are reviewing ONE file for security vulnerabilities. First run:  cat ${f.brief}\n` +
     `That is your review brief (general pass + the lenses the static router matched for THIS file). ` +
     `Then read the target file:  ${f.file}\n` +
-    `Follow the brief. Report concrete, code-grounded findings only.`
+    `Follow the brief. Report concrete, code-grounded findings only.\n\n` +
+    `For each finding, also include a detection_pattern object with:\n` +
+    `- grep_pattern: a ripgrep-compatible regex that would detect this vulnerability CLASS in ` +
+    `OTHER WordPress plugins (not specific to this file/plugin). E.g. for a CSRF on an AJAX ` +
+    `handler, the pattern might match AJAX registration without nonce verification.\n` +
+    `- anti_pattern: a regex that indicates the issue is mitigated (e.g. check_ajax_referer ` +
+    `near a wp_ajax_ handler). Files matching grep_pattern but NOT anti_pattern are suspicious.\n` +
+    `- section_name: short label like "CSRF: AJAX handler without nonce"\n` +
+    `- description: what the pattern catches and why it matters.`
   try {
     const r = await agent(prompt + durable(ckpt, `disc-${f.id}`), { label: `disc:${f.id}`, phase: 'Discover', schema: DISC_SCHEMA, model: 'sonnet', effort: 'high' })
     return { id: f.id, file: f.file, rel: f.rel, tags: f.tags, findings: (r && r.findings) || [] }
@@ -144,7 +156,7 @@ const confirmed = verified.filter((v) => v.verdict && v.verdict.is_real)
 // findings without checking whether the gating secret/nonce/token is obtainable by an
 // attacker. Only runs on confirmed findings that match access-control vuln classes or
 // have severity >= MED — cheap no-op when nothing qualifies.
-const needsReach = confirmed.filter((v) => {
+const needsReach = confirmed.map((v, idx) => ({ ...v, _ridx: idx })).filter((v) => {
   const vc = v.finding.vuln_class || ''
   const sev = (v.verdict && v.verdict.severity) || v.finding.severity || ''
   return REACH_VULN_CLASSES.test(vc) || REACH_SEVERITIES.test(sev)
@@ -152,7 +164,8 @@ const needsReach = confirmed.filter((v) => {
 log(`reachability check: ${needsReach.length} of ${confirmed.length} confirmed findings qualify`)
 
 async function reachVerify(v) {
-  const ckpt = `${CK}/reach_${v.id}_${v.finding.vuln_class || 'unk'}.json`
+  const safeVc = (v.finding.vuln_class || 'unk').replace(/[^a-zA-Z0-9_-]/g, '_')
+  const ckpt = `${CK}/reach_${v.id}_${v._ridx}_${safeVc}.json`
   const prompt =
     `REACHABILITY GATE ANALYSIS. You must determine whether an attacker can actually ` +
     `REACH and EXPLOIT this confirmed vulnerability, or whether it is gated behind a ` +
@@ -176,7 +189,7 @@ async function reachVerify(v) {
     `in a default WordPress install. Default to false when uncertain.\n` +
     `adjusted_severity: keep original if breachable, downgrade to LOW or INFORMATIONAL if not.`
   try {
-    const r = await agent(prompt + durable(ckpt, `reach-${v.id}`), { label: `reach:${v.id}`, phase: 'Reachability', schema: REACH_SCHEMA, model: 'sonnet', effort: 'high' })
+    const r = await agent(prompt + durable(ckpt, `reach-${v.id}-${v._ridx}`), { label: `reach:${v.id}.${v._ridx}`, phase: 'Reachability', schema: REACH_SCHEMA, model: 'sonnet', effort: 'high' })
     return { ...v, reachability: r }
   } catch (e) { return { ...v, reachability: null } }
 }
@@ -202,9 +215,9 @@ if (needsReach.length) {
 }
 
 // Merge reachability results back: downgrade confirmed findings where gate is unbreachable
-const reachMap = new Map(reachResults.map((r) => [`${r.id}:${r.finding.vuln_class || ''}`, r.reachability]))
-const finalConfirmed = confirmed.map((v) => {
-  const key = `${v.id}:${v.finding.vuln_class || ''}`
+const reachMap = new Map(reachResults.map((r) => [`${r.id}:${r._ridx}`, r.reachability]))
+const finalConfirmed = confirmed.map((v, idx) => {
+  const key = `${v.id}:${idx}`
   const reach = reachMap.get(key)
   if (!reach) return v
   if (!reach.gate_breachable && reach.adjusted_severity) {

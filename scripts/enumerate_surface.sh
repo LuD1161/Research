@@ -147,6 +147,51 @@ for plugin_dir in "${SRC_DIR}"/*/; do
 
         echo "### Deserialization (object injection surface)"; echo '```'
         rg_lines 'unserialize|maybe_unserialize' "${plugin_dir}"; echo '```'; echo ""
+
+        # Section 4: Learned Vulnerability Patterns (from pipeline)
+        LEARNED="${REPO_ROOT}/analysis/pipeline/learned_patterns.json"
+        if [[ -f "${LEARNED}" ]] && command -v jq &>/dev/null; then
+            echo "## Section 4: Learned Vulnerability Patterns (pipeline-discovered)"; echo ""
+            while IFS= read -r line; do
+                name="$(echo "$line" | jq -r '.section_name')"
+                pat="$(echo "$line" | jq -r '.grep_pattern')"
+                anti="$(echo "$line" | jq -r '.anti_pattern // empty')"
+                desc="$(echo "$line" | jq -r '.description // empty')"
+                vuln="$(echo "$line" | jq -r '.vuln_class // empty')"
+
+                echo "### ${name} [\`${vuln}\`]"
+                [[ -n "${desc}" ]] && echo "> ${desc}"; echo ""
+
+                if [[ -n "${anti}" ]]; then
+                    echo '```'
+                    # File-level: files matching pattern but NOT containing anti-pattern
+                    suspicious=""
+                    pat_output=$(rg -g "${PHP_GLOB}" -l -e "${pat}" "${plugin_dir}" 2>/dev/null)
+                    pat_rc=$?
+                    if [[ "${pat_rc}" -ge 2 ]]; then
+                        echo "SCAN ERROR: invalid grep_pattern '${pat}' (rg exit ${pat_rc})"
+                    else
+                        while IFS= read -r matchfile; do
+                            [[ -z "${matchfile}" ]] && continue
+                            rg -q -e "${anti}" "${matchfile}" 2>/dev/null
+                            anti_rc=$?
+                            if [[ "${anti_rc}" -ge 2 ]]; then
+                                echo "${matchfile} (SCAN ERROR: invalid anti_pattern)"
+                            elif [[ "${anti_rc}" -eq 1 ]]; then
+                                suspicious+="${matchfile} (NO MITIGATION)"$'\n'
+                            fi
+                        done <<< "${pat_output}"
+                        [[ -z "${suspicious}" ]] && echo "None found (all files have mitigation)" || echo "${suspicious}"
+                    fi
+                    echo '```'
+                else
+                    echo '```'
+                    rg_lines "${pat}" "${plugin_dir}"
+                    echo '```'
+                fi
+                echo ""
+            done < <(jq -c '.[]' "${LEARNED}")
+        fi
     } > "${out_file}"
 
     log "INFO" "  -> Written: ${out_file}"
