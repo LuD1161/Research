@@ -1,0 +1,6 @@
+{
+  "is_real": false,
+  "severity": "N/A",
+  "reasoning": "The finding correctly identifies that simple-get v4.0.1 uses url.parse(opts.url).path verbatim at line 19 with no explicit CRLF stripping. However, two layered defenses prevent exploitation: (1) url.parse() automatically percent-encodes raw CRLF characters in the URL path (e.g., literal \\r\\n becomes %0D%0A), so the path value extracted from url.parse() never contains raw CR or LF bytes; (2) Node.js's http.request sends percent-encoded sequences like %0d%0a as literal text in the request line rather than decoding them to actual CRLF bytes, so the wire-level output is 'GET /test%0D%0AX-Evil:injected HTTP/1.1' with no header injection. Both behaviors were confirmed empirically on Node.js v22.22.2. Additionally, Node.js v14+ throws ERR_UNESCAPED_CHARACTERS if raw unescaped characters are passed to http.request, providing a third layer. The finding's claimed reachability is incorrect because url.parse itself neutralizes raw CRLF before the path reaches the http layer, and the http layer does not decode percent-encoded CRLF back to raw bytes. The vulnerability does not exist in any supported Node.js version (v14+) and likely never worked as described even in older versions since url.parse has always percent-encoded control characters in the path component.",
+  "_done": true
+}
