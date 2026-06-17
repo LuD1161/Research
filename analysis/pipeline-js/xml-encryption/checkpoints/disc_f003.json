@@ -1,0 +1,32 @@
+{
+  "_done": true,
+  "file": "lib/templates/keyinfo.tpl.xml.js",
+  "findings": [
+    {
+      "vuln_class": "xml_injection",
+      "location": "module.exports template literal, line 10 — `${encryptionPublicCert}` interpolation",
+      "severity": "high",
+      "reachability": "Any caller of `encrypt()` or `encryptKeyInfo()` in xmlenc.js that controls `options.pem` or any caller that invokes the template directly with a controlled `encryptionPublicCert` parameter; in SAML/federation scenarios this can be the identity provider certificate supplied at runtime.",
+      "justification": "Unlike `keyEncryptionMethod`, `keyEncryptionDigest`, and `encryptedKey` which are all wrapped with `escapehtml()`, `encryptionPublicCert` is interpolated raw into the XML template at line 10, enabling an attacker who controls the PEM certificate or the template parameter directly to inject arbitrary XML nodes into the `<KeyInfo>` element and alter document structure.",
+      "detection_pattern": {
+        "grep_pattern": "\\$\\{[^}]+\\}",
+        "anti_pattern": "escapehtml\\(|escape\\(|encodeURIComponent\\(|DOMPurify",
+        "section_name": "XML injection: raw template interpolation in XML output",
+        "description": "Finds template literal interpolations in XML-generating files; when a field is interpolated without an XML/HTML escaping wrapper (e.g. escapehtml, xmlescape) an attacker controlling that field can inject arbitrary XML nodes or attributes."
+      }
+    },
+    {
+      "vuln_class": "unvalidated_algorithm_uri",
+      "location": "module.exports template literal, line 7 — DigestMethod Algorithm attribute",
+      "severity": "low",
+      "reachability": "Any caller that controls `options.keyEncryptionDigest` — a config-time or caller-supplied string that is concatenated directly after the fixed URI prefix `http://www.w3.org/2000/09/xmldsig#` with only HTML escaping applied.",
+      "justification": "The DigestMethod Algorithm URI is constructed as a string concatenation of a hardcoded prefix and `escapehtml(keyEncryptionDigest)` with no allowlist validation, so an attacker supplying an unexpected digest value can craft an arbitrary URI (e.g. referencing an attacker-controlled algorithm) as the Algorithm attribute, though HTML-escaping prevents attribute breakout.",
+      "detection_pattern": {
+        "grep_pattern": "Algorithm.*\\$\\{.*Digest",
+        "anti_pattern": "allowedDigests|digestAlgorithm.*indexOf|switch.*digest",
+        "section_name": "Algorithm URI injection: unvalidated digest algorithm",
+        "description": "Finds XML Algorithm attribute constructions that interpolate a caller-supplied digest or algorithm name without an allowlist check; permits an attacker to specify unsupported or attacker-chosen cryptographic algorithm URIs."
+      }
+    }
+  ]
+}
