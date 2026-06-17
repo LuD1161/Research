@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "ssrf_via_api_response_url",
+      "location": "downloadFile() line 290; called from downloadAndUnpack() lines 171/180, downloadFilesDirectly() line 190, downloadZipFile() line 205",
+      "severity": "medium",
+      "reachability": "Requires a successful admin-initiated favicon generation flow (nonce-protected AJAX). The URLs fetched (package_url, files_urls[], preview_picture_url) come from the RealFaviconGenerator API JSON response with no host allowlist check. An attacker who can MITM the API response, poison DNS for realfavicongenerator.net, or compromise the upstream API service can supply arbitrary URLs (including http://169.254.169.254/ or internal hostnames) that the WordPress server will fetch via wp_remote_get().",
+      "justification": "In downloadFile() at line 290, wp_remote_get($url, ...) is called with a $url value sourced directly from JSON fields package_url, files_urls[], and preview_picture_url (lines 50, 53, 59). No scheme or host validation is performed anywhere in this file before the HTTP fetch, enabling SSRF to internal/cloud-metadata addresses when the upstream API response is attacker-influenced.",
+      "detection_pattern": {
+        "grep_pattern": "wp_remote_get\\s*\\(\\s*\\$(?!safe_url|allowed_url|whitelisted)",
+        "anti_pattern": "wp_parse_url|parse_url.*host.*allowlist|in_array.*host|strpos.*allowed_host",
+        "section_name": "SSRF: wp_remote_get with unvalidated URL from external data",
+        "description": "Catches wp_remote_get calls where the URL variable is not immediately preceded by a host-allowlist check. Files matching the grep but not the anti_pattern may fetch attacker-controlled hosts when the URL originates from an external API response, user input, or stored option."
+      }
+    },
+    {
+      "vuln_class": "ssrf_via_stored_api_payload_replay",
+      "location": "getNonInteractiveAPIRequest() line 133; used in common.php run_non_interactive_api_request() line 484",
+      "severity": "low",
+      "reachability": "Triggered only by the scheduled daily cron action (ACTION_CHECK_FOR_UPDATE). The non_interactive_api_request value is stored in a WP option after the first admin-initiated favicon generation (common.php line ~469), sourced from the getNonInteractiveAPIRequest() accessor which reads the JSON field non_interactive_request (line 64). If the upstream API is compromised, the stored payload is replayed server-side in subsequent cron runs.",
+      "justification": "The RFG_NON_INTERACTIVE_API_REQUEST constant at line 17 maps to the 'non_interactive_request' JSON field (line 64). This value is persisted to a WP option and later POSTed verbatim back to https://realfavicongenerator.net/api/favicon by run_non_interactive_api_request(). A malicious API response could embed a request body designed to trigger arbitrary server-side behavior in subsequent scheduled invocations; the POST target is a fixed domain but the body content is fully API-controlled.",
+      "detection_pattern": {
+        "grep_pattern": "get_option.*wp_remote_post|update_option.*api_request",
+        "anti_pattern": "sanitize_text_field|wp_kses|json_encode.*hardcoded",
+        "section_name": "SSRF/Injection: stored API payload replayed in cron",
+        "description": "Catches patterns where an option value is retrieved and passed to wp_remote_post without re-sanitisation. Files matching this pattern may replay attacker-influenced data in scheduled or background contexts."
+      }
+    },
+    {
+      "vuln_class": "undefined_variable_logic_error",
+      "location": "downloadFilesDirectly() lines 195-199",
+      "severity": "low",
+      "reachability": "Reached whenever the ZIP download fails and the fallback downloadFilesDirectly() is called directly (line 174). The variable $extractedPath is used (lines 195, 196, 199) but is never assigned within downloadFilesDirectly(); it is only set in downloadZipFile() and downloadAndUnpack(). PHP evaluates this as null, so the compressed/uncompressed package path options are stored as null regardless of the isCompressed() flag, corrupting the internal state.",
+      "justification": "At lines 195-199, $extractedPath appears in both branches of the if($this->isCompressed()) check but is never declared in the scope of downloadFilesDirectly(). This is a PHP undefined-variable bug that silently stores null into RFG_FAVICON_COMPRESSED_PACKAGE_PATH or RFG_FAVICON_UNCOMPRESSED_PACKAGE_PATH, which may cause downstream file-deployment logic to skip copying favicon files.",
+      "detection_pattern": {
+        "grep_pattern": "\\$extractedPath",
+        "anti_pattern": "\\$extractedPath\\s*=",
+        "section_name": "Logic error: undefined variable used before assignment",
+        "description": "Finds uses of $extractedPath that are not preceded by an assignment in the same function scope. Adjust variable name for other plugins. Undefined variables in PHP default to null and can silently corrupt state."
+      }
+    }
+  ]
+}
