@@ -1,0 +1,31 @@
+{
+  "findings": [
+    {
+      "vuln_class": "redos_static_regex",
+      "location": "regexes.ipv6 (line 5), used in ip() (line 19)",
+      "severity": "medium",
+      "reachability": "Any caller who passes attacker-controlled input to is.ip() or is.not.ip() — in the request-ip package this is HTTP request header values (e.g., X-Forwarded-For), so it is network-reachable without authentication.",
+      "justification": "The IPv6 regex contains the sub-expression `([\\ dA-F]{1,4}:(:|\\ b)|){5}` where the empty alternative `|` allows the quantifier to match 5 zero-width tokens, creating up to 2^5 ambiguous parse paths; combined with the backreference-dependent lookaheads `(?!\\3)` and `(?!\\2\\3)` in the second half, this is a well-known ReDoS-class regex that was exploitable on Node <18 (naive NFA). V8 in Node 22.x JIT-compiles it to linear time, so exploitation requires an older runtime.",
+      "detection_pattern": {
+        "grep_pattern": "\\[\\\\dA-F\\]\\{1,4\\}.*\\|\\)\\{[3-9]",
+        "anti_pattern": "new RegExp|linearize|safe-regex|re2",
+        "section_name": "ReDoS: IPv6 static regex with ambiguous quantified alternatives",
+        "description": "Catches static IPv6-validation regexes that repeat a group with an empty alternative `|)` 3 or more times — the classic pattern that causes polynomial backtracking in non-JIT NFA engines (Node <18, older browsers)."
+      }
+    },
+    {
+      "vuln_class": "logic_precedence_type_coercion",
+      "location": "ip() function, line 19",
+      "severity": "low",
+      "reachability": "Any caller passing null/undefined or a non-string value to is.ip(). In request-ip the value comes from request header parsing which may produce missing headers.",
+      "justification": "The expression `existy(value) && regexes.ipv4.test(value) || regexes.ipv6.test(value)` evaluates as `(existy(value) && ipv4.test(value)) || ipv6.test(value)` due to JS operator precedence — the null-guard `existy()` only protects the IPv4 branch; the IPv6 branch always executes, causing `RegExp.prototype.test(null)` to silently coerce null to the string `'null'` and test it. This is a correctness bug; the current IPv6 regex does not match `'null'`, but a future regex change could introduce a false positive.",
+      "detection_pattern": {
+        "grep_pattern": "existy.*&&.*\\.test.*\\|\\|.*\\.test",
+        "anti_pattern": "return existy\\(value\\) && \\(.*\\.test.*\\|\\|.*\\.test\\)",
+        "section_name": "Logic: null guard bypassed by operator precedence in OR chain",
+        "description": "Detects patterns where a null/existy guard is `&&`-chained with one test but a second test is `||`-chained at the same level, meaning the guard does not protect the second test and null/undefined gets silently coerced to a string."
+      }
+    }
+  ],
+  "_done": true
+}
