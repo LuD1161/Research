@@ -1,0 +1,70 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "stored_xss",
+      "location": "get_updates_description(), line 206",
+      "severity": "medium",
+      "reachability": "Admin/privileged user who can trigger a favicon update; the payload originates from the remote API response stored in the fbrfg_updates_data option and is later rendered without escaping.",
+      "justification": "At line 206, $update['description'] (read from the fbrfg_updates_data option, which is populated from the external API response at line 134) is concatenated directly into an HTML string '<p>' . $update['description'] . '</p>' with no escaping, then returned and presumably displayed in the admin UI, enabling stored XSS if the upstream API (or a MITM) injects script content.",
+      "detection_pattern": {
+        "grep_pattern": "\\$update\\[.description.\\]",
+        "anti_pattern": "esc_html\\(\\s*\\$update\\[.description.\\]\\)|esc_attr\\(\\s*\\$update\\[.description.\\]\\)",
+        "section_name": "Stored XSS: unescaped API-sourced field concatenated into HTML",
+        "description": "Catches plugins that concatenate an 'description' field from an option or API response into HTML without escaping; matches files that do NOT apply esc_html/esc_attr to the value."
+      }
+    },
+    {
+      "vuln_class": "stored_xss_via_wp_kses_overly_permissive_allowlist",
+      "location": "add_favicon_markups(), lines 260-274",
+      "severity": "medium",
+      "reachability": "Anyone who can write to the fbrfg_html_code option (admins via normal flow, or via a compromised upstream API during automatic updates). The output is echoed into wp_head on every public page.",
+      "justification": "wp_kses() allows <meta content=> with no value restriction; an attacker who controls fbrfg_html_code (e.g., via a compromised realfavicongenerator.net API response, MitM, or a separate option-write vulnerability) can store a meta refresh redirect or meta http-equiv injection. More critically, the href attribute on <link> is unrestricted, so a javascript: URI or data: URI in href would pass wp_kses and be echoed on every front-end page.",
+      "detection_pattern": {
+        "grep_pattern": "wp_kses.*href.*array\\(\\)",
+        "anti_pattern": "esc_url\\s*\\(",
+        "section_name": "Stored XSS: wp_kses allowlist permits javascript: href",
+        "description": "Flags wp_kses calls that allow an href attribute without any sanitization callback; wp_kses does strip javascript: in href by default, but marking this pattern for review catches cases where a plugin author believes wp_kses fully restricts URLs when it may not in all contexts."
+      }
+    },
+    {
+      "vuln_class": "server_side_request_forgery_second_order",
+      "location": "check_for_updates() -> run_non_interactive_api_request(), lines 450-491",
+      "severity": "medium",
+      "reachability": "Any vector that can write to the fbrfg_favicon_non_interactive_api_request option. The stored value is passed as the POST body to wp_remote_post() at a hardcoded URL (realfavicongenerator.net), so this is not a direct SSRF of the target URL. However, the body is fully attacker-controlled and is forwarded to the external API without validation.",
+      "justification": "get_non_interactive_api_request() returns the raw value of fbrfg_favicon_non_interactive_api_request from the database and passes it directly as the 'body' of wp_remote_post() (line 485-490) without any sanitization or structure validation; a privilege-escalated attacker (or a compromised API response that tricks the plugin into storing malicious data) could abuse this to forge arbitrary POST bodies to the external API, potentially achieving account takeover or abusing paid API quotas.",
+      "detection_pattern": {
+        "grep_pattern": "wp_remote_post.*get_option",
+        "anti_pattern": "wp_parse_args|json_decode.*strict|sanitize_text_field",
+        "section_name": "SSRF/Request-Forgery: option value used as HTTP body without validation",
+        "description": "Matches plugins that pass a raw get_option() value directly as the body of an outbound HTTP request; without structure validation the stored value can be attacker-controlled request content."
+      }
+    },
+    {
+      "vuln_class": "unvalidated_remote_response_triggers_file_write",
+      "location": "check_for_updates(), lines 450-469",
+      "severity": "high",
+      "reachability": "Triggered automatically by the WordPress cron action fbrfg_check_for_updates. No authentication is needed to trigger cron. The attack vector is a malicious or MITM'd response from realfavicongenerator.net.",
+      "justification": "When an automatic update is available, check_for_updates() calls run_non_interactive_api_request() which sends a POST to realfavicongenerator.net and then passes the raw JSON body to Favicon_By_RealFaviconGenerator_Api_Response; that object's downloadAndUnpack() (line 461) downloads and unpacks a ZIP to a directory under wp-content/uploads, and store_pictures() (line 463) writes those files to disk — all without any cryptographic signature or integrity check on the downloaded archive, meaning a MitM between the site and realfavicongenerator.net can deliver arbitrary files to the uploads directory.",
+      "detection_pattern": {
+        "grep_pattern": "downloadAndUnpack|ZipArchive.*extractTo",
+        "anti_pattern": "hash_equals|openssl_verify|sodium_crypto_sign_verify",
+        "section_name": "Remote code inclusion: unauthenticated ZIP extraction from remote API",
+        "description": "Flags plugins that download and extract ZIP archives from remote URLs without verifying a cryptographic signature, enabling remote file write via MitM of the update channel."
+      }
+    },
+    {
+      "vuln_class": "http_host_header_injection",
+      "location": "current_page_url(), line 357-361",
+      "severity": "low",
+      "reachability": "Any unauthenticated request where HTTP_HOST is attacker-controlled (common behind load balancers that forward Host headers). The constructed URL is used in add_parameter_to_current_url() which appends a nonce and the result is returned to callers (used in admin redirects or link generation).",
+      "justification": "At line 357, $_SERVER['HTTP_HOST'] is passed through sanitize_text_field() which does NOT strip colon-encoded port injections or path traversal; the result is concatenated into a '//' . $host . $request_uri URL (line 359) without esc_url(), meaning an attacker who can set the Host header to 'evil.com' can cause the function to return a URL pointing to an attacker-controlled domain, which may be used for open-redirect or cache-poisoning attacks.",
+      "detection_pattern": {
+        "grep_pattern": "HTTP_HOST.*sanitize_text_field",
+        "anti_pattern": "esc_url\\s*\\(|wp_parse_url.*host",
+        "section_name": "Host Header Injection: HTTP_HOST used in URL construction without esc_url",
+        "description": "Matches plugins that read $_SERVER['HTTP_HOST'] through sanitize_text_field (which is insufficient for URL context) and use it to build URLs; without esc_url the resulting value can be an attacker-controlled host."
+      }
+    }
+  ]
+}
