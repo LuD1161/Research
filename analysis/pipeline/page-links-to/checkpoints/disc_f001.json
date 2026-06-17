@@ -1,0 +1,70 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "broken_access_control",
+      "location": "ajax_dismiss_notice / line 942-946",
+      "severity": "medium",
+      "reachability": "Any logged-in WordPress user (wp_ajax_ requires authentication by default, but no capability check is performed beyond being logged in)",
+      "justification": "The wp_ajax_plt_dismiss_notice handler calls dismiss_notice() which writes to the site-wide DISMISSED_NOTICES option with no nonce verification and no current_user_can() check, allowing any authenticated user to permanently suppress admin notices for all users on the site.",
+      "detection_pattern": {
+        "grep_pattern": "wp_ajax_[a-z_]+.*\\bdismiss\\b",
+        "anti_pattern": "check_ajax_referer|wp_verify_nonce|current_user_can",
+        "section_name": "CSRF+AuthZ: AJAX dismiss handler without nonce or capability check",
+        "description": "Finds AJAX handlers whose action name contains 'dismiss'; these typically mutate persistent option state and should have both a nonce and a capability check. Files matching but not containing a nonce or capability verification are likely missing access controls."
+      }
+    },
+    {
+      "vuln_class": "broken_access_control",
+      "location": "save_post / line 626-645",
+      "severity": "medium",
+      "reachability": "Any user who can submit a valid nonce for the target post (i.e., anyone who loaded the post-edit screen for that post ID, including contributors and authors on their own posts)",
+      "justification": "save_post verifies the nonce but never calls current_user_can('edit_post', $post_id), so any user who once loaded a post-edit screen for a given post and retained the nonce can set or delete the custom redirect URL on that post — including authors/contributors who lack the right to modify others' posts once they're published.",
+      "detection_pattern": {
+        "grep_pattern": "function save_post\\(\\s*\\$post_id",
+        "anti_pattern": "current_user_can.*edit_post",
+        "section_name": "AuthZ: save_post hook without capability check",
+        "description": "Finds save_post implementations that lack a current_user_can('edit_post') guard; a nonce alone is CSRF protection, not authorization — anyone with a valid nonce for any role can trigger the state change."
+      }
+    },
+    {
+      "vuln_class": "open_redirect",
+      "location": "template_redirect / get_redirect / absolute_url / lines 775-861",
+      "severity": "low",
+      "reachability": "Unauthenticated visitors — the redirect fires on every singular page request without any authentication gate",
+      "justification": "get_redirect() retrieves the raw URL value stored in post meta and passes it through absolute_url() which does not call esc_url() or wp_http_validate_url(), then hands the result to wp_redirect() with a 301 status; a stored URL such as 'javascript:alert(1)' (or any scheme) passes through unchallenged because clean_url() at save time only prepends 'http://' when the value starts with 'www.', and no scheme allowlist is enforced.",
+      "detection_pattern": {
+        "grep_pattern": "wp_redirect\\(\\s*\\$",
+        "anti_pattern": "esc_url|wp_http_validate_url|wp_sanitize_redirect",
+        "section_name": "Open redirect: wp_redirect without URL validation",
+        "description": "Matches wp_redirect calls where the URL argument is a variable; without esc_url or an allowlist check the destination could be an arbitrary or dangerous scheme stored earlier in the DB."
+      }
+    },
+    {
+      "vuln_class": "stored_xss",
+      "location": "meta_box / line 592",
+      "severity": "low",
+      "reachability": "Admin/editor who can edit posts — the script src is built by concatenating esc_url() output with an unescaped string literal suffix; however the suffix is a compile-time constant so this is not directly attacker-controlled. Risk is low but the pattern is fragile.",
+      "justification": "Line 592 emits '<script src=\"' . esc_url($this->get_url()) . 'dist/meta-box.js?v=' . self::CSS_JS_VERSION . '\">'; the esc_url wraps only the plugin URL prefix, leaving the concatenated suffix outside the escaping call — if CSS_JS_VERSION were ever made dynamic or filterable, this becomes a script injection.",
+      "detection_pattern": {
+        "grep_pattern": "echo esc_url.*\\..*['\"]",
+        "anti_pattern": "esc_url\\([^)]+\\.[^)]+\\)",
+        "section_name": "Partial escaping: esc_url applied to only part of a concatenated URL",
+        "description": "Matches patterns where esc_url is applied then further string content is appended via concatenation outside the escaping call; the suffix is not sanitized."
+      }
+    },
+    {
+      "vuln_class": "csrf",
+      "location": "ajax_dismiss_notice / line 942-946",
+      "severity": "medium",
+      "reachability": "Any logged-in WordPress user; the handler is registered under wp_ajax_ (requires auth) but never verifies a nonce, so a CSRF request from a third-party page dismisses the notice for any logged-in admin",
+      "justification": "The plt_dismiss_notice AJAX handler reads $_GET['plt_notice'] and calls update_option() with no call to check_ajax_referer() or wp_verify_nonce(), making it trivially CSRF-able by any page that can lure the logged-in admin into making a GET request to admin-ajax.php?action=plt_dismiss_notice&plt_notice=4.",
+      "detection_pattern": {
+        "grep_pattern": "add_action.*wp_ajax_[a-z_]+",
+        "anti_pattern": "check_ajax_referer|wp_verify_nonce",
+        "section_name": "CSRF: AJAX handler without nonce verification",
+        "description": "Finds all wp_ajax_ action registrations; the corresponding handler should contain check_ajax_referer or wp_verify_nonce. Handlers matched here but not the anti-pattern are missing CSRF protection."
+      }
+    }
+  ]
+}
