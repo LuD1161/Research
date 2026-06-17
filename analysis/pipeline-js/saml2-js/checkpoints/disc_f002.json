@@ -1,0 +1,96 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "auth_bypass_empty_certificate_list",
+      "location": "parse_authn_response, lines 593-624",
+      "severity": "critical",
+      "reachability": "Reachable by any caller that supplies an empty or null idp_certificates array; when idp_certificates is [] or null, the for-loop over `ref = idp_certificates || []` never executes, the code falls through to `cb_wf(new Error(...))` — so this specific path is actually an error. However, when idp_certificates is falsy and ignore_signature is true (line 589), the assertion is accepted completely unsigned.",
+      "justification": "When `options.ignore_signature` is true (a caller-controlled flag), the function at line 589 immediately calls `cb_wf(null, DOMParser.parseFromString(result))` with zero cryptographic verification, accepting any forged SAML assertion; this flag flows directly from the options object controlled by the application developer and can be set per-request via `request_options` passed to `post_assert`/`get_assert`.",
+      "detection_pattern": {
+        "grep_pattern": "ignore_signature\\s*[=:]{1,3}\\s*true|if\\s*\\(\\s*ignore_signature\\s*\\)",
+        "anti_pattern": "ignore_signature.*false|throw.*ignore_signature",
+        "section_name": "AUTH/TOKEN: ignore_signature bypass",
+        "description": "Catches SAML libraries that accept a caller-supplied ignore_signature flag which completely skips cryptographic verification of the assertion, enabling acceptance of forged tokens."
+      }
+    },
+    {
+      "vuln_class": "auth_bypass_missing_inresponseto_validation",
+      "location": "parse_authn_response / _assert, lines 396-406, 808-824",
+      "severity": "high",
+      "reachability": "Reachable by any attacker who can deliver a SAML Response (e.g., MITM or stolen assertion replay) to the SP's assertion consumer endpoint.",
+      "justification": "`parse_response_header` parses the `InResponseTo` attribute from the SAML Response and returns it in `response_header.in_response_to`, but nowhere in `_assert` or `parse_authn_response` is this value validated against a stored nonce/ID of a request that was actually issued; the library provides no replay-prevention or request-binding, making it susceptible to SAML assertion replay attacks.",
+      "detection_pattern": {
+        "grep_pattern": "InResponseTo|in_response_to",
+        "anti_pattern": "requestId.*in_response_to|nonce.*in_response_to|cache.*request_id",
+        "section_name": "AUTH/TOKEN: missing InResponseTo validation",
+        "description": "Flags SAML response parsers that read InResponseTo but do not cross-check the value against a persisted set of request IDs, leaving the SP open to assertion replay."
+      }
+    },
+    {
+      "vuln_class": "prototype_pollution_via_user_controlled_object_key",
+      "location": "parse_assertion_attributes, line 480; parse_authn_response, line 670",
+      "severity": "high",
+      "reachability": "Reachable by any IdP-controlled or forged SAML Assertion; if signature verification is bypassed (ignore_signature or forged cert), an attacker sets an Attribute Name of `__proto__` or `constructor` in the assertion.",
+      "justification": "At line 480, `assertion_attributes[attribute_name] = ...` writes IdP-supplied attribute names as plain object keys with no sanitization; when `attribute_name` is `__proto__`, this pollutes `Object.prototype` because `{}['__proto__']` targets the prototype in older V8/Node versions (pre-Node 12 hardening); even in newer runtimes, `assertion_attributes['constructor'] = [...]` clobbers the constructor property, and the object is then merged via `_.extend(user, ...)` at line 670, spreading the pollution to the returned `user` object.",
+      "detection_pattern": {
+        "grep_pattern": "\\[attribute_name\\]\\s*=|\\[key\\]\\s*=|\\[field\\]\\s*=",
+        "anti_pattern": "__proto__|hasOwnProperty.*attribute_name|Object\\.create\\(null\\)",
+        "section_name": "PROTOTYPE POLLUTION: user-key object assignment",
+        "description": "Catches code that assigns parsed/user-controlled string keys directly to plain-object properties without sanitizing __proto__ or constructor, enabling prototype pollution from attacker-supplied data."
+      }
+    },
+    {
+      "vuln_class": "auth_bypass_missing_conditions_element",
+      "location": "parse_authn_response, lines 627-658",
+      "severity": "high",
+      "reachability": "Reachable by any attacker who can deliver a signed (or unverified) SAML Assertion that omits the Conditions element.",
+      "justification": "The `Conditions` element check at line 628 is guarded by `if (conditions != null)` — if the element is absent, both the timing check (NotBefore/NotOnOrAfter) and the audience restriction check are silently skipped, meaning a valid-signature assertion with no Conditions element will be accepted for any SP audience and at any time.",
+      "detection_pattern": {
+        "grep_pattern": "getElementsByTagNameNS.*Conditions",
+        "anti_pattern": "throw.*Conditions|required.*Conditions|length.*!==.*1",
+        "section_name": "AUTH/TOKEN: optional Conditions element bypass",
+        "description": "Flags SAML parsers that treat the Conditions element as optional; a missing Conditions element should be an error, not a pass-through, because it carries the validity window and audience restriction."
+      }
+    },
+    {
+      "vuln_class": "auth_bypass_audience_restriction_skipped_when_missing",
+      "location": "parse_authn_response, lines 646-657",
+      "severity": "medium",
+      "reachability": "Reachable when IdP sends an assertion with an AudienceRestriction element that contains zero Audience children.",
+      "justification": "At line 648, audience validation only triggers `if (audiences.length > 0)`; an AudienceRestriction element with no `<Audience>` children is silently accepted, meaning a stolen assertion from another SP can be replayed here if the attacker strips the Audience sub-elements while keeping the AudienceRestriction wrapper, which may remain valid under the original signature depending on the C14N scope.",
+      "detection_pattern": {
+        "grep_pattern": "AudienceRestriction|audiences\\.length",
+        "anti_pattern": "audiences\\.length\\s*===\\s*0.*error|throw.*audience",
+        "section_name": "AUTH/TOKEN: empty AudienceRestriction bypass",
+        "description": "Catches SAML audience validation that accepts an AudienceRestriction element with zero Audience children as valid, which can permit cross-SP assertion replay."
+      }
+    },
+    {
+      "vuln_class": "xml_external_entity_xxe",
+      "location": "check_saml_signature line 353; _assert line 806; multiple DOMParser calls",
+      "severity": "medium",
+      "reachability": "Reachable by any caller that submits a SAML Response (unauthenticated endpoint in most SAML SP deployments).",
+      "justification": "`new xmldom.DOMParser().parseFromString(xml)` is called on attacker-controlled XML at multiple points (lines 353, 590, 606); the `@xmldom/xmldom` parser's XXE behavior depends on its version and configuration — older versions did not disable external entities by default, so if the deployed version resolves DOCTYPE entity references the file is vulnerable to blind XXE; no entity-disabling options are passed to the DOMParser constructor.",
+      "detection_pattern": {
+        "grep_pattern": "new DOMParser\\(\\)\\.parseFromString|xmldom.*parseFromString",
+        "anti_pattern": "resolveEntities.*false|expandEntityReferences.*false|DOCTYPE.*disallow",
+        "section_name": "DESERIALIZATION: XXE via xmldom DOMParser",
+        "description": "Catches xmldom DOMParser instantiations without explicit entity-disabling options that parse attacker-controlled XML, potentially enabling XXE if the installed xmldom version resolves external entities."
+      }
+    },
+    {
+      "vuln_class": "url_forgery_redirect_via_idp_controlled_sso_url",
+      "location": "create_logout_request_url / create_logout_response_url, lines 862, 903",
+      "severity": "medium",
+      "reachability": "Reachable by any caller that controls the IdentityProvider.sso_logout_url option; in deployments where IdP metadata is fetched dynamically or from a database, an SSRF-adjacent open redirect results.",
+      "justification": "`url.parse(identity_provider.sso_logout_url, true)` at line 862 parses the URL supplied in IdP options, then appends query parameters and calls `url.format(uri)` to produce the redirect destination; if `sso_logout_url` is not validated against an allowlist, an attacker who can influence IdP configuration (e.g., multi-tenant apps) can cause the SP to redirect users to an arbitrary URL.",
+      "detection_pattern": {
+        "grep_pattern": "url\\.parse.*sso_logout_url|url\\.format.*sso_login_url",
+        "anti_pattern": "allowlist.*sso_url|validate.*sso_logout_url",
+        "section_name": "SSRF: IdP-controlled redirect URL",
+        "description": "Flags SAML libraries that build redirect URLs directly from IdP-supplied SSO URLs without allowlist validation, enabling open redirect or SSRF in multi-tenant deployments."
+      }
+    }
+  ]
+}
