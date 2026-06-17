@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "xpath_injection",
+      "location": "decryptKeyInfo, lines 246 and 273 (xmlenc.js)",
+      "severity": "high",
+      "reachability": "Any caller who passes attacker-controlled XML to decrypt() or decryptKeyInfo(); the RetrievalMethod/@URI attribute value flows directly into an XPath string literal.",
+      "justification": "keyRetrievalMethodUri is read from the XML attribute URI via getAttribute('URI') and concatenated into XPath queries at lines 246 and 273 without any sanitization or escaping, allowing an attacker to break out of the XPath string literal with a single-quote and inject arbitrary XPath subexpressions.",
+      "detection_pattern": {
+        "grep_pattern": "xpath\\.select\\([^)]*\\+\\s*[a-zA-Z_][a-zA-Z0-9_.]*",
+        "anti_pattern": "escapeXPath|xpath\\.escape|String\\(.*\\)|normalize-space",
+        "section_name": "XPath injection: user value concatenated into xpath.select string",
+        "description": "Detects string concatenation of variables directly into an xpath.select() query; any variable derived from user or XML input is an injection point that can break the XPath expression structure."
+      }
+    },
+    {
+      "vuln_class": "undefined_reference_crash_dos",
+      "location": "decryptWithAlgorithm, line 325 (xmlenc.js)",
+      "severity": "high",
+      "reachability": "Any caller who triggers CBC decryption with a ciphertext whose last byte (after decryption) has a numeric value greater than ivLength; reachable through decrypt() with attacker-supplied XML containing crafted CipherValue.",
+      "justification": "decryptWithAlgorithm is a synchronous function with no callback parameter, yet line 325 calls callback(new Error('padding length invalid')) when the padding byte is out of range; this is a ReferenceError at runtime that crashes the process/promise chain and can be triggered by supplying a ciphertext whose last decrypted byte exceeds ivLength.",
+      "detection_pattern": {
+        "grep_pattern": "function\\s+\\w+\\s*\\([^)]*\\)\\s*\\{[^}]*\\bcallback\\b(?![^)]*callback)",
+        "anti_pattern": "return\\s+callback|throw\\s+new\\s+Error",
+        "section_name": "Undefined callback reference in synchronous function",
+        "description": "Flags functions that do not declare 'callback' as a parameter but reference it in the body; in sync helper functions extracted from async flows this causes a ReferenceError crash instead of proper error propagation."
+      }
+    },
+    {
+      "vuln_class": "xml_injection",
+      "location": "encryptKeyInfoWithScheme, line 29 (xmlenc.js) + keyinfo.tpl.xml.js line 10",
+      "severity": "medium",
+      "reachability": "Any caller who controls options.pem passed to encrypt() or encryptKeyInfo(); the extracted certificate body is inserted raw into the XML template without escaping.",
+      "justification": "The encryptionPublicCert value (built at line 29 as a raw XML snippet from options.pem) is inserted unescaped into the keyinfo template at the ${encryptionPublicCert} slot (template line 10), so a crafted PEM whose base64 body contains XML special characters (e.g. via line-break injection that confuses pemToCert) can produce malformed or injected XML output.",
+      "detection_pattern": {
+        "grep_pattern": "\\$\\{[a-zA-Z_][a-zA-Z0-9_]*\\}|\\+\\s*[a-zA-Z_][a-zA-Z0-9_.]*\\s*\\+",
+        "anti_pattern": "escapehtml\\(|escapeXml\\(|xmlescape\\(",
+        "section_name": "XML injection: unescaped template interpolation",
+        "description": "Detects template literal or string concatenation slots in XML-generating code that are not wrapped with an HTML/XML escape function; unescaped variables derived from caller input can inject XML elements or attributes."
+      }
+    },
+    {
+      "vuln_class": "null_dereference_dos",
+      "location": "pemToCert, line 15 (utils.js)",
+      "severity": "medium",
+      "reachability": "Any caller who passes a string that does not contain a valid PEM certificate block to pemToCert() via options.pem in encrypt() or encryptKeyInfo().",
+      "justification": "At line 14 the regex .exec(pem) can return null when the input has no matching certificate block; line 15 immediately accesses cert.length without a null check, throwing a TypeError: Cannot read properties of null, which crashes the process or unhandled-promise path.",
+      "detection_pattern": {
+        "grep_pattern": "\\.exec\\([^)]+\\)\\s*[;\\n][^\\n]*\\.length",
+        "anti_pattern": "if\\s*\\(.*===\\s*null|if\\s*\\(!.*\\)|\\?\\.",
+        "section_name": "Null dereference after regex exec()",
+        "description": "Flags patterns where the return value of RegExp.exec() is used without a null guard; exec() returns null on no match, so accessing .length or indices on the result crashes with TypeError."
+      }
+    }
+  ]
+}
