@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "sql_injection",
+      "location": "filter_price_sql(), line 45",
+      "severity": "high",
+      "reachability": "Any code that hooks the 'dgwt/wcas/search_page/result_post_ids' filter (another plugin, theme, or mu-plugin) can inject arbitrary values; the filter result is also indirectly influenced by the attacker-controlled search term processed in set_search_post_ids_from_ajax.",
+      "justification": "At line 45, $post_ids (obtained via apply_filters) is concatenated directly into a SQL fragment with implode(',', $post_ids) and no intval() cast, integer validation, or $wpdb->prepare() — any non-integer value injected through that filter becomes raw SQL.",
+      "detection_pattern": {
+        "grep_pattern": "implode\\s*\\(\\s*['\"],\\s*['\"]\\s*,\\s*\\$[a-zA-Z_]+\\s*\\).*\\.=.*\\$wpdb",
+        "anti_pattern": "\\$wpdb->prepare|array_map\\s*\\(\\s*'intval'|absint\\(",
+        "section_name": "SQL Injection: implode into raw SQL fragment",
+        "description": "Catches implode() calls whose result is concatenated into a SQL string touching $wpdb without prepare() or integer casting. Non-integer values produce second-order or filter-supplied SQL injection."
+      }
+    },
+    {
+      "vuln_class": "csrf_missing_nonce",
+      "location": "init() lines 30-31, set_search_post_ids_from_ajax() lines 50-84",
+      "severity": "medium",
+      "reachability": "Any unauthenticated or authenticated user can POST to admin-ajax.php?action=filtersFrontend; no nonce is checked (the phpcs:ignore at line 51 explicitly suppresses the warning).",
+      "justification": "Both wp_ajax_filtersFrontend and wp_ajax_nopriv_filtersFrontend are registered without any nonce verification, allowing cross-site or direct requests to trigger the search engine query using an attacker-supplied URL string.",
+      "detection_pattern": {
+        "grep_pattern": "wp_ajax_nopriv_[a-zA-Z0-9_]+",
+        "anti_pattern": "check_ajax_referer|wp_verify_nonce|check_admin_referer",
+        "section_name": "CSRF: nopriv AJAX handler without nonce",
+        "description": "Detects unauthenticated AJAX handlers that perform state-changing or information-leaking operations without nonce verification; files matching the first pattern but not the second are suspicious."
+      }
+    },
+    {
+      "vuln_class": "missing_input_sanitization",
+      "location": "set_search_post_ids_from_ajax(), line 63 and 82",
+      "severity": "medium",
+      "reachability": "Any unauthenticated visitor (nopriv handler) who can POST to admin-ajax.php?action=filtersFrontend with a crafted 'currenturl' value.",
+      "justification": "The search term is extracted from $_POST['currenturl'] via wp_parse_url() and wp_parse_str() (lines 63-68) with no sanitization — wc_clean() is only applied to 'orderby' and 'order', not to 's' — before being passed verbatim to Helpers::searchProducts() at line 82.",
+      "detection_pattern": {
+        "grep_pattern": "wp_parse_str\\s*\\(",
+        "anti_pattern": "wc_clean|sanitize_text_field|esc_sql",
+        "section_name": "Missing sanitization: parsed URL query values used without cleaning",
+        "description": "Catches wp_parse_str() usage where extracted array values are not sanitized before being forwarded to downstream functions; unvalidated user-supplied query parameters can propagate into search or SQL contexts."
+      }
+    },
+    {
+      "vuln_class": "broken_access_control",
+      "location": "init() line 31, set_search_post_ids_from_ajax() lines 50-84",
+      "severity": "low",
+      "reachability": "Unauthenticated users via the nopriv AJAX action.",
+      "justification": "The wp_ajax_nopriv_filtersFrontend handler performs a live search-engine query on behalf of any unauthenticated caller without rate limiting, capability check, or nonce, enabling unlimited unauthenticated search-index probing.",
+      "detection_pattern": {
+        "grep_pattern": "wp_ajax_nopriv_",
+        "anti_pattern": "current_user_can|is_user_logged_in",
+        "section_name": "Broken Access Control: nopriv handler without capability check",
+        "description": "Detects AJAX handlers available to unauthenticated users that perform privileged or information-sensitive operations without any authorization check."
+      }
+    }
+  ]
+}
