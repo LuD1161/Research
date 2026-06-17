@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "path_traversal",
+      "location": "safeMakeDir (line 29) and extractFile (line 106)",
+      "severity": "high",
+      "reachability": "Reachable by any caller that passes a malicious archive (tar/zip/etc.) with crafted entry paths; the archive is the direct input to the exported module function.",
+      "justification": "The output-directory containment checks at lines 29 and 106 use `String.prototype.indexOf(realOutputPath) !== 0` instead of `startsWith(realOutputPath + path.sep)`, so a sibling directory whose name shares the same prefix (e.g. output='/tmp/out' and dest='/tmp/out-evil/...') satisfies the check and permits writes outside the intended output tree.",
+      "detection_pattern": {
+        "grep_pattern": "\\.indexOf\\(real[Oo]utput[Pp]ath\\)\\s*[!=]==\\s*0",
+        "anti_pattern": "startsWith\\(real[Oo]utput[Pp]ath\\s*\\+\\s*['\"][\\\\/]['\"]\\)",
+        "section_name": "Path Traversal: indexOf prefix check",
+        "description": "Catches output-directory containment guards that use indexOf(prefix)===0 rather than startsWith(prefix+sep); the former is bypassable whenever a sibling path shares the same textual prefix."
+      }
+    },
+    {
+      "vuln_class": "path_traversal",
+      "location": "extractFile — symlink branch (lines 120-121)",
+      "severity": "high",
+      "reachability": "Reachable whenever the archive contains a symlink entry; no authentication or privilege is required to supply such an archive.",
+      "justification": "`fsP.symlink(x.linkname, dest)` is called with an archive-controlled `x.linkname` that is never validated; an attacker can create a symlink pointing to any absolute path (e.g. `/etc/passwd`), which persists in the output directory and allows subsequent reads of arbitrary files by the consuming application.",
+      "detection_pattern": {
+        "grep_pattern": "fs(?:P|promises)?\\.(symlink|symlinkSync)\\s*\\([^,)]*linkname",
+        "anti_pattern": "path\\.resolve\\s*\\(.*linkname|isAbsolute|startsWith",
+        "section_name": "Path Traversal: unvalidated symlink linkname",
+        "description": "Catches symlink creation calls that pass an archive-supplied `linkname` field directly without validating that it is relative and does not escape the output directory."
+      }
+    },
+    {
+      "vuln_class": "path_traversal",
+      "location": "extractFile — hardlink branch (lines 112-113, 116-117)",
+      "severity": "high",
+      "reachability": "Reachable whenever the archive contains a hard-link entry (tar type '1'); no authentication or privilege is required.",
+      "justification": "`fsP.link(x.linkname, dest)` is called with an archive-controlled `x.linkname` that is never validated; on systems where the output directory shares a filesystem with sensitive files (common for `/tmp` vs `/etc` on many Linux distros), an attacker can create a hardlink from within the output directory to any accessible file (e.g. `/etc/shadow`), exposing its contents.",
+      "detection_pattern": {
+        "grep_pattern": "fs(?:P|promises)?\\.(link|linkSync)\\s*\\([^,)]*linkname",
+        "anti_pattern": "path\\.resolve\\s*\\(.*linkname|isAbsolute|startsWith",
+        "section_name": "Path Traversal: unvalidated hardlink linkname",
+        "description": "Catches hard-link creation calls that pass an archive-supplied `linkname` field directly without verifying the source path is within the allowed output tree."
+      }
+    }
+  ]
+}
