@@ -1,0 +1,44 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "missing_ajax_die",
+      "location": "handleAjaxRequest() line 85-94",
+      "severity": "low",
+      "reachability": "Authenticated admin (activate_plugins capability) via wp_ajax_ hook",
+      "justification": "After successfully dispatching the payload via sendPayloadToWpdesk(), handleAjaxRequest() returns without calling wp_die() or exit, causing WordPress to append a spurious '-1' to the AJAX response; while not a direct security vulnerability, this deviates from the required WordPress AJAX contract and can cause clients to misinterpret the response as an error.",
+      "detection_pattern": {
+        "grep_pattern": "add_action\\(\\s*['\"]wp_ajax_",
+        "anti_pattern": "wp_die\\(\\)|wp_send_json",
+        "section_name": "Missing wp_die in AJAX handler",
+        "description": "Finds wp_ajax_ handler registrations; the anti-pattern checks for a terminating call (wp_die or wp_send_json which internally calls wp_die). Handlers missing both may leak unexpected output or mishandle responses."
+      }
+    },
+    {
+      "vuln_class": "unsanitized_input_to_external_request",
+      "location": "preparePayload() lines 49-57 / handleAjaxRequest() line 92",
+      "severity": "low",
+      "reachability": "Authenticated admin (activate_plugins capability + valid nonce) via POST/GET to wp-admin/admin-ajax.php",
+      "justification": "The values $_REQUEST['reason'] (line 49) and $_REQUEST['additional_info'] (line 55) are copied verbatim into the payload array and forwarded in a JSON body to https://data.wpdesk.org/ via wp_remote_post() without any sanitization or length-capping; an admin-level attacker could inject arbitrary strings (including oversized values) into the vendor's telemetry endpoint, constituting telemetry-data injection against the third-party collector.",
+      "detection_pattern": {
+        "grep_pattern": "\\$_REQUEST\\[",
+        "anti_pattern": "sanitize_text_field|intval|absint|wp_kses|esc_",
+        "section_name": "Unsanitized $_REQUEST forwarded to external HTTP request",
+        "description": "Matches direct $_REQUEST array reads; the anti-pattern checks for sanitization wrappers. Files matching the pattern but not the anti-pattern may be passing raw user input to wp_remote_post/get or other external sinks."
+      }
+    },
+    {
+      "vuln_class": "use_of_request_superglobal_in_ajax_handler",
+      "location": "handleAjaxRequest() line 91-92",
+      "severity": "low",
+      "reachability": "Authenticated admin (activate_plugins capability) via any HTTP method (GET, POST, or COOKIE collision)",
+      "justification": "The handler reads from $_REQUEST instead of $_POST; $_REQUEST merges GET, POST, and COOKIE superglobals, meaning a crafted GET request carrying a stolen or predictable nonce token could trigger the handler via a URL alone (e.g. embedded in an img src or bookmark), slightly widening the CSRF surface even when a nonce is present.",
+      "detection_pattern": {
+        "grep_pattern": "wp_ajax_.*handleAjaxRequest|function handleAjaxRequest",
+        "anti_pattern": "\\$_POST\\[",
+        "section_name": "AJAX handler reads $_REQUEST instead of $_POST",
+        "description": "Finds AJAX handler functions; the anti-pattern checks that input is read from $_POST rather than $_REQUEST. Handlers using $_REQUEST accept GET-parameter input which can be triggered cross-origin via URL navigation, reducing the effectiveness of nonce-based CSRF protection."
+      }
+    }
+  ]
+}
