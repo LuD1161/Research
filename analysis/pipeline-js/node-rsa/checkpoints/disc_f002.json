@@ -1,0 +1,57 @@
+{
+  "_done": true,
+  "findings": [
+    {
+      "vuln_class": "redos",
+      "location": "opensshFormat.autoImport (line 2144-2154), pkcs1Format.autoImport (line 2641-2652), pkcs8Format.autoImport (line 2756-2767) in index.node.js",
+      "severity": "high",
+      "reachability": "Any caller passing a string to importKey() without specifying a format causes all autoImport functions to run their regex against the input; an unauthenticated user who controls key material (e.g., a server that imports user-supplied PEM strings) triggers this path.",
+      "justification": "All four autoImport methods use the regex `(([A-Za-z0-9+/=]+\\s*)+)` inside a lookahead with a subsequent backreference `\\1`; the nested quantifiers combined with the alternation between base64-char and whitespace produce catastrophic polynomial (O(n^2) or worse) backtracking on inputs that match the PEM header but contain a long non-matching body (e.g., a string starting with `-----BEGIN RSA PRIVATE KEY-----` followed by N spaces and no closing tag).",
+      "detection_pattern": {
+        "grep_pattern": "\\(\\([A-Za-z0-9+/=]+\\\\s\\*\\)\\+\\)",
+        "anti_pattern": "String\\.raw|new RegExp|safe-regex|recheck",
+        "section_name": "ReDoS: nested quantifiers in PEM autodetect regex",
+        "description": "Detects the specific nested-quantifier pattern `(([A-Za-z0-9+/=]+\\s*)+)` inside PEM/SSH format-detection regexes; this pattern causes catastrophic backtracking on inputs that share the PEM header prefix but lack a valid closing delimiter."
+      }
+    },
+    {
+      "vuln_class": "deserialization_unsafe_json_parse",
+      "location": "$getDecryptedData (line 3883) in index.node.js",
+      "severity": "medium",
+      "reachability": "Reached when the caller passes `encoding='json'` to decrypt()/decryptPublic(); the decrypted plaintext bytes are decoded to UTF-8 and fed directly into JSON.parse without any prior schema validation.",
+      "justification": "Line 3883: `if (enc === 'json') return JSON.parse(toUtf8(bytes));` — if the ciphertext was produced by an attacker (e.g., in a public-key encrypt scenario where the server decrypts arbitrary blobs submitted by clients) and the caller requests JSON decoding, prototype-polluting payloads like `{\"__proto__\":{\"polluted\":true}}` pass through JSON.parse and can corrupt the global Object prototype; additionally, deeply-nested or array-heavy JSON can trigger a parser stack overflow (DoS).",
+      "detection_pattern": {
+        "grep_pattern": "JSON\\.parse\\(",
+        "anti_pattern": "JSON\\.parse\\(.*,\\s*reviver|schema\\.parse|ajv|zod|superstruct",
+        "section_name": "DESERIALIZATION: JSON.parse on decrypted/untrusted bytes",
+        "description": "Catches bare JSON.parse calls on decoded bytes; without a reviver that strips `__proto__`/`constructor` keys or a JSON schema validator, prototype pollution and parser-DoS are possible."
+      }
+    },
+    {
+      "vuln_class": "bleichenbacher_pkcs1v15_oracle",
+      "location": "Pkcs1Scheme.encUnPad / JsEngine.decrypt / NodeNativeEngine.decrypt (lines 3031-3064, 3389-3410, 4022-4038) in index.node.js",
+      "severity": "medium",
+      "reachability": "Reached when the library is configured with `encryptionScheme: 'pkcs1'` (non-default; default is pkcs1_oaep) and a server exposes a decryption oracle — i.e., it decrypts attacker-supplied ciphertexts and returns either success or a generic error.",
+      "justification": "The code comment at line 3019-3030 explicitly acknowledges that 'the valid/invalid binary oracle inherent to PKCS#1 v1.5 remains'; the $$decryptKey wrapper re-throws a single 'Error during decryption' which closes the error-message oracle but not the binary-success/failure oracle observable by the caller; an attacker with ~2^20 adaptive chosen-ciphertext queries can recover the plaintext (Bleichenbacher 1998).",
+      "detection_pattern": {
+        "grep_pattern": "RSA_PKCS1_PADDING|encryptionScheme.*pkcs1[^_]",
+        "anti_pattern": "RSA_PKCS1_OAEP_PADDING|pkcs1_oaep",
+        "section_name": "AUTH/TOKEN: PKCS#1 v1.5 Bleichenbacher oracle",
+        "description": "Flags PKCS#1 v1.5 padding mode usage for RSA decryption; without full Bleichenbacher countermeasures (synthetic random plaintext on bad padding), any oracle exposing success/failure allows adaptive chosen-ciphertext attacks."
+      }
+    },
+    {
+      "vuln_class": "weak_cryptography_default_hash",
+      "location": "PssScheme (line 3112: DEFAULT_HASH3='sha1'), OaepScheme (line 2852: DEFAULT_HASH='sha1') in index.node.js",
+      "severity": "low",
+      "reachability": "Reached when callers use PSS signing or OAEP encryption without explicitly specifying a hash algorithm; the library silently falls back to SHA-1 for both MGF1 and the hash function.",
+      "justification": "SHA-1 is cryptographically broken for collision resistance (SHAttered 2017); while PSS pre-hashes the message and OAEP uses it only for label hashing (making direct collision exploitation harder), the default promotes SHA-1 in new code and weakens the overall security margin; NIST deprecated SHA-1 for all uses in SP 800-131A Rev 2.",
+      "detection_pattern": {
+        "grep_pattern": "DEFAULT_HASH.*=.*['\"]sha1['\"]",
+        "anti_pattern": "DEFAULT_HASH.*=.*['\"]sha256['\"]|DEFAULT_HASH.*=.*['\"]sha384['\"]|DEFAULT_HASH.*=.*['\"]sha512['\"]",
+        "section_name": "AUTH/TOKEN: SHA-1 as default signing/OAEP hash",
+        "description": "Detects module-level constants that establish SHA-1 as the default hash for RSA-PSS or RSA-OAEP; SHA-1 should not be the fallback in modern cryptographic code."
+      }
+    }
+  ]
+}
