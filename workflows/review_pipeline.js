@@ -55,13 +55,11 @@ async function syncWave(tag) {
   ).catch(() => null)
 }
 
-// ---- load the router manifest via a loader agent (script sandbox can't read disk) -----
-const loaded = await agent(
-  `Read the JSON file at ${MANIFEST} and return its contents EXACTLY as your structured result.`,
-  { label: 'load-manifest', phase: 'Load', schema: { type: 'object', additionalProperties: true, required: ['files'], properties: { files: { type: 'array' } } } }
-)
-let files = ((loaded && loaded.files) || []).filter((f) => (f.tier || 1) >= TIER_MIN)
-log(`manifest: ${files.length} files at tier>=${TIER_MIN}`)
+// ---- manifest comes via args (real JSON) — NOT via an LLM loader agent, which truncates
+// bulk structured data. Launch with: Workflow({scriptPath, args: {files: <manifest.files>}}).
+let files = ((typeof args !== 'undefined' && args && args.files) || []).filter((f) => (f.tier || 1) >= TIER_MIN)
+log(`manifest: ${files.length} files at tier>=${TIER_MIN} (MANIFEST=${MANIFEST})`)
+if (!files.length) { log('NO FILES — pass args.files'); return { run: RUN, error: 'no files in args' } }
 
 // ---- DISCOVER (waves) ------------------------------------------------------------
 async function discover(i) {
