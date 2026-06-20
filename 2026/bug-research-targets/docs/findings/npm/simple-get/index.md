@@ -49,6 +49,29 @@ The redirect handler follows 3xx responses to an attacker-controlled `Location` 
 
 ---
 
+---
+
+## Real-World Exploitation
+
+### Where this library is used
+simple-get has 8M+ weekly downloads and is a dependency of popular packages like `got` and is used by Electron. Any application that fetches URLs via these packages inherits the vulnerability.
+
+### How an attacker would exploit it
+**SG-01 (Direct SSRF):**
+1. **Identify the target**: find an application feature that fetches a user-supplied URL. Common examples: URL preview/unfurl, webhook delivery, image/file proxy, RSS import, PDF generation from URL.
+2. **Supply an internal URL**: instead of a public URL, submit `http://169.254.169.254/latest/meta-data/iam/security-credentials/` (AWS metadata), `http://metadata.google.internal/` (GCP), or `http://127.0.0.1:8080/admin` (internal service).
+3. **Read the response**: if the application returns the fetched content (even partially), the attacker can read internal service responses.
+
+**SG-02 (Redirect SSRF):**
+1. **Set up a redirect**: host a page at `https://attacker.example/redirect` that returns `302 Location: http://169.254.169.254/latest/meta-data/`.
+2. **Submit the public URL**: the application's allowlist may permit `attacker.example` but simple-get follows the redirect to the internal IP without re-validating.
+3. **Bypass allowlists**: this defeats any SSRF protection that only checks the initial URL.
+
+### Impact
+- **Cloud credential theft**: read AWS/GCP/Azure IAM credentials from metadata endpoints
+- **Internal network scanning**: probe internal services, databases, caches
+- **Data exfiltration**: read responses from internal APIs, admin panels, monitoring dashboards
+
 ## Clean / Rejected
 
 | Finding | Reason for Rejection |
@@ -124,5 +147,12 @@ simple-get PoC -- version: 4.0.1
 **CONFIRMED.** Both direct SSRF and redirect-based SSRF work. The library performs zero URL validation and follows redirects to internal IPs without re-checking the destination.
 
 ---
+
+---
+
+## Download PoC Files
+
+- [poc.js](poc/poc.js) — SSRF PoC with internal target server and redirect chain
+- [Dockerfile](poc/Dockerfile) — Isolated Docker environment with pinned simple-get@4.0.1
 
 **Pipeline:** 6 raw findings → 2 confirmed (2 HIGH breachable)

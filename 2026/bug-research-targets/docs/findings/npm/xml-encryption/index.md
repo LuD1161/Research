@@ -149,6 +149,33 @@ Requires attacker control of the configuration object, which is typically not ex
 
 ---
 
+---
+
+## Real-World Exploitation
+
+### Where this library is used
+xml-encryption has 500K+ weekly downloads and is used by SAML libraries (`saml2-js`, `passport-saml`) and any Node.js application that handles encrypted XML (e.g., SAML assertions, XML-based API responses, encrypted document exchange).
+
+### How an attacker would exploit it
+**XE-01 (XPath injection):**
+1. **Identify the target**: find an application that decrypts XML from untrusted sources (SAML responses, encrypted API payloads, XML document import).
+2. **Craft malicious XML**: include a `RetrievalMethod` element with a URI containing XPath injection: `<RetrievalMethod URI="xpointer(/) | //*[local-name()='Password']"/>`.
+3. **Submit to the application**: the injected XPath query can extract data from other parts of the XML document, including encrypted elements that the attacker shouldn't be able to read.
+
+**XE-02 / XE-03 (XML template injection):**
+1. **Control the certificate or keyInfo**: if the application allows users to configure encryption certificates (e.g., SAML SP setup, API partner onboarding), inject XML elements via the certificate field.
+2. **Modify the encryption envelope**: injected XML can alter the structure of the EncryptedKey or KeyInfo elements, potentially redirecting the decryption to use an attacker-controlled key.
+
+### Chaining with SAML
+In a SAML deployment, these vulnerabilities can be chained:
+- The IdP sends a SAML assertion encrypted with xml-encryption
+- An attacker who can influence the encrypted XML (e.g. via a MitM on the IdP response) can inject XPath queries to extract assertion content or modify the encryption envelope to weaken the cryptography
+
+### Impact
+- **Data extraction**: read encrypted XML content via XPath injection
+- **Encryption downgrade**: modify the encryption envelope to use weaker algorithms
+- **Authentication bypass**: in SAML contexts, potentially modify assertion content
+
 ## Clean / Rejected
 
 | Finding | Reason for Rejection |
@@ -213,5 +240,12 @@ xml-encryption PoC -- version: 3.0.2
 **ALL THREE HIGH FINDINGS CONFIRMED.** XE-01: XPath metacharacters in `RetrievalMethod/@URI` pass through to the query unsanitized. XE-02 and XE-03: both template files interpolate caller-supplied values without XML escaping, enabling XML injection.
 
 ---
+
+---
+
+## Download PoC Files
+
+- [poc.js](poc/poc.js) — XPath injection + template injection demonstrations
+- [Dockerfile](poc/Dockerfile) — Isolated Docker environment with pinned xml-encryption@3.0.2
 
 **Pipeline:** 16 raw findings → 7 confirmed (3 HIGH breachable, 4 LOW)

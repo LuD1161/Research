@@ -47,6 +47,24 @@ Not reachability-tested (LOW severity).
 
 ---
 
+---
+
+## Real-World Exploitation
+
+### Where this library is used
+method-override is Express middleware with 1M+ weekly downloads, used in REST APIs that need to support PUT/DELETE from HTML forms (which only support GET/POST).
+
+### How an attacker would exploit it
+1. **Identify the target**: find an Express application that uses method-override. The telltale sign is that `DELETE /resource` works when sent as `POST /resource?_method=DELETE`.
+2. **Find auth middleware ordering**: the vulnerability is exploitable when authorization middleware checks `req.method` *after* method-override has already overwritten it. For example, middleware that allows all POST requests but blocks DELETE -- method-override turns your POST into DELETE before the auth check sees it.
+3. **Craft the request**: send a POST request with `?_method=DELETE` (or `X-HTTP-Method-Override: DELETE` header) to a protected endpoint. The wire-level method is POST, so WAFs and reverse proxies that filter by HTTP method won't block it.
+4. **Escalate**: use this to reach DELETE, PUT, or PATCH endpoints that the attacker's role shouldn't access.
+
+### Impact
+- **Authorization bypass**: access admin-only DELETE/PUT endpoints by spoofing the HTTP method
+- **WAF bypass**: POST requests pass through WAFs that only block DELETE/PUT
+- **Data destruction**: trigger deletion endpoints that were thought to be protected
+
 ## Clean / Rejected
 
 | Finding | Reason for Rejection |
@@ -109,5 +127,12 @@ method-override PoC -- version: 3.0.0
 **CONFIRMED.** Both `_method` query parameter and `X-HTTP-Method-Override` header override POST to DELETE in default configuration.
 
 ---
+
+---
+
+## Download PoC Files
+
+- [poc.js](poc/poc.js) — Express server demonstrating method spoofing via query param and header
+- [Dockerfile](poc/Dockerfile) — Isolated Docker environment with pinned method-override@3.0.0
 
 **Pipeline:** 3 raw findings → 2 confirmed (1 MEDIUM breachable, 1 LOW)

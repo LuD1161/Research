@@ -30,6 +30,32 @@ Any caller passing a user-controlled IPv6 string to `private-ip` — including S
 
 ---
 
+---
+
+## Real-World Exploitation
+
+### Where this library is used
+private-ip has 200K+ weekly downloads and is primarily used as an SSRF protection filter. Applications call `privateIp(ip)` to check whether an IP is internal before making outbound requests.
+
+### How an attacker would exploit it
+1. **Identify the target**: find an application that fetches user-supplied URLs and uses private-ip to block internal addresses. Common patterns: URL preview/unfurl features, webhook deliveries, image proxy endpoints, RSS feed fetchers.
+2. **Craft the bypass URL**: instead of `http://127.0.0.1/admin`, use `http://[::ffff:7f00:1]/admin`. This is the same loopback address in hex-form IPv4-mapped IPv6 notation. private-ip returns `false` (not private), so the SSRF filter allows the request through.
+3. **Hit internal services**: target cloud metadata endpoints (`http://[::ffff:a9fe:a9fe]/latest/meta-data/` = 169.254.169.254), internal admin panels, databases listening on localhost, or other services behind the SSRF filter.
+
+### Bypass payloads
+```
+http://[::ffff:7f00:1]/           → 127.0.0.1 (loopback)
+http://[::ffff:7f00:1]:8080/      → 127.0.0.1:8080
+http://[::ffff:a9fe:a9fe]/        → 169.254.169.254 (cloud metadata)
+http://[::ffff:ac10:fe01]/        → 172.16.254.1 (internal network)
+http://[::ffff:c0a8:0101]/        → 192.168.1.1 (internal network)
+```
+
+### Impact
+- **Cloud credential theft**: read IAM credentials from metadata endpoints (AWS, GCP, Azure)
+- **Internal service access**: reach admin panels, databases, caches on the internal network
+- **Full SSRF**: pivot from external access to internal network scanning and exploitation
+
 ## Clean / Rejected
 
 | Finding | Reason for Rejection |
@@ -82,5 +108,12 @@ ip                                      got     expected  verdict
 **CONFIRMED.** Two IPv6 representations bypass the filter: `::ffff:7f00:1` (hex-form IPv4-mapped loopback) and `::2` (deprecated unicast). SSRF protections relying on this package can be bypassed.
 
 ---
+
+---
+
+## Download PoC Files
+
+- [poc.mjs](poc/poc.mjs) — Battery of IPv6 bypass tests against private-ip filter
+- [Dockerfile](poc/Dockerfile) — Isolated Docker environment with pinned private-ip@3.0.2
 
 **Pipeline:** 2 raw findings → 1 confirmed (1 HIGH breachable)

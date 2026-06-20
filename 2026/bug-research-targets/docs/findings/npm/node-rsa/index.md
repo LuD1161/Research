@@ -147,6 +147,26 @@ MD4 and MD5 hash algorithms emit a `console.warn` but do not throw an error. A c
 
 ---
 
+---
+
+## Real-World Exploitation
+
+### Where this library is used
+node-rsa has 800K+ weekly downloads and is used for RSA encryption/signing in authentication systems, JWT handling, license key verification, and API security.
+
+### How an attacker would exploit it
+**NR-01 (ReDoS):** only exploitable on Node.js < 16 or non-V8 engines. If the target application passes user-supplied key material to `importKey()` without explicit format specification (the default auto-detect mode), an attacker can send a crafted string that causes the regex to backtrack exponentially, hanging the event loop.
+
+1. **Identify the target**: find an API that accepts PEM keys from users (e.g. SSH key upload, certificate import, SAML key configuration).
+2. **Craft the payload**: a string starting with `-----BEGIN ` followed by thousands of characters that don't match any known PEM type, forcing the regex into backtracking.
+3. **Send it**: POST the crafted string to the key import endpoint. On vulnerable Node versions, the server hangs.
+
+**Other findings (NR-02 through NR-07):** all require non-default configurations and are LOW severity.
+
+### Impact
+- **Denial of service**: event loop hang on vulnerable Node versions (NR-01)
+- **Theoretical crypto weaknesses**: Bleichenbacher oracle (NR-02), weak hash defaults (NR-03), only if non-default settings are used
+
 ## Clean / Rejected
 
 No findings were fully rejected. All 20 raw findings were either confirmed (11) or consolidated as duplicates across multiple discovery rounds.
@@ -202,5 +222,12 @@ node-rsa PoC -- version: 1.1.1
 **NOT REPRODUCED.** V8's linear-time regex optimization on modern Node.js (16+) prevents catastrophic backtracking. The vulnerable regex pattern exists in source but is mitigated at runtime. Exploitable on older Node.js versions or non-V8 engines.
 
 ---
+
+---
+
+## Download PoC Files
+
+- [poc.js](poc/poc.js) — ReDoS timing test with exponentially increasing input sizes
+- [Dockerfile](poc/Dockerfile) — Isolated Docker environment with pinned node-rsa@1.1.1
 
 **Pipeline:** 20 raw findings → 11 confirmed (1 HIGH breachable, 10 downgraded to LOW)

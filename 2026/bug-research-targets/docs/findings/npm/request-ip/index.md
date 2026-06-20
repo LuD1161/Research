@@ -29,6 +29,28 @@ Any remote attacker can forge all non-connection-level IP headers (`x-client-ip`
 
 ---
 
+---
+
+## Real-World Exploitation
+
+### Where this library is used
+request-ip has 3M+ weekly downloads and is used for IP-based rate limiting, geo-location, access control, and audit logging in Express/Koa applications.
+
+### How an attacker would exploit it
+1. **Identify the target**: find an application that uses request-ip for security decisions. Signs: IP-based rate limiting, geo-blocking, admin panel restricted to internal IPs, or "your IP" shown in account settings.
+2. **Spoof your IP**: add `X-Forwarded-For: 127.0.0.1` to your requests. request-ip trusts this header over the actual TCP peer address by default, with no way to configure trusted proxies.
+3. **Bypass rate limiting**: if the app rate-limits by IP, rotate through different IPs in the `X-Forwarded-For` header to get unlimited requests.
+4. **Access internal endpoints**: if admin panels are restricted to `127.0.0.1` or an internal IP range, spoof that IP to gain access.
+5. **Forge audit logs**: if the app logs the client IP for forensics, the attacker controls what gets logged.
+
+### Exploitation from the browser
+This is also exploitable from JavaScript (e.g. in a CSRF or XSS context) because `X-Forwarded-For` can be set on `fetch()` requests in some browsers, and the spoofed IP affects server-side decisions.
+
+### Impact
+- **Rate limit bypass**: unlimited API requests by rotating spoofed IPs
+- **Access control bypass**: reach IP-restricted admin endpoints
+- **Log poisoning**: forge the source IP in audit trails
+
 ## Clean / Rejected
 
 | Finding | Reason for Rejection |
@@ -107,5 +129,12 @@ request-ip PoC -- version: 3.3.0
 **CONFIRMED.** Any unauthenticated client can forge `X-Forwarded-For` (or 9 other headers) to spoof their IP. The library trusts these headers without requiring trusted proxy configuration.
 
 ---
+
+---
+
+## Download PoC Files
+
+- [poc.js](poc/poc.js) — Express server with IP-based auth demonstrating header spoofing
+- [Dockerfile](poc/Dockerfile) — Isolated Docker environment with pinned request-ip@3.3.0
 
 **Pipeline:** 7 raw findings → 1 confirmed (1 MEDIUM breachable)

@@ -29,6 +29,28 @@ The IdP's `sso_logout_url` is used as a redirect target without validation. In d
 
 ---
 
+---
+
+## Real-World Exploitation
+
+### Where this library is used
+saml2-js has 100K+ weekly downloads and implements SAML 2.0 Service Provider functionality for Node.js applications that use enterprise SSO (Single Sign-On).
+
+### How an attacker would exploit it
+1. **Identify the target**: find an application using saml2-js for SSO. The application's SAML metadata endpoint (usually `/.well-known/saml-metadata` or `/saml/metadata`) will reference saml2-js in its entity descriptor.
+2. **Compromise or impersonate the IdP metadata source**: if the application fetches IdP metadata from a URL (rather than hardcoding it), the attacker needs to control that URL. This could be via:
+   - DNS hijacking
+   - Compromising the metadata hosting server
+   - Man-in-the-middle on unencrypted metadata fetch
+   - Social engineering the admin to point to a malicious IdP
+3. **Set `sso_logout_url` to attacker domain**: the malicious IdP metadata sets `sso_logout_url` to `https://attacker.example/phish`. saml2-js uses this URL without validation.
+4. **Wait for logout**: when any user clicks "Logout" in the application, they are redirected to the attacker's phishing page, which can mimic the real login page and steal credentials.
+
+### Impact
+- **Phishing**: redirect users to a credential-harvesting page on logout
+- **Session hijacking**: if the attacker's page captures the SAMLResponse, they can replay it
+- **Trust exploitation**: users trust the logout flow because it started from the legitimate application
+
 ## Clean / Rejected
 
 | Finding | Reason for Rejection |
@@ -94,5 +116,12 @@ saml2-js PoC -- version: 4.0.4
 **CONFIRMED.** The `sso_logout_url` from IdP metadata is used as a redirect target without validation. Deployments that fetch IdP metadata dynamically are vulnerable to open redirect/phishing.
 
 ---
+
+---
+
+## Download PoC Files
+
+- [poc.js](poc/poc.js) — Creates SP/IdP with attacker-controlled logout URL and generates redirect
+- [Dockerfile](poc/Dockerfile) — Isolated Docker environment with pinned saml2-js@4.0.4
 
 **Pipeline:** 13 raw findings → 1 confirmed (1 MEDIUM breachable)

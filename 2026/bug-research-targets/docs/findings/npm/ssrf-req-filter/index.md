@@ -49,6 +49,28 @@ Unix domain socket requests bypass the filter entirely because there is no hostn
 
 ---
 
+---
+
+## Real-World Exploitation
+
+### Where this library is used
+ssrf-req-filter is used as an SSRF protection layer in Node.js applications that make outbound HTTP requests based on user input.
+
+### How an attacker would attempt to exploit it
+Both findings are structural and not breachable in default usage:
+
+**SRF-01 (DNS rebinding):** requires an attacker-controlled DNS server that returns a public IP on first lookup (passing the filter) and a private IP on the second lookup (reaching the internal service). The race window between the `lookup` event and the actual TCP connection is narrow and non-deterministic.
+
+**SRF-02 (Unix socket):** requires the application to use `socketPath` in its request options, which bypasses the filter entirely because there is no hostname to check. This is a non-default, uncommon configuration.
+
+### When to worry
+- If your application makes requests to Unix sockets based on user input (unlikely but possible in container orchestration tools)
+- If an attacker has a DNS server and can influence the DNS TTL to be very short (DNS rebinding)
+
+### Impact (if bypassed)
+- Same as any SSRF: internal service access, credential theft, network scanning
+- But in practice, the filter works correctly for standard HTTP requests to hostnames/IPs
+
 ## Clean / Rejected
 
 | Finding | Reason for Rejection |
@@ -108,5 +130,12 @@ ssrf-req-filter PoC -- version: 1.1.1
 **DEFAULT BLOCKING CONFIRMED.** The filter correctly blocks direct requests to `127.0.0.1`. Both identified bypass vectors (DNS rebinding race, Unix socket) are structural and require non-default conditions. Neither was breachable in lab.
 
 ---
+
+---
+
+## Download PoC Files
+
+- [poc.js](poc/poc.js) — Filter effectiveness test + structural bypass documentation
+- [Dockerfile](poc/Dockerfile) — Isolated Docker environment with pinned ssrf-req-filter@1.1.1
 
 **Pipeline:** 3 raw findings → 2 confirmed (0 breachable -- both downgraded)

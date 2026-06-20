@@ -1,0 +1,55 @@
+services:
+  db:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wp
+      MARIADB_PASSWORD: wp
+      MARIADB_RANDOM_ROOT_PASSWORD: "1"
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "127.0.0.1", "-u", "wp", "-pwp"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - db_data:/var/lib/mysql
+
+  wp:
+    image: wordpress:6-php8.2-apache
+    depends_on:
+      db: { condition: service_healthy }
+    ports:
+      - "8095:80"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wp
+      WORDPRESS_DB_PASSWORD: wp
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - wp_data:/var/www/html
+      - ./plugin/kirki:/var/www/html/wp-content/plugins/kirki:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1/"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  wpcli:
+    image: wordpress:cli-2.10-php8.2
+    depends_on:
+      wp: { condition: service_healthy }
+    user: "33:33"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wp
+      WORDPRESS_DB_PASSWORD: wp
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - wp_data:/var/www/html
+      - ./plugin/kirki:/var/www/html/wp-content/plugins/kirki:ro
+    entrypoint: /bin/sh
+    command: -c "wp core install --allow-root --path=/var/www/html --url=http://127.0.0.1:8095 --title='lab' --admin_user=admin --admin_password=admin --admin_email=admin@lab.local --skip-email && wp plugin activate kirki --allow-root && echo WP_READY"
+
+volumes:
+  db_data:
+  wp_data:

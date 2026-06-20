@@ -71,6 +71,28 @@ Archive hard-link entries (tar type `1`) are not validated against the output di
 
 ---
 
+---
+
+## Real-World Exploitation
+
+### Where this library is used
+decompress has 4.1M+ weekly downloads and is used by build tools, CI/CD pipelines, asset downloaders, and file management APIs. Common patterns:
+
+- **File upload endpoints** that accept `.zip` or `.tar.gz` and extract them server-side (e.g. `POST /api/upload` that calls `decompress(uploadedFile, outputDir)`)
+- **Package managers / plugin systems** that download and extract archives from URLs
+- **CI/CD pipelines** that extract build artifacts
+
+### How an attacker would exploit it
+1. **Identify the target**: find an application that accepts archive uploads and extracts them. Look for endpoints like `/upload`, `/import`, `/extract`, or features like "upload a ZIP of images/templates/plugins."
+2. **Craft the archive**: use `build_archives.py` (included below) to create a tar with a symlink entry pointing to `/etc/` or `../../../etc/passwd`. The symlink passes decompress's validation because the library checks the symlink entry's path (which is inside the output dir) but not its *target*.
+3. **Upload and trigger extraction**: submit the crafted archive to the upload endpoint. After extraction, the symlink exists on the server's filesystem.
+4. **Exploit the symlink**: if the application serves extracted files (e.g. a static file server, image gallery, or file browser), navigate to the symlink path to read arbitrary files. If the application writes through the symlink (e.g. extracting a second archive that references the symlink), arbitrary file write is possible.
+
+### Impact
+- **Read arbitrary files**: `/etc/passwd`, application configs, environment variables, database credentials
+- **Write arbitrary files**: overwrite application code, inject backdoors, modify configs
+- **Full server compromise**: if writing to web-accessible directories or cron directories
+
 ## Clean / Rejected
 
 No findings were rejected. All 3 raw findings were confirmed.
@@ -132,5 +154,13 @@ await decompress('/tmp/dc02-symlink-archive.tar', '/tmp/dc02-out');
 **DC-02 CONFIRMED.** Symlink escape creates a link to `/etc` outside the output directory. DC-03 hardlink throws `EXDEV` on cross-device targets but succeeds on same-device. DC-01 indexOf bypass requires specific directory naming.
 
 ---
+
+---
+
+## Download PoC Files
+
+- [poc.js](poc/poc.js) — Main PoC driver script
+- [build_archives.py](poc/build_archives.py) — Builds the malicious tar archives (DC-01, DC-02, DC-03)
+- [Dockerfile](poc/Dockerfile) — Isolated Docker environment with pinned decompress@4.2.1
 
 **Pipeline:** 3 raw findings → 3 confirmed (3 HIGH breachable)
