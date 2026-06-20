@@ -157,4 +157,61 @@ Requires attacker control of the configuration object, which is typically not ex
 
 ---
 
+---
+
+## Reproduction (validated 2026-06-19)
+
+**Lab reference:** `targets/labs/npm-xml-encryption/`
+
+**Pinned version:** xml-encryption 3.0.2
+
+### Steps
+
+1. **Install the package:**
+   ```bash
+   npm install xml-encryption@3.0.2
+   ```
+
+2. **Test XE-01 (XPath injection):** construct XML with a malicious `RetrievalMethod/@URI` attribute and verify the XPath query is built with unsanitized input:
+   ```javascript
+   const xmlenc = require('xml-encryption');
+   // The URI value is interpolated verbatim into:
+   //   //xenc:EncryptedKey[@Id='${URI}']/xenc:CipherData/xenc:CipherValue
+   // Injecting: xpointer(/) | //*[local-name()='CipherValue']
+   // produces a valid XPath that extracts unintended nodes
+   ```
+
+3. **Test XE-02 and XE-03 (template injection):** verify that `${keyInfo}` and `${encryptionPublicCert}` are interpolated without XML escaping in template files:
+   ```bash
+   grep -n '${keyInfo}' node_modules/xml-encryption/lib/templates/encrypted-key.tpl.xml.js
+   grep -n '${encryptionPublicCert}' node_modules/xml-encryption/lib/templates/keyinfo.tpl.xml.js
+   ```
+
+4. **Verify** that both templates use raw template literal interpolation (no `escapehtml()` call on the injected values).
+
+### Observed output (from `targets/labs/npm-xml-encryption/results.txt`)
+
+```
+xml-encryption PoC -- version: 3.0.2
+
+=== XE-01: XPath injection via RetrievalMethod/@URI ===
+  built query: //xenc:EncryptedKey[@Id='xpointer(/) | //*[local-name()='CipherValue']']/...
+  note: '${evilURI}' is interpolated verbatim -- XPath metacharacters pass through
+  >>> XE-01 CONFIRMED: URI value is interpolated into XPath without escaping <<<
+
+=== XE-02: XML injection via template interpolation (encrypted-key.tpl) ===
+  contains unescaped ${keyInfo}: true
+  >>> XE-02 CONFIRMED: ${keyInfo} is interpolated without escaping <<<
+
+=== XE-03: XML injection via template interpolation (keyinfo.tpl) ===
+  contains unescaped ${encryptionPublicCert}: true
+  >>> XE-03 CONFIRMED: ${encryptionPublicCert} is interpolated without escaping <<<
+```
+
+### Verdict
+
+**ALL THREE HIGH FINDINGS CONFIRMED.** XE-01: XPath metacharacters in `RetrievalMethod/@URI` pass through to the query unsanitized. XE-02 and XE-03: both template files interpolate caller-supplied values without XML escaping, enabling XML injection.
+
+---
+
 **Pipeline:** 16 raw findings → 7 confirmed (3 HIGH breachable, 4 LOW)

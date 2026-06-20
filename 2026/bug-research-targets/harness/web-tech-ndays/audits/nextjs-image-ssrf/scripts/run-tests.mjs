@@ -69,7 +69,16 @@ async function runPayload(payload) {
   }
 
   const timing = Date.now() - start;
-  const logsAfter = await getOracleLogs();
+
+  // Poll oracle logs for up to 2s — covers races where the redirect completes
+  // and Next.js returns the optimized image faster than the oracle has logged
+  // the underlying fetch.
+  let logsAfter = [];
+  for (let i = 0; i < 20; i++) {
+    logsAfter = await getOracleLogs();
+    if (logsAfter.length > logCountBefore) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
   const newLogs = logsAfter.slice(logCountBefore);
   const oracleHit = newLogs.length > 0;
 

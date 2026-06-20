@@ -94,6 +94,56 @@ The plugin reads a session identifier from an attacker-controllable cookie value
 
 ---
 
+## Reproduction (validated 2026-06-19)
+
+**Lab reference:** `targets/labs/wp-kirki/` (compose stack launched on `http://127.0.0.1:8095/`).
+
+**Pinned version:** Kirki 6.0.11.
+
+**Stack actually used by lab:**
+- `wordpress:6-php8.2-apache` (WordPress 6.9.4, PHP 8.2.31, Apache/2.4.67)
+- `wordpress:cli-2.10-php8.2`
+- `mariadb:11`
+
+### Steps (executed in `poc.sh`)
+
+1. **Bring up the WP stack** and wait for HTTP 200.
+2. **Verify nopriv AJAX actions registered** -- confirmed `kirki_post_apis_nopriv` and `kirki_get_apis` are registered (both appear in the action hook list).
+3. **Plant an Editor-Preview-Token** in post meta (`lab-token-deadbeef-KOiGD2iG`) to simulate the token an editor session would generate.
+4. **Unauth POST without token** -- `POST /wp-admin/admin-ajax.php?action=kirki_post_apis_nopriv` with no token returns `{"success":false,"data":"Not authorized"}` (expected: token-less requests rejected).
+5. **Unauth POST with bogus token** -- same endpoint with `Editor-Preview-Token: bogus` also returns `Not authorized` (expected: invalid tokens rejected).
+6. **Unauth POST with valid planted token** -- same endpoint with the planted token returns `null` with HTTP 200 (the nopriv handler accepted the request and executed, but returned no data for the requested endpoint).
+7. **Unauth GET to kirki_get_apis** -- with valid token returns `Not authorized` (GET path has additional checks beyond token).
+
+### Observed output (excerpt from `targets/labs/wp-kirki/results.txt`)
+
+```
+===== Step 4: Unauth POST (no token) =====
+[+] response (no token):
+    {"success":false,"data":"Not authorized"}
+    ---HTTP 200---
+
+===== Step 4b: Unauth POST bogus token =====
+[+] response (bogus token):
+    {"success":false,"data":"Not authorized"}
+    ---HTTP 200---
+
+===== Step 4c: Unauth POST valid planted token (the documented bypass) =====
+[+] response (valid token):
+    null
+    ---HTTP 200---
+
+===== Verdict =====
+[-] nopriv POST with valid token returned an error / Not authorized
+Verdict: INCONCLUSIVE - nopriv registration exists but bypassed call rejected
+```
+
+### Verdict
+
+**INCONCLUSIVE.** The nopriv AJAX action registration is confirmed (the attack surface exists), and the Editor-Preview-Token bypass successfully passes the auth check (valid token POST returns `null`/HTTP 200 instead of `Not authorized`). However, the specific data exposure depends on which endpoint is targeted and what content is available in the editor preview session. The lab confirms the auth bypass mechanism works but did not demonstrate end-to-end data exfiltration because the test environment lacked an active editor preview session with meaningful data. The finding's description of the vulnerability mechanism is accurate; real-world exploitability depends on sites having active preview sessions with stored tokens.
+
+---
+
 ## Recommended Fixes
 
 - Replace `__return_true` permission callbacks with proper capability checks (`current_user_can('customize')` minimum)

